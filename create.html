@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Post - Dating Connect</title>
+    <link rel="stylesheet" href="style.css"> <!-- Fixed: changed styles.css to style.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .create-post-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .create-post-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .create-post-header h1 {
+            color: var(--text-dark);
+            margin-bottom: 10px;
+        }
+
+        .create-post-header p {
+            color: var(--text-light);
+        }
+
+        .post-form {
+            background: var(--bg-light);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .caption-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            resize: vertical;
+            font-family: inherit;
+            font-size: 16px;
+        }
+
+        .caption-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .image-upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .image-upload-area:hover {
+            border-color: var(--accent-color);
+        }
+
+        .image-upload-area i {
+            font-size: 48px;
+            color: var(--text-light);
+            margin-bottom: 15px;
+        }
+
+        .image-upload-text {
+            color: var(--text-light);
+            margin-bottom: 10px;
+        }
+
+        .image-upload-hint {
+            font-size: 14px;
+            color: var(--text-lighter);
+        }
+
+        #postImage { /* Fixed: changed from imageInput to postImage to match social.js */
+            display: none;
+        }
+
+        .image-preview {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-dark);
+            color: var(--text-dark);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .post-guidelines {
+            background: var(--bg-dark);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
+        .post-guidelines h3 {
+            color: var(--text-dark);
+            margin-bottom: 10px;
+        }
+
+        .post-guidelines ul {
+            color: var(--text-light);
+            padding-left: 20px;
+        }
+
+        .post-guidelines li {
+            margin-bottom: 8px;
+        }
+
+        .upload-status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            display: none;
+        }
+
+        .upload-status.uploading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .upload-status.success {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .upload-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 768px) {
+            .create-post-container {
+                padding: 15px;
+            }
+
+            .post-form {
+                padding: 20px;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.html" class="logo">Bondly</a>
+            <div class="nav-toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="mingle.html" class="nav-links">
+                        <i class="fas fa-fire"></i>
+                        <span class="nav-text" style="font-family: 'Dancing Script', cursive; font-size: 1.1rem;">Discover</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="messages.html" class="nav-links">
+                        <i class="fas fa-comments"></i>
+                        <span class="nav-text" style="font-family: 'Pacifico', cursive; font-size: 1rem;">Messages</span>
+                        <span class="message-count">0</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="posts.html" class="nav-links active">
+                        <i class="fas fa-images"></i>
+                        <span class="nav-text" style="font-family: 'Great Vibes', cursive; font-size: 1.1rem;">Posts</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="account.html" class="nav-links">
+                        <i class="fas fa-user"></i>
+                        <span class="nav-text" style="font-family: 'Great Vibes', cursive; font-size: 1.2rem;">Profile</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" id="logoutBtn" class="nav-links">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span class="nav-text" style="font-family: 'Satisfy', cursive; font-size: 1rem;">Logout</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard.html" class="nav-links">
+                        <span class="nav-text" style="font-family: 'Parisienne', cursive; font-size: 1.1rem;">Dashboard</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="create-post-container">
+            <div class="create-post-header">
+                <h1><i class="fas fa-plus-circle"></i> Create New Post</h1>
+                <p>Share your thoughts and moments with the community</p>
+            </div>
+
+            <form id="createPostForm" class="post-form">
+                <div class="form-group">
+                    <label for="postCaption"><i class="fas fa-pencil-alt"></i> What's on your mind?</label>
+                    <textarea 
+                        id="postCaption" 
+                        class="caption-input" 
+                        placeholder="Share your thoughts, ask a question, or tell a story..."
+                        maxlength="500"
+                    ></textarea>
+                    <div class="char-count" style="text-align: right; margin-top: 5px; color: var(--text-light); font-size: 14px;">
+                        <span id="charCount">0</span>/500
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-image"></i> Add Photo (Optional)</label>
+                    <div class="image-upload-area" onclick="document.getElementById('postImage').click()">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <div class="image-upload-text">Click to upload an image</div>
+                        <div class="image-upload-hint">JPEG, PNG, GIF up to 10MB</div>
+                    </div>
+                    <input type="file" id="postImage" accept="image/*"> <!-- Fixed: changed id to postImage -->
+                    <div class="image-preview" id="imagePreview"></div>
+                    <div class="upload-status" id="uploadStatus"></div> <!-- Added upload status -->
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                        <i class="fas fa-arrow-left"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Post Now
+                    </button>
+                </div>
+            </form>
+
+            <div class="post-guidelines">
+                <h3><i class="fas fa-info-circle"></i> Posting Guidelines</h3>
+                <ul>
+                    <li>Be respectful and kind to others</li>
+                    <li>No inappropriate or offensive content</li>
+                    <li>Share genuine moments and stories</li>
+                    <li>Keep captions meaningful and engaging</li>
+                    <li>Respect everyone's privacy</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="social.js"></script>
+        <script type="module" src="app.js"></script>
+    <script>
+        // Character count for caption
+        const captionInput = document.getElementById('postCaption');
+        const charCount = document.getElementById('charCount');
+        
+        if (captionInput && charCount) {
+            captionInput.addEventListener('input', function() {
+                charCount.textContent = this.value.length;
+            });
+        }
+
+        // Image preview
+        const imageInput = document.getElementById('postImage'); // Fixed: changed to postImage
+        const imagePreview = document.getElementById('imagePreview');
+        const uploadStatus = document.getElementById('uploadStatus');
+        
+        if (imageInput && imagePreview) {
+            imageInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // Validate file size (10MB limit)
+                    if (file.size > 10 * 1024 * 1024) {
+                        showUploadStatus('File size must be less than 10MB', 'error');
+                        return;
+                    }
+
+                    // Validate file type
+                    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                    if (!validTypes.includes(file.type)) {
+                        showUploadStatus('Please select a valid image file (JPEG, PNG, GIF)', 'error');
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        imagePreview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                        imagePreview.style.display = 'block';
+                        showUploadStatus('Image ready for upload', 'success');
+                    };
+                    reader.onerror = function() {
+                        showUploadStatus('Error reading image file', 'error');
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    imagePreview.style.display = 'none';
+                    imagePreview.innerHTML = '';
+                    uploadStatus.style.display = 'none';
+                }
+            });
+        }
+
+        function showUploadStatus(message, type) {
+            uploadStatus.textContent = message;
+            uploadStatus.className = `upload-status ${type}`;
+            uploadStatus.style.display = 'block';
+            
+            // Auto-hide success messages after 3 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    uploadStatus.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Debug: Check if socialManager is properly initialized
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== CREATE POST DEBUG ===');
+            
+            // Check form elements
+            const form = document.getElementById('createPostForm');
+            const caption = document.getElementById('postCaption');
+            const imageInput = document.getElementById('postImage');
+            
+            console.log('Form elements:', {
+                form: form ? 'Found' : 'Missing',
+                caption: caption ? 'Found' : 'Missing',
+                imageInput: imageInput ? 'Found' : 'Missing'
+            });
+
+            // Check if socialManager is available
+            if (window.socialManager) {
+                console.log('✅ socialManager is loaded');
+            } else {
+                console.error('❌ socialManager is not loaded');
+            }
+
+            // Add form submission debug
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    console.log('=== FORM SUBMISSION DEBUG ===');
+                    const captionValue = caption ? caption.value : 'No caption';
+                    const imageFile = imageInput ? imageInput.files[0] : 'No image';
+                    
+                    console.log('Submission data:', {
+                        caption: captionValue,
+                        imageFile: imageFile,
+                        hasImage: !!imageFile
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

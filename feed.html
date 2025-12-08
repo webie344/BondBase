@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feed - Bondly Social</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #a5b4fc;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --border: #e5e7eb;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --radius: 12px;
+        }
+
+        .feed-container {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .feed-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .create-post-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+        }
+
+        .feed-filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            overflow-x: auto;
+            padding-bottom: 1rem;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            border-radius: 20px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .posts-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .post-card {
+            background: var(--bg-primary);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .post-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .post-author {
+            flex: 1;
+        }
+
+        .author-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .post-time {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .persona-badge {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .post-content {
+            margin-bottom: 1rem;
+        }
+
+        .post-text {
+            color: var(--text-primary);
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .post-image, .post-video {
+            width: 100%;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+            max-height: 400px;
+            object-fit: cover;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 1rem;
+            border-top: 1px solid var(--border);
+            padding-top: 1rem;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: var(--radius);
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+
+        .post-reactions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .reaction-tag {
+            background: var(--bg-secondary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--primary-light);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.html" class="logo">Bondly Social</a>
+            <div class="nav-menu">
+                <a href="feed.html" class="nav-links active"><i class="fas fa-home"></i><span>Feed</span></a>
+                <a href="explore.html" class="nav-links"><i class="fas fa-compass"></i><span>Explore</span></a>
+                <a href="rooms.html" class="nav-links"><i class="fas fa-users"></i><span>Rooms</span></a>
+                <a href="messages.html" class="nav-links"><i class="fas fa-comments"></i><span>Messages</span></a>
+                <a href="notifications.html" class="nav-links"><i class="fas fa-bell"></i><span>Alerts</span></a>
+                <a href="account.html" class="nav-links"><i class="fas fa-user"></i><span>Profile</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="feed-container">
+        <div class="feed-header">
+            <h1>Your Feed</h1>
+            <button class="create-post-btn" onclick="window.location.href='create-post.html'">
+                <i class="fas fa-plus"></i> Create Post
+            </button>
+        </div>
+
+        <div class="feed-filters">
+            <button class="filter-btn active" data-filter="all">All Posts</button>
+            <button class="filter-btn" data-filter="following">Following</button>
+            <button class="filter-btn" data-filter="popular">Popular</button>
+            <button class="filter-btn" data-filter="text">Text</button>
+            <button class="filter-btn" data-filter="image">Images</button>
+            <button class="filter-btn" data-filter="video">Videos</button>
+        </div>
+
+        <div class="posts-container" id="postsContainer">
+            <div class="loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading posts...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { postManager } from './social.js';
+
+        let currentFilter = 'all';
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentFilter = this.dataset.filter;
+                loadFeed();
+            });
+        });
+
+        async function loadFeed() {
+            const container = document.getElementById('postsContainer');
+            
+            try {
+                const posts = await postManager.getFeed(currentUser.uid, {
+                    sortBy: currentFilter === 'popular' ? 'popular' : 'latest',
+                    contentTypes: getContentTypes(),
+                    followingOnly: currentFilter === 'following'
+                });
+
+                renderPosts(posts, container);
+            } catch (error) {
+                console.error('Error loading feed:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <h3>Error loading feed</h3>
+                        <p>Please try again later</p>
+                    </div>
+                `;
+            }
+        }
+
+        function getContentTypes() {
+            switch(currentFilter) {
+                case 'text': return ['text'];
+                case 'image': return ['image'];
+                case 'video': return ['video'];
+                default: return ['text', 'image', 'video'];
+            }
+        }
+
+        function renderPosts(posts, container) {
+            if (posts.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-newspaper"></i>
+                        <h3>No posts yet</h3>
+                        <p>Be the first to share something or follow more users</p>
+                        <button class="create-post-btn" onclick="window.location.href='create-post.html'" style="margin-top: 1rem;">
+                            Create First Post
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = posts.map(post => `
+                <div class="post-card" data-post-id="${post.id}">
+                    <div class="post-header">
+                        <img src="${post.isAnonymous ? 'images/default-avatar.jpg' : (post.authorAvatar || 'images/default-avatar.jpg')}" 
+                             alt="${post.isAnonymous ? 'Anonymous' : post.authorName}" 
+                             class="post-avatar">
+                        <div class="post-author">
+                            <div class="author-name">${post.isAnonymous ? 'Anonymous' : post.authorName}</div>
+                            <div class="post-time">${formatTime(post.timestamp)}</div>
+                        </div>
+                        ${post.personaId ? `<span class="persona-badge">${post.personaName}</span>` : ''}
+                    </div>
+                    <div class="post-content">
+                        ${post.type === 'image' ? `<img src="${post.mediaUrl}" alt="Post image" class="post-image">` : ''}
+                        ${post.type === 'video' ? `<video src="${post.mediaUrl}" controls class="post-video"></video>` : ''}
+                        <p class="post-text">${post.content}</p>
+                    </div>
+                    <div class="post-actions">
+                        <button class="action-btn reaction-btn" onclick="toggleReaction('${post.id}')">
+                            <i class="far fa-heart"></i>
+                            <span>${post.reactions ? Object.values(post.reactions).flat().length : 0}</span>
+                        </button>
+                        <button class="action-btn comment-btn" onclick="showComments('${post.id}')">
+                            <i class="far fa-comment"></i>
+                            <span>${post.commentCount || 0}</span>
+                        </button>
+                        <button class="action-btn share-btn">
+                            <i class="far fa-share-square"></i>
+                            <span>Share</span>
+                        </button>
+                    </div>
+                    ${post.reactions && Object.keys(post.reactions).length > 0 ? `
+                        <div class="post-reactions">
+                            ${Object.entries(post.reactions).map(([emoji, users]) => 
+                                `<span class="reaction-tag">${emoji} ${users.length}</span>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        function formatTime(timestamp) {
+            // Implementation from social.js
+            return '2h ago';
+        }
+
+        // Initialize feed when page loads
+        document.addEventListener('DOMContentLoaded', loadFeed);
+    </script>
+</body>
+</html>

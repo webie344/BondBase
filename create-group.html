@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Group - BondBase</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #b3004b;
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --secondary: #8b0000;
+            --accent: #444;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --accent-color: #b3004b;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8);
+            --radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(6px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 0.75rem 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .navbar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo::before {
+            content: "👥";
+        }
+
+        .main-content {
+            margin-top: 70px;
+            padding: 20px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+
+        .page-subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .form-container {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 30px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .form-input, .form-textarea, .form-select {
+            width: 100%;
+            padding: 12px 15px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: 'Inter', sans-serif;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus, .form-textarea:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary-light);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            background-size: 12px;
+            padding-right: 40px;
+        }
+
+        .rules-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .rule-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .rule-input {
+            flex: 1;
+        }
+
+        .add-rule-btn, .remove-rule-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .add-rule-btn:hover {
+            background: var(--primary-light);
+        }
+
+        .remove-rule-btn {
+            background: var(--secondary);
+        }
+
+        .remove-rule-btn:hover {
+            background: #a30000;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            flex: 2;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            flex: 1;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .character-count {
+            text-align: right;
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin-top: 5px;
+        }
+
+        .character-count.warning {
+            color: #ff6b6b;
+        }
+
+        .max-members {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .member-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-primary);
+            outline: none;
+        }
+
+        .member-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+        }
+
+        .member-count {
+            min-width: 40px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            gap: 0.25rem;
+            padding: 0.5rem;
+            border-radius: var(--radius);
+        }
+
+        .nav-links:hover {
+            color: var(--primary-light);
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .nav-links i {
+            font-size: 1.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 15px;
+                margin-top: 60px;
+            }
+
+            .form-container {
+                padding: 20px;
+            }
+
+            .page-title {
+                font-size: 1.6rem;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.html" class="logo">BondBase Groups</a>
+            <a href="groups.html" class="nav-links">
+                <i class="fas fa-arrow-left"></i>
+                <span>Back to Groups</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="main-content">
+        <div class="page-header">
+            <h1 class="page-title">Create New Group</h1>
+            <p class="page-subtitle">Start a conversation around shared interests</p>
+        </div>
+
+        <div class="form-container">
+            <form id="createGroupForm">
+                <div class="form-group">
+                    <label for="groupName" class="form-label">Group Name *</label>
+                    <input type="text" id="groupName" class="form-input" placeholder="Enter group name" required maxlength="50">
+                    <div class="character-count">
+                        <span id="nameCount">0</span>/50
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="groupDescription" class="form-label">Group Description *</label>
+                    <textarea id="groupDescription" class="form-textarea" placeholder="What is this group about?" required maxlength="200"></textarea>
+                    <div class="character-count">
+                        <span id="descCount">0</span>/200
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="groupCategory" class="form-label">Category</label>
+                    <select id="groupCategory" class="form-select">
+                        <option value="">Select a category</option>
+                        <option value="social">Social & Dating</option>
+                        <option value="gaming">Gaming</option>
+                        <option value="music">Music</option>
+                        <option value="movies">Movies & TV</option>
+                        <option value="tech">Technology</option>
+                        <option value="sports">Sports</option>
+                        <option value="education">Education</option>
+                        <option value="business">Business</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Discussion Topics *</label>
+                    <div class="rules-container" id="topicsContainer">
+                        <div class="rule-item">
+                            <input type="text" class="form-input rule-input" placeholder="Add a topic (e.g., Music Recommendations)">
+                            <button type="button" class="add-rule-btn" id="addTopicBtn">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Group Rules</label>
+                    <div class="rules-container" id="rulesContainer">
+                        <div class="rule-item">
+                            <input type="text" class="form-input rule-input" placeholder="Add a rule (e.g., Be respectful)">
+                            <button type="button" class="add-rule-btn" id="addRuleBtn">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Maximum Members</label>
+                    <div class="max-members">
+                        <input type="range" id="maxMembers" class="member-slider" min="5" max="100" value="50">
+                        <span class="member-count" id="memberCount">50</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="groupPrivacy" class="form-label">Privacy Settings</label>
+                    <select id="groupPrivacy" class="form-select">
+                        <option value="public">Public - Anyone can join</option>
+                        <option value="private">Private - Requires approval</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="createBtn">
+                        Create Group
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="group.js"></script>
+</body>
+</html>

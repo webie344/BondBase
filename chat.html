@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - BondBase</title>
+    <!-- Add these in your head tag -->
+    <link rel="stylesheet" href="scro-fix.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="chat.css">
+    
+    <style>
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+    }
+    
+    .game-icon-btn{
+        font-size: 3px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        color: var(--text-primary);
+    }
+    
+    .game-icon-btn:hover {
+        background: rgba(179, 0, 75, 0.2);
+        color: var(--primary-light);
+    }
+
+    /* Override the existing chat-input styles for focus state */
+    .chat-input.input-focused {
+        position: relative !important;
+    }
+
+    .chat-input.input-focused input {
+        position: absolute !important;
+        left: 0 !important;
+        width: 100% !important;
+        flex: none !important;
+        padding-right: 50px !important;
+        background: var(--bg-card) !important;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3) !important;
+        z-index: 100 !important;
+        border: 1px solid var(--primary) !important;
+    }
+
+    .chat-input.input-focused .send-btn {
+        position: absolute !important;
+        right: 10px !important;
+        z-index: 101 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        background: var(--primary) !important;
+    }
+
+    .chat-input.input-focused .attachment-btn,
+    .chat-input.input-focused .voice-note-btn-main {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    .message.sending .message-time {
+        font-style: italic;
+        color: var(--text-light);
+    }
+    
+    .voice-message-play-btn {
+        z-index: 10; /* Ensure it's above other elements */
+        pointer-events: auto; /* Make sure it's clickable */
+    }
+
+    .voice-note-indicator {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 15px;
+        background-color: var(--bg-card);
+        border-radius: 25px;
+        margin: 10px 0;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+    }
+    
+    .voice-note-timer {
+        font-size: 14px;
+        color: var(--text-primary);
+        font-weight: bold;
+    }
+    
+    .voice-note-controls {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .voice-note-btn {
+        background: none;
+        border: none;
+        color: var(--primary);
+        font-size: 10px;
+        cursor: pointer;
+        padding: 5px 10px;
+        border-radius: 50%;
+        transition: all 0.3s;
+    }
+    
+    .voice-note-btn:hover {
+        background-color: rgba(179, 0, 75, 0.1);
+    }
+
+    .voice-message-controls {
+        pointer-events: none; /* Let clicks pass through to children */
+    }
+
+    .voice-message-controls > * {
+        pointer-events: auto; /* But make children clickable */
+    }
+
+    /* Call Controls - Right Aligned Positioning */
+    .call-controls {
+        position: fixed;
+        right: 15px;
+        margin-top: 50px;
+        transform: translateY(-50%);
+        display: flex;
+        gap: 10px;
+        z-index: 100;
+    }
+
+    .call-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid var(--border);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: var(--shadow);
+        color: var(--text-primary);
+    }
+
+    .call-btn:hover {
+        background: var(--primary);
+        transform: scale(1.1);
+        box-shadow: var(--shadow-lg);
+        color: white;
+    }
+
+    .call-btn i {
+        font-size: 16px;
+    }
+
+    /* Voice call button specific */
+    #voiceCallBtn {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary);
+    }
+
+    #voiceCallBtn:hover {
+        background: var(--primary);
+    }
+
+    /* Video call button specific */
+    #videoCallBtn {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary);
+    }
+
+    #videoCallBtn:hover {
+        background: var(--primary);
+    }
+
+    @media (max-width: 480px) {
+        .call-controls {
+            right: 8px;
+            gap: 6px;
+        }
+        
+        .call-btn {
+            width: 32px;
+            height: 32px;
+        }
+        
+        .call-btn i {
+            font-size: 13px;
+        }
+        
+        .chat-partner-info {
+            max-width: calc(100% - 90px);
+        }
+    }
+
+    /* Message Reactions */
+    .message-reactions {
+        display: flex;
+        gap: 5px;
+        margin-top: 5px;
+        flex-wrap: wrap;
+    }
+    
+    .reaction {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 2px 6px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+    }
+    
+    .reaction-count {
+        font-size: 10px;
+        color: var(--text-secondary);
+    }
+    
+    /* HIDE REACTION PICKER ON ALL PAGES EXCEPT CHAT */
+    /* This will hide it by default on all pages */
+    #reactionPicker {
+        display: none !important;
+    }
+    
+    /* SHOW IT ONLY ON CHAT PAGE */
+    /* When body has chat-page class, show it as bottom sheet */
+    body.chat-page #reactionPicker {
+        display: none !important; /* Start hidden */
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        background: var(--bg-primary) !important;
+        border-radius: 20px 20px 0 0 !important;
+        padding: 20px 15px 30px !important;
+        box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.3) !important;
+        z-index: 1001 !important;
+        border: 1px solid var(--border) !important;
+        border-bottom: none !important;
+        max-width: 100vw !important;
+        transform: translateY(100%) !important;
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+        pointer-events: none !important;
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        gap: 15px !important;
+    }
+
+    /* When it's shown with display: flex */
+    body.chat-page #reactionPicker[style*="display: flex"] {
+        transform: translateY(0) !important;
+        pointer-events: auto !important;
+        display: flex !important;
+    }
+
+    /* Add overlay when reaction picker is visible */
+    body.chat-page #reactionPicker::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: -1;
+        display: none;
+    }
+
+    body.chat-page #reactionPicker[style*="display: flex"]::before {
+        display: block;
+    }
+
+    body.chat-page #reactionPicker .reaction-emoji {
+        font-size: 32px !important;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding: 12px !important;
+        min-width: 50px !important;
+        min-height: 50px !important;
+        text-align: center;
+        border-radius: 50%;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.05);
+    }
+    
+    body.chat-page #reactionPicker .reaction-emoji:hover {
+        transform: scale(1.2);
+        background: rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Mobile responsiveness for chat page only */
+    @media (max-width: 768px) {
+        body.chat-page #reactionPicker {
+            padding: 15px 12px 25px !important;
+            gap: 12px !important;
+        }
+        
+        body.chat-page #reactionPicker .reaction-emoji {
+            font-size: 28px !important;
+            min-width: 45px !important;
+            min-height: 45px !important;
+            padding: 10px !important;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        body.chat-page #reactionPicker {
+            padding: 12px 10px 20px !important;
+            border-radius: 15px 15px 0 0 !important;
+            gap: 10px !important;
+        }
+        
+        body.chat-page #reactionPicker .reaction-emoji {
+            font-size: 26px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            padding: 8px !important;
+        }
+    }
+    
+    /* Reply Preview */
+    .reply-preview {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border-left: 3px solid var(--primary);
+        margin-bottom: 10px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+    }
+    
+    .reply-preview-content {
+        flex: 1;
+        margin-left: 10px;
+        overflow: hidden;
+    }
+    
+    .reply-preview-text {
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--text-secondary);
+    }
+    
+    .reply-preview-name {
+        font-size: 12px;
+        font-weight: bold;
+        color: var(--primary-light);
+    }
+    
+    .reply-preview-cancel {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 16px;
+        padding: 5px;
+    }
+    
+    .reply-preview-cancel:hover {
+        color: var(--primary-light);
+    }
+    
+    /* Message context menu */
+    .message-context-menu {
+        position: absolute;
+        background: var(--bg-card);
+        border-radius: 8px;
+        box-shadow: var(--shadow-lg);
+        z-index: 100;
+        padding: 8px 0;
+        display: none;
+        border: 1px solid var(--border);
+    }
+    
+    .context-menu-item {
+        padding: 10px 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--text-primary);
+    }
+    
+    .context-menu-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    
+    /* Swipe for reply */
+    .reply-indicator {
+        font-size: 12px;
+        color: var(--primary-light);
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .reply-indicator i {
+        font-size: 10px;
+    }
+    
+    .reply-message-preview {
+        background: rgba(255, 255, 255, 0.05);
+        border-left: 2px solid var(--primary);
+        padding: 4px 8px;
+        margin-bottom: 4px;
+        border-radius: 4px;
+        font-size: 12px;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--text-secondary);
+    }
+
+    /* Additional chat-specific styles */
+    .typing-indicator {
+        background: var(--bg-card);
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+    }
+
+    .chat-input input {
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+    }
+
+    .chat-input input::placeholder {
+        color: var(--text-light);
+    }
+
+    .attachment-btn, .voice-note-btn-main, .send-btn {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+    }
+
+    .attachment-btn:hover, .voice-note-btn-main:hover, .send-btn:hover {
+        background: var(--primary);
+        color: white;
+    }
+
+    /* Voice note player styles */
+    .voice-note-player {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: var(--radius);
+        padding: 8px 12px;
+    }
+
+    .voice-progress {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .voice-progress-bar {
+        background: var(--primary);
+    }
+
+    /* Message status indicators */
+    .message-status .fa-check {
+        color: var(--text-secondary);
+    }
+
+    .message-status .fa-check-double {
+        color: var(--primary-light);
+    }
+
+    /* Online status indicator */
+    .online-status .fa-circle {
+        color: var(--primary-light);
+    }
+
+    /* Back button styling */
+    .back-btn {
+        color: var(--text-primary);
+    }
+
+    .back-btn:hover {
+        color: var(--primary-light);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Game button styling */
+    #gameInviteBtn {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        color: var(--text-primary);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    #gameInviteBtn:hover {
+        background: var(--primary);
+        color: white;
+        transform: scale(1.1);
+    }
+    </style>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <button class="back-btn" id="backToMessages"><i class="fas fa-arrow-left"></i></button>
+            <div class="chat-partner-info">
+                <img src="images-default-profile.jpg" alt="Profile" id="chatPartnerImage">
+                <div>
+                    <h3 id="chatPartnerName">Loading..</h3>
+                    <p class="online-status" id="chatPartnerStatus"><i class="fas fa-circle"></i> Online</p>
+                </div>
+                <!-- Call Controls -->
+                <div id="callControls" class="call-controls">
+                    <button id="voiceCallBtn" class="call-btn">
+                        <i class="fas fa-phone"></i> 
+                    </button>
+                    <button id="videoCallBtn" class="call-btn">
+                        <i class="fas fa-video"></i> 
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <!-- Messages will be loaded here -->
+        </div>
+        
+        <!-- Reaction Picker will be created by app.js -->
+        <!-- It will be hidden on all pages by default CSS -->
+        
+        <div class="chat-input-container">
+            <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                <span id="partnerNameTyping">Partner</span> is typing...
+            </div>
+            
+            <!-- Reply Preview -->
+            <div id="replyPreview" class="reply-preview" style="display: none;">
+                <div class="reply-preview-content">
+                    <div class="reply-preview-name"></div>
+                    <div class="reply-preview-text"></div>
+                </div>
+                <button id="cancelReply" class="reply-preview-cancel">✕</button>
+            </div>
+            
+            <!-- Voice note recording indicator -->
+            <div class="voice-note-indicator" id="voiceNoteIndicator">
+                <div class="voice-note-timer" id="voiceNoteTimer">0:00</div>
+                <div class="voice-note-controls">
+                    <button class="voice-note-btn" id="cancelVoiceNoteBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button class="voice-note-btn" id="sendVoiceNoteBtn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="chat-input">
+                <button class="attachment-btn" id="attachmentBtn"><i class="fas fa-paperclip"></i></button>
+                <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                <button class="voice-note-btn-main" id="voiceNoteBtn">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <!-- Game Invite Button -->
+                <button id="gameInviteBtn" class="game-icon-btn" title="Play Games" onclick="openGameSelection()">
+                     👾 
+                </button>
+                <input type="text" id="messageInput" placeholder="Type a message...">
+                <button class="send-btn" id="sendMessageBtn"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load all your existing scripts exactly as before -->
+    <script src="smooth.js"></script>
+    <script type="module" src="call.js"></script>
+    <script type="module" src="pic.js"></script>
+    <script type="module" src="app.js"></script>
+    <script type="module" src="chat.js"></script>
+    <script src="fix.js"></script>
+    <script type="module" src="game.js"></script>
+    <script type="module" src="additional.js"></script>
+
+    <!-- SIMPLE FIX: Add chat-page class to body and handle reaction picker -->
+    <script>
+    // This simple script just adds click-to-close functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add chat-page class to body so our CSS only applies here
+        document.body.classList.add('chat-page');
+        
+        // When reaction picker is shown, add overlay click handler
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.attributeName === 'style') {
+                    const picker = document.getElementById('reactionPicker');
+                    if (picker && picker.style.display === 'flex') {
+                        // Add click handler to close when clicking outside
+                        const closeOnClick = function(e) {
+                            if (!picker.contains(e.target)) {
+                                picker.style.display = 'none';
+                                document.removeEventListener('click', closeOnClick);
+                            }
+                        };
+                        
+                        // Add the click handler after a small delay
+                        setTimeout(() => {
+                            document.addEventListener('click', closeOnClick);
+                        }, 10);
+                    }
+                }
+            });
+        });
+        
+        // Observe the reaction picker for style changes
+        const picker = document.getElementById('reactionPicker');
+        if (picker) {
+            observer.observe(picker, { attributes: true });
+        }
+        
+        // Also close when pressing Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const picker = document.getElementById('reactionPicker');
+                if (picker && picker.style.display === 'flex') {
+                    picker.style.display = 'none';
+                }
+            }
+        });
+    });
+    </script>
+
+    <script>
+    // Add this to your chat.html to initialize the game button
+    document.addEventListener('DOMContentLoaded', function() {
+        const gameBtn = document.getElementById('gameInviteBtn');
+        if (gameBtn) {
+            gameBtn.addEventListener('click', function() {
+                // Get the chat partner ID from your chat implementation
+                const chatPartnerId = window.chatPartnerId; // You'll need to set this
+                const chatPartnerName = document.getElementById('chatPartnerName')?.textContent || 'Opponent';
+                
+                if (chatPartnerId && window.gameManager) {
+                    window.gameManager.showGameSelectionModal(chatPartnerId, chatPartnerName);
+                }
+            });
+        }
+    });
+    </script>
+    
+    <script>
+    // Add this function to your chat.html
+    function openGameSelection() {
+        // Get chat partner info from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const chatPartnerId = urlParams.get('id');
+        
+        // Get partner name from the page
+        let chatPartnerName = 'Opponent';
+        const partnerNameElement = document.getElementById('chatPartnerName');
+        if (partnerNameElement) {
+            chatPartnerName = partnerNameElement.textContent || 'Opponent';
+        }
+        
+        if (chatPartnerId && window.gameManager) {
+            window.gameManager.showGameSelectionModal(chatPartnerId, chatPartnerName);
+        } else {
+            alert('Please start a chat with someone first or wait for game system to load');
+        }
+    }
+    </script>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatInput = document.querySelector('.chat-input');
+        const inputField = document.querySelector('.chat-input input[type="text"]');
+        
+        if (!inputField) return;
+        
+        inputField.addEventListener('focus', function() {
+            chatInput.classList.add('input-focused');
+        });
+        
+        inputField.addEventListener('blur', function() {
+            chatInput.classList.remove('input-focused');
+        });
+        
+        // Close when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!chatInput.contains(e.target)) {
+                chatInput.classList.remove('input-focused');
+            }
+        });
+    });
+    </script>
+</body>
+</html>

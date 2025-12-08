@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Guidelines - Bondly</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Same CSS as policy.html */
+        :root {
+            --primary-color: #5d78ff;
+            --primary-dark: #4a62d6;
+            --secondary-color: #ff6b6b;
+            --dark-color: #2d3748;
+            --light-color: #f8fafc;
+            --gray-color: #e2e8f0;
+            --success-color: #48bb78;
+            --error-color: #f56565;
+            --warning-color: #ed8936;
+            --border-radius: 12px;
+            --box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7ff;
+            color: var(--dark-color);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 1.2rem 0;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: var(--box-shadow);
+            position: relative;
+            z-index: 10;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .back-arrow {
+            position: absolute;
+            left: 20px;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+            background: rgba(255, 255, 255, 0.1);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        
+        .back-arrow:hover {
+            transform: translateX(-3px);
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo i {
+            margin-right: 10px;
+            color: #ffd166;
+        }
+        
+        .content-section {
+            background-color: white;
+            border-radius: var(--border-radius);
+            padding: 40px;
+            box-shadow: var(--box-shadow);
+            margin-bottom: 30px;
+            border: 1px solid var(--gray-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .content-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--primary-color), var(--secondary-color));
+        }
+        
+        h1, h2, h3 {
+            color: var(--dark-color);
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            position: relative;
+            display: inline-block;
+        }
+        
+        h1::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: var(--primary-color);
+            border-radius: 2px;
+        }
+        
+        h2 {
+            font-size: 1.8rem;
+            margin-top: 30px;
+            color: var(--primary-dark);
+        }
+        
+        h3 {
+            font-size: 1.5rem;
+            margin-top: 25px;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            font-size: 1.05rem;
+            line-height: 1.7;
+        }
+        
+        ul, ol {
+            margin-bottom: 20px;
+            padding-left: 30px;
+        }
+        
+        li {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        
+        .note {
+            font-size: 0.95rem;
+            color: #64748b;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: rgba(100, 116, 139, 0.1);
+            border-radius: 6px;
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .note i {
+            margin-right: 8px;
+            color: var(--primary-color);
+        }
+        
+        .dos-donts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .dos, .donts {
+            padding: 20px;
+            border-radius: var(--border-radius);
+        }
+        
+        .dos {
+            background-color: rgba(72, 187, 120, 0.1);
+            border-left: 4px solid var(--success-color);
+        }
+        
+        .donts {
+            background-color: rgba(245, 101, 101, 0.1);
+            border-left: 4px solid var(--error-color);
+        }
+        
+        .dos h3, .donts h3 {
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .dos h3 {
+            color: var(--success-color);
+        }
+        
+        .donts h3 {
+            color: var(--error-color);
+        }
+        
+        .dos h3 i {
+            margin-right: 10px;
+        }
+        
+        .donts h3 i {
+            margin-right: 10px;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 25px 0;
+            color: #64748b;
+            font-size: 0.95rem;
+            background-color: white;
+            border-top: 1px solid var(--gray-color);
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .footer-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        
+        .footer-links a:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .header-content {
+                padding: 0 1.5rem;
+            }
+            
+            .back-arrow {
+                left: 15px;
+                font-size: 1.3rem;
+            }
+            
+            .content-section {
+                padding: 25px;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            h2 {
+                font-size: 1.5rem;
+            }
+            
+            h3 {
+                font-size: 1.3rem;
+            }
+            
+            .dos-donts {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="back-arrow" onclick="location.href='index.html'">
+                <i class="fas fa-arrow-left"></i>
+            </div>
+            <div class="logo">
+                <i class="fas fa-heart"></i> Bondly
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="content-section">
+            <h1>Community Guidelines</h1>
+            <p class="note"><i class="fas fa-info-circle"></i> These guidelines help ensure Bondly remains a safe and welcoming space for everyone.</p>
+            
+            <p>At Bondly, we're committed to creating a respectful, safe, and inclusive environment for all members. These Community Guidelines outline our expectations for member behavior and help ensure everyone has a positive experience.</p>
+            
+            <h2>1. Be Respectful</h2>
+            <p>Treat all members with kindness and respect. We celebrate diversity and expect all members to be considerate of others' backgrounds, beliefs, and identities.</p>
+            
+            <div class="dos-donts">
+                <div class="dos">
+                    <h3><i class="fas fa-check-circle"></i> Do:</h3>
+                    <ul>
+                        <li>Use polite and respectful language</li>
+                        <li>Be open to different perspectives</li>
+                        <li>Respect personal boundaries</li>
+                        <li>Report any inappropriate behavior</li>
+                    </ul>
+                </div>
+                <div class="donts">
+                    <h3><i class="fas fa-times-circle"></i> Don't:</h3>
+                    <ul>
+                        <li>Use hate speech or slurs</li>
+                        <li>Bully, harass, or intimidate others</li>
+                        <li>Make unwanted sexual advances</li>
+                        <li>Discriminate based on any characteristic</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <h2>2. Authentic Profiles</h2>
+            <p>We require all members to maintain accurate, up-to-date profiles that represent themselves authentically.</p>
+            <ul>
+                <li>Use recent photos that clearly show your face</li>
+                <li>Provide truthful information about yourself</li>
+                <li>Don't create accounts for other people</li>
+                <li>Don't use fake names or impersonate others</li>
+            </ul>
+            
+            <h2>3. Appropriate Content</h2>
+            <p>All content shared on LoveConnect must be appropriate for our dating community.</p>
+            <ul>
+                <li>No nudity or sexually explicit content</li>
+                <li>No violent, graphic, or disturbing content</li>
+                <li>No promotion of illegal activities</li>
+                <li>No spam, advertisements, or commercial content</li>
+            </ul>
+            
+            <h2>4. Safe Interactions</h2>
+            <p>Your safety is our priority. Please follow these guidelines when interacting with others:</p>
+            <ul>
+                <li>Don't share personal contact information too quickly</li>
+                <li>Be cautious when sharing financial information</li>
+                <li>Report any suspicious behavior immediately</li>
+                <li>Meet in public places for first dates</li>
+            </ul>
+            
+            <h2>5. Age Requirements</h2>
+            <p>Bondly is for adults aged 18 and over. We strictly prohibit:</p>
+            <ul>
+                <li>Underage users on the platform</li>
+                <li>Any content that sexualizes minors</li>
+                <li>Requests for age-inappropriate relationships</li>
+            </ul>
+            
+            <h2>6. Consequences for Violations</h2>
+            <p>Violations of these guidelines may result in:</p>
+            <ul>
+                <li>Content removal</li>
+                <li>Temporary account suspension</li>
+                <li>Permanent account termination</li>
+                <li>Legal action in severe cases</li>
+            </ul>
+            
+            <h2>7. Reporting Issues</h2>
+            <p>Help us maintain a safe community by reporting any violations or concerns:</p>
+            <ul>
+                <li>Use the "Report" feature on profiles or messages</li>
+                <li>Email us at safety@Bondly.com</li>
+                <li>Include screenshots when reporting specific incidents</li>
+            </ul>
+            
+            <p class="note"><i class="fas fa-shield-alt"></i> We regularly review and update these guidelines to ensure the safety and quality of our community. By using Bondly, you agree to follow these rules.</p>
+        </div>
+    </div>
+    
+    <footer>
+        <p>© 2023 Bondly. All rights reserved.</p>
+        <div class="footer-links">
+            
+            <a href="policy.html">Privacy Policy</a>
+            <a href="contact.html">Contact Support</a>
+            <a href="about.html">About Us</a>
+        </div>
+    </footer>
+</body>
+</html>

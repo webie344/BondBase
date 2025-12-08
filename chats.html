@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private Chat - BondBase</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* EXACT SAME STYLES FROM YOUR group.html */
+        :root {
+            --primary: #b3004b;
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --secondary: #8b0000;
+            --accent: #444;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --accent-color: #b3004b;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8);
+            --radius: 12px;
+            --sidebar-width: 280px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+
+        .back-btn:hover {
+            color: var(--primary-light);
+        }
+
+        .partner-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .partner-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary);
+        }
+
+        .partner-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .partner-email {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        /* CALL BUTTONS STYLES - ADDED SECTION */
+        .call-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .call-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .call-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .call-btn:active {
+            transform: translateY(0);
+        }
+
+        .call-btn.voice-call {
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            color: white;
+        }
+
+        .call-btn.voice-call:hover {
+            background: linear-gradient(135deg, #43A047 0%, #1B5E20 100%);
+        }
+
+        .call-btn i {
+            font-size: 1rem;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .user-bio {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .view-profile-btn {
+            background: rgba(179, 0, 75, 0.1);
+            color: var(--primary-light);
+            border: 1px solid var(--primary);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            justify-content: center;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .view-profile-btn:hover {
+            background: rgba(179, 0, 75, 0.2);
+        }
+
+        /* Main Chat Area */
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: var(--bg-card);
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .chat-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        /* CHAT HEADER ACTIONS WITH CALL BUTTON - UPDATED */
+        .chat-header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .header-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .header-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--primary-light);
+        }
+
+        /* Messages Container */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: var(--bg-primary);
+            position: relative;
+        }
+
+        .no-messages {
+            text-align: center;
+            color: var(--text-light);
+            padding: 40px 20px;
+            display: none;
+        }
+
+        /* Skeleton Loading Styles - LIKE POST.HTML */
+        .messages-loading {
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .messages-loading.active {
+            display: block;
+        }
+
+        .message-group.loading {
+            margin-bottom: 20px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .loading-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            float: left;
+            margin-right: 12px;
+        }
+
+        .loading-content {
+            margin-left: 52px;
+        }
+
+        .loading-line {
+            height: 12px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .loading-line.short {
+            width: 40%;
+        }
+
+        .loading-line.medium {
+            width: 60%;
+        }
+
+        .loading-line.long {
+            width: 80%;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* MESSAGE STYLES - EXACT SAME AS YOUR group.html */
+        .message-group {
+            margin-bottom: 20px;
+            position: relative;
+            animation: fadeInUp 0.3s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 5px;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            cursor: pointer;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .message-time {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin-left: 8px;
+            font-weight: normal;
+        }
+
+        .message-content {
+            margin-left: 52px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .message-text {
+            margin-bottom: 5px;
+            word-wrap: break-word;
+            padding: 8px 12px;
+            border-radius: 6px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .message-text:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* System message styling */
+        .system-message {
+            background: rgba(0,0,0,0.02);
+            text-align: center;
+            color: var(--text-light);
+            font-style: italic;
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin: 4px 0;
+            font-size: 12px;
+        }
+
+        /* REPLY STYLES FROM group.html */
+        /* Reply preview in messages */
+        .replying-to {
+            background: rgba(114, 137, 218, 0.08);
+            border-left: 3px solid #7289da;
+            padding: 6px 10px;
+            margin-bottom: 6px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            overflow: hidden;
+            max-height: 32px;
+        }
+
+        .replying-to .reply-sender {
+            font-weight: 600;
+            color: #7289da;
+            font-size: 12px;
+            margin: 0 3px;
+            flex-shrink: 0;
+        }
+
+        /* Reply Indicator (shown when replying to a message) */
+        .reply-indicator {
+            background: rgba(114, 137, 218, 0.1);
+            border-left: 3px solid #7289da;
+            padding: 10px 12px;
+            margin: 0;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 10;
+            animation: slideDown 0.2s ease;
+            max-height: 44px;
+            overflow: hidden;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .reply-indicator-content {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding-right: 8px;
+            max-width: calc(100% - 40px);
+        }
+
+        .reply-sender {
+            font-weight: 600;
+            color: #7289da;
+            margin: 0 3px;
+            white-space: nowrap;
+        }
+
+        .cancel-reply {
+            background: none;
+            border: none;
+            color: #7289da;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            min-height: 32px;
+            flex-shrink: 0;
+        }
+
+        .cancel-reply:hover {
+            background: rgba(114, 137, 218, 0.1);
+        }
+
+        .cancel-reply i {
+            font-size: 14px;
+        }
+
+        /* Image messages */
+        .message-image {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+
+        /* Context Menu for Reply */
+        .message-context-menu {
+            position: fixed;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 9998;
+            display: none;
+            min-width: 160px;
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .menu-item {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #f5f5f5;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .menu-item:hover {
+            background: #f8f9fa;
+        }
+
+        .menu-item i {
+            width: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* Input Area */
+        .input-container {
+            background: var(--bg-card);
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            position: relative;
+        }
+
+        .message-input-container {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px 15px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            color: var(--text-primary);
+            font-size: 0.7rem;
+            font-family: 'Inter', sans-serif;
+            resize: none;
+            max-height: 120px;
+            min-height: 44px;
+        }
+
+        .message-input:focus {
+            outline: none;
+            border-color: var(--primary-light);
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--primary-light);
+        }
+
+        .send-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover {
+            background: var(--primary-light);
+        }
+
+        .send-btn:disabled {
+            background: var(--border);
+            cursor: not-allowed;
+        }
+
+        /* Lazy Loading More Indicator */
+        .load-more-container {
+            text-align: center;
+            padding: 20px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .load-more-container.visible {
+            display: block;
+        }
+
+        .load-more-btn {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .load-more-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Scrollbar Styling */
+        .sidebar-content::-webkit-scrollbar,
+        .messages-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar-content::-webkit-scrollbar-track,
+        .messages-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-content::-webkit-scrollbar-thumb,
+        .messages-container::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        .sidebar-content::-webkit-scrollbar-thumb:hover,
+        .messages-container::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .sidebar.active {
+                display: flex;
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 1000;
+                width: 100%;
+                max-width: 300px;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .reply-indicator {
+                padding: 8px 10px;
+                font-size: 12px;
+                max-height: 40px;
+            }
+            
+            .reply-indicator-content {
+                max-width: calc(100% - 35px);
+            }
+            
+            .replying-to {
+                padding: 5px 8px;
+                font-size: 11px;
+                max-height: 28px;
+            }
+            
+            .cancel-reply {
+                min-width: 28px;
+                min-height: 28px;
+                padding: 3px 6px;
+            }
+            
+            .cancel-reply i {
+                font-size: 12px;
+            }
+
+            /* Mobile call buttons adjustments */
+            .call-buttons {
+                gap: 8px;
+            }
+
+            .call-btn {
+                padding: 8px 16px;
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .chat-header {
+                padding: 12px 15px;
+            }
+
+            .messages-container {
+                padding: 15px;
+            }
+
+            .input-container {
+                padding: 15px;
+            }
+
+            .message-input {
+                padding: 10px 12px;
+            }
+
+            .reply-indicator {
+                padding: 6px 8px;
+                font-size: 11px;
+                max-height: 36px;
+            }
+            
+            .reply-indicator-content {
+                max-width: calc(100% - 30px);
+            }
+
+            /* Small screen call buttons */
+            .call-buttons {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .call-btn {
+                width: 100%;
+                justify-content: center;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="back-btn" id="backBtn">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Messages
+                </button>
+                <div class="partner-info">
+                    <img id="partnerAvatar" src="" alt="User Avatar" class="partner-avatar">
+                    <div>
+                        <h3 class="partner-name" id="partnerName">loading..</h3>
+                        <p class="partner-email" id="partnerEmail">loading..</p>
+                    </div>
+                </div>
+                
+                <!-- CALL BUTTONS IN SIDEBAR - ADDED -->
+                <div class="call-buttons">
+                    <button id="voiceCallBtn" class="call-btn voice-call">
+                        <i class="fas fa-phone-alt"></i>
+                        Start Voice Call
+                    </button>
+                </div>
+            </div>
+            <div class="sidebar-content">
+                <div class="section-title">About</div>
+                <div class="user-bio" id="userBio">
+                    No bio available.
+                </div>
+                <button class="view-profile-btn" id="viewProfileBtn">
+                    <i class="fas fa-user"></i>
+                    View Full Profile
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="chat-main">
+            <div class="chat-header">
+                <div>
+                    <h2 class="chat-title" id="chatTitle">Loading..</h2>
+                    <p class="chat-subtitle" id="chatSubtitle"></p>
+                </div>
+                <div class="chat-header-actions">
+                    <!-- CALL BUTTON IN HEADER - ADDED -->
+                    <button id="voiceCallBtnMobile" class="call-btn voice-call" style="padding: 8px 15px; font-size: 0.9rem;">
+                        <i class="fas fa-phone-alt"></i>
+                        Call
+                    </button>
+                    <button class="header-btn" id="sidebarToggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Messages Container -->
+            <div class="messages-container" id="messagesContainer">
+                <!-- Initial skeleton loading -->
+                <div id="initialLoading">
+                    <div class="message-group loading">
+                        <div class="loading-avatar"></div>
+                        <div class="loading-content">
+                            <div class="loading-line long"></div>
+                            <div class="loading-line medium"></div>
+                            <div class="loading-line short"></div>
+                        </div>
+                    </div>
+                    <div class="message-group loading">
+                        <div class="loading-avatar"></div>
+                        <div class="loading-content">
+                            <div class="loading-line long"></div>
+                            <div class="loading-line medium"></div>
+                            <div class="loading-line short"></div>
+                        </div>
+                    </div>
+                    <div class="message-group loading">
+                        <div class="loading-avatar"></div>
+                        <div class="loading-content">
+                            <div class="loading-line long"></div>
+                            <div class="loading-line medium"></div>
+                            <div class="loading-line short"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Load more button -->
+                <div class="load-more-container" id="loadMoreContainer">
+                    <button class="load-more-btn" id="loadMoreBtn">
+                        <i class="fas fa-chevron-up"></i> Load Older Messages
+                    </button>
+                </div>
+                
+                <!-- Messages will be loaded here by your JavaScript -->
+            </div>
+
+            <!-- No messages -->
+            <div class="no-messages" id="noMessages">
+                <p>No messages yet. Start the conversation!</p>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-container">
+                <div class="message-input-container">
+                    <textarea 
+                        class="message-input" 
+                        id="messageInput" 
+                        placeholder="Type your message here..."
+                        rows="1"></textarea>
+                    <div class="input-actions">
+                        <button class="action-btn" id="emojiBtn">
+                            <i class="far fa-smile"></i>
+                        </button>
+                        <button class="action-btn" id="attachmentBtn">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                    </div>
+                    <button class="send-btn" id="sendBtn" disabled>
+                        <i class="fas fa-upload"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Lazy loading skeleton setup - just the skeleton showing functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            const loadMoreContainer = document.getElementById('loadMoreContainer');
+            const initialLoading = document.getElementById('initialLoading');
+            const noMessages = document.getElementById('noMessages');
+            
+            // Your chat JavaScript will control these variables
+            window.lazyLoadingState = {
+                currentPage: 0,
+                isLoading: false,
+                hasMoreMessages: true
+            };
+            
+            // Function to create skeleton loaders
+            window.createSkeletonLoader = function(count = 3) {
+                let skeletons = '';
+                for (let i = 0; i < count; i++) {
+                    skeletons += `
+                        <div class="message-group loading">
+                            <div class="loading-avatar"></div>
+                            <div class="loading-content">
+                                <div class="loading-line long"></div>
+                                <div class="loading-line medium"></div>
+                                <div class="loading-line short"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+                return skeletons;
+            };
+            
+            // Function to show skeleton loading
+            window.showSkeletonLoading = function() {
+                const skeletonHTML = window.createSkeletonLoader();
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'messages-loading active';
+                loadingDiv.innerHTML = skeletonHTML;
+                
+                // Insert at the top of messages
+                const firstMessage = messagesContainer.querySelector('.message-group:not(.loading)');
+                if (firstMessage) {
+                    messagesContainer.insertBefore(loadingDiv, firstMessage);
+                } else {
+                    messagesContainer.appendChild(loadingDiv);
+                }
+                
+                return loadingDiv;
+            };
+            
+            // Function to remove skeleton loading
+            window.removeSkeletonLoading = function(loadingElement) {
+                if (loadingElement && loadingElement.parentNode) {
+                    loadingElement.remove();
+                }
+            };
+            
+            // Function to clear initial loading
+            window.clearInitialLoading = function() {
+                if (initialLoading) {
+                    initialLoading.style.display = 'none';
+                }
+            };
+            
+            // Function to show/hide load more button
+            window.toggleLoadMoreButton = function(show) {
+                if (loadMoreContainer) {
+                    if (show) {
+                        loadMoreContainer.classList.add('visible');
+                    } else {
+                        loadMoreContainer.classList.remove('visible');
+                    }
+                }
+            };
+            
+            // Function to show/hide no messages
+            window.toggleNoMessages = function(show) {
+                if (noMessages) {
+                    if (show) {
+                        noMessages.style.display = 'block';
+                    } else {
+                        noMessages.style.display = 'none';
+                    }
+                }
+            };
+            
+            // Load more button click handler
+            loadMoreBtn.addEventListener('click', function() {
+                // Your chat JavaScript should handle this
+                if (typeof window.loadMoreMessages === 'function') {
+                    window.loadMoreMessages();
+                }
+            });
+            
+            // Auto-load when scrolling near top (infinite scroll)
+            messagesContainer.addEventListener('scroll', function() {
+                if (messagesContainer.scrollTop < 100 && 
+                    !window.lazyLoadingState.isLoading && 
+                    window.lazyLoadingState.hasMoreMessages) {
+                    
+                    if (typeof window.loadMoreMessages === 'function') {
+                        window.loadMoreMessages();
+                    }
+                }
+            });
+            
+            // Your existing clearLoadingStates function
+            window.clearLoadingStates = function() {
+                window.clearInitialLoading();
+                
+                // Remove any skeleton loaders
+                const skeletonLoaders = document.querySelectorAll('.messages-loading.active');
+                skeletonLoaders.forEach(loader => loader.remove());
+                
+                // Remove loading class from any message groups
+                const loadingGroups = document.querySelectorAll('.message-group.loading');
+                loadingGroups.forEach(group => group.remove());
+            };
+            
+            // CALL BUTTONS FUNCTIONALITY FOR PRIVATE CHAT
+            const voiceCallBtn = document.getElementById('voiceCallBtn');
+            const voiceCallBtnMobile = document.getElementById('voiceCallBtnMobile');
+            
+            // Function to handle voice call
+            function handleVoiceCall() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const partnerId = urlParams.get('id');
+                
+                if (!partnerId) {
+                    alert('Cannot start call. No chat partner found.');
+                    return;
+                }
+                
+                // Check if calls module is loaded
+                if (window.callsModule && window.callsModule.initiatePersonalCall) {
+                    window.callsModule.initiatePersonalCall(partnerId);
+                } else {
+                    // Fallback to direct call if module isn't loaded yet
+                    const callId = 'temp_' + Date.now();
+                    window.location.href = `calls.html?type=personal&partnerId=${partnerId}&incoming=false&callId=${callId}`;
+                }
+            }
+            
+            // Add event listeners to call buttons
+            if (voiceCallBtn) {
+                voiceCallBtn.addEventListener('click', handleVoiceCall);
+            }
+            
+            if (voiceCallBtnMobile) {
+                voiceCallBtnMobile.addEventListener('click', handleVoiceCall);
+            }
+        });
+    </script>
+    
+    <!-- Import the calls module for voice calls -->
+    <script type="module" src="calls.js"></script>
+    <script type="module" src="group.js"></script>
+</body>
+</html>

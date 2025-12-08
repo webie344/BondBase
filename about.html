@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Bondly</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #5d78ff;
+            --primary-dark: #4a62d6;
+            --secondary-color: #ff6b6b;
+S            --dark-color: #2d3748;
+            --light-color: #f8fafc;
+            --gray-color: #e2e8f0;
+            --success-color: #48bb78;
+            --border-radius: 12px;
+            --box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7ff;
+            color: var(--dark-color);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 1.2rem 0;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: var(--box-shadow);
+            position: relative;
+            z-index: 10;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .back-arrow {
+            position: absolute;
+            left: 20px;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+            background: rgba(255, 255, 255, 0.1);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        
+        .back-arrow:hover {
+            transform: translateX(-3px);
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo i {
+            margin-right: 10px;
+            color: #ffd166;
+        }
+        
+        .content-section {
+            background-color: white;
+            border-radius: var(--border-radius);
+            padding: 40px;
+            box-shadow: var(--box-shadow);
+            margin-bottom: 30px;
+            border: 1px solid var(--gray-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .content-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--primary-color), var(--secondary-color));
+        }
+        
+        h1, h2, h3 {
+            color: var(--dark-color);
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            position: relative;
+            display: inline-block;
+        }
+        
+        h1::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: var(--primary-color);
+            border-radius: 2px;
+        }
+        
+        h2 {
+            font-size: 1.8rem;
+            margin-top: 40px;
+            color: var(--primary-dark);
+        }
+        
+        p {
+            margin-bottom: 15px;
+            font-size: 1.05rem;
+            line-height: 1.7;
+        }
+        
+        .mission-statement {
+            background-color: #f8faff;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            margin: 30px 0;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+        
+        .team-member {
+            text-align: center;
+        }
+        
+        .team-member img {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 5px solid white;
+            box-shadow: var(--box-shadow);
+            margin-bottom: 15px;
+        }
+        
+        .team-member h3 {
+            margin-bottom: 5px;
+        }
+        
+        .team-member p.position {
+            color: var(--primary-dark);
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+        }
+        
+        .stat-card {
+            background-color: #f8faff;
+            border-radius: var(--border-radius);
+            padding: 25px;
+            text-align: center;
+            border: 1px solid var(--gray-color);
+        }
+        
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+        
+        .stat-card .label {
+            font-size: 1rem;
+            color: #64748b;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 25px 0;
+            color: #64748b;
+            font-size: 0.95rem;
+            background-color: white;
+            border-top: 1px solid var(--gray-color);
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .footer-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        
+        .footer-links a:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .header-content {
+                padding: 0 1.5rem;
+            }
+            
+            .back-arrow {
+                left: 15px;
+                font-size: 1.3rem;
+            }
+            
+            .content-section {
+                padding: 25px;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            h2 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="back-arrow" onclick="location.href='index.html'">
+                <i class="fas fa-arrow-left"></i>
+            </div>
+            <div class="logo">
+                <i class="fas fa-heart"></i> Bondly
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="content-section">
+            <h1>About Bondly</h1>
+            <p>Bondly is a modern dating platform designed to help people find meaningful connections in today's digital world. Founded in 2020, we've helped thousands of singles find love, friendship, and companionship.</p>
+            
+            <div class="mission-statement">
+                <h2>Our Mission</h2>
+                <p>To create authentic connections between people through innovative technology while maintaining the highest standards of safety, privacy, and respect.</p>
+            </div>
+            
+            <h2>Our Story</h2>
+            <p>Bondly was born out of a simple idea: dating apps should focus on quality connections rather than endless swiping. Our founders, a group of relationship experts and tech entrepreneurs, noticed that existing platforms prioritized quantity over quality.</p>
+            
+            <p>We set out to create a different kind of dating experience - one that values meaningful interactions, authentic profiles, and real compatibility. Today, Bondly                is recognized as one of the fastest-growing dating platforms with the highest success rate for long-term relationships.</p>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="number">50,000+</div>
+                    <div class="label">Successful Matches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">120+</div>
+                    <div class="label">Countries</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">1M+</div>
+                    <div class="label">Active Members</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">85%</div>
+                    <div class="label">Satisfaction Rate</div>
+                </div>
+            </div>
+            
+            <h2>How We're Different</h2>
+            <ul>
+                <li><strong>Verified Profiles:</strong> Every profile goes through our verification process to ensure authenticity</li>
+                <li><strong>Smart Matching:</strong> Our advanced algorithm learns your preferences to suggest better matches</li>
+                <li><strong>Safety First:</strong> Dedicated safety team and reporting tools to protect our community</li>
+                <li><strong>Quality Over Quantity:</strong> We limit daily matches to encourage meaningful connections</li>
+                <li><strong>Success-Oriented:</strong> Features designed for serious daters looking for long-term relationships</li>
+            </ul>
+            
+            <h2>Meet Our Team</h2>
+            <div class="team-grid">
+                <div class="team-member">
+                    <img src="https://randomuser.me/api/portraits/women/45.jpg" alt="Sarah Johnson">
+                    <h3>Sarah Johnson</h3>
+                    <p class="position">CEO & Founder</p>
+                    <p>Relationship expert with 15 years experience in matchmaking</p>
+                </div>
+                
+                <div class="team-member">
+                    <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Michael Chen">
+                    <h3>Michael Chen</h3>
+                    <p class="position">CTO</p>
+                    <p>Tech visionary specializing in AI and matching algorithms</p>
+                </div>
+                
+                <div class="team-member">
+                    <img src="https://randomuser.me/api/portraits/women/68.jpg" alt="Aisha Mohammed">
+                    <h3>Aisha Mohammed</h3>
+                    <p class="position">Head of Safety</p>
+                    <p>Former cybersecurity expert dedicated to user protection</p>
+                </div>
+                
+                <div class="team-member">
+                    <img src="https://randomuser.me/api/portraits/men/75.jpg" alt="David Wilson">
+                    <h3>David Wilson</h3>
+                    <p class="position">Community Manager</p>
+                    <p>Ensures our community remains welcoming and respectful</p>
+                </div>
+            </div>
+            
+            <h2>Our Values</h2>
+            <ul>
+                <li><strong>Authenticity:</strong> We believe in real connections between real people</li>
+                <li><strong>Respect:</strong> Every member deserves to be treated with dignity</li>
+                <li><strong>Innovation:</strong> Continuously improving our platform to serve you better</li>
+                <li><strong>Privacy:</strong> Your data belongs to you and is protected by us</li>
+                <li><strong>Inclusivity:</strong> Love comes in all forms and we celebrate diversity</li>
+            </ul>
+        </div>
+    </div>
+    
+    <footer>
+        <p>© 2023 Bondly. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="policy.html">Privacy Policy</a>
+            <a href="terms.html">Terms of Service</a>
+            <a href="contact.html">Contact Us</a>
+        </div>
+    </footer>
+</body>
+</html>

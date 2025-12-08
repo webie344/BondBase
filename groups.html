@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groups - BondBase</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="style.css">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #b3004b;
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --secondary: #8b0000;
+            --accent: #444;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --accent-color: #b3004b;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8);
+            --radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        /* ========== SHORTENED REPLY PREVIEW STYLES ========== */
+/* Reply Indicator - SHORTENED VERSION */
+.reply-indicator {
+    background: rgba(114, 137, 218, 0.1);
+    border-left: 3px solid #7289da;
+    padding: 10px 12px;
+    margin: 0;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #666;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+    animation: slideDown 0.2s ease;
+    max-height: 44px;
+    overflow: hidden;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.reply-indicator-content {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 8px;
+    max-width: calc(100% - 40px);
+}
+
+/* Shorten the preview text to 3 words */
+.reply-indicator-content span:not(.reply-sender) {
+    display: inline;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Show only first 3 words of the replied message */
+.reply-preview-text {
+    display: inline-block;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-style: italic;
+}
+
+.reply-sender {
+    font-weight: 600;
+    color: #7289da;
+    margin: 0 3px;
+    white-space: nowrap;
+}
+
+.cancel-reply {
+    background: none;
+    border: none;
+    color: #7289da;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
+    flex-shrink: 0;
+}
+
+.cancel-reply:hover {
+    background: rgba(114, 137, 218, 0.1);
+}
+
+.cancel-reply i {
+    font-size: 14px;
+}
+
+/* Shortened reply preview in messages */
+.replying-to {
+    background: rgba(114, 137, 218, 0.08);
+    border-left: 3px solid #7289da;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    max-height: 32px;
+}
+
+.replying-to .reply-sender {
+    font-weight: 600;
+    color: #7289da;
+    font-size: 12px;
+    margin: 0 3px;
+    flex-shrink: 0;
+}
+
+.replying-to .reply-preview {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100px;
+    font-style: italic;
+    flex: 1;
+}
+
+/* Update the JavaScript function to show only 3 words */
+.reply-indicator-content::after {
+    content: '...';
+    display: inline;
+}
+
+/* For image replies */
+.reply-indicator-content .image-indicator {
+    font-style: italic;
+    color: #999;
+}
+.group-avatar-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.group-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--primary);
+    background: white;
+}
+
+.group-title-section {
+    flex: 1;
+}
+
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .reply-indicator {
+        padding: 8px 10px;
+        font-size: 12px;
+        max-height: 40px;
+    }
+    
+    .reply-indicator-content {
+        max-width: calc(100% - 35px);
+    }
+    
+    .reply-preview-text {
+        max-width: 80px;
+    }
+    
+    .replying-to {
+        padding: 5px 8px;
+        font-size: 11px;
+        max-height: 28px;
+    }
+    
+    .replying-to .reply-preview {
+        max-width: 70px;
+    }
+}
+
+@media (max-width: 480px) {
+    .reply-indicator {
+        padding: 6px 8px;
+        font-size: 11px;
+        max-height: 36px;
+    }
+    
+    .reply-indicator-content {
+        max-width: calc(100% - 30px);
+    }
+    
+    .reply-preview-text {
+        max-width: 60px;
+    }
+    
+    .cancel-reply {
+        min-width: 28px;
+        min-height: 28px;
+        padding: 3px 6px;
+    }
+    
+    .cancel-reply i {
+        font-size: 12px;
+    }
+}
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding-bottom: 70px; /* Space for bottom nav */
+        }
+
+        /* Hide the top navbar */
+        .navbar {
+            display: none;
+        }
+        
+        /* Bottom Navigation - Style from stream.html */
+        .bottom-nav {
+            position: fixed !important; /* Ensure it's fixed */
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            z-index: 1000;
+            width: 100%;
+            height: 70px; /* Fixed height */
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: #fff;
+            text-decoration: none;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+            padding: 5px;
+            flex: 1;
+            max-width: 20%; /* 5 items = 20% each */
+            height: 100%;
+        }
+
+        .nav-item:hover {
+            opacity: 1;
+        }
+
+        .nav-item.active {
+            opacity: 1;
+            color: #ff2d55;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 500;
+            text-align: center;
+        }
+        
+        /* Special style for Stream link */
+        .nav-item.stream-link .nav-label {
+            font-family: 'Great Vibes', cursive;
+            font-size: 11px;
+        }
+        
+        /* Notification badge for bottom nav */
+        .notification-badge-bottom {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background-color: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            transform: translate(25%, -25%);
+        }
+        
+        .badge-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .main-content {
+            margin-top: 20px; /* Reduced since no top nav */
+            padding: 20px;
+            margin-bottom: 70px; /* Space for bottom nav */
+        }
+
+        .page-header {
+            max-width: 1200px;
+            margin: 0 auto 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .create-group-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .create-group-btn:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            transform: translateY(-2px);
+        }
+        
+        .create-group-btn a {
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .groups-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .group-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .group-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-light);
+        }
+
+        .group-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            position: relative;
+        }
+
+        .group-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .group-category {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .group-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        .group-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            font-size: 0.85rem;
+        }
+
+        .group-members {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-light);
+        }
+
+        .group-privacy {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-light);
+        }
+
+        .group-content {
+            padding: 20px;
+        }
+
+        .group-topics {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .topics-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .topic-tag {
+            background: rgba(179, 0, 75, 0.1);
+            color: var(--primary-light);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            border: 1px solid rgba(179, 0, 75, 0.3);
+        }
+
+        .group-rules {
+            margin-bottom: 20px;
+        }
+
+        .rules-list {
+            list-style: none;
+        }
+
+        .rule-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .rule-item i {
+            color: var(--primary-light);
+            font-size: 0.8rem;
+            margin-top: 3px;
+        }
+
+        .group-actions {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .join-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+
+        .join-btn:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+        }
+
+        .join-btn.joined {
+            background: var(--secondary);
+        }
+
+        .join-btn.joined:hover {
+            background: #a30000;
+        }
+
+        .search-container {
+            max-width: 1200px;
+            margin: 0 auto 30px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 15px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--primary-light);
+        }
+
+        .no-groups {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+
+        .no-groups i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: var(--primary-light);
+            display: block;
+        }
+
+        .loading {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary-light);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .groups-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .main-content {
+                padding: 15px;
+                margin-top: 10px;
+            }
+
+            .page-title {
+                font-size: 1.6rem;
+            }
+            
+            /* Bottom nav responsive */
+            .bottom-nav {
+                height: 65px;
+            }
+            
+            .nav-item {
+                max-width: 20%;
+                padding: 3px;
+            }
+            
+            .nav-label {
+                font-size: 9px;
+            }
+            
+            .nav-icon {
+                font-size: 18px;
+            }
+            
+            .nav-item.stream-link .nav-label {
+                font-size: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .group-card {
+                margin: 0 10px;
+            }
+            
+            /* Bottom nav small screens */
+            .bottom-nav {
+                height: 60px;
+                padding: 8px 0;
+            }
+            
+            .nav-label {
+                font-size: 8px;
+            }
+            
+            .nav-icon {
+                font-size: 16px;
+            }
+            
+            .nav-item.stream-link .nav-label {
+                font-size: 9px;
+            }
+            
+            .notification-badge-bottom {
+                width: 16px;
+                height: 16px;
+                font-size: 9px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-content">
+        <div class="page-header">
+            <h1 class="page-title">Join Groups</h1>
+            <button class="create-group-btn" id="createGroupBtn">
+                <i class="fas fa-plus"></i>
+                Create Group
+            </button>
+            <button class="create-group-btn">
+                <a href="admin-groups.html">
+                    <i class="fas fa-scissors"></i>
+                    edit Group
+                </a>
+            </button>
+        </div>
+
+        <div class="search-container">
+            <input type="text" class="search-box" id="groupSearch" placeholder="Search groups by name, topic, or category...">
+        </div>
+
+        <div class="groups-grid" id="groupsGrid">
+            <!-- Groups will be loaded here -->
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Loading groups...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation with YOUR original groups.html links -->
+    <div class="bottom-nav">
+        <a href="mingle.html" class="nav-item active">
+            <i class="fas fa-users nav-icon"></i>
+            <span class="nav-label">Connect</span>
+        </a>
+        <a href="message.html" class="nav-item">
+            <i class="fas fa-comments nav-icon"></i>
+            <span class="nav-label">Chat</span>
+        </a>
+        <a href="posts.html" class="nav-item">
+            <i class="fas fa-graduation-cap nav-icon"></i>
+            <span class="nav-label">Resources</span>
+        </a>
+        <a href="stream.html" class="nav-item stream-link">
+            <i class="fas fa-play-circle nav-icon"></i>
+            <span class="nav-label">Stream</span>
+        </a>
+        <a href="account.html" class="nav-item">
+            <i class="fas fa-user-shield nav-icon"></i>
+            <span class="nav-label">My Profile</span>
+        </a>
+    </div>
+
+    <script type="module" src="group.js"></script>
+    <script type="module" src="calls.js"></script>
+        <script>
+// Simple navigation menu opener script
+document.addEventListener('DOMContentLoaded', function() {
+    // Mobile menu toggle
+    const mobileMenuBtn = document.getElementById('mobile-menu');
+    const navMenu = document.querySelector('.nav-menu');
+    const navLinks = document.querySelectorAll('.nav-links');
+    
+    if (mobileMenuBtn && navMenu) {
+        mobileMenuBtn.addEventListener('click', function() {
+            mobileMenuBtn.classList.toggle('active');
+            navMenu.classList.toggle('active');
+        });
+        
+        // Close menu when clicking on a link
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenuBtn.classList.remove('active');
+                navMenu.classList.remove('active');
+            });
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!mobileMenuBtn.contains(event.target) && 
+                !navMenu.contains(event.target) && 
+                navMenu.classList.contains('active')) {
+                mobileMenuBtn.classList.remove('active');
+                navMenu.classList.remove('active');
+            }
+        });
+    }
+    
+    // Sidebar toggle (if exists)
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('active');
+        });
+    }
+    
+    // Dropdown menus
+    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+    
+    dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            const dropdown = this.nextElementSibling;
+            
+            // Close all other dropdowns
+            document.querySelectorAll('.dropdown-content').forEach(d => {
+                if (d !== dropdown) {
+                    d.classList.remove('active');
+                }
+            });
+            
+            // Toggle current dropdown
+            dropdown.classList.toggle('active');
+        });
+    });
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!event.target.matches('.dropdown-toggle')) {
+            document.querySelectorAll('.dropdown-content').forEach(dropdown => {
+                dropdown.classList.remove('active');
+            });
+        }
+    });
+    
+    // Logout functionality
+    const logoutButtons = document.querySelectorAll('.logout-btn');
+    
+    logoutButtons.forEach(button => {
+        button.addEventListener('click', async function(e) {
+            e.preventDefault();
+            try {
+                // Redirect to login page
+                window.location.href = 'login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+    });
+    
+    // Back button functionality
+    const backButtons = document.querySelectorAll('.back-btn');
+    
+    backButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.history.back();
+        });
+    });
+});
+</script>
+</body>
+</html>

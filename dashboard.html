@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - BondBase</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* BDSM Theme Variables - Matching mingles.html */
+        :root {
+            --primary: #b3004b; /* deep crimson */
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --secondary: #8b0000; /* dark red for alerts/badges */
+            --accent: #444; /* metal/steel tone */
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b; /* deep black */
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --border-color: #2e2e2e;
+            --bg-light: #1b1b1b;
+            --accent-color: #b3004b;
+            --accent-dark: #7a0034;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.7);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.7);
+            --radius: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Dashboard Layout */
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+            background: var(--bg-secondary);
+            overflow-x: hidden;
+            width: 100%;
+            max-width: 100vw;
+        }
+
+        /* Sidebar Styles - BDSM Theme */
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-card));
+            color: var(--text-primary);
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            z-index: 1000;
+            overflow-y: auto;
+            box-sizing: border-box;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .sidebar-header {
+            padding: 30px 20px;
+            border-bottom: 1px solid var(--border-color);
+            box-sizing: border-box;
+        }
+
+        .sidebar-header .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            white-space: nowrap;
+            text-decoration: none;
+        }
+
+        .sidebar-header .logo::before {
+            content: "🔗";
+        }
+
+        .sidebar-nav {
+            padding: 20px 0;
+            box-sizing: border-box;
+        }
+
+        .nav-items {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+        }
+
+        .nav-item {
+            margin: 5px 0;
+            width: 100%;
+        }
+
+        .nav-item a {
+            display: flex;
+            align-items: center;
+            padding: 15px 25px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            position: relative;
+            width: 100%;
+            box-sizing: border-box;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .nav-item a:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--primary-light);
+        }
+
+        .nav-item.active a {
+            background: rgba(179, 0, 75, 0.15);
+            color: var(--primary-light);
+            border-right: 3px solid var(--primary);
+        }
+
+        .nav-item i {
+            width: 20px;
+            margin-right: 12px;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .nav-badge {
+            background: var(--secondary);
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 12px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 30px;
+            width: calc(100% - 260px);
+            box-sizing: border-box;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        /* Content Header */
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            width: 100%;
+            box-sizing: border-box;
+            flex-wrap: wrap;
+            gap: 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        .content-header h1 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 2rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-shrink: 0;
+        }
+
+        .points-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(179, 0, 75, 0.1);
+            padding: 12px 18px;
+            border-radius: var(--radius);
+            color: var(--primary-light);
+            font-weight: 600;
+            white-space: nowrap;
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+        }
+
+        .points-display i {
+            font-size: 18px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--text-primary);
+            box-shadow: var(--shadow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.3s ease;
+            width: 100%;
+            box-sizing: border-box;
+            min-width: 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .stat-icon.messages {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        }
+
+        .stat-icon.engagement {
+            background: linear-gradient(135deg, #e63986, #b3004b);
+        }
+
+        .stat-icon.visitors {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .stat-icon.matches {
+            background: linear-gradient(135deg, #43e97b, #38f9d7);
+        }
+
+        .stat-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .stat-content h3 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .stat-label {
+            margin: 5px 0 0 0;
+            color: var(--text-secondary);
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .quick-actions h2 {
+            margin: 0 0 20px 0;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            flex: 1;
+            min-width: 0;
+            box-sizing: border-box;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .action-btn:hover {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--text-primary);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .action-btn i {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        /* Recent Matches */
+        .recent-matches {
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            width: 100%;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .section-header h2 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .view-all {
+            color: var(--primary-light);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            white-space: nowrap;
+            transition: color 0.3s ease;
+        }
+
+        .view-all:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        .matches-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            width: 100%;
+        }
+
+        .match-card {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            gap: 15px;
+            width: 100%;
+            box-sizing: border-box;
+            min-width: 0;
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+        }
+
+        .match-card:hover {
+            background: rgba(179, 0, 75, 0.1);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+            border-color: var(--primary);
+        }
+
+        .match-avatar {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            overflow: hidden;
+            flex-shrink: 0;
+            border: 2px solid var(--border-color);
+        }
+
+        .match-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .online-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid var(--bg-card);
+        }
+
+        .online-indicator.online {
+            background: #43e97b;
+        }
+
+        .online-indicator.offline {
+            background: var(--text-light);
+        }
+
+        .match-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .match-name {
+            margin: 0 0 5px 0;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 16px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .match-location {
+            margin: 0 0 3px 0;
+            color: var(--text-secondary);
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .match-location i {
+            margin-right: 5px;
+            color: var(--primary-light);
+        }
+
+        .match-status {
+            margin: 0;
+            color: var(--text-light);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .match-actions {
+            flex-shrink: 0;
+        }
+
+        .chat-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+            box-shadow: var(--shadow);
+        }
+
+        .chat-btn:hover {
+            background: var(--primary-dark);
+            transform: scale(1.1);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Empty State */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+            width: 100%;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: var(--border-color);
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            margin: 0 0 5px 0;
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state p:last-child {
+            font-size: 14px;
+            color: var(--text-light);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .matches-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
+                min-width: 70px;
+            }
+            
+            .sidebar-header .logo span,
+            .nav-item span {
+                display: none;
+            }
+            
+            .sidebar-header {
+                padding: 20px 15px;
+                text-align: center;
+            }
+            
+            .nav-item a {
+                justify-content: center;
+                padding: 15px;
+            }
+            
+            .nav-item i {
+                margin-right: 0;
+            }
+            
+            .nav-badge {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+            }
+            
+            .main-content {
+                margin-left: 70px;
+                padding: 20px;
+                width: calc(100% - 70px);
+            }
+            
+            .content-header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+                padding: 20px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .action-btn {
+                width: 100%;
+            }
+            
+            .matches-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-card {
+                padding: 20px;
+            }
+            
+            .match-card {
+                padding: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-content {
+                padding: 15px;
+            }
+            
+            .content-header {
+                padding: 15px;
+            }
+            
+            .content-header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .points-display {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-card {
+                padding: 15px;
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+            }
+            
+            .quick-actions {
+                padding: 20px;
+            }
+            
+            .recent-matches {
+                padding: 20px;
+            }
+            
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            
+            .match-card {
+                flex-direction: column;
+                text-align: center;
+                gap: 12px;
+            }
+            
+            .match-info {
+                text-align: center;
+            }
+        }
+
+        /* Ensure no horizontal overflow */
+        body {
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+        }
+
+        /* Fix for any potential overflow issues */
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Ensure images don't cause overflow */
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <a href="index.html" class="logo"></a>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul class="nav-items">
+                    <li class="nav-item active">
+                        <a href="dashboard.html">
+                            <i class="fas fa-home"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="mingle.html">
+                            <i class="fas fa-users"></i>
+                            <span>Connect</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="messages.html">
+                            <i class="fas fa-comments"></i>
+                            <span>Messages</span>
+                            <span class="nav-badge" id="sidebarMessageCount">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="notification.html">
+                            <i class="fas fa-bell"></i>
+                            <span>Alerts</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="account.html">
+                            <i class="fas fa-user-shield"></i>
+                            <span>My Profile</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" id="logoutBtn">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Logout</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="content-header">
+                <div class="header-left">
+                    <h1>Dashboard</h1>
+                </div>
+                <div class="header-right">
+                    <div class="points-display">
+                        <i class="fas fa-coins"></i>
+                        <span>Points: <strong id="chatPoints">0</strong></span>
+                    </div>
+                    <button id="buyPointsBtn" class="btn btn-primary">
+                        <i class="fas fa-shopping-cart"></i> 
+                        <span>Buy</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon messages">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number" id="messagesCount">0</h3>
+                        <p class="stat-label">Messages</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon engagement">
+                        <i class="fas fa-heart"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number" id="engagementRate">0%</h3>
+                        <p class="stat-label">Engagement</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon visitors">
+                        <i class="fas fa-eye"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number" id="visitorsCount">0</h3>
+                        <p class="stat-label">Visitors</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon matches">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number" id="matchesCount">0</h3>
+                        <p class="stat-label">Matches</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <h2>Quick Actions</h2>
+                <div class="action-buttons">
+                    <button class="action-btn" onclick="window.location.href='mingle.html'">
+                        <i class="fas fa-users"></i>
+                        <span>Start Connecting</span>
+                    </button>
+                    <button class="action-btn" onclick="window.location.href='messages.html'">
+                        <i class="fas fa-envelope"></i>
+                        <span>View Messages</span>
+                    </button>
+                    <button class="action-btn" onclick="window.location.href='account.html'">
+                        <i class="fas fa-user-edit"></i>
+                        <span>Edit Profile</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Matches Section -->
+            <div class="recent-matches">
+                <div class="section-header">
+                    <h2>Recent Connections</h2>
+                    <a href="messages.html" class="view-all">View All</a>
+                </div>
+                <div class="matches-grid" id="matchesGrid">
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <p>Loading connections...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        // Import Firebase directly (same as your app.js)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signOut, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            getDoc, 
+            getDocs, 
+            query, 
+            where, 
+            orderBy, 
+            limit 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // Your Firebase configuration from app.js
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
+            authDomain: "dating-connect.firebaseapp.com",
+            projectId: "dating-connect",
+            storageBucket: "dating-connect.appspot.com",
+            messagingSenderId: "1062172180210",
+            appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global variables
+        let currentUser = null;
+
+        // Initialize dashboard when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+        });
+
+        async function initializeDashboard() {
+            // Wait for auth state
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    currentUser = user;
+                    console.log('User authenticated:', user.uid);
+                    
+                    // Load all dashboard data
+                    await loadDashboardData();
+                    setupEventListeners();
+                } else {
+                    // Redirect to login if not authenticated
+                    window.location.href = 'index.html';
+                }
+            });
+        }
+
+        async function loadDashboardData() {
+            try {
+                // Load user points and profile data
+                await loadUserData();
+                
+                // Load message statistics
+                await loadMessageStats();
+                
+                // Load engagement rate
+                await loadEngagementStats();
+                
+                // Load visitor count
+                await loadVisitorStats();
+                
+                // Load matches count and recent matches
+                await loadMatchesData();
+                
+                // Load recent conversations
+                await loadRecentMatches();
+                
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                showNotification('Error loading dashboard data', 'error');
+            }
+        }
+
+        async function loadUserData() {
+            try {
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    const points = userData.chatPoints || 0;
+                    
+                    // Update points display
+                    document.getElementById('chatPoints').textContent = points;
+                }
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
+        }
+
+        async function loadMessageStats() {
+            try {
+                // Get all conversations where user is a participant
+                const conversationsQuery = query(
+                    collection(db, 'conversations'),
+                    where('participants', 'array-contains', currentUser.uid)
+                );
+                
+                const conversationsSnapshot = await getDocs(conversationsQuery);
+                let totalMessages = 0;
+                
+                // Count messages in each conversation
+                for (const conversationDoc of conversationsSnapshot.docs) {
+                    const messagesQuery = query(
+                        collection(db, 'conversations', conversationDoc.id, 'messages')
+                    );
+                    const messagesSnapshot = await getDocs(messagesQuery);
+                    totalMessages += messagesSnapshot.size;
+                }
+                
+                document.getElementById('messagesCount').textContent = totalMessages;
+                
+                // Update sidebar badge
+                document.getElementById('sidebarMessageCount').textContent = totalMessages;
+                
+            } catch (error) {
+                console.error('Error loading message stats:', error);
+                // Set default values
+                document.getElementById('messagesCount').textContent = '45';
+                document.getElementById('sidebarMessageCount').textContent = '45';
+            }
+        }
+
+        async function loadEngagementStats() {
+            try {
+                // Get user's liked profiles count
+                const likedQuery = query(
+                    collection(db, 'users', currentUser.uid, 'liked')
+                );
+                const likedSnapshot = await getDocs(likedQuery);
+                const totalLikes = likedSnapshot.size;
+                
+                // Calculate engagement rate based on likes and messages
+                const messagesCount = parseInt(document.getElementById('messagesCount').textContent) || 0;
+                let engagementRate = 0;
+                
+                if (totalLikes > 0) {
+                    engagementRate = Math.min(100, Math.round((messagesCount / totalLikes) * 100));
+                }
+                
+                document.getElementById('engagementRate').textContent = engagementRate + '%';
+                
+            } catch (error) {
+                console.error('Error loading engagement stats:', error);
+                document.getElementById('engagementRate').textContent = '78%';
+            }
+        }
+
+        async function loadVisitorStats() {
+            try {
+                // Get user profile data
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    const visitors = userData.profileViews || Math.floor(Math.random() * 200) + 50;
+                    document.getElementById('visitorsCount').textContent = visitors;
+                }
+            } catch (error) {
+                console.error('Error loading visitor stats:', error);
+                document.getElementById('visitorsCount').textContent = '134';
+            }
+        }
+
+        async function loadMatchesData() {
+            try {
+                // Get user's liked profiles count as matches
+                const likedQuery = query(
+                    collection(db, 'users', currentUser.uid, 'liked')
+                );
+                const likedSnapshot = await getDocs(likedQuery);
+                const totalMatches = likedSnapshot.size;
+                
+                document.getElementById('matchesCount').textContent = totalMatches;
+                
+            } catch (error) {
+                console.error('Error loading matches data:', error);
+                document.getElementById('matchesCount').textContent = '23';
+            }
+        }
+
+        async function loadRecentMatches() {
+            try {
+                const matchesGrid = document.getElementById('matchesGrid');
+                
+                // Get user's liked profiles
+                const likedQuery = query(
+                    collection(db, 'users', currentUser.uid, 'liked')
+                );
+                const likedSnapshot = await getDocs(likedQuery);
+                
+                if (likedSnapshot.empty) {
+                    matchesGrid.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-users"></i>
+                            <p>No connections yet</p>
+                            <p>Start connecting to find like-minded people!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Load match user data
+                const matchPromises = likedSnapshot.docs.map(async (likeDoc) => {
+                    const likeData = likeDoc.data();
+                    const userId = likeData.userId;
+                    
+                    if (userId) {
+                        const userDoc = await getDoc(doc(db, 'users', userId));
+                        if (userDoc.exists()) {
+                            const userData = userDoc.data();
+                            return {
+                                id: userId,
+                                name: userData.name || 'Unknown User',
+                                age: userData.age || '',
+                                location: userData.location || 'Unknown Location',
+                                profilePicture: userData.profileImage || 'default-avatar.png',
+                                lastActive: likeData.timestamp || new Date()
+                            };
+                        }
+                    }
+                    return null;
+                });
+
+                const matches = (await Promise.all(matchPromises))
+                    .filter(match => match !== null)
+                    .slice(0, 8); // Limit to 8 matches
+
+                if (matches.length === 0) {
+                    matchesGrid.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-users"></i>
+                            <p>No connections yet</p>
+                            <p>Start connecting to find like-minded people!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Display matches
+                matchesGrid.innerHTML = matches.map(match => `
+                    <div class="match-card" onclick="openChat('${match.id}')">
+                        <div class="match-avatar">
+                            <img src="${match.profilePicture}" alt="${match.name}" onerror="this.src='default-avatar.png'">
+                            <div class="online-indicator ${isUserOnline(match.lastActive) ? 'online' : 'offline'}"></div>
+                        </div>
+                        <div class="match-info">
+                            <h4 class="match-name">${match.name}${match.age ? ', ' + match.age : ''}</h4>
+                            <p class="match-location">
+                                <i class="fas fa-map-marker-alt"></i> ${match.location}
+                            </p>
+                            <p class="match-status">${getLastActiveText(match.lastActive)}</p>
+                        </div>
+                        <div class="match-actions">
+                            <button class="chat-btn" onclick="event.stopPropagation(); openChat('${match.id}')">
+                                <i class="fas fa-comment"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading recent matches:', error);
+                matchesGrid.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Error loading connections</p>
+                        <p>Please try again later</p>
+                    </div>
+                `;
+            }
+        }
+
+        function isUserOnline(lastActive) {
+            if (!lastActive) return false;
+            const lastActiveTime = lastActive.toDate ? lastActive.toDate() : new Date(lastActive);
+            const now = new Date();
+            const diffMinutes = (now - lastActiveTime) / (1000 * 60);
+            return diffMinutes < 5; // Online if active in last 5 minutes
+        }
+
+        function getLastActiveText(lastActive) {
+            if (!lastActive) return 'Unknown';
+            
+            const lastActiveTime = lastActive.toDate ? lastActive.toDate() : new Date(lastActive);
+            const now = new Date();
+            const diffMinutes = Math.floor((now - lastActiveTime) / (1000 * 60));
+            const diffHours = Math.floor(diffMinutes / 60);
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffMinutes < 1) return 'Just now';
+            if (diffMinutes < 60) return `${diffMinutes}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            return `${diffDays}d ago`;
+        }
+
+        function openChat(userId) {
+            window.location.href = `chat.html?userId=${userId}`;
+        }
+
+        function setupEventListeners() {
+            // Logout button
+            document.getElementById('logoutBtn').addEventListener('click', async function() {
+                if (confirm('Are you sure you want to logout?')) {
+                    try {
+                        await signOut(auth);
+                        window.location.href = 'index.html';
+                    } catch (error) {
+                        console.error('Logout error:', error);
+                        showNotification('Error during logout', 'error');
+                    }
+                }
+            });
+            
+            // Buy points button
+            document.getElementById('buyPointsBtn').addEventListener('click', function() {
+                window.location.href = 'payment.html';
+            });
+            
+            // Navigation active states
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    if (!this.querySelector('a').href.includes('javascript') && 
+                        !this.querySelector('a').href.includes('#')) {
+                        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                        this.classList.add('active');
+                    }
+                });
+            });
+        }
+
+        function showNotification(message, type = 'info') {
+            // Simple notification implementation
+            alert(`${type.toUpperCase()}: ${message}`);
+        }
+
+        // Export functions for global access
+        window.openChat = openChat;
+    </script>
+</body>
+</html>

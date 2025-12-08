@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Groups - BondBase</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #b3004b;
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --secondary: #8b0000;
+            --accent: #444;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --accent-color: #b3004b;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8);
+            --radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+    a{
+        text-decoration:none;
+        color:white;
+    }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header Styles */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .header-subtitle {
+            font-size: 1rem;
+            color: var(--text-light);
+            margin-top: 5px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .action-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+        }
+
+        .back-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .back-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        /* Groups Container */
+        .groups-container {
+            margin-top: 30px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .groups-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .group-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 25px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .group-card:hover {
+            border-color: var(--primary-light);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .group-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .group-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary);
+        }
+
+        .group-details h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .group-description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+        }
+
+        .group-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .group-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .view-members-btn {
+            background: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .view-members-btn:hover {
+            background: var(--primary-light);
+        }
+
+        .delete-group-btn {
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .delete-group-btn:hover {
+            background: #c82333;
+        }
+
+        /* Members Section */
+        .members-section {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .members-list {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .member-item:last-child {
+            border-bottom: none;
+        }
+
+        .member-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .member-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .member-details h4 {
+            font-size: 1rem;
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+
+        .member-email {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .member-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .remove-member-btn {
+            background: #ffc107;
+            color: #212529;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background-color 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .remove-member-btn:hover {
+            background: #e0a800;
+        }
+
+        /* Back to Groups Button */
+        .back-to-groups {
+            margin-top: 20px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            color: var(--border);
+            margin-bottom: 20px;
+        }
+
+        .empty-text {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .loading-spinner {
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Notification Styles */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-card);
+            border-left: 4px solid;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            max-width: 400px;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification-success {
+            border-left-color: #28a745;
+        }
+
+        .notification-error {
+            border-left-color: #dc3545;
+        }
+
+        .notification-info {
+            border-left-color: var(--primary);
+        }
+
+        .notification-icon {
+            font-size: 1.2rem;
+        }
+
+        .notification-success .notification-icon {
+            color: #28a745;
+        }
+
+        .notification-error .notification-icon {
+            color: #dc3545;
+        }
+
+        .notification-info .notification-icon {
+            color: var(--primary);
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .notification-message {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-message {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .modal-cancel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .modal-cancel:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .modal-confirm {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal-confirm:hover {
+            background: #c82333;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .group-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .group-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+
+            .member-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .member-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+
+            .action-btn, .view-members-btn, .delete-group-btn {
+                padding: 8px 12px;
+                font-size: 0.9rem;
+                background: #dc3545;
+                border-radius:8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1 class="header-title">Admin Groups</h1>
+                <p class="header-subtitle">Manage groups you've created</p>
+            </div>
+            <div class="header-actions">
+                <button class="action-btn back-btn" id="bacBtn">
+                    
+                    
+                    <a href="admin-groups.html"><i class="fas fa-arrow-left"></i>Back to Dashboard</a>
+                    
+                </button>
+            </div>
+        </div>
+
+        <div class="groups-container" id="groupsContainer">
+            <h2 class="section-title">Your Created Groups</h2>
+            <div class="groups-list" id="groupsList">
+                <!-- Groups will be loaded here -->
+            </div>
+        </div>
+
+        <div class="members-section" id="membersSection">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 class="section-title" id="membersTitle">Group Members</h2>
+                <button class="action-btn back-btn" id="backToGroupsBtn" style="font-size: 0.9rem;">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Groups
+                </button>
+            </div>
+            <div class="members-list" id="membersList">
+                <!-- Members will be loaded here -->
+            </div>
+            <div class="back-to-groups">
+                <button class="action-btn back-btn" id="backToGroupsBtnBottom">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Groups
+                </button>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-icon">
+                <i class="fas fa-users-slash"></i>
+            </div>
+            <p class="empty-text">You haven't created any groups yet.</p>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading" id="loadingState">
+            <div class="loading-spinner"></div>
+            <p>Loading groups...</p>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Confirm Delete</h2>
+            </div>
+            <p class="modal-message" id="deleteModalMessage">
+                Are you sure you want to delete this group? This action cannot be undone.
+                All members will be notified and removed from the group.
+            </p>
+            <div class="modal-actions">
+                <button class="modal-btn modal-cancel" id="cancelDeleteBtn">Cancel</button>
+                <button class="modal-btn modal-confirm" id="confirmDeleteBtn">Delete Group</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Remove Member Modal -->
+    <div class="modal-overlay" id="removeMemberModal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Remove Member</h2>
+            </div>
+            <p class="modal-message" id="removeMemberMessage">
+                Are you sure you want to remove this member from the group?
+                They will be notified and will no longer have access to group messages.
+            </p>
+            <div class="modal-actions">
+                <button class="modal-btn modal-cancel" id="cancelRemoveBtn">Cancel</button>
+                <button class="modal-btn modal-confirm" id="confirmRemoveBtn">Remove Member</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="group.js"></script>
+</body>
+</html>

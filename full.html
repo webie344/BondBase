@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Image -BondBase</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.8);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .close-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        
+        .close-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .image-info {
+            font-size: 16px;
+            opacity: 0.9;
+            max-width: 60%;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        
+        .image-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 70px 20px 20px;
+            touch-action: manipulation;
+        }
+        
+        .full-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            font-size: 18px;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .error {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            text-align: center;
+            padding: 20px;
+            gap: 20px;
+        }
+        
+        .error button {
+            padding: 12px 24px;
+            background-color: #e91e63;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        
+        .error button:hover {
+            background-color: #d81b60;
+        }
+        
+        .navigation {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            z-index: 100;
+        }
+        
+        .nav-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            transition: background-color 0.2s;
+        }
+        
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px;
+            }
+            
+            .image-info {
+                font-size: 14px;
+                max-width: 50%;
+            }
+            
+            .image-container {
+                padding: 60px 10px 10px;
+            }
+            
+            .nav-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
+            }
+        }
+        
+        /* Zoom functionality */
+        .zoomed {
+            cursor: grab;
+        }
+        
+        .zoomed:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="close-btn" onclick="goBackToChat()">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="image-info" id="imageInfo"></div>
+    </div>
+    
+    <div class="image-container" id="imageContainer">
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Loading image...</div>
+        </div>
+    </div>
+
+    <div class="navigation">
+        <button class="nav-btn" onclick="zoomOut()">
+            <i class="fas fa-search-minus"></i>
+        </button>
+        <button class="nav-btn" onclick="resetZoom()">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+        <button class="nav-btn" onclick="zoomIn()">
+            <i class="fas fa-search-plus"></i>
+        </button>
+        
+    </div>
+      <script src="hack.js"></script>
+    <script>
+        let currentImage = null;
+        let currentScale = 1;
+        let isDragging = false;
+        let startX, startY, scrollLeft, scrollTop;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get the image data from localStorage
+            const imageDataStr = localStorage.getItem('fullScreenImage');
+            
+            if (!imageDataStr) {
+                showError("No image data found.");
+                return;
+            }
+            
+            try {
+                const imageData = JSON.parse(imageDataStr);
+                displayImage(imageData);
+            } catch (e) {
+                showError("Error loading image data.");
+                console.error("Error parsing image data:", e);
+            }
+            
+            // Set up keyboard shortcuts
+            document.addEventListener('keydown', handleKeyPress);
+            
+            // Set up pinch to zoom on touch devices
+            setupTouchEvents();
+        });
+        
+        function displayImage(imageData) {
+            const imageContainer = document.getElementById('imageContainer');
+            const loadingElement = document.getElementById('loading');
+            const imageInfo = document.getElementById('imageInfo');
+            
+            // Set image info text
+            if (imageData.alt) {
+                imageInfo.textContent = imageData.alt;
+            } else {
+                imageInfo.innerHTML = '&nbsp;';
+            }
+            
+            // Create the image element
+            const img = document.createElement('img');
+            img.src = imageData.url;
+            img.alt = imageData.alt || 'Full screen image';
+            img.className = 'full-image';
+            
+            // When image loads, remove loading indicator
+            img.onload = function() {
+                if (loadingElement) {
+                    loadingElement.remove();
+                }
+                imageContainer.appendChild(img);
+                currentImage = img;
+                
+                // Add zoom and drag events
+                setupImageEvents(img);
+            };
+            
+            // Handle image loading errors
+            img.onerror = function() {
+                showError("Failed to load image. It may have been deleted or is unavailable.");
+            };
+        }
+        
+        function setupImageEvents(img) {
+            // Mouse wheel zoom
+            img.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                if (e.deltaY < 0) {
+                    zoomIn();
+                } else {
+                    zoomOut();
+                }
+            });
+            
+            // Double click to zoom/reset
+            img.addEventListener('dblclick', function() {
+                if (currentScale === 1) {
+                    zoomIn(2);
+                } else {
+                    resetZoom();
+                }
+            });
+            
+            // Drag to pan when zoomed
+            img.addEventListener('mousedown', startDragging);
+            document.addEventListener('mousemove', dragImage);
+            document.addEventListener('mouseup', stopDragging);
+        }
+        
+        function setupTouchEvents() {
+            let initialDistance = null;
+            
+            document.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 2) {
+                    // Pinch start
+                    e.preventDefault();
+                    initialDistance = getDistance(e.touches[0], e.touches[1]);
+                }
+            }, { passive: false });
+            
+            document.addEventListener('touchmove', function(e) {
+                if (e.touches.length === 2 && initialDistance !== null) {
+                    // Pinch move
+                    e.preventDefault();
+                    const currentDistance = getDistance(e.touches[0], e.touches[1]);
+                    const scale = currentDistance / initialDistance;
+                    
+                    // Apply zoom
+                    if (currentImage) {
+                        currentScale *= scale;
+                        currentImage.style.transform = `scale(${currentScale})`;
+                        initialDistance = currentDistance;
+                    }
+                }
+            }, { passive: false });
+            
+            document.addEventListener('touchend', function() {
+                initialDistance = null;
+            });
+        }
+        
+        function getDistance(touch1, touch2) {
+            return Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+            );
+        }
+        
+        function startDragging(e) {
+            if (currentScale > 1) {
+                isDragging = true;
+                startX = e.pageX - currentImage.offsetLeft;
+                startY = e.pageY - currentImage.offsetTop;
+                scrollLeft = currentImage.scrollLeft;
+                scrollTop = currentImage.scrollTop;
+                currentImage.style.cursor = 'grabbing';
+            }
+        }
+        
+        function dragImage(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const x = e.pageX - currentImage.offsetLeft;
+            const y = e.pageY - currentImage.offsetTop;
+            const walkX = (x - startX) * 2;
+            const walkY = (y - startY) * 2;
+            currentImage.scrollLeft = scrollLeft - walkX;
+            currentImage.scrollTop = scrollTop - walkY;
+        }
+        
+        function stopDragging() {
+            isDragging = false;
+            if (currentImage) {
+                currentImage.style.cursor = currentScale > 1 ? 'grab' : 'default';
+            }
+        }
+        
+        function zoomIn(factor = 1.2) {
+            if (!currentImage) return;
+            currentScale *= factor;
+            currentImage.style.transform = `scale(${currentScale})`;
+            currentImage.style.cursor = 'grab';
+            currentImage.classList.add('zoomed');
+        }
+        
+        function zoomOut(factor = 1.2) {
+            if (!currentImage) return;
+            currentScale /= factor;
+            if (currentScale < 1) {
+                currentScale = 1;
+                currentImage.style.cursor = 'default';
+                currentImage.classList.remove('zoomed');
+            }
+            currentImage.style.transform = `scale(${currentScale})`;
+        }
+        
+        function resetZoom() {
+            if (!currentImage) return;
+            currentScale = 1;
+            currentImage.style.transform = 'scale(1)';
+            currentImage.style.cursor = 'default';
+            currentImage.classList.remove('zoomed');
+        }
+        
+        
+        
+        // Fixed function to handle going back to chat
+        function goBackToChat() {
+            // Try to close the window (works if opened with window.open)
+            try {
+                window.close();
+            } catch (e) {
+                // If window.close fails, redirect back to the chat page
+                // You might need to adjust the URL based on your app structure
+                window.location.href = 'chat.html';
+            }
+        }
+        
+        function handleKeyPress(e) {
+            switch(e.key) {
+                case 'Escape':
+                    goBackToChat();
+                    break;
+                case '+':
+                case '=':
+                    zoomIn();
+                    break;
+                case '-':
+                    zoomOut();
+                    break;
+                case '0':
+                    resetZoom();
+                    break;
+            }
+        }
+        
+        function showError(message) {
+            const imageContainer = document.getElementById('imageContainer');
+            const loadingElement = document.getElementById('loading');
+            
+            if (loadingElement) {
+                loadingElement.remove();
+            }
+            
+            imageContainer.innerHTML = `
+                <div class="error">
+                    <i class="fas fa-exclamation-circle" style="font-size: 48px;"></i>
+                    <p>${message}</p>
+                    <button onclick="goBackToChat()">Close</button>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Authentication Users</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .warning-section {
+            background: #fff3cd;
+            border: 2px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px;
+        }
+
+        .warning-icon {
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 15px;
+            color: #e74c3c;
+        }
+
+        .warning-text {
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #d63031;
+            margin-bottom: 15px;
+        }
+
+        .limitation-section {
+            background: #d1ecf1;
+            border: 2px solid #bee5eb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px;
+        }
+
+        .limitation-section h3 {
+            color: #0c5460;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            padding: 0 30px 30px;
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            border: 2px solid #e9ecef;
+            text-align: center;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .delete-btn {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+        }
+
+        .delete-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(231, 76, 60, 0.3);
+        }
+
+        .console-btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .console-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(52, 152, 219, 0.3);
+        }
+
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .progress-section {
+            margin-bottom: 25px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 25px;
+            background: #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            border: 2px solid #dee2e6;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+            border-radius: 10px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-weight: 600;
+            color: #2d3436;
+            font-size: 1.1rem;
+        }
+
+        .results {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+
+        .results h3 {
+            margin-bottom: 15px;
+            color: #2d3436;
+            text-align: center;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .deletion-log {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #f1f2f6;
+        }
+
+        .log-entry.success {
+            color: #27ae60;
+        }
+
+        .log-entry.error {
+            color: #e74c3c;
+        }
+
+        .log-entry.info {
+            color: #3498db;
+        }
+
+        .log-entry.warning {
+            color: #f39c12;
+        }
+
+        .recommendation {
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .buttons {
+                flex-direction: column;
+            }
+            
+            button {
+                min-width: auto;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+
+        .confirmation-dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .confirmation-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .confirmation-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+            justify-content: center;
+        }
+
+        .confirm-delete {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .cancel-delete {
+            background: #7f8c8d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Delete Authentication Users</h1>
+            <p>Remove user accounts from Firebase Authentication</p>
+        </div>
+
+        <div class="warning-section">
+            <div class="warning-icon">⚠️</div>
+            <div class="warning-text">FIREBASE AUTHENTICATION DELETION</div>
+            <div class="warning-details">
+                <ul>
+                    <li>This will delete user accounts from Firebase Authentication</li>
+                    <li>Users will no longer be able to login with these accounts</li>
+                    <li>This action cannot be undone</li>
+                    <li>User data in Firestore will remain unless also deleted</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="limitation-section">
+            <h3>⚠️ Client-Side Limitation</h3>
+            <p><strong>Important:</strong> Firebase Client SDK cannot list all authentication users.</p>
+            <p>This tool can only delete users it can successfully authenticate with (like default profiles).</p>
+            <p>For complete deletion of ALL authentication users, use the recommended method below.</p>
+        </div>
+
+        <div class="recommendation">
+            <h3>💡 Recommended Method</h3>
+            <p>For complete deletion of ALL authentication users:</p>
+            <ol style="text-align: left; margin: 15px 0;">
+                <li>Go to <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
+                <li>Select your project → Authentication → Users</li>
+                <li>Select all users and click "Delete"</li>
+            </ol>
+            <button class="console-btn" onclick="window.open('https://console.firebase.google.com', '_blank')">
+                🔧 Open Firebase Console
+            </button>
+        </div>
+
+        <div class="content">
+            <div class="control-panel">
+                <h3>Client-Side Deletion (Limited)</h3>
+                <p>This will attempt to delete default profiles and accessible users.</p>
+                <div class="buttons">
+                    <button class="delete-btn" id="deleteBtn">
+                        🗑️ Delete Accessible Auth Users
+                    </button>
+                </div>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Ready to delete authentication users...</div>
+            </div>
+
+            <div class="results">
+                <h3>Deletion Results</h3>
+                <div id="resultsContent">
+                    <div class="status info">No deletion performed yet</div>
+                </div>
+                <div class="deletion-log" id="deletionLog"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Dialog -->
+    <div class="confirmation-dialog" id="confirmationDialog">
+        <div class="confirmation-content">
+            <div class="warning-icon">🚨</div>
+            <h2 style="color: #e74c3c; margin: 15px 0;">Confirm Authentication Deletion</h2>
+            <p>You are about to delete authentication users.</p>
+            <p style="color: #e74c3c; font-weight: bold; margin: 15px 0;">
+                ⚠️ Client-side limitation: This can only delete accessible users (default profiles)
+            </p>
+            <p>For complete deletion, use Firebase Console.</p>
+            <div class="confirmation-buttons">
+                <button class="cancel-delete" id="cancelDeleteBtn">Cancel</button>
+                <button class="confirm-delete" id="confirmDeleteBtn">DELETE AUTH USERS</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { deleteAllAuthUsers } from './delete.js';
+
+        const deleteBtn = document.getElementById('deleteBtn');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const resultsContent = document.getElementById('resultsContent');
+        const deletionLog = document.getElementById('deletionLog');
+        const confirmationDialog = document.getElementById('confirmationDialog');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+
+        // Global progress update function
+        window.updateDeleteProgress = (current, total, currentName) => {
+            const percentage = (current / total) * 100;
+            progressFill.style.width = `${percentage}%`;
+            progressText.textContent = `Deleting ${currentName}... (${current}/${total})`;
+        };
+
+        function addLogEntry(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            deletionLog.appendChild(logEntry);
+            deletionLog.scrollTop = deletionLog.scrollHeight;
+        }
+
+        deleteBtn.addEventListener('click', () => {
+            confirmationDialog.style.display = 'flex';
+        });
+
+        confirmDeleteBtn.addEventListener('click', async () => {
+            confirmationDialog.style.display = 'none';
+            
+            deleteBtn.disabled = true;
+            deletionLog.innerHTML = '';
+            resultsContent.innerHTML = '<div class="status info">Starting authentication user deletion...</div>';
+            
+            try {
+                addLogEntry('🚨 Starting deletion of authentication users...', 'info');
+                addLogEntry('⚠️  Client-side limitation: Only deleting accessible users', 'warning');
+                
+                const result = await deleteAllAuthUsers();
+                
+                if (result.success) {
+                    resultsContent.innerHTML = `
+                        <div class="status success">
+                            ✅ Authentication Deletion Completed!
+                        </div>
+                        <div class="status warning">
+                            ⚠️ Limited to accessible users only
+                        </div>
+                        <div style="text-align: center; margin-top: 10px;">
+                            <strong>Deleted:</strong> ${result.deleted} users<br>
+                            <strong>Errors:</strong> ${result.errors} users
+                        </div>
+                    `;
+                    addLogEntry(`🎉 Deletion completed! ${result.deleted} users deleted, ${result.errors} errors`, 'success');
+                    addLogEntry('💡 For complete deletion, use Firebase Console → Authentication', 'info');
+                } else {
+                    resultsContent.innerHTML = `
+                        <div class="status error">
+                            ❌ Deletion Failed!
+                        </div>
+                        <div style="text-align: center; margin-top: 10px;">
+                            Error: ${result.error}
+                        </div>
+                    `;
+                    addLogEntry(`❌ Deletion failed: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                resultsContent.innerHTML = `
+                    <div class="status error">
+                        ❌ Unexpected Error
+                    </div>
+                    <div style="text-align: center; margin-top: 10px;">
+                        ${error.message}
+                    </div>
+                `;
+                addLogEntry(`❌ Unexpected error: ${error.message}`, 'error');
+            } finally {
+                deleteBtn.disabled = false;
+                progressText.textContent = 'Deletion completed';
+            }
+        });
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            confirmationDialog.style.display = 'none';
+        });
+    </script>
+</body>
+</html>

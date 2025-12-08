@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Call -BondBase</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            overflow: hidden;
+        }
+        
+        .call-container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .call-header {
+            text-align: center;
+            margin-bottom: 40px;
+            width: 100%;
+        }
+        
+        .caller-avatar {
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .caller-avatar i {
+            font-size: 60px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .call-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .call-status {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+        
+        .call-type {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-bottom: 30px;
+        }
+        
+        /* Participants section for group calls */
+        .participants-section {
+            width: 100%;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        
+        .participants-title {
+            font-size: 18px;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        
+        .participants-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .participant {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .participant:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .participant-avatar {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+        
+        .participant-avatar.local {
+            background: rgba(76, 175, 80, 0.3);
+            border: 2px solid rgba(76, 175, 80, 0.5);
+        }
+        
+        .participant-avatar i {
+            font-size: 18px;
+        }
+        
+        .participant-name {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 70px;
+        }
+        
+        .participant-status {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .participant-status.speaking {
+            background: rgba(76, 175, 80, 0.3);
+            color: #4CAF50;
+        }
+        
+        .participant-status.muted {
+            background: rgba(244, 67, 54, 0.3);
+            color: #f44336;
+        }
+        
+        /* Audio indicators */
+        .audio-indicators {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .audio-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .audio-label {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .audio-visualizer {
+            width: 60px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .audio-level {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            border-radius: 10px;
+            transition: width 0.1s ease;
+        }
+        
+        /* Call controls */
+        .call-controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+        
+        .control-btn.end-call {
+            background: #dc3545;
+        }
+        
+        .control-btn.end-call:hover {
+            background: #c82333;
+            transform: scale(1.05);
+        }
+        
+        .control-btn.active {
+            background: #4CAF50;
+        }
+        
+        /* Back button */
+        .back-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Hidden elements */
+        #callEnded {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .call-ended-icon {
+            font-size: 80px;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 20px;
+        }
+        
+        .call-ended-title {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .call-ended-message {
+            font-size: 16px;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+        
+        /* Loader */
+        #loader {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 40px;
+            border-radius: 20px;
+            z-index: 100;
+        }
+        
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        .loader-text {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Audio elements (hidden) */
+        audio {
+            display: none;
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Responsive */
+        @media (max-width: 600px) {
+            .call-container {
+                padding: 15px;
+            }
+            
+            .caller-avatar {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .caller-avatar i {
+                font-size: 50px;
+            }
+            
+            .call-title {
+                font-size: 20px;
+            }
+            
+            .participants-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+        }
+        
+        @media (max-width: 400px) {
+            .call-controls {
+                gap: 10px;
+            }
+            
+            .participants-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="call-container" id="callContainer">
+        <div class="call-header">
+            <div class="caller-avatar pulse">
+                <i class="fas fa-phone-alt"></i>
+            </div>
+            <h1 class="call-title" id="callTitle">Voice Call</h1>
+            <div class="call-status" id="callStatus">Connecting...</div>
+            <div class="call-type" id="callTypeText">Voice Call</div>
+        </div>
+        
+        <!-- Participants section (for group calls) -->
+        <div class="participants-section" id="participantsSection" style="display: none;">
+            <div class="participants-title" id="participantCount">0 participants</div>
+            <div class="participants-grid" id="participantsContainer">
+                <!-- Participants will be added here dynamically -->
+            </div>
+        </div>
+        
+        <!-- Audio indicators -->
+        <div class="audio-indicators">
+            <div class="audio-indicator">
+                <div class="audio-label">You</div>
+                <div class="audio-visualizer">
+                    <div class="audio-level" id="localAudioLevel" style="width: 30%;"></div>
+                </div>
+            </div>
+            <div class="audio-indicator">
+                <div class="audio-label" id="remoteAudioLabel">Others</div>
+                <div class="audio-visualizer">
+                    <div class="audio-level" id="remoteAudioLevel" style="width: 50%;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Call controls -->
+        <div class="call-controls">
+            <button class="control-btn" id="muteBtn">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <button class="control-btn end-call" id="endCallBtn">
+                <i class="fas fa-phone-slash"></i>
+            </button>
+        </div>
+        
+        <!-- Back button -->
+        <button class="back-btn" id="backToChat">
+            <i class="fas fa-arrow-left"></i>
+            Back to Chat
+        </button>
+        
+        <!-- Hidden audio elements -->
+        <audio id="localAudio" muted></audio>
+        <audio id="remoteAudio"></audio>
+    </div>
+    
+    <!-- Call ended screen -->
+    <div class="call-container" id="callEnded">
+        <div class="call-ended-icon">
+            <i class="fas fa-phone-slash"></i>
+        </div>
+        <h2 class="call-ended-title">Call Ended</h2>
+        <p class="call-ended-message">You are being redirected back to chat...</p>
+    </div>
+    
+    <!-- Loader -->
+    <div id="loader">
+        <div class="loader-spinner"></div>
+        <p class="loader-text">Starting call...</p>
+    </div>
+    
+    <script type="module" src="calls.js"></script>
+    
+    <script>
+        // Audio level visualization
+        let audioContext = null;
+        let localAnalyser = null;
+        let remoteAnalyser = null;
+        
+        function setupAudioVisualization() {
+            try {
+                const localAudio = document.getElementById('localAudio');
+                const remoteAudio = document.getElementById('remoteAudio');
+                
+                if (!localAudio || !remoteAudio) return;
+                
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Setup local audio analyser
+                const localSource = audioContext.createMediaStreamSource(localAudio.srcObject);
+                localAnalyser = audioContext.createAnalyser();
+                localAnalyser.fftSize = 32;
+                localSource.connect(localAnalyser);
+                
+                // Setup remote audio analyser
+                const remoteSource = audioContext.createMediaStreamSource(remoteAudio.srcObject);
+                remoteAnalyser = audioContext.createAnalyser();
+                remoteAnalyser.fftSize = 32;
+                remoteSource.connect(remoteAnalyser);
+                
+                // Start visualization
+                visualizeAudio();
+                
+            } catch (error) {
+                console.error('Audio visualization setup failed:', error);
+            }
+        }
+        
+        function visualizeAudio() {
+            if (!audioContext || !localAnalyser) return;
+            
+            const localDataArray = new Uint8Array(localAnalyser.frequencyBinCount);
+            const remoteDataArray = remoteAnalyser ? new Uint8Array(remoteAnalyser.frequencyBinCount) : null;
+            
+            function update() {
+                localAnalyser.getByteFrequencyData(localDataArray);
+                
+                // Calculate average level for local audio
+                let localSum = 0;
+                for (let i = 0; i < localDataArray.length; i++) {
+                    localSum += localDataArray[i];
+                }
+                const localAverage = localSum / localDataArray.length;
+                
+                // Update local audio level display (0-100%)
+                const localLevel = Math.min(100, (localAverage / 255) * 100);
+                const localLevelBar = document.getElementById('localAudioLevel');
+                if (localLevelBar) {
+                    localLevelBar.style.width = localLevel + '%';
+                }
+                
+                // Update remote audio level if available
+                if (remoteAnalyser && remoteDataArray) {
+                    remoteAnalyser.getByteFrequencyData(remoteDataArray);
+                    let remoteSum = 0;
+                    for (let i = 0; i < remoteDataArray.length; i++) {
+                        remoteSum += remoteDataArray[i];
+                    }
+                    const remoteAverage = remoteSum / remoteDataArray.length;
+                    const remoteLevel = Math.min(100, (remoteAverage / 255) * 100);
+                    const remoteLevelBar = document.getElementById('remoteAudioLevel');
+                    if (remoteLevelBar) {
+                        remoteLevelBar.style.width = remoteLevel + '%';
+                    }
+                }
+                
+                requestAnimationFrame(update);
+            }
+            
+            update();
+        }
+        
+        // Start visualization when streams are ready
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                setupAudioVisualization();
+            }, 2000);
+        });
+        
+        // Update UI based on call type
+        setTimeout(() => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const callType = urlParams.get('type');
+            
+            if (callType === 'group') {
+                // Show participants section for group calls
+                const participantsSection = document.getElementById('participantsSection');
+                if (participantsSection) {
+                    participantsSection.style.display = 'block';
+                }
+                
+                // Update audio label
+                const remoteAudioLabel = document.getElementById('remoteAudioLabel');
+                if (remoteAudioLabel) {
+                    remoteAudioLabel.textContent = 'Others';
+                }
+            } else {
+                // Update audio label for personal calls
+                const remoteAudioLabel = document.getElementById('remoteAudioLabel');
+                if (remoteAudioLabel) {
+                    remoteAudioLabel.textContent = 'Partner';
+                }
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

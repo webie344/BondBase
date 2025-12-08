@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Disabled - Dating Connect</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .disabled-container {
+            max-width: 500px;
+            margin: 100px auto;
+            padding: 40px;
+            text-align: center;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .disabled-icon {
+            font-size: 64px;
+            color: #ff4757;
+            margin-bottom: 20px;
+        }
+
+        .disabled-title {
+            color: #2d3436;
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .disabled-message {
+            color: #636e72;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .disabled-reasons {
+            background: #fff9f9;
+            border: 1px solid #ffe6e6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: left;
+        }
+
+        .disabled-reasons h3 {
+            color: #e84118;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .disabled-reasons ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .disabled-reasons li {
+            padding: 8px 0;
+            color: #636e72;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .disabled-reasons li i {
+            color: #e84118;
+            margin-top: 2px;
+        }
+
+        .verification-section {
+            background: #e8f4ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .verification-section h3 {
+            color: #0066cc;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .contact-support {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .contact-support h3 {
+            color: #2d3436;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .contact-email {
+            color: #0984e3;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .contact-email:hover {
+            text-decoration: underline;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--accent-color, #007bff);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover, #0056b3);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #2d3436;
+            border: 2px solid #e9ecef;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .btn-logout {
+            background: #ffe6e6;
+            color: #e84118;
+            border: 2px solid #ffcccc;
+        }
+
+        .btn-logout:hover {
+            background: #ffcccc;
+            transform: translateY(-2px);
+        }
+
+        .btn-verify {
+            background: #00b894;
+            color: white;
+        }
+
+        .btn-verify:hover {
+            background: #00a085;
+            transform: translateY(-2px);
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            max-width: 350px;
+            animation: slideIn 0.3s ease;
+            border-left: 4px solid;
+        }
+
+        .notification.success {
+            border-left-color: #28a745;
+        }
+
+        .notification.error {
+            border-left-color: #dc3545;
+        }
+
+        .notification.info {
+            border-left-color: #007bff;
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: black;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: left;
+        }
+
+        .user-info h4 {
+            margin: 0 0 8px 0;
+            color: #2d3436;
+            font-size: 14px;
+        }
+
+        .user-info p {
+            margin: 4px 0;
+            font-size: 13px;
+            color: #636e72;
+        }
+
+        .status-checker {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .status-checker h4 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .status-checker p {
+            color: #856404;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .auto-check-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #0066cc;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .auto-check-indicator .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #0066cc;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 768px) {
+            .disabled-container {
+                margin: 50px 20px;
+                padding: 30px 20px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="disabled-container">
+        <div class="disabled-icon">
+            <i class="fas fa-user-slash"></i>
+        </div>
+        
+        <h1 class="disabled-title">Account Disabled</h1>
+        
+        <p class="disabled-message">
+            Your account has been temporarily disabled. This usually happens when an account isn't verified within 3 days of creation.
+        </p>
+
+        <!-- Status Checker Section -->
+        <div class="status-checker">
+            <h4><i class="fas fa-sync-alt"></i> Automatic Status Check</h4>
+            <p>We'll automatically check if you've verified your email and redirect you when ready.</p>
+            <div class="auto-check-indicator">
+                <div class="dot"></div>
+                <span>Checking status every 10 seconds...</span>
+            </div>
+        </div>
+
+        <!-- User Information Section -->
+        <div class="user-info">
+            <h4><i class="fas fa-user"></i> Account Information</h4>
+            <p id="userEmail">Email: Loading...</p>
+            <p id="userStatus">Status: Checking...</p>
+            <p id="loginStatus">Login Status: Checking...</p>
+            <p id="verificationStatus">Email Verification: Checking...</p>
+        </div>
+
+        <div class="verification-section">
+            <h3><i class="fas fa-envelope"></i> Email Verification</h3>
+            <p style="color: #0066cc; margin-bottom: 15px;">
+                You can try resending the verification email and verify your account to reactivate it.
+            </p>
+            <button id="resendVerificationBtn" class="btn btn-verify" onclick="resendVerificationEmail()">
+                <i class="fas fa-paper-plane"></i> Resend Verification Email
+            </button>
+            <div id="verificationActionStatus" style="margin-top: 10px;"></div>
+        </div>
+
+        <div class="disabled-reasons">
+            <h3><i class="fas fa-exclamation-triangle"></i> Possible Reasons:</h3>
+            <ul>
+                <li>
+                    <i class="fas fa-envelope"></i>
+                    <span>Email verification not completed within 3 days</span>
+                </li>
+                <li>
+                    <i class="fas fa-clock"></i>
+                    <span>Account verification timeout</span>
+                </li>
+                <li>
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Security measures for unverified accounts</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="contact-support">
+            <h3><i class="fas fa-life-ring"></i> Need Help?</h3>
+            <p>Contact our support team to reactivate your account:</p>
+            <a href="mailto:support@bondlyapp103.com" class="contact-email">
+                <i class="fas fa-envelope"></i> support@bondlyapp103@gmail.com
+            </a>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-primary" onclick="handleReactivateRequest()">
+                <i class="fas fa-sync-alt"></i> Request Reactivation
+            </button>
+            
+            <button class="btn btn-secondary" onclick="goToLogin()">
+                <i class="fas fa-arrow-left"></i> Back to Login
+            </button>
+            
+            <button class="btn btn-logout" onclick="handleLogout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+
+            <button class="btn btn-verify" onclick="manualStatusCheck()" id="manualCheckBtn">
+                <i class="fas fa-refresh"></i> Check Status Now
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signOut, 
+            sendEmailVerification,
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            updateDoc, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
+            authDomain: "dating-connect.firebaseapp.com",
+            projectId: "dating-connect",
+            storageBucket: "dating-connect.appspot.com",
+            messagingSenderId: "1062172180210",
+            appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let isRedirecting = false;
+        let statusCheckInterval = null;
+        let manualCheckInProgress = false;
+
+        // Show notification function
+        function showNotification(message, type = 'info', duration = 5000) {
+            const existingNotifications = document.querySelectorAll('.notification');
+            existingNotifications.forEach(notification => notification.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, duration);
+            
+            return notification;
+        }
+
+        // Update user information display
+        function updateUserDisplay() {
+            const userEmailElement = document.getElementById('userEmail');
+            const userStatusElement = document.getElementById('userStatus');
+            const loginStatusElement = document.getElementById('loginStatus');
+            const verificationStatusElement = document.getElementById('verificationStatus');
+            
+            if (currentUser) {
+                userEmailElement.textContent = `Email: ${currentUser.email}`;
+                userStatusElement.textContent = `Status: Disabled (Awaiting Verification)`;
+                loginStatusElement.textContent = `Login Status: Logged In`;
+                verificationStatusElement.textContent = `Email Verification: ${currentUser.emailVerified ? 'Verified' : 'Not Verified'}`;
+                
+                userStatusElement.style.color = '#e84118';
+                loginStatusElement.style.color = '#00b894';
+                verificationStatusElement.style.color = currentUser.emailVerified ? '#00b894' : '#e84118';
+            } else {
+                // Try to get from localStorage
+                const storedEmail = localStorage.getItem('disabledUserEmail');
+                const storedUserId = localStorage.getItem('disabledUserId');
+                
+                if (storedEmail) {
+                    userEmailElement.textContent = `Email: ${storedEmail}`;
+                    userStatusElement.textContent = `Status: Disabled (Awaiting Verification)`;
+                    loginStatusElement.textContent = `Login Status: Not Logged In - Please use "Back to Login"`;
+                    verificationStatusElement.textContent = `Email Verification: Unknown`;
+                    
+                    userStatusElement.style.color = '#e84118';
+                    loginStatusElement.style.color = '#e84118';
+                    verificationStatusElement.style.color = '#636e72';
+                } else {
+                    userEmailElement.textContent = `Email: Not available`;
+                    userStatusElement.textContent = `Status: Unknown`;
+                    loginStatusElement.textContent = `Login Status: Not Logged In`;
+                    verificationStatusElement.textContent = `Email Verification: Unknown`;
+                    
+                    userStatusElement.style.color = '#636e72';
+                    loginStatusElement.style.color = '#e84118';
+                    verificationStatusElement.style.color = '#636e72';
+                }
+            }
+        }
+
+        // Enhanced function to get current user with multiple fallbacks
+        async function getCurrentUserWithRetry(maxRetries = 5) {
+            // Try verification manager first
+            if (window.verificationManager && window.verificationManager.getCurrentUser) {
+                const user = window.verificationManager.getCurrentUser();
+                if (user) {
+                    return user;
+                }
+            }
+            
+            // Try auth currentUser
+            if (auth.currentUser) {
+                return auth.currentUser;
+            }
+            
+            // Wait and retry
+            for (let i = 0; i < maxRetries; i++) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (auth.currentUser) {
+                    return auth.currentUser;
+                }
+            }
+            
+            return null;
+        }
+
+        // Safe redirect to login
+        function goToLogin() {
+            if (isRedirecting) return;
+            isRedirecting = true;
+            
+            // Clear any stored credentials
+            localStorage.removeItem('userPassword');
+            
+            if (window.verificationManager) {
+                window.verificationManager.resetRedirectFlag();
+            }
+            
+            window.location.href = 'login.html';
+        }
+
+        // Enhanced resend verification function
+        async function resendVerificationEmail() {
+            const button = document.getElementById('resendVerificationBtn');
+            const statusElement = document.getElementById('verificationActionStatus');
+            
+            // Get current user with retry mechanism
+            currentUser = await getCurrentUserWithRetry();
+            
+            if (!currentUser) {
+                const errorMsg = 'No user logged in. Please go back to login and try again.';
+                statusElement.innerHTML = `<p style="color: #e84118; font-size: 14px;"><i class="fas fa-exclamation-circle"></i> ${errorMsg}</p>`;
+                showNotification(errorMsg, 'error');
+                return;
+            }
+
+            try {
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+                statusElement.innerHTML = '<p style="color: #0066cc; font-size: 14px;"><i class="fas fa-info-circle"></i> Preparing to send verification email...</p>';
+
+                // Check if we sent a verification email recently
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    const lastSent = userData.verificationSentAt?.toDate?.()?.getTime() || 0;
+                    const now = new Date().getTime();
+                    const oneHour = 60 * 60 * 1000;
+
+                    if (now - lastSent < oneHour) {
+                        const infoMsg = 'Verification email sent recently. Please check your inbox and spam folder.';
+                        statusElement.innerHTML = `<p style="color: #0066cc; font-size: 14px;"><i class="fas fa-info-circle"></i> ${infoMsg}</p>`;
+                        showNotification(infoMsg, 'info');
+                        button.disabled = false;
+                        button.innerHTML = '<i class="fas fa-paper-plane"></i> Resend Verification Email';
+                        return;
+                    }
+                }
+
+                // Send verification email
+                await sendEmailVerification(currentUser);
+
+                // Update verification sent timestamp
+                await updateDoc(doc(db, 'users', currentUser.uid), {
+                    verificationSentAt: serverTimestamp()
+                });
+
+                const successMsg = 'Verification email sent! Please check your inbox and spam folder.';
+                statusElement.innerHTML = `<p style="color: #00b894; font-size: 14px;"><i class="fas fa-check-circle"></i> ${successMsg}</p>`;
+                showNotification(successMsg, 'success');
+                
+                // Re-enable button after 60 seconds to prevent spam
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-paper-plane"></i> Resend Verification Email';
+                    statusElement.innerHTML = '';
+                }, 60000);
+
+            } catch (error) {
+                let errorMessage = 'Error sending verification email. Please try again.';
+                if (error.code === 'auth/invalid-continue-uri' || error.code === 'auth/invalid-continue-url') {
+                    errorMessage = 'Configuration error. Please contact support.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    errorMessage = 'Too many requests. Please try again later.';
+                } else if (error.code === 'auth/network-request-failed') {
+                    errorMessage = 'Network error. Please check your connection.';
+                }
+                
+                statusElement.innerHTML = `<p style="color: #e84118; font-size: 14px;"><i class="fas fa-exclamation-circle"></i> ${errorMessage}</p>`;
+                showNotification(errorMessage, 'error');
+                
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-paper-plane"></i> Resend Verification Email';
+            }
+        }
+
+        // Logout function
+        async function handleLogout() {
+            try {
+                if (window.verificationManager) {
+                    window.verificationManager.resetRedirectFlag();
+                }
+                
+                // Clear stored credentials
+                localStorage.removeItem('disabledUserEmail');
+                localStorage.removeItem('disabledUserId');
+                localStorage.removeItem('userPassword');
+                
+                await signOut(auth);
+                goToLogin();
+            } catch (error) {
+                showNotification('Error logging out. Please try again.', 'error');
+            }
+        }
+
+        // Reactivation request function
+        function handleReactivateRequest() {
+            const userEmail = currentUser?.email || localStorage.getItem('disabledUserEmail') || 'Unknown email';
+            const supportEmail = 'support@bondlyapp103.com';
+            const subject = 'Account Reactivation Request - Dating Connect';
+            const body = `Hello Dating Connect Support,\n\nI would like to request reactivation of my account.\n\nUser Email: ${userEmail}\n\nPlease provide me with instructions on how to proceed.\n\nThank you.`;
+            
+            window.location.href = `mailto:${supportEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        }
+
+        // NEW: Manual status check function
+        async function manualStatusCheck() {
+            if (manualCheckInProgress) return;
+            
+            const button = document.getElementById('manualCheckBtn');
+            const originalText = button.innerHTML;
+            
+            try {
+                manualCheckInProgress = true;
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
+                
+                showNotification('Checking your verification status...', 'info', 3000);
+                
+                await checkVerificationAndRedirect(true);
+                
+            } finally {
+                manualCheckInProgress = false;
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        // NEW: Check verification status and redirect if verified
+        async function checkVerificationAndRedirect(isManualCheck = false) {
+            try {
+                // First, ensure we have the current user
+                currentUser = await getCurrentUserWithRetry(2);
+                
+                if (!currentUser) {
+                    if (isManualCheck) {
+                        showNotification('No user logged in. Please log in again.', 'error');
+                    }
+                    return;
+                }
+
+                // Check if user email is verified
+                await currentUser.reload();
+                
+                if (currentUser.emailVerified) {
+                    // Use the verification manager to fix the account status
+                    if (window.verificationManager) {
+                        const status = await window.verificationManager.forceRecheckVerificationStatus();
+                        
+                        if (status.verified && !status.disabled) {
+                            showNotification('Account verified and activated! Redirecting to dashboard...', 'success');
+                            setTimeout(() => {
+                                window.location.href = 'dashboard.html';
+                            }, 2000);
+                            return;
+                        }
+                    } else {
+                        // Fallback: manually check and update account status
+                        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+                        if (userDoc.exists()) {
+                            const userData = userDoc.data();
+                            
+                            if (userData.accountDisabled) {
+                                // User is verified but account is still disabled - fix it
+                                await updateDoc(doc(db, 'users', currentUser.uid), {
+                                    accountDisabled: false,
+                                    reenabledAt: serverTimestamp(),
+                                    updatedAt: serverTimestamp()
+                                });
+                                
+                                showNotification('Account activated! Redirecting to dashboard...', 'success');
+                                setTimeout(() => {
+                                    window.location.href = 'dashboard.html';
+                                }, 2000);
+                                return;
+                            } else {
+                                // Account is already enabled
+                                showNotification('Account is active! Redirecting to dashboard...', 'success');
+                                setTimeout(() => {
+                                    window.location.href = 'dashboard.html';
+                                }, 2000);
+                                return;
+                            }
+                        }
+                    }
+                } else {
+                    if (isManualCheck) {
+                        showNotification('Email not verified yet. Please check your inbox for the verification link.', 'info');
+                    }
+                }
+                
+                // Update display with current status
+                updateUserDisplay();
+                
+            } catch (error) {
+                if (isManualCheck) {
+                    showNotification('Error checking status. Please try again.', 'error');
+                }
+            }
+        }
+
+        // Check if user account is still disabled (legacy function)
+        async function checkAccountStatus() {
+            if (!currentUser) return;
+
+            try {
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    
+                    // If account is no longer disabled and email is verified, redirect to dashboard
+                    if (!userData.accountDisabled && currentUser.emailVerified) {
+                        showNotification('Account reactivated! Redirecting...', 'success');
+                        setTimeout(() => {
+                            window.location.href = 'dashboard.html';
+                        }, 2000);
+                    }
+                }
+            } catch (error) {
+                // Silent error handling
+            }
+        }
+
+        // Auth state listener
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                
+                // Update UI with user info
+                updateUserDisplay();
+                
+                // Store user info for recovery
+                localStorage.setItem('disabledUserEmail', user.email);
+                localStorage.setItem('disabledUserId', user.uid);
+                
+                // Start automatic status checking
+                if (!statusCheckInterval) {
+                    statusCheckInterval = setInterval(() => {
+                        checkVerificationAndRedirect(false);
+                    }, 10000); // Check every 10 seconds
+                }
+                
+            } else {
+                // User signed out - but don't auto-redirect
+                currentUser = null;
+                updateUserDisplay();
+                
+                // Stop automatic checking
+                if (statusCheckInterval) {
+                    clearInterval(statusCheckInterval);
+                    statusCheckInterval = null;
+                }
+            }
+        });
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Try to get current user immediately
+            currentUser = await getCurrentUserWithRetry();
+            updateUserDisplay();
+            
+            // Start automatic status checking
+            if (currentUser && !statusCheckInterval) {
+                statusCheckInterval = setInterval(() => {
+                    checkVerificationAndRedirect(false);
+                }, 10000); // Check every 10 seconds
+            }
+            
+            // If no user found, show instructions
+            if (!currentUser) {
+                showNotification('Please use "Back to Login" to sign in again', 'info', 10000);
+            }
+        });
+
+        // Clean up interval when leaving page
+        window.addEventListener('beforeunload', () => {
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+        });
+
+        // Make functions globally available
+        window.resendVerificationEmail = resendVerificationEmail;
+        window.handleLogout = handleLogout;
+        window.handleReactivateRequest = handleReactivateRequest;
+        window.goToLogin = goToLogin;
+        window.manualStatusCheck = manualStatusCheck;
+        window.checkVerificationAndRedirect = checkVerificationAndRedirect;
+    </script>
+</body>
+</html>
