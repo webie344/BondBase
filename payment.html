@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Chat Points - BondBase</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="dashboard.html" class="logo">BondBase</a>
+            <div class="nav-menu">
+                <ul class="nav-links">
+    <li>
+        <a href="mingle.html">
+            <span class="nav-text" style="font-family: 'Dancing Script', cursive;">Discover</span>
+        </a>
+    </li>
+    <li>
+        <a href="messages.html">
+            <span class="nav-text" style="font-family: 'Pacifico', cursive;">Messages</span>
+        </a>
+    </li>
+    <li>
+        <a href="profile.html">
+            <span class="nav-text" style="font-family: 'Great Vibes', cursive;">Profile</span>
+        </a>
+    </li>
+    <li>
+        <a href="account.html">
+            <span class="nav-text" style="font-family: 'Satisfy', cursive;">Settings</span>
+        </a>
+    </li>
+    <li>
+        <button id="logoutBtn" class="btn btn-outline">
+            <span class="nav-text" style="font-family: 'Parisienne', cursive;">Logout</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <a href="dashboard.html" class="nav-links">
+            <i class="fas fa-dashboard"></i>
+            <span class="nav-text" style="font-family: 'Cedarville Cursive', cursive;">Dashboard</span>
+        </a>
+    </li>
+                           <li class="nav-item">
+                    <a href="groups.html" class="nav-links">
+                        <i class="fas fa-users"></i>
+                        <span>Groups</span>
+                    </a>
+                </li>         
+</ul>
+            </div>
+            <div id="mobile-menu" class="mobile-menu-btn">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <main class="payment-container">
+        <button id="backBtn" class="btn btn-outline back-btn">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </button>
+
+        <div class="payment-header">
+            <h1>Purchase Chat Points</h1>
+            <div class="current-points">
+                <span>Current Points:</span>
+                <span class="chat-points-display">0</span>
+            </div>
+        </div>
+
+        <div class="plans-container">
+            <div class="plan-card">
+                <h3>30 Chat Points</h3>
+                <p class="price">$7</p>
+                <ul class="plan-features">
+                    <li>30 messages</li>
+                    <li>Basic support</li>
+                </ul>
+                <button class="plan-button btn btn-primary" data-plan="30_points">
+                    Select Plan
+                </button>
+            </div>
+
+            <div class="plan-card">
+                <h3>300 Chat Points</h3>
+                <p class="price">$25</p>
+                <ul class="plan-features">
+                    <li>300 messages</li>
+                    <li>Priority support</li>
+                    <li>Best value</li>
+                </ul>
+                <button class="plan-button btn btn-primary" data-plan="300_points">
+                    Select Plan
+                </button>
+            </div>
+
+            <div class="plan-card">
+                <h3>Lifetime Access</h3>
+                <p class="price">$200</p>
+                <ul class="plan-features">
+                    <li>Unlimited messages</li>
+                    <li>VIP support</li>
+                    <li>Premium badge</li>
+                    <li>End to end encryption of messages </li>
+                </ul>
+                <button class="plan-button btn btn-accent" data-plan="lifetime">
+                    Select Plan
+                </button>
+            </div>
+        </div>
+
+        <div class="payment-instructions">
+            <h2>Payment Instructions</h2>
+            <p>Please send your payment to one of the following cryptocurrency wallets:</p>
+            
+            <div class="wallet-option">
+                <h3>Bitcoin (BTC)</h3>
+                <div class="wallet-address">
+                    <code>bc1qq7m79ljpkmw9efw5acvx4peqpyx6umtl9tehfr</code>
+                    <button class="copy-btn" data-address="bc1qxy2kgdygjrsqtzq2n0yrf2493w83k4fj5x4zyh">
+                        <i class="far fa-copy"></i> Copy
+                    </button>
+                </div>
+            </div>
+
+            <div class="wallet-option">
+                <h3>Ethereum (ETH)</h3>
+                <div class="wallet-address">
+                    <code>0xfDC4F1F44A4e09De282d15e129e7A29c7B55E24c</code>
+                    <button class="copy-btn" data-address="0x71C7656EC7ab88b098defB751B7401B5f6d8976F">
+                        <i class="far fa-copy"></i> Copy
+                    </button>
+                </div>
+            </div>
+
+            <p class="note">After making your payment, please submit the transaction details below.</p>
+        </div>
+
+        <form id="paymentForm" class="payment-form">
+            <input type="hidden" id="selectedPlan" value="">
+            
+            <div class="form-group">
+                <label for="transactionId">Transaction ID</label>
+                <input type="text" id="transactionId" required placeholder="Enter your transaction ID">
+            </div>
+            
+            <div class="form-group">
+                <label for="paymentEmail">Your Email</label>
+                <input type="email" id="paymentEmail" required value="" placeholder="Enter your email">
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-paper-plane"></i> Submit Payment
+            </button>
+        </form>
+    </main>
+      <script type="module" src="call.js"></script>
+    <script type="module" src="app.js"></script>
+    <script src="hack.js"></script>
+</body>
+</html>

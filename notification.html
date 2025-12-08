@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - BondBase</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* BDSM Theme Variables - Matching mingles.html */
+        :root {
+            --primary: #b3004b; /* deep crimson */
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --secondary: #8b0000; /* dark red for alerts/badges */
+            --accent: #444; /* metal/steel tone */
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b; /* deep black */
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --border-color: #2e2e2e;
+            --bg-light: #1b1b1b;
+            --accent-color: #b3004b;
+            --accent-dark: #7a0034;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.7);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.7);
+            --radius: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding-bottom: 70px; /* Space for bottom nav */
+        }
+
+        /* Hide the top navbar */
+        .navbar {
+            display: none;
+        }
+        
+        /* Bottom Navigation - Style from stream.html */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #fff;
+            text-decoration: none;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+            padding: 5px;
+            flex: 1;
+            max-width: 16.666%; /* 6 items = 100/6 ≈ 16.666% */
+        }
+
+        .nav-item:hover {
+            opacity: 1;
+        }
+
+        .nav-item.active {
+            opacity: 1;
+            color: #ff2d55;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 500;
+        }
+        
+        /* Notification badge for bottom nav */
+        .notification-badge-bottom {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        
+        .badge-container {
+            position: relative;
+            display: inline-block;
+        }
+        
+        /* Message count badge for bottom nav */
+        .message-count-bottom {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* Main Content - Adjusted for no top nav */
+        .main-content {
+            padding: 40px 0;
+            min-height: calc(100vh - 70px);
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-shadow: var(--shadow);
+        }
+
+        .notification-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--text-primary);
+            box-shadow: var(--shadow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-outline {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-outline:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        /* Notification Filters */
+        .notification-filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 0.6rem 1.2rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            backdrop-filter: blur(10px);
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--text-primary);
+            border-color: var(--primary);
+        }
+
+        .filter-btn:hover:not(.active) {
+            background-color: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        /* Notifications List */
+        .notifications-container {
+            background-color: var(--bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .notification-item {
+            display: flex;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            align-items: flex-start;
+        }
+
+        .notification-item:hover {
+            background-color: rgba(179, 0, 75, 0.05);
+        }
+
+        .notification-item.unread {
+            background-color: rgba(179, 0, 75, 0.08);
+            border-left: 3px solid var(--primary);
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+
+        .notification-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            flex-shrink: 0;
+            font-size: 1.2rem;
+        }
+
+        .notification-icon.message {
+            background-color: rgba(74, 140, 255, 0.1);
+            color: #4a8cff;
+        }
+
+        .notification-icon.like {
+            background-color: rgba(179, 0, 75, 0.15);
+            color: var(--primary-light);
+        }
+
+        .notification-icon.match {
+            background-color: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+        }
+
+        .notification-icon.system {
+            background-color: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .notification-text {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+
+        .notification-time {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .notification-item-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-left: 1rem;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+            padding: 0.5rem;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-btn:hover {
+            color: var(--primary-light);
+            border-color: var(--primary-light);
+            background: rgba(179, 0, 75, 0.1);
+        }
+
+        .unread-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary-light);
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-light);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            color: var(--border-color);
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state p {
+            color: var(--text-light);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* Footer */
+        footer {
+            background-color: var(--bg-primary);
+            padding: 2rem 0;
+            border-top: 1px solid var(--border-color);
+            margin-top: 3rem;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .footer-link {
+            text-decoration: none;
+            color: var(--text-light);
+            transition: color 0.3s;
+            font-size: 0.9rem;
+        }
+
+        .footer-link:hover {
+            color: var(--primary-light);
+        }
+
+        .copyright {
+            color: var(--text-light);
+            font-size: 0.85rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 30px 0;
+            }
+
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .notification-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .notification-item {
+                flex-direction: column;
+                padding: 1.25rem;
+            }
+
+            .notification-icon {
+                margin-bottom: 1rem;
+                margin-right: 0;
+            }
+
+            .notification-item-actions {
+                margin-left: 0;
+                margin-top: 1rem;
+                justify-content: flex-end;
+            }
+
+            .footer-content {
+                flex-direction: column;
+                gap: 1.5rem;
+                text-align: center;
+            }
+
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            /* Bottom nav responsive */
+            .nav-item {
+                max-width: 20%; /* 5 items = 20% each */
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .page-title {
+                font-size: 1.75rem;
+            }
+            
+            .btn {
+                padding: 0.6rem 1rem;
+                font-size: 0.8rem;
+            }
+            
+            .notification-filters {
+                gap: 0.5rem;
+            }
+            
+            .filter-btn {
+                padding: 0.5rem 1rem;
+                font-size: 0.8rem;
+            }
+            
+            /* Bottom nav small screens */
+            .nav-icon {
+                font-size: 18px;
+            }
+            
+            .nav-label {
+                font-size: 9px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="page-title">Notifications</h1>
+                <div class="notification-actions">
+                    <button class="btn btn-outline" id="markAllReadBtn">
+                        <i class="fas fa-check-double"></i>
+                        Mark All Read
+                    </button>
+                    <button class="btn btn-primary" id="refreshNotificationsBtn">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Notification Filters -->
+            <div class="notification-filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="unread">Unread</button>
+                <button class="filter-btn" data-filter="messages">Messages</button>
+                <button class="filter-btn" data-filter="matches">Matches</button>
+                <button class="filter-btn" data-filter="likes">Likes</button>
+                <button class="filter-btn" data-filter="system">System</button>
+            </div>
+
+            <!-- Notifications List -->
+            <div class="notifications-container" id="notificationsList">
+                <!-- Sample notifications - these would be dynamically loaded -->
+                <div class="notification-item unread">
+                    <div class="notification-icon like">
+                        <i class="fas fa-heart"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">
+                            <span>New Connection</span>
+                            <div class="unread-dot"></div>
+                        </div>
+                        <p class="notification-text">Alex matched with you! Send a message to start the conversation.</p>
+                        <div class="notification-time">2 minutes ago</div>
+                    </div>
+                    <div class="notification-item-actions">
+                        <button class="action-btn" title="Mark as read">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="notification-item">
+                    <div class="notification-icon message">
+                        <i class="fas fa-comment"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">
+                            <span>New Message</span>
+                        </div>
+                        <p class="notification-text">Jordan: "Hey! I noticed we share an interest in rope art..."</p>
+                        <div class="notification-time">1 hour ago</div>
+                    </div>
+                    <div class="notification-item-actions">
+                        <button class="action-btn" title="Reply">
+                            <i class="fas fa-reply"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="notification-item unread">
+                    <div class="notification-icon system">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">
+                            <span>Safety Reminder</span>
+                            <div class="unread-dot"></div>
+                        </div>
+                        <p class="notification-text">Remember to verify boundaries and establish safe words before meeting.</p>
+                        <div class="notification-time">3 hours ago</div>
+                    </div>
+                    <div class="notification-item-actions">
+                        <button class="action-btn" title="Mark as read">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="notification-item">
+                    <div class="notification-icon match">
+                        <i class="fas fa-handshake"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">
+                            <span>Event Invitation</span>
+                        </div>
+                        <p class="notification-text">You're invited to the monthly munch this Saturday at 7 PM.</p>
+                        <div class="notification-time">1 day ago</div>
+                    </div>
+                    <div class="notification-item-actions">
+                        <button class="action-btn" title="RSVP">
+                            <i class="fas fa-calendar-plus"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation with YOUR original notification.html links -->
+    <div class="bottom-nav">
+        <a href="mingle.html" class="nav-item">
+            <i class="fas fa-users nav-icon"></i>
+            <span class="nav-label">Connect</span>
+        </a>
+        <a href="messages.html" class="nav-item">
+            <i class="fas fa-comments nav-icon"></i>
+            <span class="nav-label">Chat</span>
+            <span class="message-count-bottom">3</span>
+        </a>
+        <a href="posts.html" class="nav-item">
+            <i class="fas fa-graduation-cap nav-icon"></i>
+            <span class="nav-label">Resources</span>
+        </a>
+        <a href="notification.html" class="nav-item active">
+            <div class="badge-container">
+                <i class="fas fa-bell nav-icon"></i>
+                <span class="notification-badge-bottom">5</span>
+            </div>
+            <span class="nav-label">Alerts</span>
+        </a>
+        <a href="account.html" class="nav-item">
+            <i class="fas fa-user-shield nav-icon"></i>
+            <span class="nav-label">My Profile</span>
+        </a>
+        <a href="groups.html" class="nav-item">
+            <i class="fas fa-users nav-icon"></i>
+            <span class="nav-label">Groups</span>
+        </a>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="notification.js"></script>
+    <script type="module" src="app.js"></script>
+    
+    <script>
+        // Filter functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            filterButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Remove active class from all buttons
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    // Add active class to clicked button
+                    this.classList.add('active');
+                    
+                    // Here you would filter notifications based on data-filter attribute
+                    const filter = this.getAttribute('data-filter');
+                    console.log('Filtering by:', filter);
+                });
+            });
+
+            // Mark all as read
+            const markAllReadBtn = document.getElementById('markAllReadBtn');
+            if (markAllReadBtn) {
+                markAllReadBtn.addEventListener('click', function() {
+                    const unreadItems = document.querySelectorAll('.notification-item.unread');
+                    unreadItems.forEach(item => {
+                        item.classList.remove('unread');
+                    });
+                    // Update notification badge count
+                    const notificationBadge = document.querySelector('.notification-badge-bottom');
+                    if (notificationBadge) {
+                        notificationBadge.textContent = '0';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

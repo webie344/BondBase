@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Stream - BondBase</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .stream-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .stream-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .stream-header h1 {
+            color: var(--text-dark);
+            margin-bottom: 10px;
+        }
+
+        .stream-header p {
+            color: var(--text-light);
+        }
+
+        .stream-form {
+            background: var(--bg-light);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .form-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-file-input {
+            padding: 8px;
+        }
+
+        .file-preview {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .file-preview.active {
+            display: block;
+        }
+
+        .file-preview-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .file-preview-icon {
+            font-size: 24px;
+            color: var(--accent-color);
+        }
+
+        .file-preview-details {
+            flex: 1;
+        }
+
+        .file-preview-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 2px;
+        }
+
+        .file-preview-size {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .remove-file {
+            background: none;
+            border: none;
+            color: var(--error-color);
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: background-color 0.3s ease;
+        }
+
+        .remove-file:hover {
+            background: var(--bg-light);
+        }
+
+        .upload-options {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+
+        .upload-option {
+            flex: 1;
+            text-align: center;
+            padding: 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-option.active {
+            border-color: var(--accent-color);
+            background: var(--accent-light);
+        }
+
+        .upload-option i {
+            font-size: 24px;
+            margin-bottom: 8px;
+            color: var(--accent-color);
+        }
+
+        .upload-option h4 {
+            margin: 0 0 5px 0;
+            color: var(--text-dark);
+        }
+
+        .upload-option p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .upload-section {
+            display: none;
+        }
+
+        .upload-section.active {
+            display: block;
+        }
+
+        .video-preview {
+            width: 100%;
+            max-height: 200px;
+            border-radius: 10px;
+            margin-top: 10px;
+            display: none;
+            object-fit: cover;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn-primary {
+            flex: 1;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            flex: 1;
+            background: var(--bg-dark);
+            color: var(--text-dark);
+            border: 1px solid var(--border-color);
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-primary:disabled {
+            background: var(--text-light);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .url-help {
+            font-size: 12px;
+            color: var(--text-light);
+            margin-top: 5px;
+        }
+
+        .url-help a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .url-help a:hover {
+            text-decoration: underline;
+        }
+
+        .supported-platforms {
+            background: var(--bg-dark);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .supported-platforms h4 {
+            margin: 0 0 10px 0;
+            color: var(--text-dark);
+            font-size: 14px;
+        }
+
+        .platform-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .platform-tag {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .file-limits {
+            background: var(--bg-dark);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .file-limits h4 {
+            margin: 0 0 10px 0;
+            color: var(--text-dark);
+            font-size: 14px;
+        }
+
+        .file-limits ul {
+            margin: 0;
+            padding-left: 20px;
+            color: var(--text-light);
+            font-size: 12px;
+        }
+
+        .file-limits li {
+            margin-bottom: 5px;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .success-message {
+            display: none;
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .error-message {
+            display: none;
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .upload-progress {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: var(--text-light);
+            margin-top: 5px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .stream-container {
+                padding: 15px;
+            }
+
+            .stream-form {
+                padding: 20px;
+            }
+
+            .upload-options {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .btn-primary, .btn-secondary {
+                flex: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .upload-option {
+                padding: 12px;
+            }
+
+            .upload-option i {
+                font-size: 20px;
+            }
+
+            .upload-option h4 {
+                font-size: 14px;
+            }
+
+            .upload-option p {
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.html" class="logo">BondBase</a>
+            <div class="nav-toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="mingle.html" class="nav-links">
+                        <i class="fas fa-users"></i>
+                        <span class="nav-text" style="font-family: 'Dancing Script', cursive; font-size: 1.1rem;">Connect</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="messages.html" class="nav-links">
+                        <i class="fas fa-comments"></i>
+                        <span class="nav-text" style="font-family: 'Pacifico', cursive; font-size: 1rem;">Chat</span>
+                        <span class="message-count">0</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="stream.html" class="nav-links">
+                        <i class="fas fa-play-circle"></i>
+                        <span class="nav-text" style="font-family: 'Great Vibes', cursive; font-size: 1.1rem;">Stream</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="account.html" class="nav-links">
+                        <i class="fas fa-user-shield"></i>
+                        <span class="nav-text" style="font-family: 'Great Vibes', cursive; font-size: 1.2rem;">My Profile</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" id="logoutBtn" class="nav-links">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span class="nav-text" style="font-family: 'Satisfy', cursive; font-size: 1rem;">Logout</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard.html" class="nav-links">
+                        <span class="nav-text" style="font-family: 'Parisienne', cursive; font-size: 1.1rem;">Dashboard</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </li>
+                                <li class="nav-item">
+                    <a href="groups.html" class="nav-links">
+                        <i class="fas fa-users"></i>
+                        <span>Groups</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="stream-container">
+            <div class="stream-header">
+                <h1><i class="fas fa-video"></i> Create Stream</h1>
+                <p>Share  videos with the community - completely free!</p>
+            </div>
+
+            <div class="success-message" id="successMessage">
+                <i class="fas fa-check-circle"></i> <span>Stream created successfully! Redirecting...</span>
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                <i class="fas fa-exclamation-circle"></i> <span id="errorText"></span>
+            </div>
+
+            <form id="streamForm" class="stream-form">
+                <!-- Upload Method Selection -->
+                <div class="upload-options">
+                    <div class="upload-option active" data-method="url">
+                        <i class="fas fa-link"></i>
+                        <h4>Video URL</h4>
+                        <p>YouTube, Vimeo, etc.</p>
+                    </div>
+                    <div class="upload-option" data-method="file">
+                        <i class="fas fa-upload"></i>
+                        <h4>Upload File</h4>
+                        <p>From your device</p>
+                    </div>
+                </div>
+
+                <!-- URL Upload Section -->
+                <div class="upload-section active" id="urlSection">
+                    <div class="form-group">
+                        <label for="videoUrl"><i class="fas fa-link"></i> Video URL</label>
+                        <input type="url" id="videoUrl" class="form-input" placeholder="https://youtube.com/watch?v=...">
+                        <div class="url-help">
+                            Supported platforms: YouTube, Vimeo, Dailymotion, or direct video links
+                        </div>
+                    </div>
+
+                    <div class="supported-platforms">
+                        <h4><i class="fas fa-info-circle"></i> Supported Platforms</h4>
+                        <div class="platform-list">
+                            <span class="platform-tag">YouTube</span>
+                            <span class="platform-tag">Vimeo</span>
+                            <span class="platform-tag">Dailymotion</span>
+                            <span class="platform-tag">MP4 Links</span>
+                            <span class="platform-tag">WebM Links</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Upload Section -->
+                <div class="upload-section" id="fileSection">
+                    <div class="form-group">
+                        <label for="videoFile"><i class="fas fa-upload"></i> Video File</label>
+                        <input type="file" id="videoFile" class="form-input form-file-input" accept="video/*">
+                        <div class="url-help">
+                            Select a video file from your device (max 100MB)
+                        </div>
+                        
+                        <!-- File Preview -->
+                        <div class="file-preview" id="filePreview">
+                            <div class="file-preview-info">
+                                <i class="fas fa-file-video file-preview-icon"></i>
+                                <div class="file-preview-details">
+                                    <div class="file-preview-name" id="fileName"></div>
+                                    <div class="file-preview-size" id="fileSize"></div>
+                                </div>
+                                <button type="button" class="remove-file" id="removeFile">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Video Preview -->
+                        <video class="video-preview" id="videoPreview" controls>
+                            Your browser does not support the video tag.
+                        </video>
+
+                        <!-- Upload Progress -->
+                        <div class="upload-progress" id="uploadProgress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <div class="progress-text" id="progressText">Processing...</div>
+                        </div>
+                    </div>
+
+                    <div class="file-limits">
+                        <h4><i class="fas fa-info-circle"></i> File Requirements</h4>
+                        <ul>
+                            <li>Maximum file size: 100MB</li>
+                            <li>Supported formats: MP4, WebM, MOV</li>
+                            <li>Videos are stored securely in the cloud</li>
+                            <li>Completely free - no storage costs!</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Common Form Fields -->
+                <div class="form-group">
+                    <label for="headline"><i class="fas fa-heading"></i> Headline</label>
+                    <input type="text" id="headline" class="form-input" placeholder="Enter an engaging headline..." maxlength="100" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="description"><i class="fas fa-align-left"></i> Description</label>
+                    <textarea id="description" class="form-input form-textarea" placeholder="Describe your video content..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="category"><i class="fas fa-tag"></i> Category</label>
+                    <select id="category" class="form-input" required>
+                        <option value="">Select a category</option>
+                        <option value="sexual-health">Sexual Health</option>
+                        <option value="relationships">Relationships</option>
+                        <option value="consent">Consent Education</option>
+                        <option value="reproductive-health">Reproductive Health</option>
+                        <option value="lgbtq">LGBTQ+ Health</option>
+                        <option value="mental-health">Mental Health</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <a href="stream.html" class="btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Streams
+                    </a>
+                    <button type="submit" id="submitBtn" class="btn-primary">
+                        <i class="fas fa-upload"></i> Create Stream
+                    </button>
+                </div>
+            </form>
+
+            <div class="loading-spinner" id="loadingSpinner">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <p>Creating your stream...</p>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="stream.js"></script>
+    <script type="module" src="ap.js"></script>
+    <script>
+        // Handle upload method selection and UI interactions only
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadOptions = document.querySelectorAll('.upload-option');
+            const urlSection = document.getElementById('urlSection');
+            const fileSection = document.getElementById('fileSection');
+            const videoFileInput = document.getElementById('videoFile');
+            const filePreview = document.getElementById('filePreview');
+            const videoPreview = document.getElementById('videoPreview');
+            const fileName = document.getElementById('fileName');
+            const fileSize = document.getElementById('fileSize');
+            const removeFile = document.getElementById('removeFile');
+            const uploadProgress = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+
+            // Upload method selection
+            uploadOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    const method = this.dataset.method;
+                    
+                    // Update active states
+                    uploadOptions.forEach(opt => opt.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show/hide sections
+                    urlSection.classList.remove('active');
+                    fileSection.classList.remove('active');
+                    
+                    if (method === 'url') {
+                        urlSection.classList.add('active');
+                    } else {
+                        fileSection.classList.add('active');
+                    }
+                });
+            });
+
+            // File input change handler
+            videoFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // Validate file type
+                    const validTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/mov'];
+                    if (!validTypes.includes(file.type)) {
+                        showError('Please select a valid video file (MP4, WebM, or MOV)');
+                        this.value = '';
+                        return;
+                    }
+
+                    // Validate file size (100MB max)
+                    const maxSize = 100 * 1024 * 1024;
+                    if (file.size > maxSize) {
+                        showError('Video file must be smaller than 100MB');
+                        this.value = '';
+                        return;
+                    }
+
+                    // Show file preview
+                    fileName.textContent = file.name;
+                    fileSize.textContent = formatFileSize(file.size);
+                    filePreview.classList.add('active');
+
+                    // Show video preview
+                    const videoURL = URL.createObjectURL(file);
+                    videoPreview.src = videoURL;
+                    videoPreview.style.display = 'block';
+
+                    // Show upload progress
+                    uploadProgress.style.display = 'block';
+                    simulateUploadProgress();
+                }
+            });
+
+            // Remove file handler
+            removeFile.addEventListener('click', function() {
+                videoFileInput.value = '';
+                filePreview.classList.remove('active');
+                videoPreview.style.display = 'none';
+                videoPreview.src = '';
+                uploadProgress.style.display = 'none';
+            });
+
+            // Simulate upload progress (for demo purposes)
+            function simulateUploadProgress() {
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += Math.random() * 10;
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(interval);
+                        progressText.textContent = 'Ready to upload!';
+                    } else {
+                        progressText.textContent = `Processing... ${Math.round(progress)}%`;
+                    }
+                    progressFill.style.width = progress + '%';
+                }, 200);
+            }
+
+            // Format file size
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            // Show error message (for UI errors only)
+            function showError(message) {
+                const errorMessage = document.getElementById('errorMessage');
+                const errorText = document.getElementById('errorText');
+                errorText.textContent = message;
+                errorMessage.style.display = 'block';
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 5000);
+            }
+        });
+    </script>
+    <script>
+// Simple navigation menu opener script
+document.addEventListener('DOMContentLoaded', function() {
+    // Mobile menu toggle
+    const mobileMenuBtn = document.getElementById('mobile-menu');
+    const navMenu = document.querySelector('.nav-menu');
+    const navLinks = document.querySelectorAll('.nav-links');
+    
+    if (mobileMenuBtn && navMenu) {
+        mobileMenuBtn.addEventListener('click', function() {
+            mobileMenuBtn.classList.toggle('active');
+            navMenu.classList.toggle('active');
+        });
+        
+        // Close menu when clicking on a link
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenuBtn.classList.remove('active');
+                navMenu.classList.remove('active');
+            });
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!mobileMenuBtn.contains(event.target) && 
+                !navMenu.contains(event.target) && 
+                navMenu.classList.contains('active')) {
+                mobileMenuBtn.classList.remove('active');
+                navMenu.classList.remove('active');
+            }
+        });
+    }
+    
+    // Sidebar toggle (if exists)
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('active');
+        });
+    }
+    
+    // Dropdown menus
+    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+    
+    dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            const dropdown = this.nextElementSibling;
+            
+            // Close all other dropdowns
+            document.querySelectorAll('.dropdown-content').forEach(d => {
+                if (d !== dropdown) {
+                    d.classList.remove('active');
+                }
+            });
+            
+            // Toggle current dropdown
+            dropdown.classList.toggle('active');
+        });
+    });
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!event.target.matches('.dropdown-toggle')) {
+            document.querySelectorAll('.dropdown-content').forEach(dropdown => {
+                dropdown.classList.remove('active');
+            });
+        }
+    });
+    
+    // Logout functionality
+    const logoutButtons = document.querySelectorAll('.logout-btn');
+    
+    logoutButtons.forEach(button => {
+        button.addEventListener('click', async function(e) {
+            e.preventDefault();
+            try {
+                // Redirect to login page
+                window.location.href = 'login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+    });
+    
+    // Back button functionality
+    const backButtons = document.querySelectorAll('.back-btn');
+    
+    backButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.history.back();
+        });
+    });
+});
+</script>
+    
+</body>
+</html>

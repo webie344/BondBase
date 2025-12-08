@@ -1,0 +1,43 @@
+/* MINIMAL scroll-fix.css - Only essential fixes */
+
+/* FIX 1: Prevent browser scroll anchoring issues */
+#chatMessages, #messagesList, .messages-container {
+    overflow-anchor: none !important;
+}
+
+/* FIX 2: Force GPU acceleration WITHOUT breaking layout */
+#chatMessages, #messagesList {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* FIX 3: Ensure messages have stable dimensions */
+.message, .message-card {
+    min-height: 60px;
+    position: relative;
+    z-index: 1;
+}
+
+/* FIX 4: Prevent images from disappearing */
+.message img, .message video {
+    display: block !important;
+    max-width: 100% !important;
+    height: auto !important;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+/* FIX 5: Better touch scrolling on mobile */
+@media (hover: none) and (pointer: coarse) {
+    #chatMessages, #messagesList {
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
+
+/* FIX 6: Remove any problematic contain properties */
+#chatMessages, #messagesList, .message, .message-card {
+    contain: none !important;
+    content-visibility: visible !important;
+}

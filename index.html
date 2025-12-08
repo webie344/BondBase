@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhipRoom - Find Your Match</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #0a0a0a; /* Very dark background */
+            color: #ffffff;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Main Container */
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        /* Chain Logo */
+        .chain-logo {
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .chain-logo::before {
+            content: "⛓️";
+            font-size: 4.5rem;
+            filter: brightness(1.2);
+        }
+        
+        .tagline {
+            font-size: 1.5rem;
+            margin-bottom: 3rem;
+            opacity: 0.8;
+            color: #aaaaaa;
+        }
+        
+        /* Get Started Button */
+        .get-started-container {
+            width: 100%;
+            padding: 2.5rem;
+            background-color: #111;
+            border-top: ;
+            text-align: center;
+        }
+        
+        .btn-get-started {
+            background-color: #ff5555;
+            color: white;
+            border: none;
+            padding: 1.2rem 3.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            display: inline-block;
+            cursor: pointer;
+            width: 100%;
+            max-width: 350px;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn-get-started:hover {
+            background-color: #ff3d3d;
+            transform: translateY(-3px);
+            box-shadow: 0 7px 20px rgba(255, 85, 85, 0.25);
+        }
+        
+        .btn-get-started:active {
+            transform: translateY(-1px);
+        }
+        
+        /* Additional styling for very dark theme */
+        ::selection {
+            background-color: rgba(255, 85, 85, 0.3);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .chain-logo {
+                font-size: 3.2rem;
+            }
+
+            .chain-logo::before {
+                font-size: 3.5rem;
+            }
+            
+            .tagline {
+                font-size: 1.3rem;
+                padding: 0 1rem;
+            }
+            
+            .container {
+                padding: 1.5rem;
+            }
+            
+            .get-started-container {
+                padding: 2rem;
+            }
+            
+            .btn-get-started {
+                padding: 1rem 2.5rem;
+                font-size: 1.1rem;
+                max-width: 300px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .chain-logo {
+                font-size: 2.8rem;
+            }
+            
+            .chain-logo::before {
+                font-size: 3rem;
+            }
+            
+            .tagline {
+                font-size:1.1rem;
+                margin-bottom: 2.5rem;
+            }
+            
+            .get-started-container {
+                padding: 1.5rem;
+            }
+            
+            .btn-get-started {
+                padding: 0.9rem 2rem;
+                font-size: 1rem;
+                max-width: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Chain Logo -->
+        <div class="chain-logo">WhipRoom</div>
+        
+        <p class="tagline">
+            Kink room👹😈👿🤬
+        </p>
+    </div>
+    
+    <!-- Get Started Button at Bottom -->
+    <div class="get-started-container">
+        <a href="login.html" class="btn-get-started">Get Started</a>
+    </div>
+</body>
+</html>

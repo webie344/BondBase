@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Default Profiles</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .control-panel {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .create-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .create-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .view-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+        }
+
+        .view-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .login-btn {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(245, 158, 11, 0.3);
+        }
+
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .progress-section {
+            margin-bottom: 30px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #34d399);
+            border-radius: 10px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .results {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .results h3 {
+            margin-bottom: 15px;
+            color: #374151;
+        }
+
+        .credentials {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .credentials h3 {
+            margin-bottom: 15px;
+            color: #374151;
+        }
+
+        .profile-card {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        .profile-info {
+            flex: 1;
+        }
+
+        .profile-name {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+
+        .profile-email {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .profile-password {
+            color: #374151;
+            font-family: monospace;
+            background: #f3f4f6;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .status {
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .credential-actions {
+            display: flex;
+            gap: 10px;
+            margin-left: 15px;
+        }
+
+        .copy-btn {
+            padding: 8px 15px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .copy-btn:hover {
+            background: #2563eb;
+        }
+
+        @media (max-width: 768px) {
+            .buttons {
+                flex-direction: column;
+            }
+            
+            button {
+                min-width: auto;
+            }
+            
+            .profile-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .credential-actions {
+                margin-left: 0;
+                margin-top: 10px;
+                width: 100%;
+            }
+            
+            .copy-btn {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Create Default Profiles</h1>
+            <p>Generate 50 unique dating profiles with realistic information</p>
+        </div>
+
+        <div class="content">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label for="profileCount">Number of Profiles to Create:</label>
+                    <input type="number" id="profileCount" value="50" min="1" max="100">
+                </div>
+                
+                <div class="buttons">
+                    <button class="create-btn" id="createBtn">Create Profiles</button>
+                    <button class="view-btn" id="viewCredentialsBtn" disabled>View Credentials</button>
+                    <button class="login-btn" id="quickLoginBtn">Quick Login to Random Profile</button>
+                </div>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Ready to create profiles...</div>
+            </div>
+
+            <div class="results" id="resultsSection">
+                <h3>Creation Results</h3>
+                <div id="resultsContent"></div>
+            </div>
+
+            <div class="credentials" id="credentialsSection" style="display: none;">
+                <h3>Profile Credentials</h3>
+                <div id="credentialsContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { profileCreator, createProfiles } from './profiles.js';
+
+        const createBtn = document.getElementById('createBtn');
+        const viewCredentialsBtn = document.getElementById('viewCredentialsBtn');
+        const quickLoginBtn = document.getElementById('quickLoginBtn');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const resultsContent = document.getElementById('resultsContent');
+        const credentialsContent = document.getElementById('credentialsContent');
+        const credentialsSection = document.getElementById('credentialsSection');
+
+        // Global progress update function
+        window.updateProgress = (current, total, currentName) => {
+            const percentage = (current / total) * 100;
+            progressFill.style.width = `${percentage}%`;
+            progressText.textContent = `Creating ${currentName}... (${current}/${total})`;
+        };
+
+        createBtn.addEventListener('click', async () => {
+            const count = parseInt(document.getElementById('profileCount').value);
+            
+            createBtn.disabled = true;
+            createBtn.textContent = 'Creating Profiles...';
+            viewCredentialsBtn.disabled = true;
+            credentialsSection.style.display = 'none';
+            resultsContent.innerHTML = '<div class="status">Starting profile creation...</div>';
+            
+            try {
+                const result = await createProfiles(count);
+                
+                // Show results
+                resultsContent.innerHTML = `
+                    <div class="status success">
+                        ✅ Successfully created ${result.successful.length} profiles
+                    </div>
+                    ${result.failed.length > 0 ? `
+                        <div class="status error" style="margin-top: 10px;">
+                            ❌ ${result.failed.length} profiles failed to create
+                        </div>
+                    ` : ''}
+                `;
+                
+                viewCredentialsBtn.disabled = false;
+                
+            } catch (error) {
+                resultsContent.innerHTML = `
+                    <div class="status error">
+                        ❌ Error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create Profiles';
+                progressText.textContent = 'Creation completed!';
+            }
+        });
+
+        viewCredentialsBtn.addEventListener('click', () => {
+            if (!window.profileCredentials || window.profileCredentials.length === 0) {
+                credentialsContent.innerHTML = '<div class="status error">No profiles created yet</div>';
+                return;
+            }
+            
+            let html = '';
+            window.profileCredentials.forEach(cred => {
+                html += `
+                    <div class="profile-card">
+                        <div class="profile-info">
+                            <div class="profile-name">${cred.name}</div>
+                            <div class="profile-email">${cred.email}</div>
+                        </div>
+                        <div class="profile-password">${cred.password}</div>
+                        <div class="credential-actions">
+                            <button class="copy-btn" onclick="copyToClipboard('${cred.email}')">Copy Email</button>
+                            <button class="copy-btn" onclick="copyToClipboard('${cred.password}')">Copy Password</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            credentialsContent.innerHTML = html;
+            credentialsSection.style.display = 'block';
+        });
+
+        quickLoginBtn.addEventListener('click', async () => {
+            if (!window.profileCredentials || window.profileCredentials.length === 0) {
+                alert('Please create profiles first!');
+                return;
+            }
+            
+            const randomCred = window.profileCredentials[Math.floor(Math.random() * window.profileCredentials.length)];
+            alert(`Try logging in with:\nEmail: ${randomCred.email}\nPassword: ${randomCred.password}\n\nGo to your login page and use these credentials!`);
+        });
+
+        // Copy to clipboard function
+        window.copyToClipboard = (text) => {
+            navigator.clipboard.writeText(text).then(() => {
+                // Show temporary feedback
+                const originalText = event.target.textContent;
+                event.target.textContent = 'Copied!';
+                setTimeout(() => {
+                    event.target.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        };
+    </script>
+</body>
+</html>

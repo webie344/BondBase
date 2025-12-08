@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect - BondBase</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            /*  – Dark, Leather, Steel */
+            --primary: #b3004b; /* deep crimson */
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+
+            --secondary: #8b0000; /* dark red for alerts/badges */
+            --accent: #444; /* metal/steel tone */
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b; /* deep black */
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --border-color: #2e2e2e;
+            --bg-light: #1b1b1b;
+            --accent-color: #b3004b;
+            --accent-dark: #7a0034;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.7);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.7);
+            --radius: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+            cursor: default;
+        }
+
+        /* Modern Navigation */
+        .navbar {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(6px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 0.75rem 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .navbar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo::before {
+            content: "🔗";
+        }
+
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            gap: 1.5rem;
+        }
+
+        .nav-item {
+            position: relative;
+        }
+
+        .nav-links {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            gap: 0.25rem;
+            transition: color 0.2s ease;
+            padding: 0.5rem;
+            border-radius: var(--radius);
+        }
+
+        .nav-links:hover {
+            color: var(--primary-light);
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .nav-links i {
+            font-size: 1.25rem;
+        }
+
+        .message-count, .posts-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            background-color: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .nav-toggle {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+        }
+
+        .bar {
+            width: 25px;
+            height: 3px;
+            background-color: var(--text-primary);
+            margin: 3px 0;
+            transition: 0.3s;
+            border-radius: 2px;
+        }
+
+        /* Main Content Area for Grid */
+        .main-content {
+            margin-top: 70px;
+            padding: 15px;
+            min-height: calc(100vh - 70px);
+        }
+
+        /* Grid Layout Styles - Multiple small profiles per row */
+        .mingle-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            padding: 10px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* For larger screens, show more profiles per row */
+        @media (min-width: 1400px) {
+            .mingle-grid {
+                grid-template-columns: repeat(7, 1fr);
+            }
+        }
+
+        @media (min-width: 1200px) and (max-width: 1399px) {
+            .mingle-grid {
+                grid-template-columns: repeat(6, 1fr);
+            }
+        }
+
+        @media (min-width: 992px) and (max-width: 1199px) {
+            .mingle-grid {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 991px) {
+            .mingle-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (min-width: 480px) and (max-width: 767px) {
+            .mingle-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* For very small phones, show 2 per row */
+        @media (max-width: 479px) {
+            .mingle-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+                padding: 8px;
+            }
+        }
+
+        /* For extremely small phones */
+        @media (max-width: 320px) {
+            .mingle-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 6px;
+                padding: 6px;
+            }
+        }
+
+        .profile-grid-card {
+            background: var(--bg-card);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            border: 1px solid var(--border);
+            min-height: 180px;
+        }
+
+        .profile-grid-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-light);
+        }
+
+        .profile-grid-image {
+            width: 100%;
+            height: 110px;
+            object-fit: cover;
+            border-bottom: 1px solid var(--border);
+            transition: transform 0.3s ease;
+        }
+
+        .profile-grid-card:hover .profile-grid-image {
+            transform: scale(1.05);
+        }
+
+        .profile-grid-content {
+            padding: 8px;
+        }
+
+        .profile-grid-name {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 3px;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .profile-grid-details {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .profile-grid-bio {
+            font-size: 10px;
+            color: var(--text-light);
+            line-height: 1.3;
+            margin-bottom: 6px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            height: 26px;
+        }
+
+        .profile-grid-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        .profile-grid-likes {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .profile-grid-likes i {
+            color: var(--primary-light);
+            font-size: 9px;
+        }
+
+        .profile-grid-like-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 10px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            min-width: 45px;
+            justify-content: center;
+        }
+
+        .profile-grid-like-btn:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            transform: translateY(-1px);
+        }
+
+        .profile-grid-like-btn.liked {
+            background: var(--secondary);
+            padding: 4px 6px;
+        }
+
+        .profile-grid-like-btn.liked:hover {
+            background: #a30000;
+        }
+
+        .profile-grid-status {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            border: 2px solid var(--bg-card);
+            z-index: 2;
+        }
+
+        .profile-grid-status.online {
+            background-color: #00FF00;
+        }
+
+        .profile-grid-status.offline {
+            background-color: #9E9E9E;
+        }
+
+        .no-profiles-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+            font-size: 16px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .no-profiles-message i {
+            font-size: 36px;
+            margin-bottom: 15px;
+            color: var(--primary-light);
+            display: block;
+        }
+
+        /* Loading State */
+        .profile-grid-card.loading {
+            background: var(--bg-card);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .loading-image {
+            width: 100%;
+            height: 110px;
+            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        .loading-content {
+            padding: 8px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .loading-line {
+            height: 8px;
+            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        .loading-line.short {
+            width: 60%;
+        }
+
+        .loading-line.medium {
+            width: 80%;
+        }
+
+        @keyframes loading {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* Page Header */
+        .page-header {
+            text-align: center;
+            padding: 15px;
+            background: var(--bg-card);
+            margin: 15px auto;
+            max-width: 1200px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .page-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .page-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .nav-menu {
+                position: fixed;
+                left: -100%;
+                top: 70px;
+                flex-direction: column;
+                background-color: rgba(0, 0, 0, 0.85);
+                backdrop-filter: blur(10px);
+                width: 100%;
+                text-align: center;
+                transition: 0.3s;
+                box-shadow: var(--shadow);
+                padding: 2rem 0;
+                gap: 0;
+            }
+
+            .nav-menu.active {
+                left: 0;
+            }
+
+            .nav-item {
+                margin: 0.75rem 0;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .main-content {
+                padding: 10px;
+            }
+
+            .page-header {
+                margin: 10px;
+                padding: 12px 10px;
+            }
+
+            .page-title {
+                font-size: 1.4rem;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .mingle-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 6px;
+                padding: 6px;
+            }
+
+            .profile-grid-card {
+                min-height: 170px;
+            }
+
+            .profile-grid-image {
+                height: 100px;
+            }
+
+            .profile-grid-content {
+                padding: 6px;
+            }
+
+            .profile-grid-name {
+                font-size: 12px;
+            }
+
+            .profile-grid-like-btn {
+                padding: 3px 6px;
+                font-size: 9px;
+                min-width: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.html" class="logo">BondBase</a>
+          <!-- Add this to your navigation menu -->
+            <li>
+                <a href="notification.html" class="nav-links">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge">0</span>
+                </a>
+            </li>
+            <div class="nav-toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+            <ul class="nav-menu" id="nav-menu">
+                <li class="nav-item">
+                    <a href="mingle.html" class="nav-links active">
+                        <i class="fas fa-users"></i>
+                        <span>Connect</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="messages.html" class="nav-links">
+                        <i class="fas fa-comments"></i>
+                        <span>Chat</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="posts.html" class="nav-links">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>Resources</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="stream.html" class="nav-links active">
+                        <i class="fas fa-play-circle"></i>
+                        <span class="nav-text" style="font-family: 'Great Vibes', cursive; font-size: 1.1rem;">Stream</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="account.html" class="nav-links">
+                        <i class="fas fa-user-shield"></i>
+                        <span>My Profile</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="groups.html" class="nav-links">
+                        <i class="fas fa-users"></i>
+                        <span>Groups</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">Discover Connections</h1>
+            <p class="page-subtitle">Browse through verified profiles and find your perfect match. Click on any profile to learn more.</p>
+        </div>
+
+        <!-- Grid Container -->
+        <div id="mingleGrid" class="mingle-grid">
+            <!-- Loading State - Multiple small loading cards -->
+            <div class="profile-grid-card loading">
+                <div class="loading-image"></div>
+                <div class="loading-content">
+                    <div class="loading-line" style="width: 70%"></div>
+                    <div class="loading-line short"></div>
+                    <div class="loading-line" style="width: 40%"></div>
+                </div>
+            </div>
+            <div class="profile-grid-card loading">
+                <div class="loading-image"></div>
+                <div class="loading-content">
+                    <div class="loading-line" style="width: 70%"></div>
+                    <div class="loading-line short"></div>
+                    <div class="loading-line" style="width: 40%"></div>
+                </div>
+            </div>
+            <div class="profile-grid-card loading">
+                <div class="loading-image"></div>
+                <div class="loading-content">
+                    <div class="loading-line" style="width: 70%"></div>
+                    <div class="loading-line short"></div>
+                    <div class="loading-line" style="width: 40%"></div>
+                </div>
+            </div>
+            <div class="profile-grid-card loading">
+                <div class="loading-image"></div>
+                <div class="loading-content">
+                    <div class="loading-line" style="width: 70%"></div>
+                    <div class="loading-line short"></div>
+                    <div class="loading-line" style="width: 40%"></div>
+                </div>
+            </div>
+            <div class="profile-grid-card loading">
+                <div class="loading-image"></div>
+                <div class="loading-content">
+                    <div class="loading-line" style="width: 70%"></div>
+                    <div class="loading-line short"></div>
+                    <div class="loading-line" style="width: 40%"></div>
+                </div>
+            </div>
+            <div class="profile-grid-card loading">
+                <div class="loading-image"></div>
+                <div class="loading-content">
+                    <div class="loading-line" style="width: 70%"></div>
+                    <div class="loading-line short"></div>
+                    <div class="loading-line" style="width: 40%"></div>
+                </div>
+            </div>
+            <div class="profile-grid-card loading">
+                <div class="loading-image"></div>
+                <div class="loading-content">
+                    <div class="loading-line" style="width: 70%"></div>
+                    <div class="loading-line short"></div>
+                    <div class="loading-line" style="width: 40%"></div>
+                </div>
+            </div>
+            <div class="profile-grid-card loading">
+                <div class="loading-image"></div>
+                <div class="loading-content">
+                    <div class="loading-line" style="width: 70%"></div>
+                    <div class="loading-line short"></div>
+                    <div class="loading-line" style="width: 40%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="call.js"></script>
+    <script type="module" src="mingle-upgrades.js"></script>
+    <script type="module" src="app.js"></script>
+    <script type="module" src="filter.js"></script>
+    <script type="module" src="social.js"></script>
+    <script type="module" src="additional.js"></script>
+    <script type="module" src="creative.js"></script>
+    <script type="module" src="flip.js"></script>
+    <script type="module" src="notification.js"></script>
+
+
+</body>
+</html>
