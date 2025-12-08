@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Call -BondBase</title>
+    <title>Voice Call - BondBase</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -65,6 +65,7 @@
             font-size: 16px;
             opacity: 0.9;
             margin-bottom: 4px;
+            min-height: 24px;
         }
         
         .call-type {
@@ -156,7 +157,7 @@
             color: #f44336;
         }
         
-        /* Audio indicators */
+        /* Audio indicators - SIMPLIFIED */
         .audio-indicators {
             display: flex;
             gap: 20px;
@@ -191,7 +192,8 @@
             height: 100%;
             background: linear-gradient(90deg, #4CAF50, #8BC34A);
             border-radius: 10px;
-            transition: width 0.1s ease;
+            width: 0%;
+            transition: width 0.3s ease;
         }
         
         /* Call controls */
@@ -389,18 +391,18 @@
             </div>
         </div>
         
-        <!-- Audio indicators -->
+        <!-- Audio indicators - SIMPLIFIED -->
         <div class="audio-indicators">
             <div class="audio-indicator">
                 <div class="audio-label">You</div>
                 <div class="audio-visualizer">
-                    <div class="audio-level" id="localAudioLevel" style="width: 30%;"></div>
+                    <div class="audio-level" id="localAudioLevel"></div>
                 </div>
             </div>
             <div class="audio-indicator">
-                <div class="audio-label" id="remoteAudioLabel">Others</div>
+                <div class="audio-label" id="remoteAudioLabel">Partner</div>
                 <div class="audio-visualizer">
-                    <div class="audio-level" id="remoteAudioLevel" style="width: 50%;"></div>
+                    <div class="audio-level" id="remoteAudioLevel"></div>
                 </div>
             </div>
         </div>
@@ -422,8 +424,8 @@
         </button>
         
         <!-- Hidden audio elements -->
-        <audio id="localAudio" muted></audio>
-        <audio id="remoteAudio"></audio>
+        <audio id="localAudio" autoplay muted></audio>
+        <audio id="remoteAudio" autoplay></audio>
     </div>
     
     <!-- Call ended screen -->
@@ -444,62 +446,115 @@
     <script type="module" src="calls.js"></script>
     
     <script>
-        // Audio level visualization
+        // Global variables for audio visualization
         let audioContext = null;
         let localAnalyser = null;
         let remoteAnalyser = null;
+        let isVisualizationActive = false;
         
-        function setupAudioVisualization() {
+        // Function to start audio visualization when streams are ready
+        function startAudioVisualization() {
             try {
+                console.log('Starting audio visualization...');
+                
                 const localAudio = document.getElementById('localAudio');
                 const remoteAudio = document.getElementById('remoteAudio');
                 
-                if (!localAudio || !remoteAudio) return;
+                if (!localAudio || !remoteAudio) {
+                    console.log('Audio elements not found yet, retrying...');
+                    setTimeout(startAudioVisualization, 1000);
+                    return;
+                }
+                
+                // Check if audio streams are available
+                if (!localAudio.srcObject) {
+                    console.log('Local audio stream not available yet');
+                    setTimeout(startAudioVisualization, 1000);
+                    return;
+                }
                 
                 // Create audio context
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
                 
                 // Setup local audio analyser
-                const localSource = audioContext.createMediaStreamSource(localAudio.srcObject);
-                localAnalyser = audioContext.createAnalyser();
-                localAnalyser.fftSize = 32;
-                localSource.connect(localAnalyser);
+                if (localAudio.srcObject && !localAnalyser) {
+                    try {
+                        const localSource = audioContext.createMediaStreamSource(localAudio.srcObject);
+                        localAnalyser = audioContext.createAnalyser();
+                        localAnalyser.fftSize = 32;
+                        localAnalyser.smoothingTimeConstant = 0.8;
+                        localSource.connect(localAnalyser);
+                        console.log('Local audio analyser set up');
+                    } catch (error) {
+                        console.error('Error setting up local audio analyser:', error);
+                    }
+                }
                 
-                // Setup remote audio analyser
-                const remoteSource = audioContext.createMediaStreamSource(remoteAudio.srcObject);
-                remoteAnalyser = audioContext.createAnalyser();
-                remoteAnalyser.fftSize = 32;
-                remoteSource.connect(remoteAnalyser);
+                // Setup remote audio analyser (only when remote stream is available)
+                function setupRemoteAnalyser() {
+                    if (remoteAudio.srcObject && !remoteAnalyser) {
+                        try {
+                            const remoteSource = audioContext.createMediaStreamSource(remoteAudio.srcObject);
+                            remoteAnalyser = audioContext.createAnalyser();
+                            remoteAnalyser.fftSize = 32;
+                            remoteAnalyser.smoothingTimeConstant = 0.8;
+                            remoteSource.connect(remoteAnalyser);
+                            console.log('Remote audio analyser set up');
+                        } catch (error) {
+                            console.error('Error setting up remote audio analyser:', error);
+                        }
+                    }
+                }
                 
                 // Start visualization
-                visualizeAudio();
+                if (localAnalyser && !isVisualizationActive) {
+                    visualizeAudio();
+                    isVisualizationActive = true;
+                }
+                
+                // Setup remote analyser when remote audio is available
+                const checkRemoteInterval = setInterval(() => {
+                    if (remoteAudio.srcObject) {
+                        setupRemoteAnalyser();
+                        clearInterval(checkRemoteInterval);
+                    }
+                }, 1000);
                 
             } catch (error) {
-                console.error('Audio visualization setup failed:', error);
+                console.error('Error in startAudioVisualization:', error);
             }
         }
         
         function visualizeAudio() {
-            if (!audioContext || !localAnalyser) return;
+            if (!localAnalyser) return;
             
             const localDataArray = new Uint8Array(localAnalyser.frequencyBinCount);
             const remoteDataArray = remoteAnalyser ? new Uint8Array(remoteAnalyser.frequencyBinCount) : null;
             
             function update() {
-                localAnalyser.getByteFrequencyData(localDataArray);
+                if (!localAnalyser) return;
                 
-                // Calculate average level for local audio
+                // Update local audio level
+                localAnalyser.getByteFrequencyData(localDataArray);
                 let localSum = 0;
                 for (let i = 0; i < localDataArray.length; i++) {
                     localSum += localDataArray[i];
                 }
-                const localAverage = localSum / localDataArray.length;
+                const localAverage = localDataArray.length > 0 ? localSum / localDataArray.length : 0;
+                const localLevel = Math.min(100, (localAverage / 255) * 100 * 2); // Amplify for visibility
                 
-                // Update local audio level display (0-100%)
-                const localLevel = Math.min(100, (localAverage / 255) * 100);
                 const localLevelBar = document.getElementById('localAudioLevel');
                 if (localLevelBar) {
                     localLevelBar.style.width = localLevel + '%';
+                    
+                    // Add visual feedback for speaking
+                    if (localLevel > 10) {
+                        localLevelBar.style.background = 'linear-gradient(90deg, #4CAF50, #8BC34A)';
+                    } else {
+                        localLevelBar.style.background = 'linear-gradient(90deg, #666, #888)';
+                    }
                 }
                 
                 // Update remote audio level if available
@@ -509,11 +564,19 @@
                     for (let i = 0; i < remoteDataArray.length; i++) {
                         remoteSum += remoteDataArray[i];
                     }
-                    const remoteAverage = remoteSum / remoteDataArray.length;
-                    const remoteLevel = Math.min(100, (remoteAverage / 255) * 100);
+                    const remoteAverage = remoteDataArray.length > 0 ? remoteSum / remoteDataArray.length : 0;
+                    const remoteLevel = Math.min(100, (remoteAverage / 255) * 100 * 2);
+                    
                     const remoteLevelBar = document.getElementById('remoteAudioLevel');
                     if (remoteLevelBar) {
                         remoteLevelBar.style.width = remoteLevel + '%';
+                        
+                        // Add visual feedback for speaking
+                        if (remoteLevel > 10) {
+                            remoteLevelBar.style.background = 'linear-gradient(90deg, #4CAF50, #8BC34A)';
+                        } else {
+                            remoteLevelBar.style.background = 'linear-gradient(90deg, #666, #888)';
+                        }
                     }
                 }
                 
@@ -523,38 +586,57 @@
             update();
         }
         
-        // Start visualization when streams are ready
+        // Start visualization when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('calls.html: DOM loaded, setting up visualization');
+            
+            // Start visualization after a short delay
+            setTimeout(startAudioVisualization, 2000);
+            
+            // Also start when the window gains focus (helps with audio context)
+            window.addEventListener('focus', function() {
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => {
+                        console.log('Audio context resumed');
+                    });
+                }
+            });
+            
+            // Update UI based on call type
             setTimeout(() => {
-                setupAudioVisualization();
-            }, 2000);
+                const urlParams = new URLSearchParams(window.location.search);
+                const callType = urlParams.get('type');
+                
+                if (callType === 'group') {
+                    // Show participants section for group calls
+                    const participantsSection = document.getElementById('participantsSection');
+                    if (participantsSection) {
+                        participantsSection.style.display = 'block';
+                    }
+                    
+                    // Update audio label
+                    const remoteAudioLabel = document.getElementById('remoteAudioLabel');
+                    if (remoteAudioLabel) {
+                        remoteAudioLabel.textContent = 'Others';
+                    }
+                } else {
+                    // Update audio label for personal calls
+                    const remoteAudioLabel = document.getElementById('remoteAudioLabel');
+                    if (remoteAudioLabel) {
+                        remoteAudioLabel.textContent = 'Partner';
+                    }
+                }
+            }, 1000);
+            
+            // Create a global function to start visualization from calls.js
+            window.startAudioVisualization = startAudioVisualization;
         });
         
-        // Update UI based on call type
-        setTimeout(() => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const callType = urlParams.get('type');
-            
-            if (callType === 'group') {
-                // Show participants section for group calls
-                const participantsSection = document.getElementById('participantsSection');
-                if (participantsSection) {
-                    participantsSection.style.display = 'block';
-                }
-                
-                // Update audio label
-                const remoteAudioLabel = document.getElementById('remoteAudioLabel');
-                if (remoteAudioLabel) {
-                    remoteAudioLabel.textContent = 'Others';
-                }
-            } else {
-                // Update audio label for personal calls
-                const remoteAudioLabel = document.getElementById('remoteAudioLabel');
-                if (remoteAudioLabel) {
-                    remoteAudioLabel.textContent = 'Partner';
-                }
-            }
-        }, 1000);
+        // Helper function to manually trigger visualization
+        function triggerVisualization() {
+            console.log('Manual visualization trigger');
+            startAudioVisualization();
+        }
     </script>
 </body>
 </html>
