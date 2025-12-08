@@ -1,5 +1,5 @@
 // calls.js - Complete Voice Call System for Personal & Group Chats
-// Uses WebRTC for real-time voice communication
+// COMPLETE FIXED VERSION
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -51,16 +51,16 @@ const rtcConfiguration = {
 
 // Global variables
 let localStream = null;
-let remoteStreams = new Map(); // For group calls: userId -> MediaStream
-let peerConnections = new Map(); // userId -> RTCPeerConnection
+let remoteStreams = new Map();
+let peerConnections = new Map();
 let currentUser = null;
 let db = null;
 let auth = null;
 let activeCallId = null;
-let currentCallType = null; // 'personal' or 'group'
-let currentCallPartnerId = null; // For personal calls
-let currentGroupId = null; // For group calls
-let callParticipants = new Set(); // For group calls
+let currentCallType = null;
+let currentCallPartnerId = null;
+let currentGroupId = null;
+let callParticipants = new Set();
 let isCaller = false;
 let isMuted = false;
 let callStartTime = null;
@@ -71,11 +71,13 @@ let isRinging = false;
 let callRingtone = null;
 let callNotificationSound = null;
 let userCache = new Map();
-let processedCalls = new Set();
 let pendingSignals = [];
+let currentCallData = null;
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('calls.js: DOM loaded');
+    
     const isCallPage = window.location.pathname.includes('calls.html');
     
     // Initialize Firebase
@@ -84,23 +86,24 @@ document.addEventListener('DOMContentLoaded', function() {
         auth = getAuth(app);
         db = getFirestore(app);
         
-        // Preload notification sounds
         preloadNotificationSounds();
+        console.log('calls.js: Firebase initialized');
     } catch (error) {
+        console.error('calls.js: Firebase initialization failed:', error);
         showNotification('Firebase initialization failed. Please refresh the page.', 'error');
         return;
     }
     
-    // Set up auth state listener
     onAuthStateChanged(auth, function(user) {
+        console.log('calls.js: Auth state changed, user:', user ? 'logged in' : 'logged out');
         if (user) {
             currentUser = user;
             
             if (isCallPage) {
-                // We're on the call page - handle the call
+                console.log('calls.js: On call page, handling call');
                 handleCallPage();
             } else {
-                // We're on chat/group pages - set up call buttons and listeners
+                console.log('calls.js: On chat page, setting up listeners');
                 setupCallButtonListeners();
                 setupCallNotificationsListener();
             }
@@ -116,8 +119,9 @@ function preloadNotificationSounds() {
         callNotificationSound = new Audio('sounds/notification.mp3');
         callRingtone = new Audio('ringingtone.mp3');
         callRingtone.loop = true;
+        console.log('calls.js: Notification sounds preloaded');
     } catch (error) {
-        // Silent fail for production
+        console.error('calls.js: Failed to preload sounds:', error);
     }
 }
 
@@ -135,25 +139,16 @@ async function getUserName(userId) {
             return userName;
         }
     } catch (error) {
-        // Try group_users collection for group chat users
-        try {
-            const groupUserDoc = await getDoc(doc(db, 'group_users', userId));
-            if (groupUserDoc.exists()) {
-                const userName = groupUserDoc.data().displayName || 'Unknown User';
-                userCache.set(userId, userName);
-                return userName;
-            }
-        } catch (error2) {
-            // Silent fail
-        }
+        console.error('calls.js: Error getting user name:', error);
     }
     
     return 'Unknown User';
 }
 
-// Setup call button listeners on chat/group pages
+// Setup call button listeners
 function setupCallButtonListeners() {
-    // Personal chat call buttons
+    console.log('calls.js: Setting up call button listeners');
+    
     const voiceCallBtn = document.getElementById('voiceCallBtn');
     const groupVoiceCallBtn = document.getElementById('groupVoiceCallBtn');
     
@@ -180,59 +175,36 @@ function setupCallButtonListeners() {
             }
         });
     }
-    
-    // Also check for buttons with different IDs
-    setTimeout(() => {
-        const allCallButtons = document.querySelectorAll('[id*="call"], [id*="Call"]');
-        allCallButtons.forEach(button => {
-            if (button.id !== 'voiceCallBtn' && button.id !== 'groupVoiceCallBtn' && !button.dataset.callListener) {
-                button.dataset.callListener = 'true';
-                button.addEventListener('click', function() {
-                    // Check if we're on a group page or personal chat page
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const groupId = urlParams.get('id');
-                    
-                    if (window.location.pathname.includes('group.html') && groupId) {
-                        initiateGroupCall(groupId);
-                    } else {
-                        const partnerId = urlParams.get('id');
-                        if (partnerId) {
-                            initiatePersonalCall(partnerId);
-                        }
-                    }
-                });
-            }
-        });
-    }, 1000);
 }
 
 // Setup listener for incoming call notifications
 function setupCallNotificationsListener() {
     if (!currentUser || !db) return;
     
+    console.log('calls.js: Setting up call notifications listener');
+    
     const notificationsRef = collection(db, 'notifications', currentUser.uid, 'calls');
     
     onSnapshot(notificationsRef, (snapshot) => {
+        console.log('calls.js: Notification snapshot received');
+        
         snapshot.docChanges().forEach(async (change) => {
             if (change.type === 'added') {
                 const data = change.doc.data();
+                console.log('calls.js: New notification:', data);
                 
-                // Only process recent notifications (last 30 seconds)
                 const notificationTime = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
                 if (Date.now() - notificationTime.getTime() > 30000) {
                     await deleteDoc(doc(db, 'notifications', currentUser.uid, 'calls', change.doc.id));
                     return;
                 }
                 
-                // Play notification sound
                 playNotificationSound();
                 
-                // Show incoming call notification
                 if (data.type === 'call' && data.status === 'ringing') {
                     showIncomingCallNotification(data);
                 }
                 
-                // Mark as processed
                 await deleteDoc(doc(db, 'notifications', currentUser.uid, 'calls', change.doc.id));
             }
         });
@@ -241,7 +213,9 @@ function setupCallNotificationsListener() {
 
 // Show incoming call notification
 async function showIncomingCallNotification(data) {
-    // Remove any existing notifications first
+    console.log('calls.js: Creating incoming call notification');
+    
+    // Remove existing notifications
     const existingNotifications = document.querySelectorAll('.incoming-call-notification');
     existingNotifications.forEach(notification => {
         if (notification.parentNode) {
@@ -249,7 +223,7 @@ async function showIncomingCallNotification(data) {
         }
     });
     
-    // Get caller/group name
+    // Get caller name
     let callerName = 'Unknown';
     let callTypeText = '';
     
@@ -263,14 +237,18 @@ async function showIncomingCallNotification(data) {
                 callerName = groupDoc.data().name;
             }
         } catch (error) {
-            // Silent fail
+            console.error('calls.js: Error getting group name:', error);
         }
         callTypeText = 'Group Voice Call';
     }
     
+    // Store call data
+    currentCallData = data;
+    
     // Play ringtone
     playRingtone();
     
+    // Create notification
     const notification = document.createElement('div');
     notification.className = 'incoming-call-notification';
     notification.innerHTML = `
@@ -285,17 +263,17 @@ async function showIncomingCallNotification(data) {
                 </div>
             </div>
             <div class="notification-buttons">
-                <button id="acceptIncomingCall" class="accept-call">
+                <button class="accept-call" data-action="accept">
                     <i class="fas fa-phone"></i> Accept
                 </button>
-                <button id="rejectIncomingCall" class="reject-call">
+                <button class="reject-call" data-action="reject">
                     <i class="fas fa-phone-slash"></i> Decline
                 </button>
             </div>
         </div>
     `;
     
-    // Add styles if not already added
+    // Add styles
     if (!document.getElementById('call-notification-styles')) {
         const styles = document.createElement('style');
         styles.id = 'call-notification-styles';
@@ -314,14 +292,12 @@ async function showIncomingCallNotification(data) {
                 animation: slideIn 0.3s ease;
                 border-left: 5px solid #4CAF50;
             }
-            
             .caller-info {
                 display: flex;
                 align-items: center;
                 gap: 15px;
                 margin-bottom: 20px;
             }
-            
             .caller-avatar {
                 width: 50px;
                 height: 50px;
@@ -333,25 +309,21 @@ async function showIncomingCallNotification(data) {
                 color: white;
                 font-size: 24px;
             }
-            
             .caller-details h3 {
                 margin: 0 0 5px 0;
                 color: #333;
                 font-size: 16px;
                 font-weight: 600;
             }
-            
             .caller-details p {
                 margin: 0;
                 color: #666;
                 font-size: 14px;
             }
-            
             .notification-buttons {
                 display: flex;
                 gap: 12px;
             }
-            
             .accept-call, .reject-call {
                 flex: 1;
                 padding: 12px 0;
@@ -366,25 +338,20 @@ async function showIncomingCallNotification(data) {
                 justify-content: center;
                 gap: 8px;
             }
-            
             .accept-call {
                 background: #28a745;
                 color: white;
             }
-            
             .accept-call:hover {
                 background: #218838;
             }
-            
             .reject-call {
                 background: #dc3545;
                 color: white;
             }
-            
             .reject-call:hover {
                 background: #c82333;
             }
-            
             @keyframes slideIn {
                 from {
                     transform: translateX(100%);
@@ -395,106 +362,128 @@ async function showIncomingCallNotification(data) {
                     opacity: 1;
                 }
             }
-            
-            @keyframes slideOut {
-                from {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-                to {
-                    transform: translateX(100%);
-                    opacity: 0;
-                }
-            }
         `;
         document.head.appendChild(styles);
     }
     
     document.body.appendChild(notification);
     
-    // Store call data for the accept button
-    notification.dataset.callData = JSON.stringify(data);
-    
     // Add event listeners
-    const acceptBtn = document.getElementById('acceptIncomingCall');
-    const rejectBtn = document.getElementById('rejectIncomingCall');
+    notification.addEventListener('click', function(event) {
+        const button = event.target.closest('button');
+        if (!button) return;
+        
+        const action = button.getAttribute('data-action');
+        console.log('calls.js: Button clicked, action:', action);
+        
+        if (action === 'accept') {
+            handleAcceptCall();
+        } else if (action === 'reject') {
+            handleRejectCall();
+        }
+    });
     
-    if (acceptBtn) {
-        acceptBtn.addEventListener('click', () => {
-            // Stop ringtone
-            stopRingtone();
-            
-            // Get the call data
-            const callData = JSON.parse(notification.dataset.callData);
-            
-            // Send call-accepted signal
-            if (callData.callType === 'personal') {
-                sendSignal({
-                    type: 'call-accepted',
-                    from: currentUser.uid,
-                    callId: callData.callId
-                }, callData.from);
-                
-                // Redirect to call page
-                window.location.href = `calls.html?type=personal&partnerId=${callData.from}&incoming=true&callId=${callData.callId}`;
-            } else if (callData.callType === 'group') {
-                sendSignal({
-                    type: 'group-call-accepted',
-                    from: currentUser.uid,
-                    callId: callData.callId,
-                    groupId: callData.groupId
-                }, callData.from);
-                
-                // Redirect to call page
-                window.location.href = `calls.html?type=group&groupId=${callData.groupId}&incoming=true&callId=${callData.callId}`;
-            }
-            
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        });
-    }
-    
-    if (rejectBtn) {
-        rejectBtn.addEventListener('click', () => {
-            // Stop ringtone
-            stopRingtone();
-            
-            // Get the call data
-            const callData = JSON.parse(notification.dataset.callData);
-            
-            // Send rejection signal
-            sendSignal({
-                type: 'call-rejected',
-                from: currentUser.uid,
-                callId: callData.callId
-            }, callData.from);
-            
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        });
-    }
-    
-    // Auto remove after 30 seconds (call timeout)
+    // Auto remove after 30 seconds
     setTimeout(() => {
-        if (notification.parentNode) {
-            // Stop ringtone
-            stopRingtone();
-            
-            // Get the call data
-            const callData = JSON.parse(notification.dataset.callData);
-            
-            // Send timeout signal
-            sendSignal({
-                type: 'call-timeout',
-                from: currentUser.uid,
-                callId: callData.callId
-            }, callData.from);
-            
-            notification.parentNode.removeChild(notification);
+        if (document.body.contains(notification)) {
+            handleTimeoutCall();
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
         }
     }, 30000);
+}
+
+// Handle accept call
+async function handleAcceptCall() {
+    console.log('calls.js: handleAcceptCall called');
+    
+    if (!currentCallData) {
+        console.error('calls.js: No call data available');
+        return;
+    }
+    
+    // Stop ringtone
+    stopRingtone();
+    
+    console.log('calls.js: Current call data:', currentCallData);
+    
+    try {
+        if (currentCallData.callType === 'personal') {
+            await sendSignal({
+                type: 'call-accepted',
+                from: currentUser.uid,
+                callId: currentCallData.callId
+            }, currentCallData.from);
+            
+            console.log('calls.js: Redirecting to call page for personal call');
+            window.location.href = `calls.html?type=personal&partnerId=${currentCallData.from}&incoming=true&callId=${currentCallData.callId}`;
+            
+        } else if (currentCallData.callType === 'group') {
+            await sendSignal({
+                type: 'group-call-accepted',
+                from: currentUser.uid,
+                callId: currentCallData.callId,
+                groupId: currentCallData.groupId
+            }, currentCallData.from);
+            
+            console.log('calls.js: Redirecting to call page for group call');
+            window.location.href = `calls.html?type=group&groupId=${currentCallData.groupId}&incoming=true&callId=${currentCallData.callId}`;
+        }
+        
+        // Remove notification
+        const notification = document.querySelector('.incoming-call-notification');
+        if (notification && notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+        
+    } catch (error) {
+        console.error('calls.js: Error in handleAcceptCall:', error);
+        showNotification('Failed to accept call. Please try again.', 'error');
+    }
+}
+
+// Handle reject call
+async function handleRejectCall() {
+    console.log('calls.js: handleRejectCall called');
+    
+    if (!currentCallData) return;
+    
+    stopRingtone();
+    
+    try {
+        await sendSignal({
+            type: 'call-rejected',
+            from: currentUser.uid,
+            callId: currentCallData.callId
+        }, currentCallData.from);
+    } catch (error) {
+        console.error('calls.js: Error rejecting call:', error);
+    }
+    
+    const notification = document.querySelector('.incoming-call-notification');
+    if (notification && notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+    }
+}
+
+// Handle timeout call
+async function handleTimeoutCall() {
+    console.log('calls.js: handleTimeoutCall called');
+    
+    if (!currentCallData) return;
+    
+    stopRingtone();
+    
+    try {
+        await sendSignal({
+            type: 'call-timeout',
+            from: currentUser.uid,
+            callId: currentCallData.callId
+        }, currentCallData.from);
+    } catch (error) {
+        console.error('calls.js: Error sending timeout:', error);
+    }
 }
 
 // Play notification sound
@@ -504,12 +493,12 @@ function playNotificationSound() {
             callNotificationSound.currentTime = 0;
             callNotificationSound.play().catch(() => {});
         } catch (error) {
-            // Silent fail for production
+            console.error('calls.js: Error playing notification sound:', error);
         }
     }
 }
 
-// Play ringtone for incoming call
+// Play ringtone
 function playRingtone() {
     if (isRinging) return;
     
@@ -519,7 +508,8 @@ function playRingtone() {
             callRingtone.currentTime = 0;
             callRingtone.play().catch(() => {});
         } catch (error) {
-            // Silent fail for production
+            console.error('calls.js: Error playing ringtone:', error);
+            isRinging = false;
         }
     }
 }
@@ -530,22 +520,25 @@ function stopRingtone() {
     if (callRingtone) {
         try {
             callRingtone.pause();
+            callRingtone.currentTime = 0;
         } catch (error) {
-            // Silent fail for production
+            console.error('calls.js: Error stopping ringtone:', error);
         }
     }
 }
 
-// Handle the call page - this runs when calls.html loads
+// Handle the call page
 async function handleCallPage() {
+    console.log('calls.js: handleCallPage called');
+    
     const urlParams = new URLSearchParams(window.location.search);
-    const callType = urlParams.get('type'); // 'personal' or 'group'
+    const callType = urlParams.get('type');
     const partnerId = urlParams.get('partnerId');
     const groupId = urlParams.get('groupId');
     const isIncoming = urlParams.get('incoming') === 'true';
     const callId = urlParams.get('callId');
     
-    console.log('Call page loaded with params:', { callType, partnerId, groupId, isIncoming, callId });
+    console.log('calls.js: Call params:', { callType, partnerId, groupId, isIncoming, callId });
     
     if (!callType || (!partnerId && !groupId)) {
         showError('Invalid call parameters');
@@ -560,17 +553,10 @@ async function handleCallPage() {
         currentCallPartnerId = partnerId;
     } else if (callType === 'group') {
         currentGroupId = groupId;
-        // Initialize call participants set
         callParticipants.add(currentUser.uid);
     }
     
-    // Store in session storage for cleanup
-    sessionStorage.setItem('currentCallType', currentCallType);
-    sessionStorage.setItem('activeCallId', activeCallId);
-    if (currentCallPartnerId) sessionStorage.setItem('currentCallPartnerId', currentCallPartnerId);
-    if (currentGroupId) sessionStorage.setItem('currentGroupId', currentGroupId);
-    
-    // Update UI with call info
+    // Update UI
     try {
         if (callType === 'personal') {
             const partnerName = await getUserName(partnerId);
@@ -585,10 +571,10 @@ async function handleCallPage() {
             }
         }
     } catch (error) {
-        // Silent fail
+        console.error('calls.js: Error updating UI:', error);
     }
     
-    // Set up event listeners for call controls
+    // Set up event listeners
     const muteBtn = document.getElementById('muteBtn');
     const endCallBtn = document.getElementById('endCallBtn');
     const backToChatBtn = document.getElementById('backToChat');
@@ -597,25 +583,22 @@ async function handleCallPage() {
     if (endCallBtn) endCallBtn.addEventListener('click', endCall);
     if (backToChatBtn) backToChatBtn.addEventListener('click', goBackToChat);
     
-    // Setup signaling listener FIRST
+    // Setup signaling listener
     setupSignalingListener();
     
-    // Start the call process
+    // Start call process
     if (isCaller) {
-        // We are the caller - initiate the call
         startCall();
     } else {
-        // We are the receiver - wait for offer
         setupMediaForReceiver();
     }
 }
 
-// Setup media for receiver (without starting stream immediately)
+// Setup media for receiver
 async function setupMediaForReceiver() {
     showLoader('Preparing for call...');
     
     if (currentCallType === 'personal') {
-        // Create peer connection for personal call
         createPeerConnection(currentCallPartnerId);
     }
 }
@@ -629,11 +612,8 @@ async function initiatePersonalCall(partnerId) {
     
     const callId = `${currentUser.uid}_${partnerId}_${Date.now()}`;
     
-    // Send notification to the partner
     try {
         await sendCallNotification(partnerId, 'personal', callId);
-        
-        // Redirect to call page
         window.location.href = `calls.html?type=personal&partnerId=${partnerId}&incoming=false&callId=${callId}`;
     } catch (error) {
         showNotification('Failed to initiate call. Please try again.', 'error');
@@ -647,7 +627,6 @@ async function initiateGroupCall(groupId) {
         return;
     }
     
-    // Get group members
     try {
         const membersRef = collection(db, 'groups', groupId, 'members');
         const membersSnapshot = await getDocs(membersRef);
@@ -666,12 +645,10 @@ async function initiateGroupCall(groupId) {
         
         const callId = `${currentUser.uid}_${groupId}_${Date.now()}`;
         
-        // Send notifications to all members
         await Promise.all(members.map(memberId => 
             sendCallNotification(memberId, 'group', callId, groupId)
         ));
         
-        // Redirect to call page
         window.location.href = `calls.html?type=group&groupId=${groupId}&incoming=false&callId=${callId}`;
         
     } catch (error) {
@@ -709,7 +686,6 @@ async function startCall() {
     try {
         showLoader('Starting call...');
         
-        // Get local media stream
         try {
             localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
@@ -719,7 +695,7 @@ async function startCall() {
                     sampleRate: 44100,
                     channelCount: 1
                 },
-                video: false // Voice only
+                video: false
             });
         } catch (error) {
             if (error.name === 'NotAllowedError') {
@@ -732,7 +708,6 @@ async function startCall() {
             return;
         }
         
-        // Update local audio element
         const localAudio = document.getElementById('localAudio');
         if (localAudio) {
             localAudio.srcObject = localStream;
@@ -741,10 +716,8 @@ async function startCall() {
         }
         
         if (currentCallType === 'personal') {
-            // Personal call - connect to single partner
             await startPersonalCall();
         } else if (currentCallType === 'group') {
-            // Group call - connect to all members
             await startGroupCall();
         }
         
@@ -758,10 +731,8 @@ async function startCall() {
 
 // Start personal call
 async function startPersonalCall() {
-    // Create peer connection
     createPeerConnection(currentCallPartnerId);
     
-    // Add local stream to peer connection
     localStream.getTracks().forEach(track => {
         const pc = peerConnections.get(currentCallPartnerId);
         if (pc) {
@@ -769,10 +740,6 @@ async function startPersonalCall() {
         }
     });
     
-    // Process any pending signals that arrived before peerConnection was ready
-    processPendingSignals();
-    
-    // Create and send offer
     try {
         const peerConnection = peerConnections.get(currentCallPartnerId);
         if (!peerConnection) {
@@ -793,7 +760,6 @@ async function startPersonalCall() {
             callId: activeCallId
         }, currentCallPartnerId);
         
-        // Set timeout to end call if no answer
         callTimeout = setTimeout(() => {
             if (peerConnection && peerConnection.connectionState !== 'connected') {
                 showError('No answer from user');
@@ -808,7 +774,6 @@ async function startPersonalCall() {
 
 // Start group call
 async function startGroupCall() {
-    // Get all group members
     try {
         const membersRef = collection(db, 'groups', currentGroupId, 'members');
         const membersSnapshot = await getDocs(membersRef);
@@ -820,11 +785,9 @@ async function startGroupCall() {
             }
         });
         
-        // Create peer connection for each member
         for (const memberId of members) {
             createPeerConnection(memberId);
             
-            // Add local stream to peer connection
             localStream.getTracks().forEach(track => {
                 const pc = peerConnections.get(memberId);
                 if (pc) {
@@ -832,7 +795,6 @@ async function startGroupCall() {
                 }
             });
             
-            // Create and send offer
             const peerConnection = peerConnections.get(memberId);
             const offer = await peerConnection.createOffer({
                 offerToReceiveAudio: true,
@@ -850,9 +812,7 @@ async function startGroupCall() {
             }, memberId);
         }
         
-        // Set timeout
         callTimeout = setTimeout(() => {
-            // Check if anyone answered
             let anyoneAnswered = false;
             peerConnections.forEach(pc => {
                 if (pc.connectionState === 'connected') {
@@ -866,7 +826,6 @@ async function startGroupCall() {
             }
         }, 30000);
         
-        // Update participants UI
         updateParticipantsUI();
         
     } catch (error) {
@@ -874,21 +833,12 @@ async function startGroupCall() {
     }
 }
 
-// Process pending signals
-function processPendingSignals() {
-    while (pendingSignals.length > 0) {
-        const signal = pendingSignals.shift();
-        handleSignalingMessage(signal);
-    }
-}
-
-// Create peer connection for a specific user
+// Create peer connection
 function createPeerConnection(userId) {
     try {
         const peerConnection = new RTCPeerConnection(rtcConfiguration);
         peerConnections.set(userId, peerConnection);
         
-        // Handle remote stream for personal calls
         peerConnection.ontrack = (event) => {
             console.log('Received remote track from:', userId);
             if (event.streams && event.streams[0]) {
@@ -896,7 +846,6 @@ function createPeerConnection(userId) {
                 remoteStreams.set(userId, remoteStream);
                 
                 if (currentCallType === 'personal') {
-                    // For personal calls, play the remote audio
                     const remoteAudio = document.getElementById('remoteAudio');
                     if (remoteAudio) {
                         remoteAudio.srcObject = remoteStream;
@@ -906,7 +855,6 @@ function createPeerConnection(userId) {
                     }
                 }
                 
-                // Add participant to UI for group calls
                 if (currentCallType === 'group') {
                     callParticipants.add(userId);
                     updateParticipantsUI();
@@ -918,7 +866,6 @@ function createPeerConnection(userId) {
             }
         };
         
-        // Handle ICE candidates
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 sendSignal({
@@ -932,7 +879,6 @@ function createPeerConnection(userId) {
             }
         };
         
-        // Handle connection state changes
         peerConnection.onconnectionstatechange = () => {
             console.log(`Connection state changed for ${userId}:`, peerConnection.connectionState);
             if (peerConnection.connectionState === 'connected') {
@@ -940,7 +886,6 @@ function createPeerConnection(userId) {
                 updateCallStatus('Connected');
                 startCallTimer();
                 
-                // Clear timeout if call is connected
                 if (callTimeout) {
                     clearTimeout(callTimeout);
                     callTimeout = null;
@@ -948,13 +893,10 @@ function createPeerConnection(userId) {
                 
             } else if (peerConnection.connectionState === 'disconnected' || 
                        peerConnection.connectionState === 'failed') {
-                console.log(`Connection lost for ${userId}`);
-                // Handle disconnection
                 if (currentCallType === 'group') {
                     callParticipants.delete(userId);
                     updateParticipantsUI();
                     
-                    // If all participants disconnected, end call
                     if (callParticipants.size <= 1) {
                         showCallEnded();
                     }
@@ -964,27 +906,18 @@ function createPeerConnection(userId) {
             }
         };
         
-        // Handle ICE connection state
-        peerConnection.oniceconnectionstatechange = () => {
-            console.log(`ICE connection state for ${userId}:`, peerConnection.iceConnectionState);
-            if (peerConnection.iceConnectionState === 'disconnected') {
-                console.log('ICE connection disconnected for user:', userId);
-            }
-        };
-        
     } catch (error) {
         showError("Failed to create peer connection: " + error.message);
     }
 }
 
-// Update participants UI for group calls
+// Update participants UI
 async function updateParticipantsUI() {
     const participantsContainer = document.getElementById('participantsContainer');
     if (!participantsContainer) return;
     
     participantsContainer.innerHTML = '';
     
-    // Add local participant (current user)
     const localParticipant = document.createElement('div');
     localParticipant.className = 'participant';
     localParticipant.innerHTML = `
@@ -998,7 +931,6 @@ async function updateParticipantsUI() {
     `;
     participantsContainer.appendChild(localParticipant);
     
-    // Add remote participants
     for (const userId of callParticipants) {
         if (userId === currentUser.uid) continue;
         
@@ -1017,11 +949,10 @@ async function updateParticipantsUI() {
             `;
             participantsContainer.appendChild(participant);
         } catch (error) {
-            // Silent fail
+            console.error('calls.js: Error adding participant to UI:', error);
         }
     }
     
-    // Update participant count
     const participantCount = document.getElementById('participantCount');
     if (participantCount) {
         participantCount.textContent = `${callParticipants.size} participant${callParticipants.size !== 1 ? 's' : ''}`;
@@ -1039,29 +970,20 @@ function setupSignalingListener() {
             if (change.type === 'added') {
                 const data = change.doc.data();
                 
-                // Skip if already processed
                 if (data.processed) return;
                 
-                // Only process signals for the current active call
                 if (data.callId && data.callId !== activeCallId) return;
                 
-                console.log('Received signal:', data.type, 'from:', data.from);
-                
-                // If peerConnection isn't ready yet, store the signal for later processing
-                if (currentCallType === 'personal' && !peerConnections.has(data.from)) {
-                    pendingSignals.push(data);
-                    return;
-                }
+                console.log('calls.js: Received signal:', data.type, 'from:', data.from);
                 
                 await handleSignalingMessage(data);
                 
-                // Mark the signal as processed
                 try {
                     await setDoc(doc(db, 'calls', currentUser.uid, 'signals', change.doc.id), {
                         processed: true
                     }, { merge: true });
                 } catch (error) {
-                    // Silent fail
+                    console.error('calls.js: Error marking signal as processed:', error);
                 }
             }
         });
@@ -1073,7 +995,7 @@ function setupSignalingListener() {
 // Handle incoming signaling messages
 async function handleSignalingMessage(data) {
     try {
-        console.log('Handling signal:', data.type, 'from:', data.from);
+        console.log('calls.js: Handling signal:', data.type);
         
         switch (data.type) {
             case 'offer':
@@ -1082,10 +1004,6 @@ async function handleSignalingMessage(data) {
                 } else if (data.callType === 'group') {
                     await handleGroupOffer(data);
                 }
-                break;
-                
-            case 'group-offer':
-                await handleGroupOffer(data);
                 break;
                 
             case 'answer':
@@ -1097,11 +1015,6 @@ async function handleSignalingMessage(data) {
                 break;
                 
             case 'call-accepted':
-                hideLoader();
-                updateCallStatus('Connecting...');
-                break;
-                
-            case 'group-call-accepted':
                 hideLoader();
                 updateCallStatus('Connecting...');
                 break;
@@ -1119,27 +1032,22 @@ async function handleSignalingMessage(data) {
             case 'end-call':
                 showCallEnded();
                 break;
-                
-            default:
-                console.log('Unknown signal type:', data.type);
         }
     } catch (error) {
-        console.error('Error handling signaling message:', error);
+        console.error('calls.js: Error handling signaling message:', error);
         showNotification('Error handling call request: ' + error.message, 'error');
     }
 }
 
-// Handle personal call offer
+// Handle personal offer
 async function handlePersonalOffer(data) {
-    console.log('Handling personal offer from:', data.from);
+    console.log('calls.js: Handling personal offer from:', data.from);
     
-    // Clear any existing timeout
     if (callTimeout) {
         clearTimeout(callTimeout);
         callTimeout = null;
     }
     
-    // Get local media stream for the receiver
     if (!localStream) {
         try {
             localStream = await navigator.mediaDevices.getUserMedia({
@@ -1153,7 +1061,6 @@ async function handlePersonalOffer(data) {
                 video: false
             });
             
-            // Update local audio element
             const localAudio = document.getElementById('localAudio');
             if (localAudio) {
                 localAudio.srcObject = localStream;
@@ -1166,12 +1073,9 @@ async function handlePersonalOffer(data) {
         }
     }
     
-    // Create peer connection if it doesn't exist
     if (!peerConnections.has(data.from)) {
-        console.log('Creating peer connection for:', data.from);
         createPeerConnection(data.from);
         
-        // Add local stream to peer connection
         localStream.getTracks().forEach(track => {
             const pc = peerConnections.get(data.from);
             if (pc) {
@@ -1181,21 +1085,16 @@ async function handlePersonalOffer(data) {
     }
     
     const peerConnection = peerConnections.get(data.from);
-    if (!peerConnection) {
-        console.error('No peer connection for:', data.from);
-        return;
-    }
+    if (!peerConnection) return;
     
     const offer = data.offer;
     try {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-        console.log('Set remote description successfully');
     } catch (error) {
-        console.error('Error setting remote description:', error);
+        console.error('calls.js: Error setting remote description:', error);
         return;
     }
     
-    // Create and send answer
     try {
         const answer = await peerConnection.createAnswer({
             offerToReceiveAudio: true,
@@ -1211,26 +1110,22 @@ async function handlePersonalOffer(data) {
             callType: 'personal'
         }, data.from);
         
-        console.log('Sent answer to:', data.from);
-        
         hideLoader();
         updateCallStatus('Connected');
         startCallTimer();
     } catch (error) {
-        console.error('Error creating/sending answer:', error);
+        console.error('calls.js: Error creating/sending answer:', error);
         showError('Failed to answer call: ' + error.message);
     }
 }
 
-// Handle group call offer
+// Handle group offer
 async function handleGroupOffer(data) {
-    // Clear any existing timeout
     if (callTimeout) {
         clearTimeout(callTimeout);
         callTimeout = null;
     }
     
-    // Get local media stream if we don't have it
     if (!localStream) {
         try {
             localStream = await navigator.mediaDevices.getUserMedia({
@@ -1244,7 +1139,6 @@ async function handleGroupOffer(data) {
                 video: false
             });
             
-            // Update local audio element
             const localAudio = document.getElementById('localAudio');
             if (localAudio) {
                 localAudio.srcObject = localStream;
@@ -1257,11 +1151,9 @@ async function handleGroupOffer(data) {
         }
     }
     
-    // Create peer connection for this caller
     if (!peerConnections.has(data.from)) {
         createPeerConnection(data.from);
         
-        // Add local stream to peer connection
         localStream.getTracks().forEach(track => {
             const pc = peerConnections.get(data.from);
             if (pc) {
@@ -1274,7 +1166,6 @@ async function handleGroupOffer(data) {
     const offer = data.offer;
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
     
-    // Create and send answer
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
     
@@ -1287,7 +1178,6 @@ async function handleGroupOffer(data) {
         groupId: data.groupId
     }, data.from);
     
-    // Add to participants
     callParticipants.add(data.from);
     updateParticipantsUI();
     
@@ -1298,21 +1188,18 @@ async function handleGroupOffer(data) {
 
 // Handle answer
 async function handleAnswer(data) {
-    console.log('Handling answer from:', data.from);
+    console.log('calls.js: Handling answer from:', data.from);
     const peerConnection = peerConnections.get(data.from);
     if (peerConnection) {
         const answer = data.answer;
         try {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-            console.log('Set remote answer successfully');
             
-            // Clear the call timeout
             if (callTimeout) {
                 clearTimeout(callTimeout);
                 callTimeout = null;
             }
             
-            // Add to participants for group calls
             if (currentCallType === 'group') {
                 callParticipants.add(data.from);
                 updateParticipantsUI();
@@ -1322,7 +1209,7 @@ async function handleAnswer(data) {
             updateCallStatus('Connected');
             startCallTimer();
         } catch (error) {
-            console.error('Error setting remote answer:', error);
+            console.error('calls.js: Error setting remote answer:', error);
         }
     }
 }
@@ -1335,33 +1222,23 @@ async function handleIceCandidate(data) {
             const iceCandidate = new RTCIceCandidate(data.candidate);
             await peerConnection.addIceCandidate(iceCandidate);
         } catch (error) {
-            console.error('Error adding ICE candidate:', error);
+            console.error('calls.js: Error adding ICE candidate:', error);
         }
     }
 }
 
-// Send signaling message
-async function sendSignal(data, targetUserId = null) {
-    const targetId = targetUserId;
-    
-    if (!targetId || !db) {
-        return;
-    }
+// Send signal
+async function sendSignal(data, targetUserId) {
+    if (!targetUserId || !db) return;
     
     try {
-        // Add timestamp and from field
         data.timestamp = serverTimestamp();
-        
-        // Create a unique ID for this signal
         const signalId = `signal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
-        // Send to the recipient's signaling channel
-        await setDoc(doc(db, 'calls', targetId, 'signals', signalId), data);
-        
-        console.log('Sent signal:', data.type, 'to:', targetId);
+        await setDoc(doc(db, 'calls', targetUserId, 'signals', signalId), data);
         
     } catch (error) {
-        console.error('Error sending signal:', error);
+        console.error('calls.js: Error sending signal:', error);
     }
 }
 
@@ -1418,29 +1295,23 @@ function toggleMute() {
                 '<i class="fas fa-microphone"></i>';
         }
         
-        // Update participants UI for group calls
         if (currentCallType === 'group') {
             updateParticipantsUI();
         }
     }
 }
 
-// End the current call
+// End call
 async function endCall() {
     try {
-        // Clear any timeout
         if (callTimeout) {
             clearTimeout(callTimeout);
             callTimeout = null;
         }
         
-        // Stop call timer and get duration
         const callDuration = stopCallTimer();
-        
-        // Stop ringtone if playing
         stopRingtone();
         
-        // Send end call signals to all connected peers
         if (currentCallType === 'personal' && currentCallPartnerId) {
             await sendSignal({
                 type: 'end-call',
@@ -1449,7 +1320,6 @@ async function endCall() {
                 duration: callDuration
             }, currentCallPartnerId);
         } else if (currentCallType === 'group' && currentGroupId) {
-            // Send to all participants
             for (const userId of callParticipants) {
                 if (userId !== currentUser.uid) {
                     await sendSignal({
@@ -1471,9 +1341,8 @@ async function endCall() {
     }
 }
 
-// Clean up call resources
+// Clean up resources
 function cleanupCallResources() {
-    // Close all peer connections
     peerConnections.forEach((pc, userId) => {
         if (pc) {
             pc.close();
@@ -1481,38 +1350,26 @@ function cleanupCallResources() {
     });
     peerConnections.clear();
     
-    // Stop local stream
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
     }
     
-    // Clear remote streams
     remoteStreams.clear();
     
-    // Clear signaling listeners
     signalingUnsubscribers.forEach(unsubscribe => {
         if (unsubscribe) unsubscribe();
     });
     signalingUnsubscribers.clear();
     
-    // Clear participants
     callParticipants.clear();
-    
-    // Clear pending signals
     pendingSignals = [];
     
-    // Clear session storage
-    sessionStorage.removeItem('currentCallType');
-    sessionStorage.removeItem('activeCallId');
-    sessionStorage.removeItem('currentCallPartnerId');
-    sessionStorage.removeItem('currentGroupId');
-    
-    // Clear global variables
     activeCallId = null;
     currentCallType = null;
     currentCallPartnerId = null;
     currentGroupId = null;
+    currentCallData = null;
 }
 
 // Show call ended screen
@@ -1523,7 +1380,6 @@ function showCallEnded() {
     if (callEndedElement) callEndedElement.style.display = 'flex';
     if (callContainer) callContainer.style.display = 'none';
     
-    // Auto-redirect to chat page after 2 seconds
     setTimeout(() => {
         goBackToChat();
     }, 2000);
@@ -1538,17 +1394,7 @@ function goBackToChat() {
     } else if (currentCallType === 'group' && currentGroupId) {
         window.location.href = 'group.html?id=' + currentGroupId;
     } else {
-        // Try to get from session storage
-        const partnerId = sessionStorage.getItem('currentCallPartnerId');
-        const groupId = sessionStorage.getItem('currentGroupId');
-        
-        if (partnerId) {
-            window.location.href = 'chat.html?id=' + partnerId;
-        } else if (groupId) {
-            window.location.href = 'group.html?id=' + groupId;
-        } else {
-            window.location.href = 'groups.html';
-        }
+        window.location.href = 'groups.html';
     }
 }
 
@@ -1617,7 +1463,6 @@ function showNotification(message, type = 'info') {
     
     document.body.appendChild(notification);
     
-    // Auto remove after 3 seconds
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => {
@@ -1635,10 +1480,12 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-// Export functions for use in other files
+// Export functions
 window.callsModule = {
     initiatePersonalCall,
     initiateGroupCall,
     endCall,
     toggleMute
 };
+
+console.log('calls.js: Complete module loaded');
