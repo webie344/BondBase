@@ -72,6 +72,7 @@ let callRingtone = null;
 let callNotificationSound = null;
 let userCache = new Map();
 let processedCalls = new Set();
+let pendingSignals = [];
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -411,6 +412,9 @@ async function showIncomingCallNotification(data) {
     
     document.body.appendChild(notification);
     
+    // Store call data for the accept button
+    notification.dataset.callData = JSON.stringify(data);
+    
     // Add event listeners
     const acceptBtn = document.getElementById('acceptIncomingCall');
     const rejectBtn = document.getElementById('rejectIncomingCall');
@@ -420,26 +424,29 @@ async function showIncomingCallNotification(data) {
             // Stop ringtone
             stopRingtone();
             
+            // Get the call data
+            const callData = JSON.parse(notification.dataset.callData);
+            
             // Send call-accepted signal
-            if (data.callType === 'personal') {
+            if (callData.callType === 'personal') {
                 sendSignal({
                     type: 'call-accepted',
                     from: currentUser.uid,
-                    callId: data.callId
-                }, data.from);
+                    callId: callData.callId
+                }, callData.from);
                 
                 // Redirect to call page
-                window.location.href = `calls.html?type=personal&partnerId=${data.from}&incoming=true&callId=${data.callId}`;
-            } else if (data.callType === 'group') {
+                window.location.href = `calls.html?type=personal&partnerId=${callData.from}&incoming=true&callId=${callData.callId}`;
+            } else if (callData.callType === 'group') {
                 sendSignal({
                     type: 'group-call-accepted',
                     from: currentUser.uid,
-                    callId: data.callId,
-                    groupId: data.groupId
-                }, data.from);
+                    callId: callData.callId,
+                    groupId: callData.groupId
+                }, callData.from);
                 
                 // Redirect to call page
-                window.location.href = `calls.html?type=group&groupId=${data.groupId}&incoming=true&callId=${data.callId}`;
+                window.location.href = `calls.html?type=group&groupId=${callData.groupId}&incoming=true&callId=${callData.callId}`;
             }
             
             if (notification.parentNode) {
@@ -453,12 +460,15 @@ async function showIncomingCallNotification(data) {
             // Stop ringtone
             stopRingtone();
             
+            // Get the call data
+            const callData = JSON.parse(notification.dataset.callData);
+            
             // Send rejection signal
             sendSignal({
                 type: 'call-rejected',
                 from: currentUser.uid,
-                callId: data.callId
-            }, data.from);
+                callId: callData.callId
+            }, callData.from);
             
             if (notification.parentNode) {
                 notification.parentNode.removeChild(notification);
@@ -472,12 +482,15 @@ async function showIncomingCallNotification(data) {
             // Stop ringtone
             stopRingtone();
             
+            // Get the call data
+            const callData = JSON.parse(notification.dataset.callData);
+            
             // Send timeout signal
             sendSignal({
                 type: 'call-timeout',
                 from: currentUser.uid,
-                callId: data.callId
-            }, data.from);
+                callId: callData.callId
+            }, callData.from);
             
             notification.parentNode.removeChild(notification);
         }
@@ -532,6 +545,8 @@ async function handleCallPage() {
     const isIncoming = urlParams.get('incoming') === 'true';
     const callId = urlParams.get('callId');
     
+    console.log('Call page loaded with params:', { callType, partnerId, groupId, isIncoming, callId });
+    
     if (!callType || (!partnerId && !groupId)) {
         showError('Invalid call parameters');
         return;
@@ -548,6 +563,12 @@ async function handleCallPage() {
         // Initialize call participants set
         callParticipants.add(currentUser.uid);
     }
+    
+    // Store in session storage for cleanup
+    sessionStorage.setItem('currentCallType', currentCallType);
+    sessionStorage.setItem('activeCallId', activeCallId);
+    if (currentCallPartnerId) sessionStorage.setItem('currentCallPartnerId', currentCallPartnerId);
+    if (currentGroupId) sessionStorage.setItem('currentGroupId', currentGroupId);
     
     // Update UI with call info
     try {
@@ -576,6 +597,9 @@ async function handleCallPage() {
     if (endCallBtn) endCallBtn.addEventListener('click', endCall);
     if (backToChatBtn) backToChatBtn.addEventListener('click', goBackToChat);
     
+    // Setup signaling listener FIRST
+    setupSignalingListener();
+    
     // Start the call process
     if (isCaller) {
         // We are the caller - initiate the call
@@ -584,9 +608,6 @@ async function handleCallPage() {
         // We are the receiver - wait for offer
         setupMediaForReceiver();
     }
-    
-    // Setup signaling listener
-    setupSignalingListener();
 }
 
 // Setup media for receiver (without starting stream immediately)
@@ -742,13 +763,26 @@ async function startPersonalCall() {
     
     // Add local stream to peer connection
     localStream.getTracks().forEach(track => {
-        peerConnections.get(currentCallPartnerId).addTrack(track, localStream);
+        const pc = peerConnections.get(currentCallPartnerId);
+        if (pc) {
+            pc.addTrack(track, localStream);
+        }
     });
+    
+    // Process any pending signals that arrived before peerConnection was ready
+    processPendingSignals();
     
     // Create and send offer
     try {
         const peerConnection = peerConnections.get(currentCallPartnerId);
-        const offer = await peerConnection.createOffer();
+        if (!peerConnection) {
+            throw new Error('Peer connection not created');
+        }
+        
+        const offer = await peerConnection.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: false
+        });
         await peerConnection.setLocalDescription(offer);
         
         await sendSignal({
@@ -792,12 +826,18 @@ async function startGroupCall() {
             
             // Add local stream to peer connection
             localStream.getTracks().forEach(track => {
-                peerConnections.get(memberId).addTrack(track, localStream);
+                const pc = peerConnections.get(memberId);
+                if (pc) {
+                    pc.addTrack(track, localStream);
+                }
             });
             
             // Create and send offer
             const peerConnection = peerConnections.get(memberId);
-            const offer = await peerConnection.createOffer();
+            const offer = await peerConnection.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: false
+            });
             await peerConnection.setLocalDescription(offer);
             
             await sendSignal({
@@ -834,6 +874,14 @@ async function startGroupCall() {
     }
 }
 
+// Process pending signals
+function processPendingSignals() {
+    while (pendingSignals.length > 0) {
+        const signal = pendingSignals.shift();
+        handleSignalingMessage(signal);
+    }
+}
+
 // Create peer connection for a specific user
 function createPeerConnection(userId) {
     try {
@@ -842,6 +890,7 @@ function createPeerConnection(userId) {
         
         // Handle remote stream for personal calls
         peerConnection.ontrack = (event) => {
+            console.log('Received remote track from:', userId);
             if (event.streams && event.streams[0]) {
                 const remoteStream = event.streams[0];
                 remoteStreams.set(userId, remoteStream);
@@ -851,7 +900,9 @@ function createPeerConnection(userId) {
                     const remoteAudio = document.getElementById('remoteAudio');
                     if (remoteAudio) {
                         remoteAudio.srcObject = remoteStream;
-                        remoteAudio.play().catch(() => {});
+                        remoteAudio.play().catch((error) => {
+                            console.log('Error playing remote audio:', error);
+                        });
                     }
                 }
                 
@@ -883,6 +934,7 @@ function createPeerConnection(userId) {
         
         // Handle connection state changes
         peerConnection.onconnectionstatechange = () => {
+            console.log(`Connection state changed for ${userId}:`, peerConnection.connectionState);
             if (peerConnection.connectionState === 'connected') {
                 hideLoader();
                 updateCallStatus('Connected');
@@ -896,6 +948,7 @@ function createPeerConnection(userId) {
                 
             } else if (peerConnection.connectionState === 'disconnected' || 
                        peerConnection.connectionState === 'failed') {
+                console.log(`Connection lost for ${userId}`);
                 // Handle disconnection
                 if (currentCallType === 'group') {
                     callParticipants.delete(userId);
@@ -913,6 +966,7 @@ function createPeerConnection(userId) {
         
         // Handle ICE connection state
         peerConnection.oniceconnectionstatechange = () => {
+            console.log(`ICE connection state for ${userId}:`, peerConnection.iceConnectionState);
             if (peerConnection.iceConnectionState === 'disconnected') {
                 console.log('ICE connection disconnected for user:', userId);
             }
@@ -991,6 +1045,14 @@ function setupSignalingListener() {
                 // Only process signals for the current active call
                 if (data.callId && data.callId !== activeCallId) return;
                 
+                console.log('Received signal:', data.type, 'from:', data.from);
+                
+                // If peerConnection isn't ready yet, store the signal for later processing
+                if (currentCallType === 'personal' && !peerConnections.has(data.from)) {
+                    pendingSignals.push(data);
+                    return;
+                }
+                
                 await handleSignalingMessage(data);
                 
                 // Mark the signal as processed
@@ -1011,6 +1073,8 @@ function setupSignalingListener() {
 // Handle incoming signaling messages
 async function handleSignalingMessage(data) {
     try {
+        console.log('Handling signal:', data.type, 'from:', data.from);
+        
         switch (data.type) {
             case 'offer':
                 if (data.callType === 'personal') {
@@ -1055,14 +1119,20 @@ async function handleSignalingMessage(data) {
             case 'end-call':
                 showCallEnded();
                 break;
+                
+            default:
+                console.log('Unknown signal type:', data.type);
         }
     } catch (error) {
+        console.error('Error handling signaling message:', error);
         showNotification('Error handling call request: ' + error.message, 'error');
     }
 }
 
 // Handle personal call offer
 async function handlePersonalOffer(data) {
+    console.log('Handling personal offer from:', data.from);
+    
     // Clear any existing timeout
     if (callTimeout) {
         clearTimeout(callTimeout);
@@ -1098,33 +1168,58 @@ async function handlePersonalOffer(data) {
     
     // Create peer connection if it doesn't exist
     if (!peerConnections.has(data.from)) {
+        console.log('Creating peer connection for:', data.from);
         createPeerConnection(data.from);
         
         // Add local stream to peer connection
         localStream.getTracks().forEach(track => {
-            peerConnections.get(data.from).addTrack(track, localStream);
+            const pc = peerConnections.get(data.from);
+            if (pc) {
+                pc.addTrack(track, localStream);
+            }
         });
     }
     
     const peerConnection = peerConnections.get(data.from);
+    if (!peerConnection) {
+        console.error('No peer connection for:', data.from);
+        return;
+    }
+    
     const offer = data.offer;
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    try {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        console.log('Set remote description successfully');
+    } catch (error) {
+        console.error('Error setting remote description:', error);
+        return;
+    }
     
     // Create and send answer
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-    
-    await sendSignal({
-        type: 'answer',
-        answer: answer,
-        from: currentUser.uid,
-        callId: data.callId,
-        callType: 'personal'
-    }, data.from);
-    
-    hideLoader();
-    updateCallStatus('Connected');
-    startCallTimer();
+    try {
+        const answer = await peerConnection.createAnswer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: false
+        });
+        await peerConnection.setLocalDescription(answer);
+        
+        await sendSignal({
+            type: 'answer',
+            answer: answer,
+            from: currentUser.uid,
+            callId: data.callId,
+            callType: 'personal'
+        }, data.from);
+        
+        console.log('Sent answer to:', data.from);
+        
+        hideLoader();
+        updateCallStatus('Connected');
+        startCallTimer();
+    } catch (error) {
+        console.error('Error creating/sending answer:', error);
+        showError('Failed to answer call: ' + error.message);
+    }
 }
 
 // Handle group call offer
@@ -1168,7 +1263,10 @@ async function handleGroupOffer(data) {
         
         // Add local stream to peer connection
         localStream.getTracks().forEach(track => {
-            peerConnections.get(data.from).addTrack(track, localStream);
+            const pc = peerConnections.get(data.from);
+            if (pc) {
+                pc.addTrack(track, localStream);
+            }
         });
     }
     
@@ -1200,26 +1298,32 @@ async function handleGroupOffer(data) {
 
 // Handle answer
 async function handleAnswer(data) {
+    console.log('Handling answer from:', data.from);
     const peerConnection = peerConnections.get(data.from);
     if (peerConnection) {
         const answer = data.answer;
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-        
-        // Clear the call timeout
-        if (callTimeout) {
-            clearTimeout(callTimeout);
-            callTimeout = null;
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            console.log('Set remote answer successfully');
+            
+            // Clear the call timeout
+            if (callTimeout) {
+                clearTimeout(callTimeout);
+                callTimeout = null;
+            }
+            
+            // Add to participants for group calls
+            if (currentCallType === 'group') {
+                callParticipants.add(data.from);
+                updateParticipantsUI();
+            }
+            
+            hideLoader();
+            updateCallStatus('Connected');
+            startCallTimer();
+        } catch (error) {
+            console.error('Error setting remote answer:', error);
         }
-        
-        // Add to participants for group calls
-        if (currentCallType === 'group') {
-            callParticipants.add(data.from);
-            updateParticipantsUI();
-        }
-        
-        hideLoader();
-        updateCallStatus('Connected');
-        startCallTimer();
     }
 }
 
@@ -1231,7 +1335,7 @@ async function handleIceCandidate(data) {
             const iceCandidate = new RTCIceCandidate(data.candidate);
             await peerConnection.addIceCandidate(iceCandidate);
         } catch (error) {
-            // Silent fail
+            console.error('Error adding ICE candidate:', error);
         }
     }
 }
@@ -1254,8 +1358,10 @@ async function sendSignal(data, targetUserId = null) {
         // Send to the recipient's signaling channel
         await setDoc(doc(db, 'calls', targetId, 'signals', signalId), data);
         
+        console.log('Sent signal:', data.type, 'to:', targetId);
+        
     } catch (error) {
-        // Silent fail
+        console.error('Error sending signal:', error);
     }
 }
 
@@ -1393,6 +1499,15 @@ function cleanupCallResources() {
     // Clear participants
     callParticipants.clear();
     
+    // Clear pending signals
+    pendingSignals = [];
+    
+    // Clear session storage
+    sessionStorage.removeItem('currentCallType');
+    sessionStorage.removeItem('activeCallId');
+    sessionStorage.removeItem('currentCallPartnerId');
+    sessionStorage.removeItem('currentGroupId');
+    
     // Clear global variables
     activeCallId = null;
     currentCallType = null;
@@ -1416,12 +1531,24 @@ function showCallEnded() {
 
 // Go back to chat
 function goBackToChat() {
+    cleanupCallResources();
+    
     if (currentCallType === 'personal' && currentCallPartnerId) {
         window.location.href = 'chat.html?id=' + currentCallPartnerId;
     } else if (currentCallType === 'group' && currentGroupId) {
         window.location.href = 'group.html?id=' + currentGroupId;
     } else {
-        window.location.href = 'groups.html';
+        // Try to get from session storage
+        const partnerId = sessionStorage.getItem('currentCallPartnerId');
+        const groupId = sessionStorage.getItem('currentGroupId');
+        
+        if (partnerId) {
+            window.location.href = 'chat.html?id=' + partnerId;
+        } else if (groupId) {
+            window.location.href = 'group.html?id=' + groupId;
+        } else {
+            window.location.href = 'groups.html';
+        }
     }
 }
 
@@ -1515,4 +1642,3 @@ window.callsModule = {
     endCall,
     toggleMute
 };
-
