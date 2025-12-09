@@ -1878,4 +1878,3 @@ window.callsModule = {
     toggleMute
 };
 
-console.log('calls.js: Complete module loaded and ready');,
