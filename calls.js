@@ -1,5 +1,5 @@
 // calls.js - Complete Voice Call System for Personal & Group Chats
-// COMPLETE FIXED VERSION - Proper WebRTC serialization
+// FIXED VERSION - Proper WebRTC serialization and connection handling
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -16,7 +16,9 @@ import {
     serverTimestamp,
     getDoc,
     deleteDoc,
-    getDocs
+    getDocs,
+    query,
+    where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Use existing Firebase config
@@ -621,7 +623,7 @@ async function handleCallPage() {
     }
     
     currentCallType = callType;
-    activeCallId = callId || `${currentUser.uid}_${callType}_${Date.now()}`;
+    activeCallId = callId || `${currentUser.uid}_${Date.now()}`;
     isCaller = !isIncoming;
     
     if (callType === 'personal') {
@@ -893,12 +895,14 @@ async function startPersonalCall() {
     createPeerConnection(currentCallPartnerId);
     
     // Add local stream to peer connection
-    localStream.getTracks().forEach(track => {
-        const pc = peerConnections.get(currentCallPartnerId);
-        if (pc) {
-            pc.addTrack(track, localStream);
-        }
-    });
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            const pc = peerConnections.get(currentCallPartnerId);
+            if (pc) {
+                pc.addTrack(track, localStream);
+            }
+        });
+    }
     
     // Create and send offer
     try {
@@ -917,7 +921,7 @@ async function startPersonalCall() {
         console.log('calls.js: Sending offer to:', currentCallPartnerId);
         await sendSignal({
             type: 'offer',
-            offer: offer,  // This needs to be serialized
+            offer: offer,
             callType: 'personal',
             from: currentUser.uid,
             callId: activeCallId
@@ -968,12 +972,14 @@ async function startGroupCall() {
             createPeerConnection(memberId);
             
             // Add local stream to peer connection
-            localStream.getTracks().forEach(track => {
-                const pc = peerConnections.get(memberId);
-                if (pc) {
-                    pc.addTrack(track, localStream);
-                }
-            });
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    const pc = peerConnections.get(memberId);
+                    if (pc) {
+                        pc.addTrack(track, localStream);
+                    }
+                });
+            }
             
             // Create and send offer
             const peerConnection = peerConnections.get(memberId);
@@ -984,8 +990,8 @@ async function startGroupCall() {
             await peerConnection.setLocalDescription(offer);
             
             await sendSignal({
-                type: 'group-offer',
-                offer: offer,  // This needs to be serialized
+                type: 'offer',
+                offer: offer,
                 callType: 'group',
                 from: currentUser.uid,
                 callId: activeCallId,
@@ -1051,13 +1057,14 @@ function createPeerConnection(userId) {
                             });
                         }
                     }
+                } else if (currentCallType === 'group') {
+                    // For group calls, create a new audio element for each participant
+                    createGroupAudioElement(userId, remoteStream);
                 }
                 
-                // Add participant to UI for group calls
-                if (currentCallType === 'group') {
-                    callParticipants.add(userId);
-                    updateParticipantsUI();
-                }
+                // Add participant to UI
+                callParticipants.add(userId);
+                updateParticipantsUI();
                 
                 hideLoader();
                 updateCallStatus('Connected');
@@ -1074,7 +1081,7 @@ function createPeerConnection(userId) {
                 console.log('calls.js: ICE candidate generated for:', userId);
                 sendSignal({
                     type: 'ice-candidate',
-                    candidate: event.candidate,  // This needs to be serialized
+                    candidate: event.candidate,
                     from: currentUser.uid,
                     callId: activeCallId,
                     callType: currentCallType,
@@ -1103,18 +1110,14 @@ function createPeerConnection(userId) {
             } else if (peerConnection.connectionState === 'disconnected' || 
                        peerConnection.connectionState === 'failed') {
                 console.log(`calls.js: Connection lost for ${userId}`);
-                // Handle disconnection
-                if (currentCallType === 'group') {
-                    callParticipants.delete(userId);
-                    updateParticipantsUI();
-                    
-                    // If all participants disconnected, end call
-                    if (callParticipants.size <= 1) {
-                        console.log('calls.js: All participants disconnected');
-                        showCallEnded();
-                    }
-                } else {
-                    console.log('calls.js: Personal call disconnected');
+                
+                // Remove from participants
+                callParticipants.delete(userId);
+                updateParticipantsUI();
+                
+                // If all participants disconnected, end call
+                if (currentCallType === 'personal' || callParticipants.size <= 1) {
+                    console.log('calls.js: Call disconnected');
                     showCallEnded();
                 }
             }
@@ -1126,6 +1129,26 @@ function createPeerConnection(userId) {
         console.error('calls.js: Failed to create peer connection:', error);
         showError("Failed to create peer connection: " + error.message);
     }
+}
+
+// Create audio element for group call participants
+function createGroupAudioElement(userId, remoteStream) {
+    const audioElement = document.createElement('audio');
+    audioElement.id = `remoteAudio_${userId}`;
+    audioElement.autoplay = true;
+    audioElement.controls = false;
+    audioElement.style.display = 'none';
+    audioElement.srcObject = remoteStream;
+    
+    // Try to play the audio
+    const playPromise = audioElement.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            console.error('calls.js: Error playing group audio:', error);
+        });
+    }
+    
+    document.body.appendChild(audioElement);
 }
 
 // Update participants UI for group calls
@@ -1243,10 +1266,8 @@ async function handleSignalingMessage(data) {
         
         switch (data.type) {
             case 'offer':
-                if (data.callType === 'personal') {
-                    await handlePersonalOffer(data);
-                } else if (data.callType === 'group') {
-                    await handleGroupOffer(data);
+                if (data.callType === 'personal' || data.callType === 'group') {
+                    await handleIncomingOffer(data);
                 }
                 break;
                 
@@ -1290,9 +1311,9 @@ async function handleSignalingMessage(data) {
     }
 }
 
-// Handle personal call offer
-async function handlePersonalOffer(data) {
-    console.log('calls.js: Handling personal offer from:', data.from);
+// Handle incoming offer (both personal and group)
+async function handleIncomingOffer(data) {
+    console.log('calls.js: Handling incoming offer from:', data.from);
     
     // Clear any existing timeout
     if (callTimeout) {
@@ -1341,12 +1362,14 @@ async function handlePersonalOffer(data) {
         createPeerConnection(data.from);
         
         // Add local stream to peer connection
-        localStream.getTracks().forEach(track => {
-            const pc = peerConnections.get(data.from);
-            if (pc) {
-                pc.addTrack(track, localStream);
-            }
-        });
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                const pc = peerConnections.get(data.from);
+                if (pc) {
+                    pc.addTrack(track, localStream);
+                }
+            });
+        }
     }
     
     const peerConnection = peerConnections.get(data.from);
@@ -1355,10 +1378,15 @@ async function handlePersonalOffer(data) {
         return;
     }
     
-    const offer = data.offer;
+    // Set remote description
     try {
+        const offerDescription = new RTCSessionDescription({
+            type: 'offer',
+            sdp: data.offer.sdp
+        });
+        
         console.log('calls.js: Setting remote description');
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        await peerConnection.setRemoteDescription(offerDescription);
         console.log('calls.js: Set remote description successfully');
     } catch (error) {
         console.error('calls.js: Error setting remote description:', error);
@@ -1377,10 +1405,11 @@ async function handlePersonalOffer(data) {
         console.log('calls.js: Sending answer to:', data.from);
         await sendSignal({
             type: 'answer',
-            answer: answer,  // This needs to be serialized
+            answer: answer,
             from: currentUser.uid,
             callId: data.callId,
-            callType: 'personal'
+            callType: data.callType || 'personal',
+            groupId: data.groupId
         }, data.from);
         
         console.log('calls.js: Answer sent');
@@ -1396,103 +1425,19 @@ async function handlePersonalOffer(data) {
     }
 }
 
-// Handle group call offer
-async function handleGroupOffer(data) {
-    console.log('calls.js: Handling group offer from:', data.from);
-    
-    // Clear any existing timeout
-    if (callTimeout) {
-        clearTimeout(callTimeout);
-        callTimeout = null;
-    }
-    
-    // Get local media stream if we don't have it
-    if (!localStream) {
-        try {
-            console.log('calls.js: Getting microphone access for group call');
-            localStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 44100,
-                    channelCount: 1
-                },
-                video: false
-            });
-            
-            // Update local audio element
-            const localAudio = document.getElementById('localAudio');
-            if (localAudio) {
-                localAudio.srcObject = localStream;
-                localAudio.muted = true;
-                
-                const playPromise = localAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(() => {
-                        console.error('calls.js: Error playing local audio');
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('calls.js: Failed to access microphone:', error);
-            showError('Failed to access microphone: ' + error.message);
-            return;
-        }
-    }
-    
-    // Create peer connection for this caller
-    if (!peerConnections.has(data.from)) {
-        console.log('calls.js: Creating peer connection for:', data.from);
-        createPeerConnection(data.from);
-        
-        // Add local stream to peer connection
-        localStream.getTracks().forEach(track => {
-            const pc = peerConnections.get(data.from);
-            if (pc) {
-                pc.addTrack(track, localStream);
-            }
-        });
-    }
-    
-    const peerConnection = peerConnections.get(data.from);
-    const offer = data.offer;
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-    
-    // Create and send answer
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-    
-    await sendSignal({
-        type: 'answer',
-        answer: answer,  // This needs to be serialized
-        from: currentUser.uid,
-        callId: data.callId,
-        callType: 'group',
-        groupId: data.groupId
-    }, data.from);
-    
-    // Add to participants
-    callParticipants.add(data.from);
-    updateParticipantsUI();
-    
-    hideLoader();
-    updateCallStatus('Connected');
-    startCallTimer();
-    isCallActive = true;
-    
-    console.log('calls.js: Group call connected with:', data.from);
-}
-
 // Handle answer
 async function handleAnswer(data) {
     console.log('calls.js: Handling answer from:', data.from);
     const peerConnection = peerConnections.get(data.from);
     if (peerConnection) {
-        const answer = data.answer;
         try {
+            const answerDescription = new RTCSessionDescription({
+                type: 'answer',
+                sdp: data.answer.sdp
+            });
+            
             console.log('calls.js: Setting remote answer');
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            await peerConnection.setRemoteDescription(answerDescription);
             console.log('calls.js: Set remote answer successfully');
             
             // Clear the call timeout
@@ -1501,11 +1446,9 @@ async function handleAnswer(data) {
                 callTimeout = null;
             }
             
-            // Add to participants for group calls
-            if (currentCallType === 'group') {
-                callParticipants.add(data.from);
-                updateParticipantsUI();
-            }
+            // Add to participants
+            callParticipants.add(data.from);
+            updateParticipantsUI();
             
             hideLoader();
             updateCallStatus('Connected');
@@ -1525,8 +1468,8 @@ async function handleIceCandidate(data) {
     const peerConnection = peerConnections.get(data.from);
     if (peerConnection && data.candidate) {
         try {
-            console.log('calls.js: Adding ICE candidate from:', data.from);
             const iceCandidate = new RTCIceCandidate(data.candidate);
+            console.log('calls.js: Adding ICE candidate from:', data.from);
             await peerConnection.addIceCandidate(iceCandidate);
         } catch (error) {
             console.error('calls.js: Error adding ICE candidate:', error);
@@ -1534,7 +1477,7 @@ async function handleIceCandidate(data) {
     }
 }
 
-// Send signaling message - FIXED VERSION
+// Send signaling message - PROPERLY SERIALIZED VERSION
 async function sendSignal(data, targetUserId) {
     if (!targetUserId || !db) {
         console.error('calls.js: Cannot send signal - missing target or db');
@@ -1572,6 +1515,7 @@ async function sendSignal(data, targetUserId) {
         
         // Add timestamp
         serializedData.timestamp = serverTimestamp();
+        serializedData.processed = false;
         
         // Create a unique ID for this signal
         const signalId = `signal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1722,6 +1666,13 @@ function cleanupCallResources() {
     
     // Clear remote streams
     remoteStreams.clear();
+    
+    // Remove all group audio elements
+    document.querySelectorAll('[id^="remoteAudio_"]').forEach(el => {
+        el.pause();
+        el.srcObject = null;
+        el.remove();
+    });
     
     // Clear signaling listeners
     signalingUnsubscribers.forEach(unsubscribe => {
@@ -1877,4 +1828,3 @@ window.callsModule = {
     endCall,
     toggleMute
 };
-
