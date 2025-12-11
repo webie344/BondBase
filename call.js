@@ -1,11 +1,12 @@
-// call.js - WebRTC implementation for voice and video calls
-// This file works independently alongside app.js
+// call.js - Independent WebRTC implementation for voice and video calls
+// Load this file BEFORE app.js - No dependencies on app.js
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
-    onAuthStateChanged 
+    onAuthStateChanged,
+    signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { 
     getFirestore,
@@ -17,10 +18,23 @@ import {
     getDoc,
     deleteDoc,
     updateDoc,
-    arrayUnion
+    addDoc,
+    query,
+    orderBy,
+    getDocs
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// WebRTC configuration with more robust ICE servers
+// Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
+    authDomain: "dating-connect.firebaseapp.com",
+    projectId: "dating-connect",
+    storageBucket: "dating-connect.appspot.com",
+    messagingSenderId: "1062172180210",
+    appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
+};
+
+// WebRTC configuration
 const rtcConfiguration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -29,10 +43,12 @@ const rtcConfiguration = {
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' }
     ],
-    iceCandidatePoolSize: 10
+    iceCandidatePoolSize: 10,
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require'
 };
 
-// Global variables for WebRTC
+// Global variables
 let localStream = null;
 let remoteStream = null;
 let peerConnection = null;
@@ -47,35 +63,26 @@ let isMuted = false;
 let isVideoEnabled = true;
 let activeCallId = null;
 let callTimeout = null;
-let pendingSignals = []; // Store signals that arrive before peerConnection is ready
+let pendingSignals = [];
 let callNotificationSound = null;
 let callRingtone = null;
 let isRinging = false;
-let notificationSoundInterval = null;
+let callStartTime = null;
+let callDurationInterval = null;
 
-// Firebase configuration (same as in app.js)
-const firebaseConfig = {
-    apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
-    authDomain: "dating-connect.firebaseapp.com",
-    projectId: "dating-connect",
-    storageBucket: "dating-connect.appspot.com",
-    messagingSenderId: "1062172180210",
-    appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
-};
-
-// Initialize based on whether we're on chat.html or call.html
+// Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("=== CALL.JS LOADED ===");
+    console.log("=== INDEPENDENT CALL.JS LOADED ===");
     
     const isCallPage = window.location.pathname.includes('call.html');
     console.log("Is call page:", isCallPage);
     
-    // Initialize Firebase
+    // Initialize Firebase independently
     try {
         const app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
-        console.log("Firebase initialized successfully");
+        console.log("Firebase initialized successfully in call.js");
         
         // Preload notification sounds
         preloadNotificationSounds();
@@ -85,11 +92,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // Set up auth state listener
+    // Set up independent auth state listener
     onAuthStateChanged(auth, function(user) {
         if (user) {
             currentUser = user;
-            console.log("User authenticated:", user.uid);
+            console.log("User authenticated in call.js:", user.uid);
             
             if (isCallPage) {
                 // We're on the call page - handle the call
@@ -101,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 setupMissedCallsListener();
             }
         } else {
-            console.log("User not authenticated");
+            console.log("User not authenticated in call.js");
             showNotification('Please log in to make calls.', 'error');
         }
     });
@@ -109,12 +116,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Preload notification sounds
 function preloadNotificationSounds() {
-    // Create notification sound for incoming calls
-    callNotificationSound = new Audio('sounds/notification.mp3');
-    
-    // Create ringtone for incoming calls (repeating)
-    callRingtone = new Audio('ringingtone.mp3');
-    callRingtone.loop = true;
+    try {
+        callNotificationSound = new Audio('sounds/notification.mp3');
+        callRingtone = new Audio('ringingtone.mp3');
+        callRingtone.loop = true;
+    } catch (error) {
+        console.error("Error preloading sounds:", error);
+    }
 }
 
 // Set up listener for missed calls
@@ -139,7 +147,7 @@ function setupMissedCallsListener() {
                     return;
                 }
                 
-                // Add missed call to chat
+                // Add missed call to chat with proper WhatsApp-style formatting
                 await addMissedCallToChat(data);
                 
                 // Mark as processed
@@ -149,20 +157,39 @@ function setupMissedCallsListener() {
     });
 }
 
-// Add missed call to chat
+// Add missed call to chat with WhatsApp-style formatting
 async function addMissedCallToChat(callData) {
     try {
         // Create a combined ID for the chat thread
         const threadId = [currentUser.uid, callData.from].sort().join('_');
         
-        // Add missed call message to chat
-        await addDoc(collection(db, 'conversations', threadId, 'messages'), {
+        // Get caller name for the message
+        let callerName = 'Unknown';
+        try {
+            const callerDoc = await getDoc(doc(db, 'users', callData.from));
+            if (callerDoc.exists()) {
+                callerName = callerDoc.data().name || callerName;
+            }
+        } catch (error) {
+            console.error("Error getting caller name:", error);
+        }
+        
+        // Create WhatsApp-style missed call message
+        const callMessage = {
             type: 'missed-call',
             callType: callData.callType,
             senderId: callData.from,
+            senderName: callerName,
             timestamp: serverTimestamp(),
-            read: false
-        });
+            read: false,
+            callId: callData.callId,
+            text: `Missed ${callData.callType} call`,
+            isSystemMessage: true,
+            displayText: `📞 Missed ${callData.callType === 'video' ? 'video' : 'voice'} call • Tap to call back`
+        };
+        
+        // Add missed call message to chat
+        await addDoc(collection(db, 'conversations', threadId, 'messages'), callMessage);
         
         // Update the conversation document
         await setDoc(doc(db, 'conversations', threadId), {
@@ -170,12 +197,14 @@ async function addMissedCallToChat(callData) {
             lastMessage: {
                 text: `Missed ${callData.callType} call`,
                 senderId: callData.from,
-                timestamp: serverTimestamp()
+                timestamp: serverTimestamp(),
+                type: 'missed-call'
             },
             updatedAt: serverTimestamp()
         }, { merge: true });
         
-        console.log("Missed call added to chat");
+        console.log("WhatsApp-style missed call added to chat");
+        
     } catch (error) {
         console.error("Error adding missed call to chat:", error);
     }
@@ -184,10 +213,14 @@ async function addMissedCallToChat(callData) {
 // Play notification sound
 function playNotificationSound() {
     if (callNotificationSound) {
-        callNotificationSound.currentTime = 0;
-        callNotificationSound.play().catch(error => {
-            console.log("Notification sound play failed:", error);
-        });
+        try {
+            callNotificationSound.currentTime = 0;
+            callNotificationSound.play().catch(error => {
+                console.log("Notification sound play failed:", error);
+            });
+        } catch (error) {
+            console.error("Error playing notification sound:", error);
+        }
     }
 }
 
@@ -197,10 +230,14 @@ function playRingtone() {
     
     isRinging = true;
     if (callRingtone) {
-        callRingtone.currentTime = 0;
-        callRingtone.play().catch(error => {
-            console.log("Ringtone play failed:", error);
-        });
+        try {
+            callRingtone.currentTime = 0;
+            callRingtone.play().catch(error => {
+                console.log("Ringtone play failed:", error);
+            });
+        } catch (error) {
+            console.error("Error playing ringtone:", error);
+        }
     }
 }
 
@@ -208,7 +245,11 @@ function playRingtone() {
 function stopRingtone() {
     isRinging = false;
     if (callRingtone) {
-        callRingtone.pause();
+        try {
+            callRingtone.pause();
+        } catch (error) {
+            console.error("Error stopping ringtone:", error);
+        }
     }
 }
 
@@ -225,7 +266,7 @@ function setupCallButtonListeners() {
             initiateCall('audio');
         });
     } else {
-        console.error("Voice call button not found");
+        console.warn("Voice call button not found");
     }
     
     if (videoCallBtn) {
@@ -234,7 +275,7 @@ function setupCallButtonListeners() {
             initiateCall('video');
         });
     } else {
-        console.error("Video call button not found");
+        console.warn("Video call button not found");
     }
 }
 
@@ -281,7 +322,11 @@ function showIncomingCallNotification(data) {
     
     // Remove any existing notifications first
     const existingNotifications = document.querySelectorAll('.incoming-call-notification');
-    existingNotifications.forEach(notification => notification.remove());
+    existingNotifications.forEach(notification => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    });
     
     // Play ringtone
     playRingtone();
@@ -304,40 +349,61 @@ function showIncomingCallNotification(data) {
     `;
     
     // Add styles if not already added
-    if (!document.getElementById('notification-styles')) {
+    if (!document.getElementById('call-notification-styles')) {
         const styles = document.createElement('style');
-        styles.id = 'notification-styles';
+        styles.id = 'call-notification-styles';
         styles.textContent = `
             .incoming-call-notification {
                 position: fixed;
-                top: 20px;
-                right: 20px;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
                 background: white;
-                padding: 20px;
-                border-radius: 10px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+                padding: 25px;
+                border-radius: 15px;
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
                 z-index: 10000;
-                max-width: 300px;
+                max-width: 320px;
+                width: 90%;
+                text-align: center;
+            }
+            .notification-content h3 {
+                margin: 0 0 10px 0;
+                color: #333;
+                font-size: 18px;
+            }
+            .notification-content p {
+                margin: 0 0 20px 0;
+                color: #666;
+                font-size: 14px;
             }
             .notification-buttons {
                 display: flex;
-                gap: 10px;
-                margin-top: 15px;
+                gap: 12px;
+                justify-content: center;
             }
             .accept-call, .reject-call {
-                padding: 8px 16px;
+                padding: 10px 20px;
                 border: none;
-                border-radius: 20px;
+                border-radius: 25px;
                 cursor: pointer;
                 font-weight: bold;
+                font-size: 14px;
+                transition: all 0.2s;
             }
             .accept-call {
                 background: #28a745;
                 color: white;
             }
+            .accept-call:hover {
+                background: #218838;
+            }
             .reject-call {
                 background: #dc3545;
                 color: white;
+            }
+            .reject-call:hover {
+                background: #c82333;
             }
         `;
         document.head.appendChild(styles);
@@ -346,30 +412,41 @@ function showIncomingCallNotification(data) {
     document.body.appendChild(notification);
     
     // Add event listeners
-    document.getElementById('acceptIncomingCall').addEventListener('click', () => {
-        // Stop ringtone
-        stopRingtone();
-        
-        // Redirect to call page
-        window.location.href = `call.html?type=${data.callType}&partnerId=${data.from}&incoming=true&callId=${data.callId}`;
-        notification.remove();
-    });
+    const acceptBtn = document.getElementById('acceptIncomingCall');
+    const rejectBtn = document.getElementById('rejectIncomingCall');
     
-    document.getElementById('rejectIncomingCall').addEventListener('click', () => {
-        // Stop ringtone
-        stopRingtone();
-        
-        // Send rejection signal
-        sendSignal({
-            type: 'call-rejected',
-            from: currentUser.uid
-        }, data.from);
-        
-        // Add missed call to database
-        addMissedCall(data.from, data.callType, data.callId);
-        
-        notification.remove();
-    });
+    if (acceptBtn) {
+        acceptBtn.addEventListener('click', () => {
+            // Stop ringtone
+            stopRingtone();
+            
+            // Redirect to call page
+            window.location.href = `call.html?type=${data.callType}&partnerId=${data.from}&incoming=true&callId=${data.callId}`;
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        });
+    }
+    
+    if (rejectBtn) {
+        rejectBtn.addEventListener('click', () => {
+            // Stop ringtone
+            stopRingtone();
+            
+            // Send rejection signal
+            sendSignal({
+                type: 'call-rejected',
+                from: currentUser.uid
+            }, data.from);
+            
+            // Add missed call to database
+            addMissedCall(data.from, data.callType, data.callId);
+            
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        });
+    }
     
     // Auto remove after 30 seconds
     setTimeout(() => {
@@ -380,7 +457,7 @@ function showIncomingCallNotification(data) {
             // Add missed call to database
             addMissedCall(data.from, data.callType, data.callId);
             
-            notification.remove();
+            notification.parentNode.removeChild(notification);
         }
     }, 30000);
 }
@@ -421,22 +498,38 @@ async function handleCallPage() {
     isCaller = !isIncoming;
     activeCallId = callId || `${currentUser.uid}_${partnerId}_${Date.now()}`;
     
+    // Store partner ID in session storage for cleanup
+    sessionStorage.setItem('currentCallPartnerId', partnerId);
+    sessionStorage.setItem('currentCallType', callType);
+    sessionStorage.setItem('activeCallId', activeCallId);
+    
     // Update UI with caller name
     try {
         const partnerDoc = await getDoc(doc(db, 'users', partnerId));
         if (partnerDoc.exists()) {
             const partnerName = partnerDoc.data().name || 'Unknown';
-            document.getElementById('callerName').textContent = partnerName;
+            const callerNameElement = document.getElementById('callerName');
+            if (callerNameElement) {
+                callerNameElement.textContent = partnerName;
+            }
+            
+            // Also update the page title
+            document.title = `${partnerName} - ${callType === 'video' ? 'Video' : 'Voice'} Call`;
         }
     } catch (error) {
         console.error('Error getting partner info:', error);
     }
     
     // Set up event listeners for call controls
-    document.getElementById('muteBtn').addEventListener('click', toggleMute);
-    document.getElementById('videoBtn').addEventListener('click', toggleVideo);
-    document.getElementById('endCallBtn').addEventListener('click', endCall);
-    document.getElementById('backToChat').addEventListener('click', goBackToChat);
+    const muteBtn = document.getElementById('muteBtn');
+    const videoBtn = document.getElementById('videoBtn');
+    const endCallBtn = document.getElementById('endCallBtn');
+    const backToChatBtn = document.getElementById('backToChat');
+    
+    if (muteBtn) muteBtn.addEventListener('click', toggleMute);
+    if (videoBtn) videoBtn.addEventListener('click', toggleVideo);
+    if (endCallBtn) endCallBtn.addEventListener('click', endCall);
+    if (backToChatBtn) backToChatBtn.addEventListener('click', goBackToChat);
     
     // Set up signaling listener FIRST
     setupSignalingListener();
@@ -522,18 +615,21 @@ async function startCall() {
     try {
         showLoader('Starting call...');
         
-        // Get local media stream with better error handling
+        // Get local media stream
         console.log("Requesting media stream...");
         try {
             localStream = await navigator.mediaDevices.getUserMedia({
                 video: currentCallType === 'video' ? {
                     width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 30 }
                 } : false,
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
-                    sampleRate: 44100
+                    autoGainControl: true,
+                    sampleRate: 44100,
+                    channelCount: 1
                 }
             });
             console.log("Media stream obtained");
@@ -550,10 +646,14 @@ async function startCall() {
         }
         
         // Display local video if it's a video call
-        if (currentCallType === 'video') {
-            document.getElementById('localVideo').srcObject = localStream;
-        } else {
-            document.getElementById('localVideo').style.display = 'none';
+        const localVideo = document.getElementById('localVideo');
+        if (localVideo) {
+            if (currentCallType === 'video') {
+                localVideo.srcObject = localStream;
+                localVideo.muted = true;
+            } else {
+                localVideo.style.display = 'none';
+            }
         }
         
         // Create peer connection
@@ -595,6 +695,9 @@ async function startCall() {
                     // Add missed call to database
                     addMissedCall(currentCallPartnerId, currentCallType, activeCallId);
                     
+                    // Add call history to chat
+                    addCallHistoryToChat('call-ended', 0, currentCallPartnerId, currentCallType, activeCallId);
+                    
                     showError('No answer from user');
                     setTimeout(goBackToChat, 2000);
                 }
@@ -621,21 +724,28 @@ async function waitForOffer() {
         localStream = await navigator.mediaDevices.getUserMedia({
             video: currentCallType === 'video' ? {
                 width: { ideal: 1280 },
-                height: { ideal: 720 }
+                height: { ideal: 720 },
+                frameRate: { ideal: 30 }
             } : false,
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
-                sampleRate: 44100
+                autoGainControl: true,
+                sampleRate: 44100,
+                channelCount: 1
             }
         });
         console.log("Media stream prepared");
         
         // Display local video if it's a video call
-        if (currentCallType === 'video') {
-            document.getElementById('localVideo').srcObject = localStream;
-        } else {
-            document.getElementById('localVideo').style.display = 'none';
+        const localVideo = document.getElementById('localVideo');
+        if (localVideo) {
+            if (currentCallType === 'video') {
+                localVideo.srcObject = localStream;
+                localVideo.muted = true;
+            } else {
+                localVideo.style.display = 'none';
+            }
         }
         
         // Create peer connection
@@ -752,7 +862,8 @@ async function handleSignalingMessage(data) {
                         callTimeout = null;
                     }
                     
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                    const offer = data.offer;
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
                     
                     // Create and send answer
                     const answer = await peerConnection.createAnswer();
@@ -767,6 +878,7 @@ async function handleSignalingMessage(data) {
                     
                     hideLoader();
                     updateCallStatus('Connected');
+                    startCallTimer();
                     console.log("Call answered successfully");
                 }
                 break;
@@ -782,9 +894,11 @@ async function handleSignalingMessage(data) {
                         callTimeout = null;
                     }
                     
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                    const answer = data.answer;
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
                     hideLoader();
                     updateCallStatus('Connected');
+                    startCallTimer();
                     console.log("Call connected successfully");
                 }
                 break;
@@ -794,7 +908,6 @@ async function handleSignalingMessage(data) {
                 if (peerConnection && data.candidate) {
                     console.log("Adding ICE candidate");
                     try {
-                        // Convert plain object back to RTCIceCandidate
                         const iceCandidate = new RTCIceCandidate(data.candidate);
                         await peerConnection.addIceCandidate(iceCandidate);
                     } catch (error) {
@@ -829,6 +942,43 @@ async function handleSignalingMessage(data) {
     }
 }
 
+// Start call timer
+function startCallTimer() {
+    callStartTime = new Date();
+    
+    if (callDurationInterval) {
+        clearInterval(callDurationInterval);
+    }
+    
+    callDurationInterval = setInterval(() => {
+        if (callStartTime) {
+            const now = new Date();
+            const duration = Math.floor((now - callStartTime) / 1000);
+            const minutes = Math.floor(duration / 60);
+            const seconds = duration % 60;
+            updateCallStatus(`Connected ${minutes}:${seconds.toString().padStart(2, '0')}`);
+        }
+    }, 1000);
+}
+
+// Stop call timer
+function stopCallTimer() {
+    if (callDurationInterval) {
+        clearInterval(callDurationInterval);
+        callDurationInterval = null;
+    }
+    
+    // Calculate final call duration
+    if (callStartTime) {
+        const endTime = new Date();
+        const duration = Math.floor((endTime - callStartTime) / 1000);
+        callStartTime = null;
+        return duration;
+    }
+    
+    return 0;
+}
+
 // Create peer connection
 function createPeerConnection() {
     console.log("Creating peer connection...");
@@ -843,7 +993,7 @@ function createPeerConnection() {
                 const remoteVideo = document.getElementById('remoteVideo');
                 if (remoteVideo) {
                     remoteVideo.srcObject = remoteStream;
-                    // Play the remote video
+                    remoteVideo.muted = false;
                     remoteVideo.play().catch(error => {
                         console.error("Error playing remote video:", error);
                     });
@@ -857,7 +1007,6 @@ function createPeerConnection() {
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 console.log("ICE candidate generated, sending to peer");
-                // Convert RTCIceCandidate to a plain object for Firestore
                 const candidateData = {
                     candidate: event.candidate.candidate,
                     sdpMid: event.candidate.sdpMid,
@@ -867,7 +1016,7 @@ function createPeerConnection() {
                 
                 sendSignal({
                     type: 'ice-candidate',
-                    candidate: candidateData,  // Send plain object, not RTCIceCandidate
+                    candidate: candidateData,
                     from: currentUser.uid,
                     callId: activeCallId
                 });
@@ -882,28 +1031,12 @@ function createPeerConnection() {
             if (peerConnection.connectionState === 'connected') {
                 hideLoader();
                 updateCallStatus('Connected');
+                startCallTimer();
             } else if (peerConnection.connectionState === 'disconnected' || 
                        peerConnection.connectionState === 'failed') {
                 console.log("Call disconnected or failed");
                 showCallEnded();
             }
-        };
-        
-        // Handle ICE connection state changes
-        peerConnection.oniceconnectionstatechange = () => {
-            console.log("ICE connection state changed:", peerConnection.iceConnectionState);
-            if (peerConnection.iceConnectionState === 'failed') {
-                console.log("ICE connection failed");
-                // Try to restart ICE
-                if (peerConnection.restartIce) {
-                    peerConnection.restartIce();
-                }
-            }
-        };
-        
-        // Handle negotiation needed event
-        peerConnection.onnegotiationneeded = () => {
-            console.log("Negotiation needed");
         };
         
         console.log("Peer connection created");
@@ -950,8 +1083,10 @@ function toggleMute() {
         audioTracks[0].enabled = !isMuted;
         
         const muteBtn = document.getElementById('muteBtn');
-        muteBtn.classList.toggle('active', isMuted);
-        muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i>' : '<i class="fas fa-microphone"></i>';
+        if (muteBtn) {
+            muteBtn.classList.toggle('active', isMuted);
+            muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i>' : '<i class="fas fa-microphone"></i>';
+        }
         
         console.log('Microphone', isMuted ? 'muted' : 'unmuted');
     }
@@ -967,10 +1102,15 @@ function toggleVideo() {
         videoTracks[0].enabled = isVideoEnabled;
         
         const videoBtn = document.getElementById('videoBtn');
-        videoBtn.classList.toggle('active', !isVideoEnabled);
+        if (videoBtn) {
+            videoBtn.classList.toggle('active', !isVideoEnabled);
+        }
         
         // Show/hide local video based on state
-        document.getElementById('localVideo').style.display = isVideoEnabled ? 'block' : 'none';
+        const localVideo = document.getElementById('localVideo');
+        if (localVideo) {
+            localVideo.style.display = isVideoEnabled ? 'block' : 'none';
+        }
         
         console.log('Video', isVideoEnabled ? 'enabled' : 'disabled');
     }
@@ -981,61 +1121,207 @@ async function endCall() {
     try {
         console.log('Ending call...');
         
+        // Get partner ID from session storage if currentCallPartnerId is null
+        const partnerId = currentCallPartnerId || sessionStorage.getItem('currentCallPartnerId');
+        const callType = currentCallType || sessionStorage.getItem('currentCallType');
+        const callId = activeCallId || sessionStorage.getItem('activeCallId');
+        
+        if (!partnerId) {
+            console.warn('No partner ID found for call cleanup');
+            cleanupCallResources();
+            return;
+        }
+        
         // Clear any timeout
         if (callTimeout) {
             clearTimeout(callTimeout);
             callTimeout = null;
         }
         
+        // Stop call timer and get duration
+        const callDuration = stopCallTimer();
+        
         // Stop ringtone if playing
         stopRingtone();
         
         // Send end call signal
-        if (currentCallPartnerId) {
+        if (partnerId) {
             await sendSignal({
                 type: 'end-call',
                 from: currentUser.uid,
-                callId: activeCallId
-            });
+                callId: callId,
+                duration: callDuration
+            }, partnerId);
         }
         
-        // Close peer connection
-        if (peerConnection) {
-            peerConnection.close();
-            peerConnection = null;
+        // Add call history to chat
+        if (partnerId && callType) {
+            await addCallHistoryToChat('call-ended', callDuration, partnerId, callType, callId);
         }
         
-        // Stop local stream
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-            localStream = null;
-        }
-        
+        cleanupCallResources();
         showCallEnded();
         
     } catch (error) {
         console.error('Error ending call:', error);
+        cleanupCallResources();
     }
+}
+
+// Clean up call resources
+function cleanupCallResources() {
+    // Close peer connection
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    
+    // Stop local stream
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    
+    // Clear session storage
+    sessionStorage.removeItem('currentCallPartnerId');
+    sessionStorage.removeItem('currentCallType');
+    sessionStorage.removeItem('activeCallId');
+    
+    // Clear global variables
+    currentCallPartnerId = null;
+    currentCallType = null;
+    activeCallId = null;
+}
+
+// Add call history to chat with WhatsApp-style formatting
+async function addCallHistoryToChat(callType, duration = null, partnerId = null, callTypeValue = null, callId = null) {
+    try {
+        const targetPartnerId = partnerId || currentCallPartnerId;
+        const targetCallType = callTypeValue || currentCallType;
+        const targetCallId = callId || activeCallId;
+        
+        if (!targetPartnerId || !targetCallType) {
+            console.warn('Missing partner ID or call type for call history');
+            return;
+        }
+        
+        const threadId = [currentUser.uid, targetPartnerId].sort().join('_');
+        
+        // Determine the message content based on call type and duration
+        let messageText = '';
+        let displayText = '';
+        let isOutgoing = true;
+        
+        if (callType === 'missed-call') {
+            // This is a missed call from someone else
+            isOutgoing = false;
+            messageText = `Missed ${targetCallType} call`;
+            displayText = `📞 Missed ${targetCallType === 'video' ? 'video' : 'voice'} call • Tap to call back`;
+        } else if (callType === 'call-ended') {
+            if (duration && duration > 0) {
+                // Successful call with duration
+                const durationText = formatCallDurationForMessage(duration);
+                messageText = `${targetCallType === 'video' ? 'Video' : 'Voice'} call • ${durationText}`;
+                displayText = `📞 ${targetCallType === 'video' ? 'Video' : 'Voice'} call • ${durationText}`;
+            } else {
+                // Call ended without connection (no answer)
+                messageText = `${targetCallType === 'video' ? 'Video' : 'Voice'} call`;
+                displayText = `📞 ${targetCallType === 'video' ? 'Video' : 'Voice'} call`;
+            }
+        }
+        
+        // Add call history message to chat with WhatsApp-style formatting
+        await addDoc(collection(db, 'conversations', threadId, 'messages'), {
+            type: callType,
+            callType: targetCallType,
+            senderId: currentUser.uid,
+            timestamp: serverTimestamp(),
+            read: false,
+            callId: targetCallId,
+            duration: duration,
+            text: messageText,
+            displayText: displayText,
+            isSystemMessage: true,
+            isOutgoing: isOutgoing
+        });
+        
+        // Update conversation
+        await setDoc(doc(db, 'conversations', threadId), {
+            participants: [currentUser.uid, targetPartnerId],
+            lastMessage: {
+                text: messageText,
+                senderId: currentUser.uid,
+                timestamp: serverTimestamp(),
+                type: callType
+            },
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        
+        console.log("WhatsApp-style call history added to chat:", displayText);
+        
+    } catch (error) {
+        console.error("Error adding call history to chat:", error);
+    }
+}
+
+// Format call duration for message display (WhatsApp-style)
+function formatCallDurationForMessage(seconds) {
+    if (!seconds || seconds === 0) return 'No answer';
+    
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    
+    if (mins === 0) {
+        return `${secs} sec`;
+    }
+    if (secs === 0) {
+        return `${mins} min`;
+    }
+    return `${mins} min ${secs} sec`;
 }
 
 // Show call ended screen
 function showCallEnded() {
     console.log('Showing call ended screen');
-    document.getElementById('callEnded').style.display = 'flex';
-    document.getElementById('remoteVideo').style.display = 'none';
-    document.getElementById('localVideo').style.display = 'none';
+    
+    const callEndedElement = document.getElementById('callEnded');
+    const remoteVideoElement = document.getElementById('remoteVideo');
+    const localVideoElement = document.getElementById('localVideo');
+    
+    if (callEndedElement) callEndedElement.style.display = 'flex';
+    if (remoteVideoElement) remoteVideoElement.style.display = 'none';
+    if (localVideoElement) localVideoElement.style.display = 'none';
+    
+    // Auto-redirect to chat page after 2 seconds
+    setTimeout(() => {
+        goBackToChat();
+    }, 2000);
 }
 
 // Go back to chat
 function goBackToChat() {
     console.log('Returning to chat');
-    window.location.href = 'chat.html?id=' + currentCallPartnerId;
+    const partnerId = currentCallPartnerId || sessionStorage.getItem('currentCallPartnerId');
+    
+    // Clear session storage
+    sessionStorage.removeItem('currentCallPartnerId');
+    sessionStorage.removeItem('currentCallType');
+    sessionStorage.removeItem('activeCallId');
+    
+    if (partnerId) {
+        window.location.href = 'chat.html?id=' + partnerId;
+    } else {
+        window.location.href = 'chat.html';
+    }
 }
 
 // Update call status
 function updateCallStatus(status) {
     console.log('Call status:', status);
-    document.getElementById('callStatus').textContent = status;
+    const callStatusElement = document.getElementById('callStatus');
+    if (callStatusElement) {
+        callStatusElement.textContent = status;
+    }
 }
 
 // Show loader
@@ -1044,7 +1330,10 @@ function showLoader(message) {
     if (loader) {
         loader.style.display = 'block';
         if (message) {
-            loader.querySelector('p').textContent = message;
+            const loaderText = loader.querySelector('p');
+            if (loaderText) {
+                loaderText.textContent = message;
+            }
         }
     }
 }
@@ -1064,17 +1353,11 @@ function showError(message) {
     setTimeout(goBackToChat, 3000);
 }
 
-// Show notification (for chat page)
+// Show notification
 function showNotification(message, type = 'info') {
     console.log('Notification:', message, type);
     
-    // Check if app.js notification function exists
-    if (typeof window.showNotification === 'function') {
-        window.showNotification(message, type);
-        return;
-    }
-    
-    // Fallback notification
+    // Create independent notification system
     const notification = document.createElement('div');
     notification.style.cssText = `
         position: fixed;
@@ -1116,8 +1399,32 @@ function showNotification(message, type = 'info') {
 // Clean up when leaving the page
 window.addEventListener('beforeunload', () => {
     console.log('Page unloading, cleaning up call...');
-    endCall();
+    if (peerConnection || localStream) {
+        endCall();
+    }
     if (signalingUnsubscribe) {
         signalingUnsubscribe();
     }
 });
+
+// Make callBack function available globally
+window.callBack = function(partnerId, callType) {
+    if (!partnerId || !callType) {
+        console.error('Missing parameters for call back');
+        return;
+    }
+    
+    console.log('Calling back:', partnerId, callType);
+    
+    // Generate a unique call ID
+    const callId = `${currentUser.uid}_${partnerId}_${Date.now()}`;
+    
+    // Send a notification to the partner first
+    sendCallNotification(partnerId, callType, callId).then(() => {
+        // Redirect to call page with call parameters
+        window.location.href = `call.html?type=${callType}&partnerId=${partnerId}&incoming=false&callId=${callId}`;
+    }).catch(error => {
+        console.error('Error sending call notification:', error);
+        showNotification('Failed to initiate call. Please try again.', 'error');
+    });
+};
