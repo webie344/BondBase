@@ -1,12 +1,11 @@
-// call.js - Independent WebRTC implementation for voice and video calls
-// Load this file BEFORE app.js - No dependencies on app.js
+// call.js - WebRTC implementation with improved face swap
+// This file works independently alongside app.js
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
-    onAuthStateChanged,
-    signOut
+    onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { 
     getFirestore,
@@ -16,25 +15,10 @@ import {
     onSnapshot,
     serverTimestamp,
     getDoc,
-    deleteDoc,
-    updateDoc,
-    addDoc,
-    query,
-    orderBy,
-    getDocs
+    deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Firebase configuration
-const firebaseConfig = {
-    apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
-    authDomain: "dating-connect.firebaseapp.com",
-    projectId: "dating-connect",
-    storageBucket: "dating-connect.appspot.com",
-    messagingSenderId: "1062172180210",
-    appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
-};
-
-// WebRTC configuration
+// WebRTC configuration with more robust ICE servers
 const rtcConfiguration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -43,12 +27,10 @@ const rtcConfiguration = {
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' }
     ],
-    iceCandidatePoolSize: 10,
-    bundlePolicy: 'max-bundle',
-    rtcpMuxPolicy: 'require'
+    iceCandidatePoolSize: 10
 };
 
-// Global variables
+// Global variables for WebRTC
 let localStream = null;
 let remoteStream = null;
 let peerConnection = null;
@@ -64,39 +46,52 @@ let isVideoEnabled = true;
 let activeCallId = null;
 let callTimeout = null;
 let pendingSignals = [];
-let callNotificationSound = null;
-let callRingtone = null;
-let isRinging = false;
-let callStartTime = null;
-let callDurationInterval = null;
 
-// Initialize when DOM is loaded
+// Face swap variables
+let isFaceSwapEnabled = false;
+let faceSwapImage = null;
+let faceSwapCanvas = null;
+let faceSwapCtx = null;
+let isProcessing = false;
+let debugMode = true;
+let originalVideoTrack = null;
+let processedStream = null;
+let faceapiLoaded = false;
+
+// Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
+    authDomain: "dating-connect.firebaseapp.com",
+    projectId: "dating-connect",
+    storageBucket: "dating-connect.appspot.com",
+    messagingSenderId: "1062172180210",
+    appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
+};
+
+// Initialize based on whether we're on chat.html or call.html
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("=== INDEPENDENT CALL.JS LOADED ===");
+    console.log("=== CALL.JS LOADED ===");
     
     const isCallPage = window.location.pathname.includes('call.html');
     console.log("Is call page:", isCallPage);
     
-    // Initialize Firebase independently
+    // Initialize Firebase
     try {
         const app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
-        console.log("Firebase initialized successfully in call.js");
-        
-        // Preload notification sounds
-        preloadNotificationSounds();
+        console.log("Firebase initialized successfully");
     } catch (error) {
         console.error("Firebase initialization error:", error);
         showNotification('Firebase initialization failed. Please refresh the page.', 'error');
         return;
     }
     
-    // Set up independent auth state listener
+    // Set up auth state listener
     onAuthStateChanged(auth, function(user) {
         if (user) {
             currentUser = user;
-            console.log("User authenticated in call.js:", user.uid);
+            console.log("User authenticated:", user.uid);
             
             if (isCallPage) {
                 // We're on the call page - handle the call
@@ -105,153 +100,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // We're on the chat page - set up call buttons
                 setupCallButtonListeners();
                 setupCallNotificationsListener();
-                setupMissedCallsListener();
             }
         } else {
-            console.log("User not authenticated in call.js");
+            console.log("User not authenticated");
             showNotification('Please log in to make calls.', 'error');
         }
     });
 });
-
-// Preload notification sounds
-function preloadNotificationSounds() {
-    try {
-        callNotificationSound = new Audio('sounds/notification.mp3');
-        callRingtone = new Audio('ringingtone.mp3');
-        callRingtone.loop = true;
-    } catch (error) {
-        console.error("Error preloading sounds:", error);
-    }
-}
-
-// Set up listener for missed calls
-function setupMissedCallsListener() {
-    if (!currentUser || !db) return;
-    
-    console.log("Setting up missed calls listener");
-    
-    const callsRef = collection(db, 'calls', currentUser.uid, 'missed');
-    
-    onSnapshot(callsRef, (snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
-            if (change.type === 'added') {
-                const data = change.doc.data();
-                console.log("New missed call:", data);
-                
-                // Only process recent missed calls (last 24 hours)
-                const callTime = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
-                if (Date.now() - callTime.getTime() > 24 * 60 * 60 * 1000) {
-                    console.log("Missed call too old, skipping");
-                    await deleteDoc(doc(db, 'calls', currentUser.uid, 'missed', change.doc.id));
-                    return;
-                }
-                
-                // Add missed call to chat with proper WhatsApp-style formatting
-                await addMissedCallToChat(data);
-                
-                // Mark as processed
-                await deleteDoc(doc(db, 'calls', currentUser.uid, 'missed', change.doc.id));
-            }
-        });
-    });
-}
-
-// Add missed call to chat with WhatsApp-style formatting
-async function addMissedCallToChat(callData) {
-    try {
-        // Create a combined ID for the chat thread
-        const threadId = [currentUser.uid, callData.from].sort().join('_');
-        
-        // Get caller name for the message
-        let callerName = 'Unknown';
-        try {
-            const callerDoc = await getDoc(doc(db, 'users', callData.from));
-            if (callerDoc.exists()) {
-                callerName = callerDoc.data().name || callerName;
-            }
-        } catch (error) {
-            console.error("Error getting caller name:", error);
-        }
-        
-        // Create WhatsApp-style missed call message
-        const callMessage = {
-            type: 'missed-call',
-            callType: callData.callType,
-            senderId: callData.from,
-            senderName: callerName,
-            timestamp: serverTimestamp(),
-            read: false,
-            callId: callData.callId,
-            text: `Missed ${callData.callType} call`,
-            isSystemMessage: true,
-            displayText: `📞 Missed ${callData.callType === 'video' ? 'video' : 'voice'} call • Tap to call back`
-        };
-        
-        // Add missed call message to chat
-        await addDoc(collection(db, 'conversations', threadId, 'messages'), callMessage);
-        
-        // Update the conversation document
-        await setDoc(doc(db, 'conversations', threadId), {
-            participants: [currentUser.uid, callData.from],
-            lastMessage: {
-                text: `Missed ${callData.callType} call`,
-                senderId: callData.from,
-                timestamp: serverTimestamp(),
-                type: 'missed-call'
-            },
-            updatedAt: serverTimestamp()
-        }, { merge: true });
-        
-        console.log("WhatsApp-style missed call added to chat");
-        
-    } catch (error) {
-        console.error("Error adding missed call to chat:", error);
-    }
-}
-
-// Play notification sound
-function playNotificationSound() {
-    if (callNotificationSound) {
-        try {
-            callNotificationSound.currentTime = 0;
-            callNotificationSound.play().catch(error => {
-                console.log("Notification sound play failed:", error);
-            });
-        } catch (error) {
-            console.error("Error playing notification sound:", error);
-        }
-    }
-}
-
-// Play ringtone for incoming call
-function playRingtone() {
-    if (isRinging) return;
-    
-    isRinging = true;
-    if (callRingtone) {
-        try {
-            callRingtone.currentTime = 0;
-            callRingtone.play().catch(error => {
-                console.log("Ringtone play failed:", error);
-            });
-        } catch (error) {
-            console.error("Error playing ringtone:", error);
-        }
-    }
-}
-
-// Stop ringtone
-function stopRingtone() {
-    isRinging = false;
-    if (callRingtone) {
-        try {
-            callRingtone.pause();
-        } catch (error) {
-            console.error("Error stopping ringtone:", error);
-        }
-    }
-}
 
 // Set up event listeners for call buttons on chat page
 function setupCallButtonListeners() {
@@ -266,7 +121,7 @@ function setupCallButtonListeners() {
             initiateCall('audio');
         });
     } else {
-        console.warn("Voice call button not found");
+        console.error("Voice call button not found");
     }
     
     if (videoCallBtn) {
@@ -275,7 +130,7 @@ function setupCallButtonListeners() {
             initiateCall('video');
         });
     } else {
-        console.warn("Video call button not found");
+        console.error("Video call button not found");
     }
 }
 
@@ -301,9 +156,6 @@ function setupCallNotificationsListener() {
                     return;
                 }
                 
-                // Play notification sound
-                playNotificationSound();
-                
                 // Show incoming call notification
                 if (data.type === 'call' && data.status === 'ringing') {
                     showIncomingCallNotification(data);
@@ -322,14 +174,7 @@ function showIncomingCallNotification(data) {
     
     // Remove any existing notifications first
     const existingNotifications = document.querySelectorAll('.incoming-call-notification');
-    existingNotifications.forEach(notification => {
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
-        }
-    });
-    
-    // Play ringtone
-    playRingtone();
+    existingNotifications.forEach(notification => notification.remove());
     
     const notification = document.createElement('div');
     notification.className = 'incoming-call-notification';
@@ -349,61 +194,40 @@ function showIncomingCallNotification(data) {
     `;
     
     // Add styles if not already added
-    if (!document.getElementById('call-notification-styles')) {
+    if (!document.getElementById('notification-styles')) {
         const styles = document.createElement('style');
-        styles.id = 'call-notification-styles';
+        styles.id = 'notification-styles';
         styles.textContent = `
             .incoming-call-notification {
                 position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
+                top: 20px;
+                right: 20px;
                 background: white;
-                padding: 25px;
-                border-radius: 15px;
-                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
                 z-index: 10000;
-                max-width: 320px;
-                width: 90%;
-                text-align: center;
-            }
-            .notification-content h3 {
-                margin: 0 0 10px 0;
-                color: #333;
-                font-size: 18px;
-            }
-            .notification-content p {
-                margin: 0 0 20px 0;
-                color: #666;
-                font-size: 14px;
+                max-width: 300px;
             }
             .notification-buttons {
                 display: flex;
-                gap: 12px;
-                justify-content: center;
+                gap: 10px;
+                margin-top: 15px;
             }
             .accept-call, .reject-call {
-                padding: 10px 20px;
+                padding: 8px 16px;
                 border: none;
-                border-radius: 25px;
+                border-radius: 20px;
                 cursor: pointer;
                 font-weight: bold;
-                font-size: 14px;
-                transition: all 0.2s;
             }
             .accept-call {
                 background: #28a745;
                 color: white;
             }
-            .accept-call:hover {
-                background: #218838;
-            }
             .reject-call {
                 background: #dc3545;
                 color: white;
-            }
-            .reject-call:hover {
-                background: #c82333;
             }
         `;
         document.head.appendChild(styles);
@@ -412,68 +236,27 @@ function showIncomingCallNotification(data) {
     document.body.appendChild(notification);
     
     // Add event listeners
-    const acceptBtn = document.getElementById('acceptIncomingCall');
-    const rejectBtn = document.getElementById('rejectIncomingCall');
+    document.getElementById('acceptIncomingCall').addEventListener('click', () => {
+        // Redirect to call page
+        window.location.href = `call.html?type=${data.callType}&partnerId=${data.from}&incoming=true&callId=${data.callId}`;
+        notification.remove();
+    });
     
-    if (acceptBtn) {
-        acceptBtn.addEventListener('click', () => {
-            // Stop ringtone
-            stopRingtone();
-            
-            // Redirect to call page
-            window.location.href = `call.html?type=${data.callType}&partnerId=${data.from}&incoming=true&callId=${data.callId}`;
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        });
-    }
-    
-    if (rejectBtn) {
-        rejectBtn.addEventListener('click', () => {
-            // Stop ringtone
-            stopRingtone();
-            
-            // Send rejection signal
-            sendSignal({
-                type: 'call-rejected',
-                from: currentUser.uid
-            }, data.from);
-            
-            // Add missed call to database
-            addMissedCall(data.from, data.callType, data.callId);
-            
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        });
-    }
+    document.getElementById('rejectIncomingCall').addEventListener('click', () => {
+        // Send rejection signal
+        sendSignal({
+            type: 'call-rejected',
+            from: currentUser.uid
+        }, data.from);
+        notification.remove();
+    });
     
     // Auto remove after 30 seconds
     setTimeout(() => {
         if (notification.parentNode) {
-            // Stop ringtone
-            stopRingtone();
-            
-            // Add missed call to database
-            addMissedCall(data.from, data.callType, data.callId);
-            
-            notification.parentNode.removeChild(notification);
+            notification.remove();
         }
     }, 30000);
-}
-
-// Add missed call to database
-async function addMissedCall(from, callType, callId) {
-    try {
-        await setDoc(doc(db, 'calls', from, 'missed', `missed_${Date.now()}`), {
-            from: currentUser.uid,
-            callType: callType,
-            callId: callId,
-            timestamp: serverTimestamp()
-        });
-    } catch (error) {
-        console.error("Error adding missed call:", error);
-    }
 }
 
 // Handle the call page - this runs when call.html loads
@@ -498,38 +281,28 @@ async function handleCallPage() {
     isCaller = !isIncoming;
     activeCallId = callId || `${currentUser.uid}_${partnerId}_${Date.now()}`;
     
-    // Store partner ID in session storage for cleanup
-    sessionStorage.setItem('currentCallPartnerId', partnerId);
-    sessionStorage.setItem('currentCallType', callType);
-    sessionStorage.setItem('activeCallId', activeCallId);
-    
     // Update UI with caller name
     try {
         const partnerDoc = await getDoc(doc(db, 'users', partnerId));
         if (partnerDoc.exists()) {
             const partnerName = partnerDoc.data().name || 'Unknown';
-            const callerNameElement = document.getElementById('callerName');
-            if (callerNameElement) {
-                callerNameElement.textContent = partnerName;
-            }
-            
-            // Also update the page title
-            document.title = `${partnerName} - ${callType === 'video' ? 'Video' : 'Voice'} Call`;
+            document.getElementById('callerName').textContent = partnerName;
         }
     } catch (error) {
         console.error('Error getting partner info:', error);
     }
     
     // Set up event listeners for call controls
-    const muteBtn = document.getElementById('muteBtn');
-    const videoBtn = document.getElementById('videoBtn');
-    const endCallBtn = document.getElementById('endCallBtn');
-    const backToChatBtn = document.getElementById('backToChat');
+    document.getElementById('muteBtn').addEventListener('click', toggleMute);
+    document.getElementById('videoBtn').addEventListener('click', toggleVideo);
+    document.getElementById('endCallBtn').addEventListener('click', endCall);
+    document.getElementById('backToChat').addEventListener('click', goBackToChat);
     
-    if (muteBtn) muteBtn.addEventListener('click', toggleMute);
-    if (videoBtn) videoBtn.addEventListener('click', toggleVideo);
-    if (endCallBtn) endCallBtn.addEventListener('click', endCall);
-    if (backToChatBtn) backToChatBtn.addEventListener('click', goBackToChat);
+    // Set up face swap functionality
+    setupFaceSwap();
+    
+    // Pre-load face models in background
+    preloadFaceAPI();
     
     // Set up signaling listener FIRST
     setupSignalingListener();
@@ -546,6 +319,557 @@ async function handleCallPage() {
     }
 }
 
+// Set up face swap functionality
+function setupFaceSwap() {
+    console.log("Setting up face swap functionality");
+    
+    // Create face swap button if it doesn't exist
+    if (!document.getElementById('faceSwapBtn')) {
+        const faceSwapBtn = document.createElement('button');
+        faceSwapBtn.id = 'faceSwapBtn';
+        faceSwapBtn.className = 'control-btn face-swap-btn';
+        faceSwapBtn.innerHTML = '<i class="fas fa-user-circle"></i>';
+        faceSwapBtn.title = 'Swap your face with another image';
+        
+        // Add button to call controls
+        const callControls = document.querySelector('.call-controls');
+        if (callControls) {
+            // Insert before the end call button
+            callControls.insertBefore(faceSwapBtn, document.getElementById('endCallBtn'));
+        }
+    }
+    
+    // Create hidden file input if it doesn't exist
+    if (!document.getElementById('faceImageInput')) {
+        const faceImageInput = document.createElement('input');
+        faceImageInput.type = 'file';
+        faceImageInput.id = 'faceImageInput';
+        faceImageInput.accept = 'image/*';
+        faceImageInput.style.display = 'none';
+        document.body.appendChild(faceImageInput);
+    }
+    
+    // Create face swap modal if it doesn't exist
+    if (!document.getElementById('faceSwapModal')) {
+        const faceSwapModal = document.createElement('div');
+        faceSwapModal.id = 'faceSwapModal';
+        faceSwapModal.className = 'face-swap-modal';
+        faceSwapModal.style.display = 'none';
+        faceSwapModal.innerHTML = `
+            <div class="face-swap-content">
+                <h3>Select a Face Image</h3>
+                <p>Please select an image to use for face swapping</p>
+                <button id="selectFaceImage">Select Image</button>
+                <button class="secondary" id="cancelFaceSelect">Cancel</button>
+            </div>
+        `;
+        document.body.appendChild(faceSwapModal);
+    }
+    
+    // Create debug panel if it doesn't exist
+    if (!document.getElementById('faceDebugPanel')) {
+        const debugPanel = document.createElement('div');
+        debugPanel.id = 'faceDebugPanel';
+        debugPanel.innerHTML = `
+            <h4>Face Swap Debug</h4>
+            <div id="debugInfo"></div>
+            <button id="toggleDebug">Hide Debug</button>
+        `;
+        document.body.appendChild(debugPanel);
+        
+        // Add debug panel styles
+        if (!document.getElementById('debug-panel-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'debug-panel-styles';
+            styles.textContent = `
+                #faceDebugPanel {
+                    position: fixed;
+                    bottom: 10px;
+                    left: 10px;
+                    background: rgba(0,0,0,0.7);
+                    color: white;
+                    padding: 10px;
+                    border-radius: 5px;
+                    z-index: 10000;
+                    font-family: monospace;
+                    font-size: 12px;
+                    max-width: 300px;
+                    max-height: 200px;
+                    overflow-y: auto;
+                }
+                #faceDebugPanel h4 {
+                    margin: 0 0 8px 0;
+                }
+                #debugInfo {
+                    max-height: 120px;
+                    overflow-y: auto;
+                    margin-bottom: 8px;
+                }
+                #toggleDebug {
+                    margin-top: 8px;
+                    background: #444;
+                    color: white;
+                    border: none;
+                    padding: 4px 8px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                }
+                .face-swap-modal {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.8);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                }
+                .face-swap-content {
+                    background: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    text-align: center;
+                    max-width: 400px;
+                    width: 90%;
+                }
+                .face-swap-content h3 {
+                    margin-bottom: 15px;
+                    color: #333;
+                }
+                .face-swap-content button {
+                    background: #4CAF50;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    margin: 10px 5px;
+                }
+                .face-swap-content button.secondary {
+                    background: #f44336;
+                }
+                .face-swap-btn.active {
+                    background: #4CAF50;
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+    }
+    
+    // Add event listeners
+    document.getElementById('faceSwapBtn').addEventListener('click', toggleFaceSwap);
+    document.getElementById('faceImageInput').addEventListener('change', handleFaceImageUpload);
+    document.getElementById('selectFaceImage').addEventListener('click', function() {
+        document.getElementById('faceImageInput').click();
+        hideFaceSwapModal();
+    });
+    document.getElementById('cancelFaceSelect').addEventListener('click', hideFaceSwapModal);
+    document.getElementById('toggleDebug').addEventListener('click', function() {
+        const debugPanel = document.getElementById('faceDebugPanel');
+        if (debugPanel) {
+            const isHidden = debugPanel.style.display === 'none';
+            debugPanel.style.display = isHidden ? 'block' : 'none';
+            this.textContent = isHidden ? 'Hide Debug' : 'Show Debug';
+        }
+    });
+    
+    console.log("Face swap setup complete");
+}
+
+// Pre-load FaceAPI.js models
+async function preloadFaceAPI() {
+    try {
+        debugLog("Loading FaceAPI.js...");
+        
+        // Load FaceAPI.js
+        await loadScript('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js');
+        debugLog("FaceAPI.js loaded");
+        
+        // Load models
+        await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
+        await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
+        
+        faceapiLoaded = true;
+        debugLog("FaceAPI models loaded successfully");
+    } catch (error) {
+        debugLog("Error loading FaceAPI: " + error.message, true);
+    }
+}
+
+// Debug logging function for face swap
+function debugLog(message, isError = false) {
+    if (debugMode) {
+        console.log(isError ? "❌ " + message : "ℹ️ " + message);
+        
+        // Update debug panel
+        const debugInfo = document.getElementById('debugInfo');
+        if (debugInfo) {
+            const logEntry = document.createElement('div');
+            logEntry.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            logEntry.style.color = isError ? '#ff6b6b' : '#fff';
+            logEntry.style.marginBottom = '4px';
+            logEntry.style.fontSize = '11px';
+            debugInfo.appendChild(logEntry);
+            
+            // Auto-scroll to bottom
+            debugInfo.scrollTop = debugInfo.scrollHeight;
+        }
+    }
+}
+
+// Hide face swap modal
+function hideFaceSwapModal() {
+    const faceSwapModal = document.getElementById('faceSwapModal');
+    if (faceSwapModal) {
+        faceSwapModal.style.display = 'none';
+    }
+}
+
+// Show face swap modal
+function showFaceSwapModal() {
+    const faceSwapModal = document.getElementById('faceSwapModal');
+    if (faceSwapModal) {
+        faceSwapModal.style.display = 'flex';
+    }
+}
+
+// Handle face image upload
+function handleFaceImageUpload(event) {
+    debugLog("Face image upload triggered");
+    const file = event.target.files[0];
+    if (!file) {
+        debugLog("No file selected");
+        return;
+    }
+    
+    debugLog("File selected: " + file.name);
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        faceSwapImage = new Image();
+        faceSwapImage.onload = function() {
+            debugLog("Face image loaded successfully: " + faceSwapImage.width + "x" + faceSwapImage.height);
+            if (isFaceSwapEnabled) {
+                startFaceSwap();
+            }
+        };
+        faceSwapImage.onerror = function() {
+            debugLog("Error loading face image", true);
+        };
+        faceSwapImage.src = e.target.result;
+    };
+    reader.onerror = function() {
+        debugLog("Error reading file", true);
+    };
+    reader.readAsDataURL(file);
+}
+
+// Toggle face swap on/off
+function toggleFaceSwap() {
+    debugLog("Face swap button clicked");
+    
+    if (!faceSwapImage) {
+        debugLog("No face image selected - showing prompt");
+        // No face image selected, prompt user to upload one
+        showFaceSwapModal();
+        return;
+    }
+    
+    isFaceSwapEnabled = !isFaceSwapEnabled;
+    const button = document.getElementById('faceSwapBtn');
+    
+    if (button) {
+        button.classList.toggle('active', isFaceSwapEnabled);
+        debugLog("Face swap " + (isFaceSwapEnabled ? "enabled" : "disabled"));
+    }
+    
+    if (isFaceSwapEnabled) {
+        startFaceSwap();
+    } else {
+        stopFaceSwap();
+    }
+}
+
+// Start face swap processing
+async function startFaceSwap() {
+    if (!faceSwapImage || !localStream) {
+        debugLog("Cannot start face swap: missing image or stream", true);
+        return;
+    }
+    
+    if (!faceapiLoaded) {
+        debugLog("FaceAPI not loaded yet", true);
+        return;
+    }
+    
+    debugLog("Starting face swap with FaceAPI");
+    
+    try {
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (!videoTrack) {
+            debugLog("No video track available", true);
+            return;
+        }
+        
+        // Store original track for restoration
+        originalVideoTrack = videoTrack;
+        
+        // Create canvas for processing
+        if (!faceSwapCanvas) {
+            faceSwapCanvas = document.createElement('canvas');
+            faceSwapCtx = faceSwapCanvas.getContext('2d');
+            faceSwapCanvas.style.display = 'none';
+            document.body.appendChild(faceSwapCanvas);
+        }
+        
+        // Use a more efficient approach with requestVideoFrameCallback
+        isFaceSwapEnabled = true;
+        isProcessing = true;
+        
+        const videoElement = document.getElementById('localVideo');
+        let lastFrameTime = 0;
+        const targetFPS = 15; // Reduced FPS for better performance
+        
+        // Create a stream from canvas
+        processedStream = faceSwapCanvas.captureStream(30);
+        const processedTrack = processedStream.getVideoTracks()[0];
+        
+        // Replace the track in the peer connection
+        const sender = peerConnection.getSenders().find(s => 
+            s.track && s.track.kind === 'video'
+        );
+        
+        if (sender) {
+            await sender.replaceTrack(processedTrack);
+            debugLog("Replaced video track with processed stream");
+        }
+        
+        // Processing function
+        const processFrame = async (now, metadata) => {
+            if (!isFaceSwapEnabled || !isProcessing) return;
+            
+            // Throttle processing to target FPS
+            if (now - lastFrameTime < 1000 / targetFPS) {
+                videoElement.requestVideoFrameCallback(processFrame);
+                return;
+            }
+            
+            lastFrameTime = now;
+            
+            try {
+                // Process frame
+                await processFaceSwapFrame(videoElement, metadata);
+            } catch (error) {
+                debugLog("Error processing frame: " + error.message, true);
+            }
+            
+            // Request next frame
+            if (isFaceSwapEnabled && isProcessing) {
+                videoElement.requestVideoFrameCallback(processFrame);
+            }
+        };
+        
+        // Start processing
+        videoElement.requestVideoFrameCallback(processFrame);
+        
+    } catch (error) {
+        debugLog("Error starting face swap: " + error.message, true);
+        isFaceSwapEnabled = false;
+        isProcessing = false;
+    }
+}
+
+// Process a single frame for face swapping
+async function processFaceSwapFrame(videoElement, metadata) {
+    // Set canvas dimensions
+    faceSwapCanvas.width = videoElement.videoWidth || 640;
+    faceSwapCanvas.height = videoElement.videoHeight || 480;
+    
+    // Draw current video frame
+    faceSwapCtx.drawImage(videoElement, 0, 0, faceSwapCanvas.width, faceSwapCanvas.height);
+    
+    try {
+        // Detect faces using FaceAPI.js
+        const detections = await faceapi
+            .detectAllFaces(faceSwapCanvas, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks();
+        
+        // Apply face swap if faces detected
+        if (detections.length > 0) {
+            applyFaceSwap(detections[0]);
+        }
+    } catch (error) {
+        debugLog("Face detection error: " + error.message, true);
+    }
+}
+
+// Apply face swap using FaceAPI.js landmarks
+function applyFaceSwap(detection) {
+    if (!faceSwapImage) return;
+    
+    const landmarks = detection.landmarks;
+    if (!landmarks) return;
+    
+    // Get face bounding box
+    const box = detection.detection.box;
+    const x = box.x;
+    const y = box.y;
+    const width = box.width;
+    const height = box.height;
+    
+    // Draw the replacement face with better blending
+    faceSwapCtx.save();
+    
+    // Create a clipping path based on face shape
+    faceSwapCtx.beginPath();
+    
+    // Use jaw outline for more natural face shape
+    const jawOutline = landmarks.getJawOutline();
+    faceSwapCtx.moveTo(jawOutline[0].x, jawOutline[0].y);
+    for (let i = 1; i < jawOutline.length; i++) {
+        faceSwapCtx.lineTo(jawOutline[i].x, jawOutline[i].y);
+    }
+    faceSwapCtx.closePath();
+    faceSwapCtx.clip();
+    
+    // Draw the replacement face image with proper scaling
+    faceSwapCtx.drawImage(faceSwapImage, x, y, width, height);
+    faceSwapCtx.restore();
+    
+    // Preserve the original mouth for lip sync
+    preserveMouth(landmarks);
+    
+    // Preserve the original eyes for natural blinking
+    preserveEyes(landmarks);
+}
+
+// Preserve the original mouth for lip sync
+function preserveMouth(landmarks) {
+    const mouth = landmarks.getMouth();
+    if (!mouth || mouth.length < 12) return;
+    
+    // Get mouth bounding box
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const point of mouth) {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+    }
+    
+    const mouthWidth = maxX - minX;
+    const mouthHeight = maxY - minY;
+    
+    // Create a temporary canvas for the mouth region
+    const mouthCanvas = document.createElement('canvas');
+    const mouthCtx = mouthCanvas.getContext('2d');
+    mouthCanvas.width = mouthWidth;
+    mouthCanvas.height = mouthHeight;
+    
+    // Draw the mouth region from the original frame
+    mouthCtx.drawImage(
+        faceSwapCanvas, 
+        minX, minY, mouthWidth, mouthHeight,
+        0, 0, mouthWidth, mouthHeight
+    );
+    
+    // Apply the mouth back with feathering for smoother blend
+    faceSwapCtx.globalCompositeOperation = 'source-over';
+    faceSwapCtx.drawImage(mouthCanvas, minX, minY, mouthWidth, mouthHeight);
+}
+
+// Preserve the original eyes for natural blinking
+function preserveEyes(landmarks) {
+    const leftEye = landmarks.getLeftEye();
+    const rightEye = landmarks.getRightEye();
+    
+    if (leftEye && leftEye.length === 6) {
+        preserveEyeRegion(leftEye);
+    }
+    
+    if (rightEye && rightEye.length === 6) {
+        preserveEyeRegion(rightEye);
+    }
+}
+
+// Preserve a single eye region
+function preserveEyeRegion(eyePoints) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const point of eyePoints) {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+    }
+    
+    const eyeWidth = maxX - minX;
+    const eyeHeight = maxY - minY;
+    
+    // Expand the region slightly to include eyelids
+    const expandedMinX = Math.max(0, minX - eyeWidth * 0.2);
+    const expandedMinY = Math.max(0, minY - eyeHeight * 0.2);
+    const expandedMaxX = Math.min(faceSwapCanvas.width, maxX + eyeWidth * 0.2);
+    const expandedMaxY = Math.min(faceSwapCanvas.height, maxY + eyeHeight * 0.2);
+    const expandedWidth = expandedMaxX - expandedMinX;
+    const expandedHeight = expandedMaxY - expandedMinY;
+    
+    // Create a temporary canvas for the eye region
+    const eyeCanvas = document.createElement('canvas');
+    const eyeCtx = eyeCanvas.getContext('2d');
+    eyeCanvas.width = expandedWidth;
+    eyeCanvas.height = expandedHeight;
+    
+    // Draw the eye region from the original frame
+    eyeCtx.drawImage(
+        faceSwapCanvas, 
+        expandedMinX, expandedMinY, expandedWidth, expandedHeight,
+        0, 0, expandedWidth, expandedHeight
+    );
+    
+    // Apply the eye back
+    faceSwapCtx.globalCompositeOperation = 'source-over';
+    faceSwapCtx.drawImage(eyeCanvas, expandedMinX, expandedMinY, expandedWidth, expandedHeight);
+}
+
+// Stop face swap processing
+function stopFaceSwap() {
+    debugLog("Stopping face swap");
+    isFaceSwapEnabled = false;
+    isProcessing = false;
+    
+    // Restore original video stream
+    if (localStream && originalVideoTrack) {
+        const sender = peerConnection.getSenders().find(s => 
+            s.track && s.track.kind === 'video'
+        );
+        if (sender) {
+            sender.replaceTrack(originalVideoTrack);
+            debugLog("Restored original video track");
+        }
+    }
+}
+
+// Load a script dynamically
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+// Clean up face swap when leaving the page
+function cleanupFaceSwap() {
+    debugLog("Cleaning up face swap");
+    stopFaceSwap();
+}
+
+// [Rest of the WebRTC functions remain the same as in your original code]
 // Initiate a call from chat page - redirect to call.html
 function initiateCall(type) {
     console.log("Initiating call of type:", type);
@@ -615,21 +939,18 @@ async function startCall() {
     try {
         showLoader('Starting call...');
         
-        // Get local media stream
+        // Get local media stream with better error handling
         console.log("Requesting media stream...");
         try {
             localStream = await navigator.mediaDevices.getUserMedia({
                 video: currentCallType === 'video' ? {
                     width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    frameRate: { ideal: 30 }
+                    height: { ideal: 720 }
                 } : false,
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 44100,
-                    channelCount: 1
+                    sampleRate: 44100
                 }
             });
             console.log("Media stream obtained");
@@ -646,14 +967,10 @@ async function startCall() {
         }
         
         // Display local video if it's a video call
-        const localVideo = document.getElementById('localVideo');
-        if (localVideo) {
-            if (currentCallType === 'video') {
-                localVideo.srcObject = localStream;
-                localVideo.muted = true;
-            } else {
-                localVideo.style.display = 'none';
-            }
+        if (currentCallType === 'video') {
+            document.getElementById('localVideo').srcObject = localStream;
+        } else {
+            document.getElementById('localVideo').style.display = 'none';
         }
         
         // Create peer connection
@@ -691,13 +1008,6 @@ async function startCall() {
             callTimeout = setTimeout(() => {
                 if (peerConnection && peerConnection.connectionState !== 'connected') {
                     console.log("Call timeout - no answer");
-                    
-                    // Add missed call to database
-                    addMissedCall(currentCallPartnerId, currentCallType, activeCallId);
-                    
-                    // Add call history to chat
-                    addCallHistoryToChat('call-ended', 0, currentCallPartnerId, currentCallType, activeCallId);
-                    
                     showError('No answer from user');
                     setTimeout(goBackToChat, 2000);
                 }
@@ -724,28 +1034,21 @@ async function waitForOffer() {
         localStream = await navigator.mediaDevices.getUserMedia({
             video: currentCallType === 'video' ? {
                 width: { ideal: 1280 },
-                height: { ideal: 720 },
-                frameRate: { ideal: 30 }
+                height: { ideal: 720 }
             } : false,
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true,
-                sampleRate: 44100,
-                channelCount: 1
+                sampleRate: 44100
             }
         });
         console.log("Media stream prepared");
         
         // Display local video if it's a video call
-        const localVideo = document.getElementById('localVideo');
-        if (localVideo) {
-            if (currentCallType === 'video') {
-                localVideo.srcObject = localStream;
-                localVideo.muted = true;
-            } else {
-                localVideo.style.display = 'none';
-            }
+        if (currentCallType === 'video') {
+            document.getElementById('localVideo').srcObject = localStream;
+        } else {
+            document.getElementById('localVideo').style.display = 'none';
         }
         
         // Create peer connection
@@ -834,7 +1137,7 @@ function setupSignalingListener() {
                 }
             }
         });
-    }, (error) => {
+    }, (error)=> {
         console.error("Error in signaling listener:", error);
     });
 }
@@ -862,8 +1165,7 @@ async function handleSignalingMessage(data) {
                         callTimeout = null;
                     }
                     
-                    const offer = data.offer;
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                     
                     // Create and send answer
                     const answer = await peerConnection.createAnswer();
@@ -878,7 +1180,6 @@ async function handleSignalingMessage(data) {
                     
                     hideLoader();
                     updateCallStatus('Connected');
-                    startCallTimer();
                     console.log("Call answered successfully");
                 }
                 break;
@@ -894,11 +1195,9 @@ async function handleSignalingMessage(data) {
                         callTimeout = null;
                     }
                     
-                    const answer = data.answer;
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
                     hideLoader();
                     updateCallStatus('Connected');
-                    startCallTimer();
                     console.log("Call connected successfully");
                 }
                 break;
@@ -908,6 +1207,7 @@ async function handleSignalingMessage(data) {
                 if (peerConnection && data.candidate) {
                     console.log("Adding ICE candidate");
                     try {
+                        // Convert plain object back to RTCIceCandidate
                         const iceCandidate = new RTCIceCandidate(data.candidate);
                         await peerConnection.addIceCandidate(iceCandidate);
                     } catch (error) {
@@ -919,10 +1219,6 @@ async function handleSignalingMessage(data) {
             case 'call-rejected':
                 // Call was rejected
                 console.log("Call was rejected by remote party");
-                
-                // Add missed call to database
-                addMissedCall(currentCallPartnerId, currentCallType, activeCallId);
-                
                 showError('Call was rejected.');
                 setTimeout(goBackToChat, 2000);
                 break;
@@ -942,43 +1238,6 @@ async function handleSignalingMessage(data) {
     }
 }
 
-// Start call timer
-function startCallTimer() {
-    callStartTime = new Date();
-    
-    if (callDurationInterval) {
-        clearInterval(callDurationInterval);
-    }
-    
-    callDurationInterval = setInterval(() => {
-        if (callStartTime) {
-            const now = new Date();
-            const duration = Math.floor((now - callStartTime) / 1000);
-            const minutes = Math.floor(duration / 60);
-            const seconds = duration % 60;
-            updateCallStatus(`Connected ${minutes}:${seconds.toString().padStart(2, '0')}`);
-        }
-    }, 1000);
-}
-
-// Stop call timer
-function stopCallTimer() {
-    if (callDurationInterval) {
-        clearInterval(callDurationInterval);
-        callDurationInterval = null;
-    }
-    
-    // Calculate final call duration
-    if (callStartTime) {
-        const endTime = new Date();
-        const duration = Math.floor((endTime - callStartTime) / 1000);
-        callStartTime = null;
-        return duration;
-    }
-    
-    return 0;
-}
-
 // Create peer connection
 function createPeerConnection() {
     console.log("Creating peer connection...");
@@ -993,7 +1252,7 @@ function createPeerConnection() {
                 const remoteVideo = document.getElementById('remoteVideo');
                 if (remoteVideo) {
                     remoteVideo.srcObject = remoteStream;
-                    remoteVideo.muted = false;
+                    // Play the remote video
                     remoteVideo.play().catch(error => {
                         console.error("Error playing remote video:", error);
                     });
@@ -1007,6 +1266,7 @@ function createPeerConnection() {
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 console.log("ICE candidate generated, sending to peer");
+                // Convert RTCIceCandidate to a plain object for Firestore
                 const candidateData = {
                     candidate: event.candidate.candidate,
                     sdpMid: event.candidate.sdpMid,
@@ -1016,7 +1276,7 @@ function createPeerConnection() {
                 
                 sendSignal({
                     type: 'ice-candidate',
-                    candidate: candidateData,
+                    candidate: candidateData,  // Send plain object, not RTCIceCandidate
                     from: currentUser.uid,
                     callId: activeCallId
                 });
@@ -1031,12 +1291,28 @@ function createPeerConnection() {
             if (peerConnection.connectionState === 'connected') {
                 hideLoader();
                 updateCallStatus('Connected');
-                startCallTimer();
             } else if (peerConnection.connectionState === 'disconnected' || 
                        peerConnection.connectionState === 'failed') {
                 console.log("Call disconnected or failed");
                 showCallEnded();
             }
+        };
+        
+        // Handle ICE connection state changes
+        peerConnection.oniceconnectionstatechange = () => {
+            console.log("ICE connection state changed:", peerConnection.iceConnectionState);
+            if (peerConnection.iceConnectionState === 'failed') {
+                console.log("ICE connection failed");
+                // Try to restart ICE
+                if (peerConnection.restartIce) {
+                    peerConnection.restartIce();
+                }
+            }
+        };
+        
+        // Handle negotiation needed event
+        peerConnection.onnegotiationneeded = () => {
+            console.log("Negotiation needed");
         };
         
         console.log("Peer connection created");
@@ -1083,10 +1359,8 @@ function toggleMute() {
         audioTracks[0].enabled = !isMuted;
         
         const muteBtn = document.getElementById('muteBtn');
-        if (muteBtn) {
-            muteBtn.classList.toggle('active', isMuted);
-            muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i>' : '<i class="fas fa-microphone"></i>';
-        }
+        muteBtn.classList.toggle('active', isMuted);
+        muteBtn.innerHTML = isMuted ? '<i class="fas fa-microphone-slash"></i>' : '<i class="fas fa-microphone"></i>';
         
         console.log('Microphone', isMuted ? 'muted' : 'unmuted');
     }
@@ -1102,15 +1376,10 @@ function toggleVideo() {
         videoTracks[0].enabled = isVideoEnabled;
         
         const videoBtn = document.getElementById('videoBtn');
-        if (videoBtn) {
-            videoBtn.classList.toggle('active', !isVideoEnabled);
-        }
+        videoBtn.classList.toggle('active', !isVideoEnabled);
         
         // Show/hide local video based on state
-        const localVideo = document.getElementById('localVideo');
-        if (localVideo) {
-            localVideo.style.display = isVideoEnabled ? 'block' : 'none';
-        }
+        document.getElementById('localVideo').style.display = isVideoEnabled ? 'block' : 'none';
         
         console.log('Video', isVideoEnabled ? 'enabled' : 'disabled');
     }
@@ -1121,207 +1390,61 @@ async function endCall() {
     try {
         console.log('Ending call...');
         
-        // Get partner ID from session storage if currentCallPartnerId is null
-        const partnerId = currentCallPartnerId || sessionStorage.getItem('currentCallPartnerId');
-        const callType = currentCallType || sessionStorage.getItem('currentCallType');
-        const callId = activeCallId || sessionStorage.getItem('activeCallId');
-        
-        if (!partnerId) {
-            console.warn('No partner ID found for call cleanup');
-            cleanupCallResources();
-            return;
-        }
-        
         // Clear any timeout
         if (callTimeout) {
             clearTimeout(callTimeout);
             callTimeout = null;
         }
         
-        // Stop call timer and get duration
-        const callDuration = stopCallTimer();
-        
-        // Stop ringtone if playing
-        stopRingtone();
-        
         // Send end call signal
-        if (partnerId) {
+        if (currentCallPartnerId) {
             await sendSignal({
                 type: 'end-call',
                 from: currentUser.uid,
-                callId: callId,
-                duration: callDuration
-            }, partnerId);
+                callId: activeCallId
+            });
         }
         
-        // Add call history to chat
-        if (partnerId && callType) {
-            await addCallHistoryToChat('call-ended', callDuration, partnerId, callType, callId);
+        // Close peer connection
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
         }
         
-        cleanupCallResources();
+        // Stop local stream
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+        
+        // Clean up face swap
+        cleanupFaceSwap();
+        
         showCallEnded();
         
     } catch (error) {
         console.error('Error ending call:', error);
-        cleanupCallResources();
     }
-}
-
-// Clean up call resources
-function cleanupCallResources() {
-    // Close peer connection
-    if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-    }
-    
-    // Stop local stream
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-    
-    // Clear session storage
-    sessionStorage.removeItem('currentCallPartnerId');
-    sessionStorage.removeItem('currentCallType');
-    sessionStorage.removeItem('activeCallId');
-    
-    // Clear global variables
-    currentCallPartnerId = null;
-    currentCallType = null;
-    activeCallId = null;
-}
-
-// Add call history to chat with WhatsApp-style formatting
-async function addCallHistoryToChat(callType, duration = null, partnerId = null, callTypeValue = null, callId = null) {
-    try {
-        const targetPartnerId = partnerId || currentCallPartnerId;
-        const targetCallType = callTypeValue || currentCallType;
-        const targetCallId = callId || activeCallId;
-        
-        if (!targetPartnerId || !targetCallType) {
-            console.warn('Missing partner ID or call type for call history');
-            return;
-        }
-        
-        const threadId = [currentUser.uid, targetPartnerId].sort().join('_');
-        
-        // Determine the message content based on call type and duration
-        let messageText = '';
-        let displayText = '';
-        let isOutgoing = true;
-        
-        if (callType === 'missed-call') {
-            // This is a missed call from someone else
-            isOutgoing = false;
-            messageText = `Missed ${targetCallType} call`;
-            displayText = `📞 Missed ${targetCallType === 'video' ? 'video' : 'voice'} call • Tap to call back`;
-        } else if (callType === 'call-ended') {
-            if (duration && duration > 0) {
-                // Successful call with duration
-                const durationText = formatCallDurationForMessage(duration);
-                messageText = `${targetCallType === 'video' ? 'Video' : 'Voice'} call • ${durationText}`;
-                displayText = `📞 ${targetCallType === 'video' ? 'Video' : 'Voice'} call • ${durationText}`;
-            } else {
-                // Call ended without connection (no answer)
-                messageText = `${targetCallType === 'video' ? 'Video' : 'Voice'} call`;
-                displayText = `📞 ${targetCallType === 'video' ? 'Video' : 'Voice'} call`;
-            }
-        }
-        
-        // Add call history message to chat with WhatsApp-style formatting
-        await addDoc(collection(db, 'conversations', threadId, 'messages'), {
-            type: callType,
-            callType: targetCallType,
-            senderId: currentUser.uid,
-            timestamp: serverTimestamp(),
-            read: false,
-            callId: targetCallId,
-            duration: duration,
-            text: messageText,
-            displayText: displayText,
-            isSystemMessage: true,
-            isOutgoing: isOutgoing
-        });
-        
-        // Update conversation
-        await setDoc(doc(db, 'conversations', threadId), {
-            participants: [currentUser.uid, targetPartnerId],
-            lastMessage: {
-                text: messageText,
-                senderId: currentUser.uid,
-                timestamp: serverTimestamp(),
-                type: callType
-            },
-            updatedAt: serverTimestamp()
-        }, { merge: true });
-        
-        console.log("WhatsApp-style call history added to chat:", displayText);
-        
-    } catch (error) {
-        console.error("Error adding call history to chat:", error);
-    }
-}
-
-// Format call duration for message display (WhatsApp-style)
-function formatCallDurationForMessage(seconds) {
-    if (!seconds || seconds === 0) return 'No answer';
-    
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    
-    if (mins === 0) {
-        return `${secs} sec`;
-    }
-    if (secs === 0) {
-        return `${mins} min`;
-    }
-    return `${mins} min ${secs} sec`;
 }
 
 // Show call ended screen
 function showCallEnded() {
     console.log('Showing call ended screen');
-    
-    const callEndedElement = document.getElementById('callEnded');
-    const remoteVideoElement = document.getElementById('remoteVideo');
-    const localVideoElement = document.getElementById('localVideo');
-    
-    if (callEndedElement) callEndedElement.style.display = 'flex';
-    if (remoteVideoElement) remoteVideoElement.style.display = 'none';
-    if (localVideoElement) localVideoElement.style.display = 'none';
-    
-    // Auto-redirect to chat page after 2 seconds
-    setTimeout(() => {
-        goBackToChat();
-    }, 2000);
+    document.getElementById('callEnded').style.display = 'flex';
+    document.getElementById('remoteVideo').style.display = 'none';
+    document.getElementById('localVideo').style.display = 'none';
 }
 
 // Go back to chat
 function goBackToChat() {
     console.log('Returning to chat');
-    const partnerId = currentCallPartnerId || sessionStorage.getItem('currentCallPartnerId');
-    
-    // Clear session storage
-    sessionStorage.removeItem('currentCallPartnerId');
-    sessionStorage.removeItem('currentCallType');
-    sessionStorage.removeItem('activeCallId');
-    
-    if (partnerId) {
-        window.location.href = 'chat.html?id=' + partnerId;
-    } else {
-        window.location.href = 'chat.html';
-    }
+    window.location.href = 'chat.html?id=' + currentCallPartnerId;
 }
 
 // Update call status
 function updateCallStatus(status) {
     console.log('Call status:', status);
-    const callStatusElement = document.getElementById('callStatus');
-    if (callStatusElement) {
-        callStatusElement.textContent = status;
-    }
+    document.getElementById('callStatus').textContent = status;
 }
 
 // Show loader
@@ -1330,10 +1453,7 @@ function showLoader(message) {
     if (loader) {
         loader.style.display = 'block';
         if (message) {
-            const loaderText = loader.querySelector('p');
-            if (loaderText) {
-                loaderText.textContent = message;
-            }
+            loader.querySelector('p').textContent = message;
         }
     }
 }
@@ -1353,11 +1473,17 @@ function showError(message) {
     setTimeout(goBackToChat, 3000);
 }
 
-// Show notification
+// Show notification (for chat page)
 function showNotification(message, type = 'info') {
     console.log('Notification:', message, type);
     
-    // Create independent notification system
+    // Check if app.js notification function exists
+    if (typeof window.showNotification === 'function') {
+        window.showNotification(message, type);
+        return;
+    }
+    
+    // Fallback notification
     const notification = document.createElement('div');
     notification.style.cssText = `
         position: fixed;
@@ -1399,32 +1525,8 @@ function showNotification(message, type = 'info') {
 // Clean up when leaving the page
 window.addEventListener('beforeunload', () => {
     console.log('Page unloading, cleaning up call...');
-    if (peerConnection || localStream) {
-        endCall();
-    }
+    endCall();
     if (signalingUnsubscribe) {
         signalingUnsubscribe();
     }
 });
-
-// Make callBack function available globally
-window.callBack = function(partnerId, callType) {
-    if (!partnerId || !callType) {
-        console.error('Missing parameters for call back');
-        return;
-    }
-    
-    console.log('Calling back:', partnerId, callType);
-    
-    // Generate a unique call ID
-    const callId = `${currentUser.uid}_${partnerId}_${Date.now()}`;
-    
-    // Send a notification to the partner first
-    sendCallNotification(partnerId, callType, callId).then(() => {
-        // Redirect to call page with call parameters
-        window.location.href = `call.html?type=${callType}&partnerId=${partnerId}&incoming=false&callId=${callId}`;
-    }).catch(error => {
-        console.error('Error sending call notification:', error);
-        showNotification('Failed to initiate call. Please try again.', 'error');
-    });
-};
