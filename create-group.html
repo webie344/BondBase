@@ -302,6 +302,113 @@
             font-size: 1.25rem;
         }
 
+        /* Group Photo Upload Styles */
+        .photo-upload-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .photo-preview {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: var(--bg-primary);
+            border: 2px dashed var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .photo-preview:hover {
+            border-color: var(--primary-light);
+        }
+
+        .photo-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .photo-placeholder {
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .photo-placeholder i {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: var(--text-light);
+        }
+
+        .photo-upload-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s ease;
+        }
+
+        .photo-upload-btn:hover {
+            background: var(--primary-light);
+        }
+
+        .photo-info {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        /* Restricted Words Styles */
+        .restricted-words-container {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid var(--border);
+        }
+
+        .restricted-words-info {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .restricted-words-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .restricted-word-tag {
+            background: var(--secondary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .restricted-word-tag button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 0;
+            font-size: 0.8rem;
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 padding: 15px;
@@ -322,6 +429,11 @@
 
             .btn {
                 width: 100%;
+            }
+
+            .photo-preview {
+                width: 120px;
+                height: 120px;
             }
         }
     </style>
@@ -345,6 +457,27 @@
 
         <div class="form-container">
             <form id="createGroupForm">
+                <!-- Group Photo Upload -->
+                <div class="form-group">
+                    <label class="form-label">Group Photo</label>
+                    <div class="photo-upload-container">
+                        <div class="photo-preview" id="photoPreview">
+                            <div class="photo-placeholder">
+                                <i class="fas fa-camera"></i>
+                                <div>Click to upload</div>
+                            </div>
+                            <img id="photoPreviewImg" alt="Group photo preview">
+                        </div>
+                        <button type="button" class="photo-upload-btn" id="uploadPhotoBtn">
+                            <i class="fas fa-upload"></i> Choose Photo
+                        </button>
+                        <input type="file" id="groupPhoto" accept="image/*" style="display: none;">
+                        <div class="photo-info">
+                            Recommended: Square image, at least 300x300 pixels
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="groupName" class="form-label">Group Name *</label>
                     <input type="text" id="groupName" class="form-input" placeholder="Enter group name" required maxlength="50">
@@ -401,6 +534,20 @@
                     </div>
                 </div>
 
+                <!-- Restricted Words Section -->
+                <div class="form-group">
+                    <label class="form-label">Restricted Words</label>
+                    <div class="restricted-words-container">
+                        <div class="restricted-words-info">
+                            Users who use these words will be restricted from chatting for 2 hours. Separate words with commas.
+                        </div>
+                        <textarea id="restrictedWords" class="form-textarea" placeholder="e.g., hate, spam, inappropriate, offensive" rows="3"></textarea>
+                        <div class="restricted-words-list" id="restrictedWordsList">
+                            <!-- Restricted words will appear here as tags -->
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">Maximum Members</label>
                     <div class="max-members">
@@ -430,5 +577,90 @@
     </div>
 
     <script type="module" src="group.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const photoPreview = document.getElementById('photoPreview');
+            const photoPreviewImg = document.getElementById('photoPreviewImg');
+            const uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
+            const groupPhotoInput = document.getElementById('groupPhoto');
+            const restrictedWordsInput = document.getElementById('restrictedWords');
+            const restrictedWordsList = document.getElementById('restrictedWordsList');
+            
+            let groupPhotoFile = null;
+            let restrictedWords = [];
+
+            // Photo upload functionality
+            photoPreview.addEventListener('click', () => {
+                groupPhotoInput.click();
+            });
+
+            uploadPhotoBtn.addEventListener('click', () => {
+                groupPhotoInput.click();
+            });
+
+            groupPhotoInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    // Validate file type
+                    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+                    if (!validTypes.includes(file.type)) {
+                        alert('Please upload a valid image file (JPEG, PNG, GIF, WebP)');
+                        return;
+                    }
+
+                    // Validate file size (max 5MB)
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('Image must be less than 5MB');
+                        return;
+                    }
+
+                    groupPhotoFile = file;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        photoPreviewImg.src = e.target.result;
+                        photoPreviewImg.style.display = 'block';
+                        photoPreview.querySelector('.photo-placeholder').style.display = 'none';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Restricted words functionality
+            restrictedWordsInput.addEventListener('input', updateRestrictedWordsList);
+            restrictedWordsInput.addEventListener('blur', updateRestrictedWordsList);
+
+            function updateRestrictedWordsList() {
+                const text = restrictedWordsInput.value.trim();
+                if (text) {
+                    restrictedWords = text.split(',').map(word => word.trim()).filter(word => word.length > 0);
+                } else {
+                    restrictedWords = [];
+                }
+                
+                renderRestrictedWords();
+            }
+
+            function renderRestrictedWords() {
+                restrictedWordsList.innerHTML = '';
+                restrictedWords.forEach((word, index) => {
+                    const tag = document.createElement('div');
+                    tag.className = 'restricted-word-tag';
+                    tag.innerHTML = `
+                        ${word}
+                        <button type="button" onclick="removeRestrictedWord(${index})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    restrictedWordsList.appendChild(tag);
+                });
+            }
+
+            window.removeRestrictedWord = function(index) {
+                restrictedWords.splice(index, 1);
+                restrictedWordsInput.value = restrictedWords.join(', ');
+                renderRestrictedWords();
+            };
+        });
+    </script>
 </body>
 </html>

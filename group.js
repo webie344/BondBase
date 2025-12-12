@@ -1,5 +1,5 @@
-// group.js - Complete Group Chat System with Cloudinary Image Support & Invite Links
-// UPDATED VERSION: Removed localStorage, uses proper in-memory caching
+// group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
+// UPDATED VERSION: Added group photo upload, restricted words, and video support
 
 import { 
     getFirestore, 
@@ -105,8 +105,14 @@ class GroupChat {
         
         this.sentMessageIds = new Set();
         
+        // Restricted users tracking
+        this.restrictedUsers = new Map(); // groupId -> Map(userId -> restrictionEndTime)
+        
         this.setupAuthListener();
         this.createMessageContextMenu();
+        
+        // Initialize restricted users check
+        this.checkRestrictedUsers();
     }
 
     getCachedItem(cacheKey, cacheMap) {
@@ -143,6 +149,174 @@ class GroupChat {
             groupMembers: new Map(),
             profileSetupChecked: false
         };
+    }
+
+    // Check for restricted users periodically
+    checkRestrictedUsers() {
+        setInterval(() => {
+            const now = Date.now();
+            for (const [groupId, users] of this.restrictedUsers) {
+                for (const [userId, restrictionEnd] of users) {
+                    if (now > restrictionEnd) {
+                        users.delete(userId);
+                    }
+                }
+                if (users.size === 0) {
+                    this.restrictedUsers.delete(groupId);
+                }
+            }
+        }, 60000); // Check every minute
+    }
+
+    async restrictUser(groupId, userId, durationHours = 2) {
+        if (!this.restrictedUsers.has(groupId)) {
+            this.restrictedUsers.set(groupId, new Map());
+        }
+        
+        const restrictionEnd = Date.now() + (durationHours * 60 * 60 * 1000);
+        this.restrictedUsers.get(groupId).set(userId, restrictionEnd);
+        
+        // Store restriction in Firebase for persistence
+        try {
+            const restrictionRef = doc(db, 'groups', groupId, 'restricted_users', userId);
+            await setDoc(restrictionRef, {
+                userId: userId,
+                restrictedUntil: new Date(restrictionEnd),
+                restrictedAt: serverTimestamp(),
+                restrictedBy: this.firebaseUser?.uid,
+                reason: 'Used restricted word'
+            }, { merge: true });
+        } catch (error) {
+            console.error('Error saving restriction to Firebase:', error);
+        }
+    }
+
+    async isUserRestricted(groupId, userId) {
+        // Check local cache first
+        if (this.restrictedUsers.has(groupId)) {
+            const restrictionEnd = this.restrictedUsers.get(groupId).get(userId);
+            if (restrictionEnd && Date.now() < restrictionEnd) {
+                return true;
+            }
+        }
+        
+        // Check Firebase
+        try {
+            const restrictionRef = doc(db, 'groups', groupId, 'restricted_users', userId);
+            const restrictionSnap = await getDoc(restrictionRef);
+            
+            if (restrictionSnap.exists()) {
+                const data = restrictionSnap.data();
+                const restrictedUntil = data.restrictedUntil?.toDate ? data.restrictedUntil.toDate() : new Date(data.restrictedUntil);
+                
+                if (Date.now() < restrictedUntil.getTime()) {
+                    // Update local cache
+                    if (!this.restrictedUsers.has(groupId)) {
+                        this.restrictedUsers.set(groupId, new Map());
+                    }
+                    this.restrictedUsers.get(groupId).set(userId, restrictedUntil.getTime());
+                    return true;
+                } else {
+                    // Restriction expired, delete it
+                    await deleteDoc(restrictionRef);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking restriction in Firebase:', error);
+        }
+        
+        return false;
+    }
+
+    async checkMessageForRestrictedWords(groupId, message) {
+        try {
+            const groupRef = doc(db, 'groups', groupId);
+            const groupSnap = await getDoc(groupRef);
+            
+            if (groupSnap.exists()) {
+                const groupData = groupSnap.data();
+                const restrictedWords = groupData.restrictedWords || [];
+                
+                if (restrictedWords.length === 0) {
+                    return false;
+                }
+                
+                const messageLower = message.toLowerCase();
+                for (const word of restrictedWords) {
+                    if (word.trim() && messageLower.includes(word.toLowerCase().trim())) {
+                        return word;
+                    }
+                }
+            }
+            return false;
+        } catch (error) {
+            console.error('Error checking restricted words:', error);
+            return false;
+        }
+    }
+
+    async uploadMediaToCloudinary(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', cloudinaryConfig.uploadPreset);
+        
+        // Determine resource type
+        const isVideo = file.type.startsWith('video/');
+        formData.append('resource_type', isVideo ? 'video' : 'image');
+        
+        try {
+            const response = await fetch(
+                `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/${isVideo ? 'video' : 'image'}/upload`,
+                {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                }
+            );
+            
+            if (!response.ok) {
+                throw new Error(`Cloudinary error: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            if (!data.secure_url) {
+                throw new Error('Invalid response from Cloudinary');
+            }
+            return data.secure_url;
+        } catch (error) {
+            console.error('Error uploading media to Cloudinary:', error);
+            throw error;
+        }
+    }
+
+    validateImageFile(file) {
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+            throw new Error('Image file must be less than 10MB');
+        }
+        
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            throw new Error('Please upload a valid image file (JPEG, PNG, GIF, WebP)');
+        }
+        
+        return true;
+    }
+
+    validateVideoFile(file) {
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        if (file.size > maxSize) {
+            throw new Error('Video file must be less than 50MB');
+        }
+        
+        const allowedTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-msvideo'];
+        if (!allowedTypes.includes(file.type)) {
+            throw new Error('Please upload a valid video file (MP4, WebM, OGG, MOV, AVI)');
+        }
+        
+        return true;
     }
 
     async getUserProfile(userId, forceRefresh = false) {
@@ -211,7 +385,7 @@ class GroupChat {
                         mutualGroups.push({
                             id: groupId,
                             name: groupData.name,
-                            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(groupData.name)}`,
+                            avatar: groupData.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(groupData.name)}`,
                             memberCount: groupData.memberCount || 0,
                             description: groupData.description || ''
                         });
@@ -231,13 +405,13 @@ class GroupChat {
         return `private_${ids[0]}_${ids[1]}`;
     }
 
-    async sendPrivateMessage(toUserId, text = null, imageUrl = null, replyTo = null) {
+    async sendPrivateMessage(toUserId, text = null, imageUrl = null, videoUrl = null, replyTo = null) {
         try {
             if (!this.firebaseUser || !this.currentUser) {
                 throw new Error('You must be logged in to send messages');
             }
             
-            if (!text && !imageUrl) {
+            if (!text && !imageUrl && !videoUrl) {
                 throw new Error('Message cannot be empty');
             }
             
@@ -265,13 +439,18 @@ class GroupChat {
                 messageData.type = 'image';
             }
             
+            if (videoUrl) {
+                messageData.videoUrl = videoUrl;
+                messageData.type = 'video';
+            }
+            
             await addDoc(messagesRef, messageData);
             
             const chatRef = doc(db, 'private_chats', chatId);
             await setDoc(chatRef, {
                 participants: [this.firebaseUser.uid, toUserId],
                 lastMessage: {
-                    text: text ? text.trim() : '📷 Image',
+                    text: text ? text.trim() : (imageUrl ? '📷 Image' : videoUrl ? '🎬 Video' : ''),
                     senderId: this.firebaseUser.uid,
                     senderName: this.currentUser.name,
                     timestamp: serverTimestamp()
@@ -286,41 +465,51 @@ class GroupChat {
         }
     }
 
-    async sendPrivateImageMessage(toUserId, file, replyTo = null) {
+    async sendPrivateMediaMessage(toUserId, file, replyTo = null) {
         try {
-            this.validateImageFile(file);
+            const isVideo = file.type.startsWith('video/');
             
-            const tempMessageId = 'temp_private_image_' + Date.now();
-            this.showTempPrivateImageMessage(toUserId, file, tempMessageId);
+            if (isVideo) {
+                this.validateVideoFile(file);
+            } else {
+                this.validateImageFile(file);
+            }
             
-            const imageUrl = await this.uploadImageToCloudinary(file);
+            const tempMessageId = 'temp_private_media_' + Date.now();
+            this.showTempPrivateMediaMessage(toUserId, file, tempMessageId, isVideo);
             
-            await this.sendPrivateMessage(toUserId, null, imageUrl, replyTo);
+            const mediaUrl = await this.uploadMediaToCloudinary(file);
+            
+            if (isVideo) {
+                await this.sendPrivateMessage(toUserId, null, null, mediaUrl, replyTo);
+            } else {
+                await this.sendPrivateMessage(toUserId, null, mediaUrl, null, replyTo);
+            }
             
             this.removeTempPrivateMessage(tempMessageId);
             
             return true;
         } catch (error) {
-            console.error('Error sending private image message:', error);
+            console.error('Error sending private media message:', error);
             throw error;
         }
     }
 
-    showTempPrivateImageMessage(toUserId, file, tempId) {
+    showTempPrivateMediaMessage(toUserId, file, tempId, isVideo = false) {
         if (this.currentChatPartnerId === toUserId) {
-            const tempImageUrl = URL.createObjectURL(file);
+            const tempMediaUrl = URL.createObjectURL(file);
             this.tempPrivateMessages.set(tempId, {
                 id: tempId,
                 senderId: this.firebaseUser.uid,
                 senderName: this.currentUser.name,
                 senderAvatar: this.currentUser.avatar,
-                imageUrl: tempImageUrl,
+                [isVideo ? 'videoUrl' : 'imageUrl']: tempMediaUrl,
                 timestamp: new Date().toISOString(),
-                type: 'image',
+                type: isVideo ? 'video' : 'image',
                 status: 'uploading'
             });
             
-            const event = new CustomEvent('tempPrivateImageMessage', { 
+            const event = new CustomEvent('tempPrivateMediaMessage', { 
                 detail: { 
                     tempId,
                     message: this.tempPrivateMessages.get(tempId),
@@ -521,7 +710,7 @@ class GroupChat {
                     if (!lastMessageSnap.empty) {
                         const msgData = lastMessageSnap.docs[0].data();
                         lastMessage = {
-                            text: msgData.text || '📷 Image',
+                            text: msgData.text || (msgData.imageUrl ? '📷 Image' : msgData.videoUrl ? '🎬 Video' : ''),
                             senderName: msgData.senderName || 'User',
                             timestamp: msgData.timestamp ? 
                                 (msgData.timestamp.toDate ? msgData.timestamp.toDate() : msgData.timestamp) : 
@@ -532,7 +721,7 @@ class GroupChat {
                     groupChats.push({
                         id: docSnap.id,
                         name: groupData.name,
-                        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(groupData.name)}`,
+                        avatar: groupData.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(groupData.name)}`,
                         lastMessage: lastMessage,
                         memberCount: groupData.memberCount || 0,
                         unreadCount: 0
@@ -1029,7 +1218,7 @@ class GroupChat {
         }
     }
 
-    async createGroup(groupData) {
+    async createGroup(groupData, photoFile = null) {
         try {
             if (!this.firebaseUser || !this.currentUser) {
                 throw new Error('You must be logged in to create a group');
@@ -1040,6 +1229,11 @@ class GroupChat {
             const inviteCode = this.generateInviteCode();
             const inviteLink = `https://bondlydatingweb.vercel.app/join.html?code=${inviteCode}`;
             
+            let photoUrl = null;
+            if (photoFile) {
+                photoUrl = await this.uploadMediaToCloudinary(photoFile);
+            }
+            
             const group = {
                 id: groupRef.id,
                 name: groupData.name,
@@ -1047,11 +1241,13 @@ class GroupChat {
                 category: groupData.category || 'social',
                 topics: groupData.topics || [],
                 rules: groupData.rules || [],
+                restrictedWords: groupData.restrictedWords || [],
                 maxMembers: groupData.maxMembers || 50,
                 privacy: groupData.privacy || 'public',
                 createdBy: this.firebaseUser.uid,
                 creatorName: this.currentUser.name,
                 creatorAvatar: this.currentUser.avatar,
+                photoUrl: photoUrl,
                 memberCount: 1,
                 inviteCode: inviteCode,
                 inviteLink: inviteLink,
@@ -1308,61 +1504,30 @@ class GroupChat {
         }
     }
 
-    async uploadImageToCloudinary(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', cloudinaryConfig.uploadPreset);
-        formData.append('resource_type', 'image');
-        
-        try {
-            const response = await fetch(
-                `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`,
-                {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                }
-            );
-            
-            if (!response.ok) {
-                throw new Error(`Cloudinary error: ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            if (!data.secure_url) {
-                throw new Error('Invalid response from Cloudinary');
-            }
-            return data.secure_url;
-        } catch (error) {
-            console.error('Error uploading image to Cloudinary:', error);
-            throw error;
-        }
-    }
-
-    validateImageFile(file) {
-        const maxSize = 10 * 1024 * 1024;
-        if (file.size > maxSize) {
-            throw new Error('Image file must be less than 10MB');
-        }
-        
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-        if (!allowedTypes.includes(file.type)) {
-            throw new Error('Please upload a valid image file (JPEG, PNG, GIF, WebP)');
-        }
-        
-        return true;
-    }
-
-    async sendMessage(groupId, text = null, imageUrl = null, replyTo = null) {
+    async sendMessage(groupId, text = null, imageUrl = null, videoUrl = null, replyTo = null) {
         try {
             if (!this.firebaseUser || !this.currentUser) {
                 throw new Error('You must be logged in to send messages');
             }
             
-            if (!text && !imageUrl) {
+            // Check if user is restricted
+            const isRestricted = await this.isUserRestricted(groupId, this.firebaseUser.uid);
+            if (isRestricted) {
+                throw new Error('You are restricted from sending messages in this group for 2 hours due to using restricted words.');
+            }
+            
+            if (!text && !imageUrl && !videoUrl) {
                 throw new Error('Message cannot be empty');
+            }
+            
+            // Check for restricted words in text messages
+            if (text) {
+                const restrictedWord = await this.checkMessageForRestrictedWords(groupId, text);
+                if (restrictedWord) {
+                    // Restrict the user
+                    await this.restrictUser(groupId, this.firebaseUser.uid, 2);
+                    throw new Error(`Your message contains a restricted word (${restrictedWord}). You have been restricted from chatting for 2 hours.`);
+                }
             }
             
             const messageId = `${groupId}_${this.firebaseUser.uid}_${Date.now()}`;
@@ -1395,6 +1560,11 @@ class GroupChat {
                 messageData.type = 'image';
             }
             
+            if (videoUrl) {
+                messageData.videoUrl = videoUrl;
+                messageData.type = 'video';
+            }
+            
             await addDoc(messagesRef, messageData);
             
             const groupRef = doc(db, 'groups', groupId);
@@ -1402,7 +1572,7 @@ class GroupChat {
                 updatedAt: serverTimestamp(),
                 lastActivity: serverTimestamp(),
                 lastMessage: {
-                    text: text ? text.trim() : '📷 Image',
+                    text: text ? text.trim() : (imageUrl ? '📷 Image' : videoUrl ? '🎬 Video' : ''),
                     sender: this.currentUser.name,
                     timestamp: serverTimestamp()
                 }
@@ -1419,41 +1589,51 @@ class GroupChat {
         }
     }
 
-    async sendImageMessage(groupId, file, replyTo = null) {
+    async sendMediaMessage(groupId, file, replyTo = null) {
         try {
-            this.validateImageFile(file);
+            const isVideo = file.type.startsWith('video/');
             
-            const tempMessageId = 'temp_image_' + Date.now();
-            this.showTempImageMessage(groupId, file, tempMessageId);
+            if (isVideo) {
+                this.validateVideoFile(file);
+            } else {
+                this.validateImageFile(file);
+            }
             
-            const imageUrl = await this.uploadImageToCloudinary(file);
+            const tempMessageId = 'temp_media_' + Date.now();
+            this.showTempMediaMessage(groupId, file, tempMessageId, isVideo);
             
-            await this.sendMessage(groupId, null, imageUrl, replyTo);
+            const mediaUrl = await this.uploadMediaToCloudinary(file);
+            
+            if (isVideo) {
+                await this.sendMessage(groupId, null, null, mediaUrl, replyTo);
+            } else {
+                await this.sendMessage(groupId, null, mediaUrl, null, replyTo);
+            }
             
             this.removeTempMessage(tempMessageId);
             
             return true;
         } catch (error) {
-            console.error('Error sending image message:', error);
+            console.error('Error sending media message:', error);
             throw error;
         }
     }
 
-    showTempImageMessage(groupId, file, tempId) {
+    showTempMediaMessage(groupId, file, tempId, isVideo = false) {
         if (window.currentGroupId === groupId) {
-            const tempImageUrl = URL.createObjectURL(file);
+            const tempMediaUrl = URL.createObjectURL(file);
             const tempMessage = {
                 id: tempId,
                 senderId: this.firebaseUser.uid,
                 senderName: this.currentUser.name,
                 senderAvatar: this.currentUser.avatar,
-                imageUrl: tempImageUrl,
+                [isVideo ? 'videoUrl' : 'imageUrl']: tempMediaUrl,
                 timestamp: new Date().toISOString(),
-                type: 'image',
+                type: isVideo ? 'video' : 'image',
                 status: 'uploading'
             };
             
-            const event = new CustomEvent('tempImageMessage', { detail: tempMessage });
+            const event = new CustomEvent('tempMediaMessage', { detail: tempMessage });
             document.dispatchEvent(event);
         }
     }
@@ -1705,7 +1885,7 @@ class GroupChat {
         const truncatedName = this.truncateName(this.replyingToMessage.senderName);
         const truncatedMessage = this.replyingToMessage.text ? 
             this.truncateMessage(this.replyingToMessage.text) : 
-            '📷 Image';
+            (this.replyingToMessage.imageUrl ? '📷 Image' : this.replyingToMessage.videoUrl ? '🎬 Video' : '');
         
         indicator.innerHTML = `
             <div class="reply-indicator-content">
@@ -2023,9 +2203,51 @@ function initCreateGroupPage() {
     const addRuleBtn = document.getElementById('addRuleBtn');
     const cancelBtn = document.getElementById('cancelBtn');
     const createBtn = document.getElementById('createBtn');
+    const groupPhotoInput = document.getElementById('groupPhoto');
+    const photoPreview = document.getElementById('photoPreview');
+    const photoPreviewImg = document.getElementById('photoPreviewImg');
+    const uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
+    const restrictedWordsInput = document.getElementById('restrictedWords');
     
     let topics = [''];
     let rules = [''];
+    let groupPhotoFile = null;
+    
+    // Photo upload functionality
+    photoPreview.addEventListener('click', () => {
+        groupPhotoInput.click();
+    });
+
+    uploadPhotoBtn.addEventListener('click', () => {
+        groupPhotoInput.click();
+    });
+
+    groupPhotoInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+            if (!validTypes.includes(file.type)) {
+                alert('Please upload a valid image file (JPEG, PNG, GIF, WebP)');
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Image must be less than 5MB');
+                return;
+            }
+
+            groupPhotoFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                photoPreviewImg.src = e.target.result;
+                photoPreviewImg.style.display = 'block';
+                photoPreview.querySelector('.photo-placeholder').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
     
     nameInput.addEventListener('input', () => {
         nameCount.textContent = nameInput.value.length;
@@ -2158,12 +2380,19 @@ function initCreateGroupPage() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
+        // Get restricted words from input
+        const restrictedWordsText = restrictedWordsInput.value.trim();
+        const restrictedWords = restrictedWordsText ? 
+            restrictedWordsText.split(',').map(word => word.trim()).filter(word => word.length > 0) : 
+            [];
+        
         const groupData = {
             name: nameInput.value.trim(),
             description: descInput.value.trim(),
             category: document.getElementById('groupCategory').value,
             topics: topics.filter(t => t.trim()).map(t => t.trim()),
             rules: rules.filter(r => r.trim()).map(r => r.trim()),
+            restrictedWords: restrictedWords,
             maxMembers: parseInt(maxMembersSlider.value),
             privacy: document.getElementById('groupPrivacy').value
         };
@@ -2187,7 +2416,7 @@ function initCreateGroupPage() {
         createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
         
         try {
-            const result = await groupChat.createGroup(groupData);
+            const result = await groupChat.createGroup(groupData, groupPhotoFile);
             
             alert(`Group created successfully!\n\nInvite Link: ${result.inviteLink}\n\nThis link has been copied to your clipboard.`);
             
@@ -2240,8 +2469,11 @@ function initGroupsPage() {
         filterGroups(searchTerm);
     });
     
-    function generateGroupAvatar(groupName) {
-        const seed = encodeURIComponent(groupName);
+    function generateGroupAvatar(group) {
+        if (group.photoUrl) {
+            return group.photoUrl;
+        }
+        const seed = encodeURIComponent(group.name);
         return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=gradientLinear`;
     }
     
@@ -2274,7 +2506,7 @@ function initGroupsPage() {
             groupCard.innerHTML = `
                 <div class="group-header">
                     <div class="group-avatar-section">
-                        <img src="${generateGroupAvatar(group.name)}" alt="${group.name}" class="group-avatar">
+                        <img src="${generateGroupAvatar(group)}" alt="${group.name}" class="group-avatar">
                         <div class="group-title-section">
                             <h3 class="group-name">${group.name}</h3>
                             <span class="group-category">${group.category || 'General'}</span>
@@ -2668,7 +2900,7 @@ function initGroupPage() {
     attachmentBtn.addEventListener('click', () => {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
-        fileInput.accept = 'image/*';
+        fileInput.accept = 'image/*,video/*';
         fileInput.multiple = false;
         
         fileInput.addEventListener('change', async (e) => {
@@ -2679,14 +2911,14 @@ function initGroupPage() {
                     attachmentBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                     attachmentBtn.disabled = true;
                     
-                    await groupChat.sendImageMessage(groupId, file, groupChat.replyingToMessage?.id);
+                    await groupChat.sendMediaMessage(groupId, file, groupChat.replyingToMessage?.id);
                     
                     attachmentBtn.innerHTML = originalHTML;
                     attachmentBtn.disabled = false;
                     
                 } catch (error) {
-                    console.error('Error sending image:', error);
-                    alert(error.message || 'Failed to send image. Please try again.');
+                    console.error('Error sending media:', error);
+                    alert(error.message || 'Failed to send media. Please try again.');
                     
                     attachmentBtn.innerHTML = '<i class="fas fa-paperclip"></i>';
                     attachmentBtn.disabled = false;
@@ -2697,7 +2929,7 @@ function initGroupPage() {
         fileInput.click();
     });
     
-    document.addEventListener('tempImageMessage', (e) => {
+    document.addEventListener('tempMediaMessage', (e) => {
         const tempMessage = e.detail;
         tempMessages.set(tempMessage.id, tempMessage);
         
@@ -2729,7 +2961,8 @@ function initGroupPage() {
                 return;
             }
             
-            const groupAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(groupData.name)}&backgroundColor=00897b&backgroundType=gradientLinear`;
+            const groupAvatarUrl = groupData.photoUrl || 
+                `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(groupData.name)}&backgroundColor=00897b&backgroundType=gradientLinear`;
             
             if (groupAvatar) groupAvatar.src = groupAvatarUrl;
             if (groupNameSidebar) groupNameSidebar.textContent = groupData.name;
@@ -3140,7 +3373,7 @@ function initGroupPage() {
                                 const truncatedName = groupChat.truncateName(repliedMessage.senderName);
                                 const truncatedMessage = repliedMessage.text ? 
                                     groupChat.truncateMessage(repliedMessage.text) : 
-                                    '📷 Image';
+                                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : '');
                                 
                                 replyHtml = `
                                     <div class="replying-to">
@@ -3168,6 +3401,26 @@ function initGroupPage() {
                                              class="message-image"
                                              style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer;"
                                              onclick="openImageModal('${msg.imageUrl}')">
+                                        ${isUploading ? `
+                                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                                   background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                                                   font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                                                <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                    ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                                </div>
+                            `;
+                        } else if (msg.videoUrl) {
+                            return `
+                                <div class="${messageDivClass}" data-message-id="${msg.id}">
+                                    ${replyHtml}
+                                    <div class="message-video-container" style="position: relative;">
+                                        <video controls style="max-width: 300px; max-height: 300px; border-radius: 8px;">
+                                            <source src="${msg.videoUrl}" type="video/mp4">
+                                            Your browser does not support the video tag.
+                                        </video>
                                         ${isUploading ? `
                                             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                                                    background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
@@ -3228,12 +3481,7 @@ function initGroupPage() {
         sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         
         try {
-            await groupChat.sendMessage(
-                groupId, 
-                text, 
-                null, 
-                groupChat.replyingToMessage?.id
-            );
+            await groupChat.sendMessage(groupId, text);
             
             messageInput.value = '';
             messageInput.style.height = 'auto';
@@ -3241,7 +3489,7 @@ function initGroupPage() {
             
         } catch (error) {
             console.error('Error sending message:', error);
-            alert('Failed to send message. Please try again.');
+            alert(error.message || 'Failed to send message. Please try again.');
         } finally {
             sendBtn.disabled = false;
             sendBtn.innerHTML = 'Send';
@@ -3395,8 +3643,11 @@ function initAdminGroupsPage() {
         }
     }
     
-    function generateGroupAvatar(groupName) {
-        const seed = encodeURIComponent(groupName);
+    function generateGroupAvatar(group) {
+        if (group.photoUrl) {
+            return group.photoUrl;
+        }
+        const seed = encodeURIComponent(group.name);
         return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=00897b&backgroundType=gradientLinear`;
     }
     
@@ -3410,7 +3661,7 @@ function initAdminGroupsPage() {
             const groupCard = document.createElement('div');
             groupCard.className = 'group-card';
             
-            const groupAvatar = generateGroupAvatar(group.name);
+            const groupAvatar = generateGroupAvatar(group);
             
             const createdAt = group.createdAt ? 
                 new Date(group.createdAt).toLocaleDateString('en-US', {
@@ -3727,7 +3978,8 @@ function initJoinPage() {
             
             console.log('Group found:', group.name);
             
-            const groupAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.name)}&backgroundColor=00897b&backgroundType=gradientLinear`;
+            const groupAvatar = group.photoUrl || 
+                `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.name)}&backgroundColor=00897b&backgroundType=gradientLinear`;
             
             const memberCount = group.memberCount || 0;
             const maxMembers = group.maxMembers || 50;
@@ -4171,7 +4423,7 @@ function initChatPage() {
     attachmentBtn.addEventListener('click', () => {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
-        fileInput.accept = 'image/*';
+        fileInput.accept = 'image/*,video/*';
         fileInput.multiple = false;
         
         fileInput.addEventListener('change', async (e) => {
@@ -4182,14 +4434,14 @@ function initChatPage() {
                     attachmentBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                     attachmentBtn.disabled = true;
                     
-                    await groupChat.sendPrivateImageMessage(partnerId, file, groupChat.replyingToMessage?.id);
+                    await groupChat.sendPrivateMediaMessage(partnerId, file, groupChat.replyingToMessage?.id);
                     
                     attachmentBtn.innerHTML = originalHTML;
                     attachmentBtn.disabled = false;
                     
                 } catch (error) {
-                    console.error('Error sending image:', error);
-                    alert(error.message || 'Failed to send image. Please try again.');
+                    console.error('Error sending media:', error);
+                    alert(error.message || 'Failed to send media. Please try again.');
                     
                     attachmentBtn.innerHTML = '<i class="fas fa-paperclip"></i>';
                     attachmentBtn.disabled = false;
@@ -4200,7 +4452,7 @@ function initChatPage() {
         fileInput.click();
     });
     
-    document.addEventListener('tempPrivateImageMessage', (e) => {
+    document.addEventListener('tempPrivateMediaMessage', (e) => {
         const { tempId, message, partnerId: eventPartnerId } = e.detail;
         
         if (eventPartnerId === partnerId) {
@@ -4339,7 +4591,7 @@ function initChatPage() {
                                 const truncatedName = groupChat.truncateName(repliedMessage.senderName);
                                 const truncatedMessage = repliedMessage.text ? 
                                     groupChat.truncateMessage(repliedMessage.text) : 
-                                    '📷 Image';
+                                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : '');
                                 
                                 replyHtml = `
                                     <div class="replying-to">
@@ -4367,6 +4619,26 @@ function initChatPage() {
                                              class="message-image"
                                              style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer;"
                                              onclick="openImageModal('${msg.imageUrl}')">
+                                        ${isUploading ? `
+                                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                                   background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                                                   font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                                                <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                    ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                                </div>
+                            `;
+                        } else if (msg.videoUrl) {
+                            return `
+                                <div class="${messageDivClass}" data-message-id="${msg.id}">
+                                    ${replyHtml}
+                                    <div class="message-video-container" style="position: relative;">
+                                        <video controls style="max-width: 300px; max-height: 300px; border-radius: 8px;">
+                                            <source src="${msg.videoUrl}" type="video/mp4">
+                                            Your browser does not support the video tag.
+                                        </video>
                                         ${isUploading ? `
                                             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                                                    background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
@@ -4420,6 +4692,7 @@ function initChatPage() {
             await groupChat.sendPrivateMessage(
                 partnerId, 
                 text, 
+                null, 
                 null, 
                 groupChat.replyingToMessage?.id
             );
