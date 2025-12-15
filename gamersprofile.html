@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gamer Profile - WhipRoom</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styl.css">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #b3004b;
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --secondary: #8b0000;
+            --accent: #444;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --border-color: #2e2e2e;
+            --bg-light: #1b1b1b;
+            --accent-color: #b3004b;
+            --accent-dark: #7a0034;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.7);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.7);
+            --radius: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        /* Navigation */
+        .navbar {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(6px);
+            position: sticky;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 0.75rem 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .navbar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo::before {
+            content: "🔗";
+        }
+
+        /* Profile Container */
+        .profile-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        .profile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--primary-light);
+        }
+
+        /* Profile Content */
+        .profile-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+        }
+
+        /* Profile Card */
+        .gamer-profile-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            position: sticky;
+            top: 100px;
+        }
+
+        .profile-avatar {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .profile-avatar img {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .gamer-tag {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .game-platform {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .gamer-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .gamer-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(179, 0, 75, 0.2);
+            color: var(--primary-light);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            border: 1px solid rgba(179, 0, 75, 0.3);
+        }
+
+        .profile-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius);
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .contact-btn {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            font-size: 1rem;
+        }
+
+        .contact-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        /* Profile Details */
+        .profile-details {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .details-section {
+            margin-bottom: 2.5rem;
+        }
+
+        .details-section h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .stat-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .progress {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .stat-card .progress-bar {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .achievements-list {
+            list-style: none;
+        }
+
+        .achievements-list li {
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius);
+            margin-bottom: 0.75rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .screenshot-section {
+            margin-top: 2rem;
+        }
+
+        .screenshot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .screenshot-item {
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .screenshot-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .screenshot-item:hover img {
+            transform: scale(1.05);
+        }
+
+        /* Loading State */
+        .loading-state {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .profile-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .gamer-profile-card {
+                position: static;
+            }
+            
+            .profile-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .profile-container {
+                padding: 0 1rem;
+            }
+            
+            .profile-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .screenshot-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.html" class="logo">WhipRoom</a>
+            <a href="account.html" class="back-btn">
+                <i class="fas fa-arrow-left"></i> Back to Account
+            </a>
+        </div>
+    </nav>
+
+    <div class="profile-container">
+        <div class="profile-header">
+            <h1 style="font-size: 2.5rem; font-weight: 700; color: var(--text-primary);">
+                Gamer Profile
+            </h1>
+        </div>
+
+        <div class="profile-content">
+            <!-- Profile Card -->
+            <div class="gamer-profile-card">
+                <div class="profile-avatar">
+                    <img id="profileAvatar" src="images-default-profile.jpg" alt="Profile">
+                </div>
+                
+                <div class="profile-info">
+                    <h2 class="gamer-tag" id="gamerTagDisplay">Loading...</h2>
+                    
+                    <div class="game-platform" id="gamePlatformDisplay">
+                        <i class="fas fa-gamepad"></i>
+                        <span id="gameInfo">Loading...</span>
+                    </div>
+                    
+                    <div class="gamer-badges" id="gamerBadges">
+                        <!-- Badges will be populated here -->
+                    </div>
+                    
+                    <div class="profile-stats" id="quickStats">
+                        <!-- Quick stats will be populated here -->
+                    </div>
+                    
+                    <button id="contactGamerBtn" class="contact-btn">
+                        <i class="fas fa-envelope"></i> Message This Gamer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Profile Details -->
+            <div class="profile-details">
+                <!-- Loading State -->
+                <div id="loadingState" class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Loading gamer profile...</p>
+                </div>
+
+                <!-- Profile Details (Loaded by JavaScript) -->
+                <div id="profileDetails" style="display: none;">
+                    <!-- Stats Section -->
+                    <div class="details-section">
+                        <h3><i class="fas fa-chart-line"></i> Gaming Statistics</h3>
+                        <div class="stats-grid" id="detailedStats">
+                            <!-- Detailed stats will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Preferences Section -->
+                    <div class="details-section">
+                        <h3><i class="fas fa-sliders-h"></i> Gaming Preferences</h3>
+                        <div id="preferencesInfo">
+                            <!-- Preferences will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Achievements Section -->
+                    <div class="details-section">
+                        <h3><i class="fas fa-trophy"></i> Achievements</h3>
+                        <div id="achievementsInfo">
+                            <p>No achievements listed yet.</p>
+                        </div>
+                    </div>
+
+                    <!-- Screenshots Section -->
+                    <div class="details-section screenshot-section">
+                        <h3><i class="fas fa-camera"></i> Game Screenshots</h3>
+                        <div id="screenshotsInfo">
+                            <p>No screenshots uploaded yet.</p>
+                        </div>
+                    </div>
+
+                    <!-- Share Section -->
+                    <div class="details-section">
+                        <h3><i class="fas fa-share-alt"></i> Share Profile</h3>
+                        <div class="share-actions">
+                            <p>Share this gamer profile with others:</p>
+                            <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+                                <button id="copyProfileUrlBtn" class="btn-primary" style="padding: 0.75rem 1.5rem;">
+                                    <i class="fas fa-copy"></i> Copy Profile Link
+                                </button>
+                                <button id="shareProfileBtn" class="btn-secondary" style="padding: 0.75rem 1.5rem;">
+                                    <i class="fas fa-share-alt"></i> Share
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div id="errorState" style="display: none; text-align: center; padding: 3rem 2rem;">
+                    <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--secondary); margin-bottom: 1rem;"></i>
+                    <h3>Profile Not Found</h3>
+                    <p>This gamer profile could not be loaded. It may have been removed or the link may be incorrect.</p>
+                    <a href="mingle.html" class="back-btn" style="margin-top: 1rem;">
+                        <i class="fas fa-users"></i> Browse Other Gamers
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { 
+            getAuth, 
+            onAuthStateChanged,
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc,
+            collection,
+            query,
+            where,
+            getDocs
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('user');
+        const profileId = urlParams.get('profile');
+
+        // DOM Elements
+        const loadingState = document.getElementById('loadingState');
+        const profileDetails = document.getElementById('profileDetails');
+        const errorState = document.getElementById('errorState');
+        const contactBtn = document.getElementById('contactGamerBtn');
+
+        // Load gamer profile
+        async function loadGamerProfile() {
+            try {
+                if (!userId) {
+                    showError();
+                    return;
+                }
+
+                // Get user data
+                const userDoc = await getDoc(doc(db, 'users', userId));
+                if (!userDoc.exists()) {
+                    showError();
+                    return;
+                }
+
+                const userData = userDoc.data();
+                
+                // Get gamer profile
+                const gamerProfileRef = collection(db, 'users', userId, 'gamerProfile');
+                const gamerProfileQuery = query(gamerProfileRef);
+                const gamerProfileSnap = await getDocs(gamerProfileQuery);
+                
+                let gamerProfileData = null;
+                if (!gamerProfileSnap.empty) {
+                    gamerProfileData = gamerProfileSnap.docs[0].data();
+                }
+
+                // Update UI
+                updateProfileUI(userData, gamerProfileData);
+                
+                // Hide loading, show content
+                loadingState.style.display = 'none';
+                profileDetails.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading gamer profile:', error);
+                showError();
+            }
+        }
+
+        function updateProfileUI(userData, gamerProfileData) {
+            // Profile Avatar
+            document.getElementById('profileAvatar').src = userData.profileImage || 'images-default-profile.jpg';
+            
+            // Gamer Tag
+            document.getElementById('gamerTagDisplay').textContent = 
+                gamerProfileData?.gamerTag || userData.name || 'Unknown Gamer';
+            
+            // Game Info
+            const gameInfo = [];
+            if (gamerProfileData?.primaryGame) {
+                gameInfo.push(gamerProfileData.primaryGame);
+            }
+            if (gamerProfileData?.platform) {
+                gameInfo.push(gamerProfileData.platform);
+            }
+            document.getElementById('gameInfo').textContent = gameInfo.join(' • ') || 'Not specified';
+            
+            // Badges
+            updateBadges(gamerProfileData);
+            
+            // Quick Stats
+            updateQuickStats(gamerProfileData);
+            
+            // Detailed Stats
+            updateDetailedStats(gamerProfileData);
+            
+            // Preferences
+            updatePreferences(gamerProfileData);
+            
+            // Achievements
+            updateAchievements(gamerProfileData);
+            
+            // Screenshots
+            updateScreenshots(gamerProfileData);
+            
+            // Contact Button
+            setupContactButton(userData.id);
+        }
+
+        function updateBadges(gamerProfileData) {
+            const badgesContainer = document.getElementById('gamerBadges');
+            badgesContainer.innerHTML = '';
+            
+            if (!gamerProfileData) return;
+            
+            const badges = [];
+            
+            // Platform badge
+            if (gamerProfileData.platform) {
+                badges.push({
+                    text: gamerProfileData.platform,
+                    icon: 'fa-gamepad'
+                });
+            }
+            
+            // Play style badge
+            if (gamerProfileData.playStyle) {
+                badges.push({
+                    text: gamerProfileData.playStyle,
+                    icon: 'fa-users'
+                });
+            }
+            
+            // Rank badge
+            if (gamerProfileData.rank) {
+                badges.push({
+                    text: gamerProfileData.rank,
+                    icon: 'fa-trophy'
+                });
+            }
+            
+            // Add badges to container
+            badges.forEach(badge => {
+                const badgeElement = document.createElement('div');
+                badgeElement.className = 'gamer-badge';
+                badgeElement.innerHTML = `
+                    <i class="fas ${badge.icon}"></i>
+                    <span>${badge.text}</span>
+                `;
+                badgesContainer.appendChild(badgeElement);
+            });
+        }
+
+        function updateQuickStats(gamerProfileData) {
+            const quickStatsContainer = document.getElementById('quickStats');
+            quickStatsContainer.innerHTML = '';
+            
+            if (!gamerProfileData) return;
+            
+            const stats = [
+                {
+                    label: 'Level',
+                    value: gamerProfileData.level || 'N/A',
+                    icon: 'fa-level-up-alt'
+                },
+                {
+                    label: 'Rank',
+                    value: gamerProfileData.rank || 'Unranked',
+                    icon: 'fa-chess-queen'
+                },
+                {
+                    label: 'K/D',
+                    value: gamerProfileData.kdRatio || 'N/A',
+                    icon: 'fa-crosshairs'
+                },
+                {
+                    label: 'Win Rate',
+                    value: gamerProfileData.winRate ? `${gamerProfileData.winRate}%` : 'N/A',
+                    icon: 'fa-chart-line'
+                }
+            ];
+            
+            stats.forEach(stat => {
+                const statElement = document.createElement('div');
+                statElement.className = 'stat-item';
+                statElement.innerHTML = `
+                    <div class="stat-value">${stat.value}</div>
+                    <div class="stat-label">${stat.label}</div>
+                `;
+                quickStatsContainer.appendChild(statElement);
+            });
+        }
+
+        function updateDetailedStats(gamerProfileData) {
+            const detailedStatsContainer = document.getElementById('detailedStats');
+            detailedStatsContainer.innerHTML = '';
+            
+            if (!gamerProfileData) return;
+            
+            const stats = [
+                {
+                    label: 'Total Kills',
+                    value: gamerProfileData.totalKills || 0,
+                    max: 10000
+                },
+                {
+                    label: 'Top Kills',
+                    value: gamerProfileData.topKills || 0,
+                    max: 50
+                },
+                {
+                    label: 'Hours Played',
+                    value: gamerProfileData.hoursPlayed || 0,
+                    max: 2000
+                },
+                {
+                    label: 'Win Rate',
+                    value: gamerProfileData.winRate || 0,
+                    max: 100
+                }
+            ];
+            
+            stats.forEach(stat => {
+                const statElement = document.createElement('div');
+                statElement.className = 'stat-card';
+                
+                const percentage = stat.max > 0 ? Math.min((stat.value / stat.max) * 100, 100) : 0;
+                
+                statElement.innerHTML = `
+                    <div class="value">${stat.value}</div>
+                    <div class="label">${stat.label}</div>
+                    <div class="progress">
+                        <div class="progress-bar" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+                detailedStatsContainer.appendChild(statElement);
+            });
+        }
+
+        function updatePreferences(gamerProfileData) {
+            const preferencesContainer = document.getElementById('preferencesInfo');
+            preferencesContainer.innerHTML = '';
+            
+            if (!gamerProfileData) return;
+            
+            let preferencesHTML = '<div style="display: flex; flex-wrap: wrap; gap: 1rem;">';
+            
+            // Play style
+            if (gamerProfileData.playStyle) {
+                preferencesHTML += `
+                    <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius);">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Play Style</div>
+                        <div>${gamerProfileData.playStyle}</div>
+                    </div>
+                `;
+            }
+            
+            // Mic preference
+            if (gamerProfileData.micPreference) {
+                preferencesHTML += `
+                    <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius);">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Mic Preference</div>
+                        <div>${gamerProfileData.micPreference}</div>
+                    </div>
+                `;
+            }
+            
+            // Looking for
+            if (gamerProfileData.lookingFor && gamerProfileData.lookingFor.length > 0) {
+                preferencesHTML += `
+                    <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius); flex: 1; min-width: 200px;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Looking For</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            ${gamerProfileData.lookingFor.map(item => `
+                                <span style="background: rgba(179,0,75,0.2); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.9rem;">
+                                    ${item}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            preferencesHTML += '</div>';
+            preferencesContainer.innerHTML = preferencesHTML;
+        }
+
+        function updateAchievements(gamerProfileData) {
+            const achievementsContainer = document.getElementById('achievementsInfo');
+            
+            if (!gamerProfileData?.achievements) {
+                achievementsContainer.innerHTML = '<p>No achievements listed yet.</p>';
+                return;
+            }
+            
+            achievementsContainer.innerHTML = `
+                <ul class="achievements-list">
+                    ${gamerProfileData.achievements.split('\n').map(achievement => 
+                        achievement.trim() ? `<li>${achievement}</li>` : ''
+                    ).join('')}
+                </ul>
+            `;
+        }
+
+        function updateScreenshots(gamerProfileData) {
+            const screenshotsContainer = document.getElementById('screenshotsInfo');
+            
+            if (!gamerProfileData?.screenshotUrl) {
+                screenshotsContainer.innerHTML = '<p>No screenshots uploaded yet.</p>';
+                return;
+            }
+            
+            screenshotsContainer.innerHTML = `
+                <div class="screenshot-grid">
+                    <div class="screenshot-item">
+                        <img src="${gamerProfileData.screenshotUrl}" alt="Game Screenshot" onclick="openImage('${gamerProfileData.screenshotUrl}')" style="cursor: pointer;">
+                    </div>
+                </div>
+            `;
+        }
+
+        function setupContactButton(gamerId) {
+            contactBtn.addEventListener('click', () => {
+                if (currentUser && currentUser.uid === gamerId) {
+                    alert("You can't message yourself!");
+                    return;
+                }
+                
+                if (currentUser) {
+                    // Redirect to chat with this gamer
+                    window.location.href = `chat.html?id=${gamerId}`;
+                } else {
+                    alert('Please log in to message this gamer');
+                    window.location.href = 'login.html';
+                }
+            });
+        }
+
+        function showError() {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'block';
+        }
+
+        // Open image in full screen
+        window.openImage = function(imageUrl) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.9);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                cursor: pointer;
+            `;
+            
+            modal.innerHTML = `
+                <img src="${imageUrl}" style="max-width: 90%; max-height: 90%; object-fit: contain;">
+                <button style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; font-size: 2rem; cursor: pointer;">
+                    ×
+                </button>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            modal.querySelector('button').addEventListener('click', () => {
+                document.body.removeChild(modal);
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
+        };
+
+        // Copy profile URL
+        document.getElementById('copyProfileUrlBtn')?.addEventListener('click', () => {
+            const profileUrl = window.location.href;
+            navigator.clipboard.writeText(profileUrl).then(() => {
+                alert('Profile URL copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy URL');
+            });
+        });
+
+        // Share profile
+        document.getElementById('shareProfileBtn')?.addEventListener('click', () => {
+            if (navigator.share) {
+                navigator.share({
+                    title: document.getElementById('gamerTagDisplay').textContent + "'s Gamer Profile",
+                    text: 'Check out this gamer profile on WhipRoom!',
+                    url: window.location.href
+                }).catch(err => {
+                    console.error('Share failed:', err);
+                });
+            } else {
+                // Fallback to copying URL
+                document.getElementById('copyProfileUrlBtn').click();
+            }
+        });
+
+        // Initialize
+        let currentUser = null;
+        let db;
+        
+        // Wait for auth and db to be available
+        document.addEventListener('DOMContentLoaded', async () => {
+            // These should be imported from app.js
+            // For now, we'll check if they're available globally
+            if (typeof auth !== 'undefined') {
+                onAuthStateChanged(auth, (user) => {
+                    currentUser = user;
+                });
+            }
+            
+            if (typeof app !== 'undefined') {
+                // Get db from the imported app
+                // This assumes app.js has initialized Firebase
+                db = getFirestore(app);
+            }
+            
+            // Load the profile
+            setTimeout(loadGamerProfile, 1000);
+        });
+    </script>
+</body>
+</html>

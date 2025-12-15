@@ -15,17 +15,15 @@
     
     <style>
         :root {
-            /*  – Dark, Leather, Steel */
-            --primary: #b3004b; /* deep crimson */
+            --primary: #b3004b;
             --primary-dark: #7a0034;
             --primary-light: #e63986;
-
-            --secondary: #8b0000; /* dark red for alerts/badges */
-            --accent: #444; /* metal/steel tone */
+            --secondary: #8b0000;
+            --accent: #444;
             --text-primary: #ffffff;
             --text-secondary: #d1d5db;
             --text-light: #9ca3af;
-            --bg-primary: #0b0b0b; /* deep black */
+            --bg-primary: #0b0b0b;
             --bg-secondary: #141414;
             --bg-card: #1a1a1a;
             --border: #2e2e2e;
@@ -55,7 +53,7 @@
             min-height: 100vh;
         }
 
-        /* Modern Navigation */
+        /* Navigation Styles */
         .navbar {
             background: rgba(255, 255, 255, 0.06);
             backdrop-filter: blur(6px);
@@ -324,7 +322,7 @@
             color: var(--text-secondary);
             font-size: 1rem;
             margin-bottom: 2rem;
-            line-height: 1;.6
+            line-height: 1.6;
         }
 
         /* Form Styles */
@@ -801,7 +799,7 @@
             padding: 0.3rem;
             border: 1px solid var(--border);
             margin-bottom: 1.5rem;
-             width:200px;
+            width: 200px;
         }
 
         .share-link-section {
@@ -822,7 +820,7 @@
             background: var(--bg-primary);
             color: var(--text-primary);
             font-size: 7px;
-            border-radius:5px;
+            border-radius: 5px;
         }
 
         .share-input:focus {
@@ -944,13 +942,12 @@
             justify-content: center;
             gap: 0.5rem;
         }
-          .share-container{
-              min-width:250px;
-              max-width:250px;
-          }
-    
-    
-    
+
+        .share-container {
+            min-width: 250px;
+            max-width: 250px;
+        }
+
         /* Modal Styles */
         .modal {
             display: none;
@@ -1086,6 +1083,186 @@
             cursor: pointer;
         }
 
+        /* Gamer Profile Specific Styles */
+        .profile-preview-container {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
+        .profile-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .profile-preview-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .gamer-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius);
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-card .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .gamer-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(179, 0, 75, 0.2);
+            color: var(--primary-light);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid rgba(179, 0, 75, 0.3);
+        }
+
+        .gamer-screenshot {
+            width: 100%;
+            max-width: 300px;
+            border-radius: var(--radius);
+            margin-top: 1rem;
+            border: 2px solid var(--border);
+        }
+
+        .generate-profile-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            font-size: 1rem;
+        }
+
+        .generate-profile-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .screenshot-upload {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius);
+            border: 2px dashed var(--border);
+        }
+
+        .screenshot-preview {
+            max-width: 300px;
+            max-height: 200px;
+            border-radius: var(--radius);
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .gamer-profile-link {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            align-items: center;
+        }
+
+        .gamer-profile-link input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .link-preview {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-top: 1rem;
+            border: 1px solid var(--border);
+            display: none;
+        }
+
+        .link-preview h4 {
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .link-preview-content {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .link-preview-image {
+            width: 80px;
+            height: 80px;
+            border-radius: var(--radius);
+            object-fit: cover;
+        }
+
+        .link-preview-info {
+            flex: 1;
+        }
+
+        .link-preview-info h5 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-primary);
+        }
+
+        .link-preview-info p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .stats-preview {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .stat-preview-item {
+            background: rgba(179, 0, 75, 0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: var(--primary-light);
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .account-content {
@@ -1130,6 +1307,14 @@
             .nav-toggle {
                 display: flex;
             }
+
+            .profile-preview-content {
+                grid-template-columns: 1fr;
+            }
+
+            .gamer-stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
         }
 
         @media (max-width: 480px) {
@@ -1164,6 +1349,10 @@
             }
 
             .ambassador-tiers {
+                grid-template-columns: 1fr;
+            }
+
+            .gamer-stats-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -1216,7 +1405,7 @@
                         <span>Logout</span>
                     </a>
                 </li>
-                                <li class="nav-item">
+                <li class="nav-item">
                     <a href="groups.html" class="nav-links">
                         <i class="fas fa-users"></i>
                         <span>Groups</span>
@@ -1255,6 +1444,9 @@
                     </button>
                     <button class="menu-item" data-section="posts">
                         <i class="fas fa-graduation-cap"></i> My Resources
+                    </button>
+                    <button class="menu-item" data-section="gamer">
+                        <i class="fas fa-gamepad"></i> Gamer Profile
                     </button>
                     <button class="menu-item" data-section="display">
                         <i class="fas fa-palette"></i> Chat Display
@@ -1421,6 +1613,230 @@
                             <div class="modal-actions">
                                 <button id="cancelDelete" class="btn-secondary">Cancel</button>
                                 <button id="confirmDelete" class="btn-danger">Delete Resource</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gamer Profile Section -->
+                <div class="account-section" id="gamerSection" style="display: none;">
+                    <h2><i class="fas fa-gamepad"></i> Gamer Profile</h2>
+                    <p class="section-description">Showcase your gaming skills and achievements. Share your stats and connect with fellow gamers.</p>
+                    
+                    <!-- Current Gamer Profile Preview -->
+                    <div id="currentGamerProfile" class="profile-preview-container" style="display: none;">
+                        <div class="profile-preview-header">
+                            <h3>Your Current Gamer Profile</h3>
+                            <button id="editGamerProfileBtn" class="btn-secondary">
+                                <i class="fas fa-edit"></i> Edit Profile
+                            </button>
+                        </div>
+                        <div id="gamerProfilePreview" class="profile-preview-content">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Create/Update Gamer Profile -->
+                    <div class="gamer-profile-form-container" id="gamerProfileFormContainer">
+                        <h3><i class="fas fa-edit"></i> Gamer Profile Details</h3>
+                        
+                        <form id="gamerProfileForm">
+                            <!-- Primary Gaming Info -->
+                            <div class="form-group">
+                                <label for="gamerTag">Gamer Tag / Username *</label>
+                                <input type="text" id="gamerTag" required placeholder="e.g., ShadowSlayer94">
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="primaryGame">Primary Game</label>
+                                    <select id="primaryGame">
+                                        <option value="">Select game</option>
+                                        <option value="call-of-duty">Call of Duty</option>
+                                        <option value="fortnite">Fortnite</option>
+                                        <option value="valorant">Valorant</option>
+                                        <option value="apex-legends">Apex Legends</option>
+                                        <option value="league-of-legends">League of Legends</option>
+                                        <option value="dota-2">Dota 2</option>
+                                        <option value="cs-go">CS:GO</option>
+                                        <option value="overwatch">Overwatch</option>
+                                        <option value="rainbow-six">Rainbow Six Siege</option>
+                                        <option value="pubg">PUBG</option>
+                                        <option value="minecraft">Minecraft</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="platform">Primary Platform</label>
+                                    <select id="platform">
+                                        <option value="">Select platform</option>
+                                        <option value="pc">PC</option>
+                                        <option value="playstation">PlayStation</option>
+                                        <option value="xbox">Xbox</option>
+                                        <option value="nintendo">Nintendo</option>
+                                        <option value="mobile">Mobile</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Gaming Stats -->
+                            <div class="stats-section">
+                                <h4><i class="fas fa-chart-line"></i> Gaming Statistics</h4>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="rank">Rank / Tier</label>
+                                        <input type="text" id="rank" placeholder="e.g., Diamond III, Grandmaster, Global Elite">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="level">Player Level</label>
+                                        <input type="number" id="level" min="1" placeholder="e.g., 250">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="kdRatio">K/D Ratio</label>
+                                        <input type="number" id="kdRatio" step="0.01" placeholder="e.g., 2.5">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="winRate">Win Rate %</label>
+                                        <input type="number" id="winRate" min="0" max="100" placeholder="e.g., 68">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="totalKills">Total Kills</label>
+                                        <input type="number" id="totalKills" min="0" placeholder="e.g., 15000">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="topKills">Top Kills in Match</label>
+                                        <input type="number" id="topKills" min="0" placeholder="e.g., 28">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Gaming Preferences -->
+                            <div class="preferences-section">
+                                <h4><i class="fas fa-sliders-h"></i> Gaming Preferences</h4>
+                                
+                                <div class="form-group">
+                                    <label for="playStyle">Preferred Play Style</label>
+                                    <select id="playStyle">
+                                        <option value="">Select style</option>
+                                        <option value="competitive">Competitive</option>
+                                        <option value="casual">Casual</option>
+                                        <option value="ranked">Ranked</option>
+                                        <option value="tournament">Tournament</option>
+                                        <option value="fun">Just for Fun</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="micPreference">Microphone Preference</label>
+                                    <select id="micPreference">
+                                        <option value="">Select preference</option>
+                                        <option value="mic-on">Mic Always On</option>
+                                        <option value="mic-optional">Mic Optional</option>
+                                        <option value="mic-strategic">Mic for Strategy Only</option>
+                                        <option value="no-mic">No Mic</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Looking For</label>
+                                    <div class="checkbox-group" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
+                                        <label style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" id="lookingTeammates" value="teammates">
+                                            <span>Teammates</span>
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" id="lookingRanked" value="ranked">
+                                            <span>Ranked Players</span>
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" id="lookingCasual" value="casual">
+                                            <span>Casual Players</span>
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" id="lookingTournament" value="tournament">
+                                            <span>Tournament Teams</span>
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" id="lookingFriends" value="friends">
+                                            <span>Gaming Friends</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Gaming Achievements -->
+                            <div class="achievements-section">
+                                <h4><i class="fas fa-trophy"></i> Gaming Achievements</h4>
+                                
+                                <div class="form-group">
+                                    <label for="achievements">Notable Achievements</label>
+                                    <textarea id="achievements" rows="3" placeholder="List your notable gaming achievements, tournaments won, records, etc."></textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="hoursPlayed">Total Hours Played</label>
+                                    <input type="number" id="hoursPlayed" min="0" placeholder="e.g., 1500">
+                                </div>
+                            </div>
+                            
+                            <!-- Screenshot Upload -->
+                            <div class="screenshot-upload">
+                                <h4><i class="fas fa-camera"></i> Profile Screenshot</h4>
+                                <p class="section-description">Upload a screenshot of your gaming profile/stats for verification and display.</p>
+                                
+                                <input type="file" id="gamerScreenshot" accept="image/*" style="display: none;">
+                                <label for="gamerScreenshot" class="upload-btn">
+                                    <i class="fas fa-upload"></i> Upload Screenshot
+                                </label>
+                                
+                                <div id="screenshotPreviewContainer" style="display: none;">
+                                    <img id="screenshotPreview" class="screenshot-preview" alt="Screenshot Preview">
+                                    <button type="button" id="removeScreenshot" class="btn-secondary" style="margin-top: 0.5rem;">
+                                        <i class="fas fa-trash"></i> Remove Screenshot
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Submit Button -->
+                            <button type="submit" class="btn-primary" style="margin-top: 2rem;">
+                                <i class="fas fa-save"></i> Save Gamer Profile
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Generate Public Profile -->
+                    <div class="generate-profile-section" id="generateProfileSection" style="display: none;">
+                        <h3><i class="fas fa-share-alt"></i> Generate Public Profile</h3>
+                        <p class="section-description">Create a public link to share your gamer profile with others.</p>
+                        
+                        <button id="generateProfileBtn" class="generate-profile-btn">
+                            <i class="fas fa-magic"></i> Generate Public Profile Link
+                        </button>
+                        
+                        <!-- Profile Link Display -->
+                        <div id="profileLinkContainer" class="gamer-profile-link" style="display: none;">
+                            <input type="text" id="gamerProfileLink" readonly>
+                            <button id="copyProfileLinkBtn" class="btn-primary">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                        </div>
+                        
+                        <!-- Link Preview -->
+                        <div id="linkPreview" class="link-preview">
+                            <h4>Link Preview</h4>
+                            <div id="linkPreviewContent" class="link-preview-content">
+                                <!-- Preview will be populated here -->
                             </div>
                         </div>
                     </div>
@@ -1806,7 +2222,38 @@
             }
         });
 
+        // Gamer Profile Screenshot Upload
+        document.getElementById('gamerScreenshot').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('screenshotPreview').src = e.target.result;
+                    document.getElementById('screenshotPreviewContainer').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
 
+        // Remove Screenshot
+        document.getElementById('removeScreenshot').addEventListener('click', function() {
+            document.getElementById('screenshotPreview').src = '';
+            document.getElementById('screenshotPreviewContainer').style.display = 'none';
+            document.getElementById('gamerScreenshot').value = '';
+        });
+
+        // Copy Profile Link
+        document.getElementById('copyProfileLinkBtn')?.addEventListener('click', function() {
+            const profileLink = document.getElementById('gamerProfileLink');
+            profileLink.select();
+            profileLink.setSelectionRange(0, 99999);
+            
+            try {
+                navigator.clipboard.writeText(profileLink.value);
+                alert('Profile link copied to clipboard!');
+            } catch (err) {
+                alert('Failed to copy link');
+            }
         });
     </script>
 
@@ -1814,11 +2261,13 @@
     <script type="module" src="call.js"></script>
     <script type="module" src="notification.js"></script>
     <script type="module" src="app.js"></script>
+    
     <script type="module" src="chat.js"></script>
     <script type="module" src="pagination.js"></script>
     <script type="module" src="creative.js"></script>
     <script type="module" src="form.js"></script>
     <script src="location.js"></script>
     <script type="module" src="social.js"></script>
+    <script type="module" src="games.js"></script>
 </body>
 </html>
