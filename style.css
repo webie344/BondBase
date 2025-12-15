@@ -1038,14 +1038,10 @@ img {
     gap: 0.25rem;
     transition: color 0.2s ease;
     padding: 0.5rem;
-    border-radius: var(--radius);
+    
     font-weight: 500;
 }
 
-.nav-links:hover {
-    color: var(--primary-light);
-    background-color: rgba(255, 255, 255, 0.02);
-}
 
 .nav-links i {
     font-size: 1.25rem;
@@ -2207,25 +2203,7 @@ body.account-page .account-container {
         z-index: 999;
     }
     
-    .nav-menu.active {
-        left: 0;
-    }
-    
-    .nav-toggle {
-        display: flex;
-    }
-    
-    .nav-toggle.active .bar:nth-child(2) {
-        opacity: 0;
-    }
-    
-    .nav-toggle.active .bar:nth-child(1) {
-        transform: translateY(8px) rotate(45deg);
-    }
-    
-    .nav-toggle.active .bar:nth-child(3) {
-        transform: translateY(-8px) rotate(-45deg);
-    }
+
     
     .hero h1 {
         font-size: 2rem;
@@ -2957,6 +2935,6 @@ textarea:focus {
 
 /* Focus outline for accessibility */
 *:focus {
-    outline: 2px solid var(--primary);
+    
     outline-offset: 2px;
 }
