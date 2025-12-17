@@ -1,4 +1,4 @@
-// games.js - Independent Gamer Profile Management System
+// games.js - Complete Gamer Profile Management System
 // Firebase configuration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
@@ -20,7 +20,7 @@ import {
     deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Firebase configuration (same as app.js)
+// Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
     authDomain: "dating-connect.firebaseapp.com",
@@ -30,7 +30,7 @@ const firebaseConfig = {
     appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
 };
 
-// Initialize Firebase (independent initialization)
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -53,13 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initGamerSystem() {
     try {
-        console.log('Initializing independent gamer system...');
+        console.log('Initializing gamer system...');
         
         // Set up auth state listener
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                console.log('User authenticated in games.js:', user.uid);
+                console.log('User authenticated:', user.uid);
                 
                 // Get current profile ID from URL (for profile.html)
                 const urlParams = new URLSearchParams(window.location.search);
@@ -68,7 +68,7 @@ async function initGamerSystem() {
                 // Check which page we're on
                 const currentPage = window.location.pathname.split('/').pop().split('.')[0];
                 
-                console.log('Initializing gamer system on page:', currentPage, 'User:', currentUser?.uid, 'Profile ID:', currentProfileId);
+                console.log('Initializing on page:', currentPage);
                 
                 switch(currentPage) {
                     case 'account':
@@ -85,7 +85,7 @@ async function initGamerSystem() {
                 }
             } else {
                 currentUser = null;
-                console.log('No user logged in for games.js');
+                console.log('No user logged in');
                 
                 // For gamersprofile page, we still need to load public profile
                 const currentPage = window.location.pathname.split('/').pop().split('.')[0];
@@ -103,66 +103,26 @@ async function initGamerSystem() {
 // ========== ACCOUNT PAGE FUNCTIONS ==========
 async function initAccountPageGamerProfile() {
     if (!db) {
-        console.log('Waiting for db...');
         setTimeout(initAccountPageGamerProfile, 500);
         return;
     }
     
     // Wait for user to be loaded
     if (!currentUser) {
-        console.log('Waiting for user authentication...');
         setTimeout(initAccountPageGamerProfile, 500);
         return;
     }
     
-    console.log('Initializing account page gamer profile for user:', currentUser.uid);
+    console.log('Initializing account page for user:', currentUser.uid);
     
     // Wait for DOM to be ready
     setTimeout(async () => {
         try {
-            // Get DOM elements
-            const gamerProfileForm = document.getElementById('gamerProfileForm');
-            const generateProfileBtn = document.getElementById('generateProfileBtn');
-            const gamerProfileLink = document.getElementById('gamerProfileLink');
-            const copyProfileLinkBtn = document.getElementById('copyProfileLinkBtn');
-            const gamerProfilePreview = document.getElementById('gamerProfilePreview');
-            const currentGamerProfile = document.getElementById('currentGamerProfile');
-            const editGamerProfileBtn = document.getElementById('editGamerProfileBtn');
-            const gamerProfileFormContainer = document.getElementById('gamerProfileFormContainer');
-            const generateProfileSection = document.getElementById('generateProfileSection');
-            const linkPreview = document.getElementById('linkPreview');
-            const screenshotInput = document.getElementById('gamerScreenshot');
-            const screenshotPreview = document.getElementById('screenshotPreview');
-            const screenshotPreviewContainer = document.getElementById('screenshotPreviewContainer');
-            const removeScreenshotBtn = document.getElementById('removeScreenshot');
+            // Setup event listeners
+            setupAccountPageListeners();
             
             // Load existing gamer profile
             await loadGamerProfile(currentUser.uid);
-            
-            // Setup event listeners
-            if (gamerProfileForm) {
-                gamerProfileForm.addEventListener('submit', handleGamerProfileSubmit);
-            }
-            
-            if (generateProfileBtn) {
-                generateProfileBtn.addEventListener('click', generatePublicProfile);
-            }
-            
-            if (copyProfileLinkBtn) {
-                copyProfileLinkBtn.addEventListener('click', copyProfileLink);
-            }
-            
-            if (editGamerProfileBtn) {
-                editGamerProfileBtn.addEventListener('click', editGamerProfile);
-            }
-            
-            if (screenshotInput) {
-                screenshotInput.addEventListener('change', handleScreenshotUpload);
-            }
-            
-            if (removeScreenshotBtn) {
-                removeScreenshotBtn.addEventListener('click', removeScreenshot);
-            }
             
             console.log('Account page gamer profile initialized');
             
@@ -172,7 +132,39 @@ async function initAccountPageGamerProfile() {
     }, 1000);
 }
 
-// Load existing gamer profile
+function setupAccountPageListeners() {
+    const gamerProfileForm = document.getElementById('gamerProfileForm');
+    const generateProfileBtn = document.getElementById('generateProfileBtn');
+    const copyProfileLinkBtn = document.getElementById('copyProfileLinkBtn');
+    const editGamerProfileBtn = document.getElementById('editGamerProfileBtn');
+    const screenshotInput = document.getElementById('gamerScreenshot');
+    const removeScreenshotBtn = document.getElementById('removeScreenshot');
+    
+    if (gamerProfileForm) {
+        gamerProfileForm.addEventListener('submit', handleGamerProfileSubmit);
+    }
+    
+    if (generateProfileBtn) {
+        generateProfileBtn.addEventListener('click', generatePublicProfile);
+    }
+    
+    if (copyProfileLinkBtn) {
+        copyProfileLinkBtn.addEventListener('click', copyProfileLink);
+    }
+    
+    if (editGamerProfileBtn) {
+        editGamerProfileBtn.addEventListener('click', editGamerProfile);
+    }
+    
+    if (screenshotInput) {
+        screenshotInput.addEventListener('change', handleScreenshotUpload);
+    }
+    
+    if (removeScreenshotBtn) {
+        removeScreenshotBtn.addEventListener('click', removeScreenshot);
+    }
+}
+
 async function loadGamerProfile(userId) {
     try {
         console.log('Loading gamer profile for user:', userId);
@@ -183,8 +175,6 @@ async function loadGamerProfile(userId) {
         
         if (!gamerProfileSnap.empty) {
             const profileData = gamerProfileSnap.docs[0].data();
-            const profileId = gamerProfileSnap.docs[0].id;
-            
             console.log('Found existing gamer profile:', profileData.gamerTag);
             
             // Display current profile
@@ -227,10 +217,7 @@ function displayCurrentProfile(profileData) {
     const gamerProfilePreview = document.getElementById('gamerProfilePreview');
     const currentGamerProfile = document.getElementById('currentGamerProfile');
     
-    if (!gamerProfilePreview || !currentGamerProfile) {
-        console.log('Profile preview elements not found');
-        return;
-    }
+    if (!gamerProfilePreview || !currentGamerProfile) return;
     
     let html = `
         <div class="profile-info">
@@ -288,10 +275,7 @@ function displayCurrentProfile(profileData) {
 
 function populateForm(profileData) {
     const gamerProfileForm = document.getElementById('gamerProfileForm');
-    if (!gamerProfileForm) {
-        console.log('Gamer profile form not found');
-        return;
-    }
+    if (!gamerProfileForm) return;
     
     // Populate form fields
     const fields = {
@@ -540,7 +524,6 @@ async function generatePublicProfile() {
 }
 
 function generateProfileId() {
-    // Generate a unique ID
     return 'gamer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
@@ -607,7 +590,6 @@ function copyProfileLink() {
 // ========== PROFILE PAGE FUNCTIONS ==========
 async function initProfilePageGamerDisplay() {
     if (!db) {
-        console.log('Waiting for db...');
         setTimeout(initProfilePageGamerDisplay, 500);
         return;
     }
@@ -745,7 +727,6 @@ async function loadProfileGamerInfo(profileId) {
 // ========== GAMERSPROFILE PAGE FUNCTIONS ==========
 async function initGamersProfilePage() {
     if (!db) {
-        console.log('Waiting for db...');
         setTimeout(initGamersProfilePage, 500);
         return;
     }
@@ -844,6 +825,12 @@ function updateGamersProfileUI(userData, gamerProfileData) {
     
     // Screenshots
     updateProfileScreenshots(gamerProfileData);
+    
+    // Hide loading, show content
+    const loadingState = document.getElementById('loadingState');
+    const profileDetails = document.getElementById('profileDetails');
+    if (loadingState) loadingState.style.display = 'none';
+    if (profileDetails) profileDetails.style.display = 'block';
 }
 
 function updateProfileBadges(gamerProfileData) {
@@ -857,27 +844,30 @@ function updateProfileBadges(gamerProfileData) {
     if (gamerProfileData.platform) {
         badges.push({
             text: gamerProfileData.platform,
-            icon: 'fa-gamepad'
+            icon: 'fa-gamepad',
+            class: 'platform-badge'
         });
     }
     
     if (gamerProfileData.playStyle) {
         badges.push({
             text: gamerProfileData.playStyle,
-            icon: 'fa-users'
+            icon: 'fa-users',
+            class: 'style-badge'
         });
     }
     
     if (gamerProfileData.rank) {
         badges.push({
             text: gamerProfileData.rank,
-            icon: 'fa-trophy'
+            icon: 'fa-trophy',
+            class: 'rank-badge'
         });
     }
     
     badges.forEach(badge => {
         const badgeElement = document.createElement('div');
-        badgeElement.className = 'gamer-badge';
+        badgeElement.className = `gamer-badge ${badge.class}`;
         badgeElement.innerHTML = `
             <i class="fas ${badge.icon}"></i>
             <span>${badge.text}</span>
@@ -896,22 +886,26 @@ function updateProfileQuickStats(gamerProfileData) {
         {
             label: 'Level',
             value: gamerProfileData.level || 'N/A',
-            icon: 'fa-level-up-alt'
+            icon: 'fa-level-up-alt',
+            color: '#e63986'
         },
         {
             label: 'Rank',
             value: gamerProfileData.rank || 'Unranked',
-            icon: 'fa-chess-queen'
+            icon: 'fa-chess-queen',
+            color: '#FFD700'
         },
         {
             label: 'K/D',
             value: gamerProfileData.kdRatio || 'N/A',
-            icon: 'fa-crosshairs'
+            icon: 'fa-crosshairs',
+            color: '#00ff88'
         },
         {
             label: 'Win Rate',
             value: gamerProfileData.winRate ? `${gamerProfileData.winRate}%` : 'N/A',
-            icon: 'fa-chart-line'
+            icon: 'fa-chart-line',
+            color: '#00a8ff'
         }
     ];
     
@@ -919,8 +913,13 @@ function updateProfileQuickStats(gamerProfileData) {
         const statElement = document.createElement('div');
         statElement.className = 'stat-item';
         statElement.innerHTML = `
-            <div class="stat-value">${stat.value}</div>
-            <div class="stat-label">${stat.label}</div>
+            <div class="stat-icon" style="color: ${stat.color};">
+                <i class="fas ${stat.icon}"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">${stat.value}</div>
+                <div class="stat-label">${stat.label}</div>
+            </div>
         `;
         quickStats.appendChild(statElement);
     });
@@ -936,22 +935,26 @@ function updateProfileDetailedStats(gamerProfileData) {
         {
             label: 'Total Kills',
             value: gamerProfileData.totalKills || 0,
-            max: 10000
+            max: 10000,
+            icon: 'fa-skull'
         },
         {
             label: 'Top Kills',
             value: gamerProfileData.topKills || 0,
-            max: 50
+            max: 50,
+            icon: 'fa-crown'
         },
         {
             label: 'Hours Played',
             value: gamerProfileData.hoursPlayed || 0,
-            max: 2000
+            max: 2000,
+            icon: 'fa-clock'
         },
         {
             label: 'Win Rate',
             value: gamerProfileData.winRate || 0,
-            max: 100
+            max: 100,
+            icon: 'fa-chart-line'
         }
     ];
     
@@ -962,10 +965,15 @@ function updateProfileDetailedStats(gamerProfileData) {
         const percentage = stat.max > 0 ? Math.min((stat.value / stat.max) * 100, 100) : 0;
         
         statElement.innerHTML = `
-            <div class="value">${stat.value}</div>
-            <div class="label">${stat.label}</div>
-            <div class="progress">
-                <div class="progress-bar" style="width: ${percentage}%"></div>
+            <div class="stat-card-header">
+                <i class="fas ${stat.icon}"></i>
+                <span>${stat.label}</span>
+            </div>
+            <div class="stat-card-content">
+                <div class="value">${stat.value}</div>
+                <div class="progress">
+                    <div class="progress-bar" style="width: ${percentage}%"></div>
+                </div>
             </div>
         `;
         detailedStats.appendChild(statElement);
@@ -980,36 +988,49 @@ function updateProfilePreferences(gamerProfileData) {
     
     if (!gamerProfileData) return;
     
-    let preferencesHTML = '<div style="display: flex; flex-wrap: wrap; gap: 1rem;">';
+    let preferencesHTML = '<div class="preferences-grid">';
     
     if (gamerProfileData.playStyle) {
         preferencesHTML += `
-            <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius);">
-                <div style="font-weight: 600; margin-bottom: 0.5rem;">Play Style</div>
-                <div>${gamerProfileData.playStyle}</div>
+            <div class="preference-card">
+                <div class="preference-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="preference-content">
+                    <div class="preference-label">Play Style</div>
+                    <div class="preference-value">${gamerProfileData.playStyle}</div>
+                </div>
             </div>
         `;
     }
     
     if (gamerProfileData.micPreference) {
         preferencesHTML += `
-            <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius);">
-                <div style="font-weight: 600; margin-bottom: 0.5rem;">Mic Preference</div>
-                <div>${gamerProfileData.micPreference}</div>
+            <div class="preference-card">
+                <div class="preference-icon">
+                    <i class="fas fa-microphone"></i>
+                </div>
+                <div class="preference-content">
+                    <div class="preference-label">Mic Preference</div>
+                    <div class="preference-value">${gamerProfileData.micPreference}</div>
+                </div>
             </div>
         `;
     }
     
     if (gamerProfileData.lookingFor && gamerProfileData.lookingFor.length > 0) {
         preferencesHTML += `
-            <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius); flex: 1; min-width: 200px;">
-                <div style="font-weight: 600; margin-bottom: 0.5rem;">Looking For</div>
-                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                    ${gamerProfileData.lookingFor.map(item => `
-                        <span style="background: rgba(179,0,75,0.2); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.9rem;">
-                            ${item}
-                        </span>
-                    `).join('')}
+            <div class="preference-card">
+                <div class="preference-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="preference-content">
+                    <div class="preference-label">Looking For</div>
+                    <div class="preference-tags">
+                        ${gamerProfileData.lookingFor.map(item => `
+                            <span class="preference-tag">${item}</span>
+                        `).join('')}
+                    </div>
                 </div>
             </div>
         `;
@@ -1024,16 +1045,24 @@ function updateProfileAchievements(gamerProfileData) {
     if (!achievementsInfo) return;
     
     if (!gamerProfileData?.achievements) {
-        achievementsInfo.innerHTML = '<p>No achievements listed yet.</p>';
+        achievementsInfo.innerHTML = '<div class="empty-state">No achievements listed yet.</div>';
         return;
     }
     
     achievementsInfo.innerHTML = `
-        <ul class="achievements-list">
-            ${gamerProfileData.achievements.split('\n').map(achievement => 
-                achievement.trim() ? `<li>${achievement}</li>` : ''
-            ).join('')}
-        </ul>
+        <div class="achievements-grid">
+            ${gamerProfileData.achievements.split('\n').filter(a => a.trim()).map((achievement, index) => `
+                <div class="achievement-card">
+                    <div class="achievement-icon">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+                    <div class="achievement-content">
+                        <div class="achievement-text">${achievement.trim()}</div>
+                        <div class="achievement-date">Achievement #${index + 1}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
     `;
 }
 
@@ -1042,14 +1071,18 @@ function updateProfileScreenshots(gamerProfileData) {
     if (!screenshotsInfo) return;
     
     if (!gamerProfileData?.screenshotUrl) {
-        screenshotsInfo.innerHTML = '<p>No screenshots uploaded yet.</p>';
+        screenshotsInfo.innerHTML = '<div class="empty-state">No screenshots uploaded yet.</div>';
         return;
     }
     
     screenshotsInfo.innerHTML = `
         <div class="screenshot-grid">
             <div class="screenshot-item">
-                <img src="${gamerProfileData.screenshotUrl}" alt="Game Screenshot" onclick="openImageInFullScreen('${gamerProfileData.screenshotUrl}')" style="cursor: pointer;">
+                <img src="${gamerProfileData.screenshotUrl}" alt="Game Screenshot" 
+                     onclick="openImageInFullScreen('${gamerProfileData.screenshotUrl}')">
+                <div class="screenshot-overlay">
+                    <i class="fas fa-search-plus"></i>
+                </div>
             </div>
         </div>
     `;
@@ -1098,36 +1131,93 @@ function showError(message) {
 // ========== UTILITY FUNCTIONS ==========
 function openImageInFullScreen(imageUrl) {
     const modal = document.createElement('div');
+    modal.className = 'image-modal';
     modal.style.cssText = `
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0,0,0,0.9);
+        background: rgba(0,0,0,0.95);
         display: flex;
         align-items: center;
         justify-content: center;
         z-index: 10000;
-        cursor: pointer;
+        animation: fadeIn 0.3s ease;
     `;
     
     modal.innerHTML = `
-        <img src="${imageUrl}" style="max-width: 90%; max-height: 90%; object-fit: contain;">
-        <button style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; font-size: 2rem; cursor: pointer;">
-            ×
-        </button>
+        <div class="modal-content">
+            <img src="${imageUrl}" alt="Full Screen" class="modal-image">
+            <button class="modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
     `;
     
     document.body.appendChild(modal);
     
-    modal.querySelector('button').addEventListener('click', () => {
-        document.body.removeChild(modal);
+    // Add modal styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .modal-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+        }
+        .modal-image {
+            max-width: 100%;
+            max-height: 90vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .modal-close {
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        .modal-close:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    modal.querySelector('.modal-close').addEventListener('click', () => {
+        modal.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+        }, 300);
     });
     
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
-            document.body.removeChild(modal);
+            modal.style.animation = 'fadeOut 0.3s ease';
+            setTimeout(() => {
+                if (modal.parentNode) {
+                    modal.parentNode.removeChild(modal);
+                }
+            }, 300);
         }
     });
 }
@@ -1138,7 +1228,7 @@ function showNotification(message, type = 'info') {
     existingNotifications.forEach(notification => notification.remove());
     
     const notification = document.createElement('div');
-    notification.className = 'custom-notification ' + type;
+    notification.className = `custom-notification ${type}`;
     notification.style.cssText = `
         position: fixed;
         top: 20px;
@@ -1153,6 +1243,8 @@ function showNotification(message, type = 'info') {
         display: flex;
         align-items: center;
         gap: 10px;
+        max-width: 400px;
+        backdrop-filter: blur(10px);
     `;
     
     notification.innerHTML = `
@@ -1191,3 +1283,4 @@ function showNotification(message, type = 'info') {
 
 // Make functions available globally
 window.openImageInFullScreen = openImageInFullScreen;
+window.showNotification = showNotification;
