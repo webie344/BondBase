@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gamer Profile - WhipRoom</title>
+    <title>Gamer Profile - Bondbase</title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,10 +31,10 @@
             --bg-light: #1b1b1b;
             --accent-color: #b3004b;
             --accent-dark: #7a0034;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.7);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.7);
-            --radius: 12px;
-            --radius-lg: 16px;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.5);
+            --radius: 16px;
+            --radius-lg: 24px;
         }
 
         * {
@@ -45,23 +45,25 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--bg-secondary);
+            background: linear-gradient(135deg, #0b0b0b 0%, #141414 100%);
             color: var(--text-primary);
-            line-height: 1.5;
+            line-height: 1.6;
             min-height: 100vh;
+            overflow-x: hidden;
         }
 
         /* Navigation */
         .navbar {
-            background: rgba(255, 255, 255, 0.06);
-            backdrop-filter: blur(6px);
-            position: sticky;
+            background: rgba(20, 20, 20, 0.9);
+            backdrop-filter: blur(10px);
+            position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 1000;
-            padding: 0.75rem 0;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            padding: 1rem 0;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid var(--border);
         }
 
         .navbar-container {
@@ -70,107 +72,158 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 1.5rem;
+            padding: 0 2rem;
         }
 
         .logo {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: 700;
             color: var(--primary-light);
             text-decoration: none;
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .logo:hover {
+            color: white;
+            transform: scale(1.05);
         }
 
         .logo::before {
-            content: "🔗";
+            content: "🎮";
+            font-size: 2rem;
         }
 
         /* Profile Container */
         .profile-container {
             max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 1.5rem;
+            margin: 4rem auto 1rem;
+            padding: 0 2rem;
+            animation: fadeIn 0.8s ease;
         }
 
-        .profile-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-secondary);
-            text-decoration: none;
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-            transition: all 0.2s ease;
-        }
-
-        .back-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--primary-light);
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* Profile Content */
         .profile-content {
             display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 2rem;
+            grid-template-columns: 380px 1fr;
+            gap: 1.5rem;
+            animation: slideIn 0.8s ease 0.2s both;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
         }
 
         /* Profile Card */
         .gamer-profile-card {
-            background: var(--bg-card);
+            background: linear-gradient(145deg, #1a1a1a 0%, #222222 100%);
             border-radius: var(--radius-lg);
             padding: 2rem;
-            box-shadow: var(--shadow);
-            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             position: sticky;
             top: 100px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            height: fit-content;
+        }
+
+        .gamer-profile-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 50px rgba(179, 0, 75, 0.2);
         }
 
         .profile-avatar {
             text-align: center;
             margin-bottom: 1.5rem;
+            position: relative;
         }
 
         .profile-avatar img {
-            width: 150px;
-            height: 150px;
+            width: 140px;
+            height: 140px;
             border-radius: 50%;
             object-fit: cover;
-            border: 4px solid var(--primary);
-            margin-bottom: 1rem;
+            border: 6px solid var(--primary);
+            box-shadow: 0 10px 30px rgba(179, 0, 75, 0.3);
+            transition: all 0.3s ease;
+            animation: pulse 2s infinite;
+        }
+
+        .profile-avatar img:hover {
+            transform: scale(1.05);
+            border-color: var(--primary-light);
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 10px 30px rgba(179, 0, 75, 0.3); }
+            50% { box-shadow: 0 10px 40px rgba(179, 0, 75, 0.5); }
+            100% { box-shadow: 0 10px 30px rgba(179, 0, 75, 0.3); }
+        }
+
+        .profile-avatar::after {
+            content: '🎮';
+            position: absolute;
+            bottom: 10px;
+            right: calc(50% - 70px + 110px);
+            background: var(--primary);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            border: 4px solid var(--bg-card);
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
         }
 
         .gamer-tag {
             font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--text-primary);
+            font-weight: 800;
+            color: white;
             margin-bottom: 0.5rem;
+            text-align: center;
+            background: linear-gradient(45deg, var(--primary-light), #ff6b9d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .game-platform {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            justify-content: center;
+            gap: 1rem;
             color: var(--text-secondary);
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+        }
+
+        .game-platform i {
+            color: var(--primary-light);
         }
 
         .gamer-badges {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.5rem;
+            gap: 0.75rem;
             margin-bottom: 1.5rem;
+            justify-content: center;
         }
 
         .gamer-badge {
@@ -178,11 +231,36 @@
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem 1rem;
-            background: rgba(179, 0, 75, 0.2);
-            color: var(--primary-light);
-            border-radius: 20px;
+            border-radius: 50px;
             font-size: 0.9rem;
-            border: 1px solid rgba(179, 0, 75, 0.3);
+            font-weight: 600;
+            transition: all 0.3s ease;
+            animation: slideUp 0.5s ease;
+        }
+
+        .gamer-badge.platform-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .gamer-badge.style-badge {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .gamer-badge.rank-badge {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #333;
+        }
+
+        .gamer-badge:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .profile-stats {
@@ -196,25 +274,57 @@
             background: rgba(255, 255, 255, 0.05);
             border-radius: var(--radius);
             padding: 1rem;
-            text-align: center;
             border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: fadeInUp 0.6s ease;
+        }
+
+        .stat-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-3px);
+            border-color: var(--primary-light);
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stat-icon {
+            font-size: 1.5rem;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .stat-content {
+            flex: 1;
         }
 
         .stat-value {
             font-size: 1.5rem;
             font-weight: 700;
-            color: var(--primary-light);
+            color: white;
             margin-bottom: 0.25rem;
         }
 
         .stat-label {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .contact-btn {
             width: 100%;
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
             border: none;
             padding: 1rem;
@@ -227,40 +337,65 @@
             justify-content: center;
             gap: 0.75rem;
             font-size: 1rem;
+            position: relative;
+            overflow: hidden;
+            animation: pulseBtn 2s infinite;
         }
 
         .contact-btn:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(179, 0, 75, 0.4);
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+        }
+
+        @keyframes pulseBtn {
+            0% { box-shadow: 0 5px 15px rgba(179, 0, 75, 0.3); }
+            50% { box-shadow: 0 5px 25px rgba(179, 0, 75, 0.5); }
+            100% { box-shadow: 0 5px 15px rgba(179, 0, 75, 0.3); }
         }
 
         /* Profile Details */
         .profile-details {
-            background: var(--bg-card);
+            background: linear-gradient(145deg, #1a1a1a 0%, #222222 100%);
             border-radius: var(--radius-lg);
             padding: 2rem;
-            box-shadow: var(--shadow);
-            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            animation: slideInRight 0.8s ease 0.4s both;
+        }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
         }
 
         .details-section {
             margin-bottom: 2.5rem;
+            animation: fadeIn 0.6s ease;
         }
 
         .details-section h3 {
             font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 1rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid rgba(179, 0, 75, 0.3);
         }
 
+        .details-section h3 i {
+            color: var(--primary-light);
+            font-size: 1.25rem;
+        }
+
+        /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
             margin-top: 1rem;
         }
 
@@ -269,127 +404,470 @@
             border-radius: var(--radius);
             padding: 1.5rem;
             border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary-light);
+            box-shadow: 0 10px 30px rgba(179, 0, 75, 0.2);
+        }
+
+        .stat-card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card-header i {
+            font-size: 1.25rem;
+            color: var(--primary-light);
+        }
+
+        .stat-card-header span {
+            font-weight: 600;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .stat-card-content {
+            position: relative;
         }
 
         .stat-card .value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary-light);
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-card .label {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
+            font-size: 2rem;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(45deg, var(--primary-light), #ff6b9d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .stat-card .progress {
-            height: 6px;
+            height: 8px;
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
+            border-radius: 4px;
             overflow: hidden;
-            margin-top: 0.5rem;
+            margin-top: 1rem;
         }
 
         .stat-card .progress-bar {
             height: 100%;
-            background: var(--primary);
-            border-radius: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            border-radius: 4px;
+            position: relative;
+            animation: progressAnimation 1.5s ease;
         }
 
-        .achievements-list {
-            list-style: none;
+        @keyframes progressAnimation {
+            from { width: 0; }
         }
 
-        .achievements-list li {
-            padding: 1rem;
-            background: rgba(255, 255, 255, 0.03);
+        /* Preferences */
+        .preferences-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .preference-card {
+            background: rgba(255, 255, 255, 0.05);
             border-radius: var(--radius);
-            margin-bottom: 0.75rem;
-            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 1.25rem;
         }
 
-        .screenshot-section {
-            margin-top: 2rem;
+        .preference-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--primary-light);
         }
 
+        .preference-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(179, 0, 75, 0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            color: var(--primary-light);
+        }
+
+        .preference-content {
+            flex: 1;
+        }
+
+        .preference-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .preference-value {
+            font-size: 1.1rem;
+            color: white;
+            font-weight: 500;
+        }
+
+        .preference-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .preference-tag {
+            background: rgba(179, 0, 75, 0.2);
+            color: var(--primary-light);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .preference-tag:hover {
+            background: rgba(179, 0, 75, 0.3);
+            transform: scale(1.05);
+        }
+
+        /* Achievements */
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .achievement-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 1.25rem;
+            animation: slideUp 0.6s ease;
+        }
+
+        .achievement-card:hover {
+            transform: translateY(-5px);
+            border-color: #FFD700;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.2);
+        }
+
+        .achievement-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 215, 0, 0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            color: #FFD700;
+        }
+
+        .achievement-content {
+            flex: 1;
+        }
+
+        .achievement-text {
+            font-size: 1rem;
+            color: white;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .achievement-date {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Screenshots */
         .screenshot-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.25rem;
         }
 
         .screenshot-item {
             border-radius: var(--radius);
             overflow: hidden;
             border: 1px solid var(--border);
+            position: relative;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .screenshot-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+            border-color: var(--primary-light);
         }
 
         .screenshot-item img {
             width: 100%;
             height: 200px;
             object-fit: cover;
-            transition: transform 0.3s ease;
+            transition: transform 0.5s ease;
         }
 
         .screenshot-item:hover img {
             transform: scale(1.05);
         }
 
+        .screenshot-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .screenshot-item:hover .screenshot-overlay {
+            opacity: 1;
+        }
+
+        .screenshot-overlay i {
+            font-size: 2.5rem;
+            color: white;
+            background: rgba(179, 0, 75, 0.8);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Share Section */
+        .share-actions {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .share-actions p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .btn-primary, .btn-secondary {
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.95rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(179, 0, 75, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-3px);
+        }
+
         /* Loading State */
         .loading-state {
             text-align: center;
             padding: 4rem 2rem;
+            animation: fadeIn 0.5s ease;
         }
 
         .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid var(--border);
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
+            margin: 0 auto 1.5rem;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .loading-state p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            animation: pulse 2s infinite;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius);
+            border: 2px dashed var(--border);
+        }
+
+        .empty-state i {
+            font-size: 2.5rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        /* Error State */
+        .error-state {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .error-state i {
+            font-size: 3rem;
+            color: var(--secondary);
+            margin-bottom: 1rem;
+        }
+
+        .error-state h3 {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .error-state p {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
         }
 
         /* Responsive */
-        @media (max-width: 968px) {
+        @media (max-width: 1024px) {
+            .profile-content {
+                grid-template-columns: 320px 1fr;
+                gap: 1.5rem;
+            }
+        }
+
+        @media (max-width: 900px) {
             .profile-content {
                 grid-template-columns: 1fr;
+                gap: 1.5rem;
             }
             
             .gamer-profile-card {
                 position: static;
             }
-            
-            .profile-stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
         }
 
         @media (max-width: 768px) {
             .profile-container {
+                padding: 0 1.5rem;
+                margin-top: 5rem;
+            }
+            
+            .navbar-container {
+                padding: 0 1.5rem;
+            }
+            
+            .profile-stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid,
+            .preferences-grid,
+            .achievements-grid,
+            .screenshot-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .gamer-profile-card,
+            .profile-details {
+                padding: 1.5rem;
+            }
+            
+            .gamer-tag {
+                font-size: 1.6rem;
+            }
+            
+            .profile-avatar img {
+                width: 120px;
+                height: 120px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .profile-container {
                 padding: 0 1rem;
             }
             
-            .profile-header {
+            .navbar-container {
+                padding: 0 1rem;
+            }
+            
+            .stat-item {
+                padding: 0.75rem;
+            }
+            
+            .stat-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1.25rem;
+            }
+            
+            .stat-value {
+                font-size: 1.25rem;
+            }
+            
+            .preference-card,
+            .achievement-card {
+                padding: 1rem;
                 flex-direction: column;
-                gap: 1rem;
-                align-items: flex-start;
+                align-items: center;
+                text-align: center;
             }
             
-            .stats-grid {
-                grid-template-columns: 1fr;
+            .preference-icon,
+            .achievement-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
             }
             
-            .screenshot-grid {
-                grid-template-columns: 1fr;
+            .gamer-tag {
+                font-size: 1.4rem;
             }
         }
     </style>
@@ -398,12 +876,6 @@
 
 
     <div class="profile-container">
-        <div class="profile-header">
-            <h1 style="font-size: 2.5rem; font-weight: 700; color: var(--text-primary);">
-                Gamer Profile
-            </h1>
-        </div>
-
         <div class="profile-content">
             <!-- Profile Card -->
             <div class="gamer-profile-card">
@@ -414,9 +886,9 @@
                 <div class="profile-info">
                     <h2 class="gamer-tag" id="gamerTagDisplay">Loading...</h2>
                     
-                    <div class="game-platform" id="gamePlatformDisplay">
+                    <div class="game-platform" id="gameInfo">
                         <i class="fas fa-gamepad"></i>
-                        <span id="gameInfo">Loading...</span>
+                        <span id="gamePlatformText">Loading game info...</span>
                     </div>
                     
                     <div class="gamer-badges" id="gamerBadges">
@@ -463,7 +935,10 @@
                     <div class="details-section">
                         <h3><i class="fas fa-trophy"></i> Achievements</h3>
                         <div id="achievementsInfo">
-                            <p>No achievements listed yet.</p>
+                            <div class="empty-state">
+                                <i class="fas fa-trophy"></i>
+                                <p>No achievements listed yet.</p>
+                            </div>
                         </div>
                     </div>
 
@@ -471,7 +946,10 @@
                     <div class="details-section screenshot-section">
                         <h3><i class="fas fa-camera"></i> Game Screenshots</h3>
                         <div id="screenshotsInfo">
-                            <p>No screenshots uploaded yet.</p>
+                            <div class="empty-state">
+                                <i class="fas fa-camera"></i>
+                                <p>No screenshots uploaded yet.</p>
+                            </div>
                         </div>
                     </div>
 
@@ -481,10 +959,10 @@
                         <div class="share-actions">
                             <p>Share this gamer profile with others:</p>
                             <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
-                                <button id="copyProfileUrlBtn" class="btn-primary" style="padding: 0.75rem 1.5rem;">
+                                <button id="copyProfileUrlBtn" class="btn-primary">
                                     <i class="fas fa-copy"></i> Copy Profile Link
                                 </button>
-                                <button id="shareProfileBtn" class="btn-secondary" style="padding: 0.75rem 1.5rem;">
+                                <button id="shareProfileBtn" class="btn-secondary">
                                     <i class="fas fa-share-alt"></i> Share
                                 </button>
                             </div>
@@ -492,439 +970,71 @@
                     </div>
                 </div>
 
-
+                <!-- Error State -->
+                <div id="errorState" class="error-state" style="display: none;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <h3>Profile Not Found</h3>
+                    <p>The gamer profile you're looking for doesn't exist or has been removed.</p>
+                    <a href="mingle.html" class="btn-primary" style="text-decoration: none; margin-top: 1rem;">
+                        <i class="fas fa-users"></i> Browse Other Gamers
+                    </a>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Link to games.js -->
     <script type="module" src="games.js"></script>
-    <script type="module">
-        import { 
-            getAuth, 
-            onAuthStateChanged,
-            signOut 
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            doc, 
-            getDoc,
-            collection,
-            query,
-            where,
-            getDocs
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // Get URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const userId = urlParams.get('user');
-        const profileId = urlParams.get('profile');
-
-        // DOM Elements
-        const loadingState = document.getElementById('loadingState');
-        const profileDetails = document.getElementById('profileDetails');
-        const errorState = document.getElementById('errorState');
-        const contactBtn = document.getElementById('contactGamerBtn');
-
-        // Load gamer profile
-        async function loadGamerProfile() {
-            try {
-                if (!userId) {
-                    showError();
-                    return;
-                }
-
-                // Get user data
-                const userDoc = await getDoc(doc(db, 'users', userId));
-                if (!userDoc.exists()) {
-                    showError();
-                    return;
-                }
-
-                const userData = userDoc.data();
-                
-                // Get gamer profile
-                const gamerProfileRef = collection(db, 'users', userId, 'gamerProfile');
-                const gamerProfileQuery = query(gamerProfileRef);
-                const gamerProfileSnap = await getDocs(gamerProfileQuery);
-                
-                let gamerProfileData = null;
-                if (!gamerProfileSnap.empty) {
-                    gamerProfileData = gamerProfileSnap.docs[0].data();
-                }
-
-                // Update UI
-                updateProfileUI(userData, gamerProfileData);
-                
-                // Hide loading, show content
-                loadingState.style.display = 'none';
-                profileDetails.style.display = 'block';
-                
-            } catch (error) {
-                console.error('Error loading gamer profile:', error);
-                showError();
-            }
-        }
-
-        function updateProfileUI(userData, gamerProfileData) {
-            // Profile Avatar
-            document.getElementById('profileAvatar').src = userData.profileImage || 'images-default-profile.jpg';
-            
-            // Gamer Tag
-            document.getElementById('gamerTagDisplay').textContent = 
-                gamerProfileData?.gamerTag || userData.name || 'Unknown Gamer';
-            
-            // Game Info
-            const gameInfo = [];
-            if (gamerProfileData?.primaryGame) {
-                gameInfo.push(gamerProfileData.primaryGame);
-            }
-            if (gamerProfileData?.platform) {
-                gameInfo.push(gamerProfileData.platform);
-            }
-            document.getElementById('gameInfo').textContent = gameInfo.join(' • ') || 'Not specified';
-            
-            // Badges
-            updateBadges(gamerProfileData);
-            
-            // Quick Stats
-            updateQuickStats(gamerProfileData);
-            
-            // Detailed Stats
-            updateDetailedStats(gamerProfileData);
-            
-            // Preferences
-            updatePreferences(gamerProfileData);
-            
-            // Achievements
-            updateAchievements(gamerProfileData);
-            
-            // Screenshots
-            updateScreenshots(gamerProfileData);
-            
-            // Contact Button
-            setupContactButton(userData.id);
-        }
-
-        function updateBadges(gamerProfileData) {
-            const badgesContainer = document.getElementById('gamerBadges');
-            badgesContainer.innerHTML = '';
-            
-            if (!gamerProfileData) return;
-            
-            const badges = [];
-            
-            // Platform badge
-            if (gamerProfileData.platform) {
-                badges.push({
-                    text: gamerProfileData.platform,
-                    icon: 'fa-gamepad'
+    <!-- Copy URL functionality -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Copy profile URL
+            const copyBtn = document.getElementById('copyProfileUrlBtn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', function() {
+                    const profileUrl = window.location.href;
+                    navigator.clipboard.writeText(profileUrl).then(() => {
+                        showNotification('Profile URL copied to clipboard!', 'success');
+                    }).catch(err => {
+                        console.error('Failed to copy:', err);
+                        showNotification('Failed to copy URL', 'error');
+                    });
                 });
             }
-            
-            // Play style badge
-            if (gamerProfileData.playStyle) {
-                badges.push({
-                    text: gamerProfileData.playStyle,
-                    icon: 'fa-users'
+
+            // Share profile
+            const shareBtn = document.getElementById('shareProfileBtn');
+            if (shareBtn) {
+                shareBtn.addEventListener('click', function() {
+                    const gamerTag = document.getElementById('gamerTagDisplay')?.textContent || 'Gamer';
+                    
+                    if (navigator.share) {
+                        navigator.share({
+                            title: `${gamerTag}'s Gamer Profile`,
+                            text: `Check out ${gamerTag}'s gaming profile on Bondbase!`,
+                            url: window.location.href
+                        }).catch(err => {
+                            console.error('Share failed:', err);
+                        });
+                    } else {
+                        // Fallback to copying URL
+                        document.getElementById('copyProfileUrlBtn').click();
+                    }
                 });
             }
-            
-            // Rank badge
-            if (gamerProfileData.rank) {
-                badges.push({
-                    text: gamerProfileData.rank,
-                    icon: 'fa-trophy'
-                });
-            }
-            
-            // Add badges to container
-            badges.forEach(badge => {
-                const badgeElement = document.createElement('div');
-                badgeElement.className = 'gamer-badge';
-                badgeElement.innerHTML = `
-                    <i class="fas ${badge.icon}"></i>
-                    <span>${badge.text}</span>
-                `;
-                badgesContainer.appendChild(badgeElement);
-            });
-        }
-
-        function updateQuickStats(gamerProfileData) {
-            const quickStatsContainer = document.getElementById('quickStats');
-            quickStatsContainer.innerHTML = '';
-            
-            if (!gamerProfileData) return;
-            
-            const stats = [
-                {
-                    label: 'Level',
-                    value: gamerProfileData.level || 'N/A',
-                    icon: 'fa-level-up-alt'
-                },
-                {
-                    label: 'Rank',
-                    value: gamerProfileData.rank || 'Unranked',
-                    icon: 'fa-chess-queen'
-                },
-                {
-                    label: 'K/D',
-                    value: gamerProfileData.kdRatio || 'N/A',
-                    icon: 'fa-crosshairs'
-                },
-                {
-                    label: 'Win Rate',
-                    value: gamerProfileData.winRate ? `${gamerProfileData.winRate}%` : 'N/A',
-                    icon: 'fa-chart-line'
-                }
-            ];
-            
-            stats.forEach(stat => {
-                const statElement = document.createElement('div');
-                statElement.className = 'stat-item';
-                statElement.innerHTML = `
-                    <div class="stat-value">${stat.value}</div>
-                    <div class="stat-label">${stat.label}</div>
-                `;
-                quickStatsContainer.appendChild(statElement);
-            });
-        }
-
-        function updateDetailedStats(gamerProfileData) {
-            const detailedStatsContainer = document.getElementById('detailedStats');
-            detailedStatsContainer.innerHTML = '';
-            
-            if (!gamerProfileData) return;
-            
-            const stats = [
-                {
-                    label: 'Total Kills',
-                    value: gamerProfileData.totalKills || 0,
-                    max: 10000
-                },
-                {
-                    label: 'Top Kills',
-                    value: gamerProfileData.topKills || 0,
-                    max: 50
-                },
-                {
-                    label: 'Hours Played',
-                    value: gamerProfileData.hoursPlayed || 0,
-                    max: 2000
-                },
-                {
-                    label: 'Win Rate',
-                    value: gamerProfileData.winRate || 0,
-                    max: 100
-                }
-            ];
-            
-            stats.forEach(stat => {
-                const statElement = document.createElement('div');
-                statElement.className = 'stat-card';
-                
-                const percentage = stat.max > 0 ? Math.min((stat.value / stat.max) * 100, 100) : 0;
-                
-                statElement.innerHTML = `
-                    <div class="value">${stat.value}</div>
-                    <div class="label">${stat.label}</div>
-                    <div class="progress">
-                        <div class="progress-bar" style="width: ${percentage}%"></div>
-                    </div>
-                `;
-                detailedStatsContainer.appendChild(statElement);
-            });
-        }
-
-        function updatePreferences(gamerProfileData) {
-            const preferencesContainer = document.getElementById('preferencesInfo');
-            preferencesContainer.innerHTML = '';
-            
-            if (!gamerProfileData) return;
-            
-            let preferencesHTML = '<div style="display: flex; flex-wrap: wrap; gap: 1rem;">';
-            
-            // Play style
-            if (gamerProfileData.playStyle) {
-                preferencesHTML += `
-                    <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius);">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Play Style</div>
-                        <div>${gamerProfileData.playStyle}</div>
-                    </div>
-                `;
-            }
-            
-            // Mic preference
-            if (gamerProfileData.micPreference) {
-                preferencesHTML += `
-                    <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius);">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Mic Preference</div>
-                        <div>${gamerProfileData.micPreference}</div>
-                    </div>
-                `;
-            }
-            
-            // Looking for
-            if (gamerProfileData.lookingFor && gamerProfileData.lookingFor.length > 0) {
-                preferencesHTML += `
-                    <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius); flex: 1; min-width: 200px;">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Looking For</div>
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                            ${gamerProfileData.lookingFor.map(item => `
-                                <span style="background: rgba(179,0,75,0.2); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.9rem;">
-                                    ${item}
-                                </span>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-            
-            preferencesHTML += '</div>';
-            preferencesContainer.innerHTML = preferencesHTML;
-        }
-
-        function updateAchievements(gamerProfileData) {
-            const achievementsContainer = document.getElementById('achievementsInfo');
-            
-            if (!gamerProfileData?.achievements) {
-                achievementsContainer.innerHTML = '<p>No achievements listed yet.</p>';
-                return;
-            }
-            
-            achievementsContainer.innerHTML = `
-                <ul class="achievements-list">
-                    ${gamerProfileData.achievements.split('\n').map(achievement => 
-                        achievement.trim() ? `<li>${achievement}</li>` : ''
-                    ).join('')}
-                </ul>
-            `;
-        }
-
-        function updateScreenshots(gamerProfileData) {
-            const screenshotsContainer = document.getElementById('screenshotsInfo');
-            
-            if (!gamerProfileData?.screenshotUrl) {
-                screenshotsContainer.innerHTML = '<p>No screenshots uploaded yet.</p>';
-                return;
-            }
-            
-            screenshotsContainer.innerHTML = `
-                <div class="screenshot-grid">
-                    <div class="screenshot-item">
-                        <img src="${gamerProfileData.screenshotUrl}" alt="Game Screenshot" onclick="openImage('${gamerProfileData.screenshotUrl}')" style="cursor: pointer;">
-                    </div>
-                </div>
-            `;
-        }
-
-        function setupContactButton(gamerId) {
-            contactBtn.addEventListener('click', () => {
-                if (currentUser && currentUser.uid === gamerId) {
-                    alert("You can't message yourself!");
-                    return;
-                }
-                
-                if (currentUser) {
-                    // Redirect to chat with this gamer
-                    window.location.href = `chat.html?id=${gamerId}`;
-                } else {
-                    alert('Please log in to message this gamer');
-                    window.location.href = 'login.html';
-                }
-            });
-        }
-
-        function showError() {
-            loadingState.style.display = 'none';
-            errorState.style.display = 'block';
-        }
-
-        // Open image in full screen
-        window.openImage = function(imageUrl) {
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.9);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-                cursor: pointer;
-            `;
-            
-            modal.innerHTML = `
-                <img src="${imageUrl}" style="max-width: 90%; max-height: 90%; object-fit: contain;">
-                <button style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; font-size: 2rem; cursor: pointer;">
-                    ×
-                </button>
-            `;
-            
-            document.body.appendChild(modal);
-            
-            modal.querySelector('button').addEventListener('click', () => {
-                document.body.removeChild(modal);
-            });
-            
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    document.body.removeChild(modal);
-                }
-            });
-        };
-
-        // Copy profile URL
-        document.getElementById('copyProfileUrlBtn')?.addEventListener('click', () => {
-            const profileUrl = window.location.href;
-            navigator.clipboard.writeText(profileUrl).then(() => {
-                alert('Profile URL copied to clipboard!');
-            }).catch(err => {
-                console.error('Failed to copy:', err);
-                alert('Failed to copy URL');
-            });
         });
 
-        // Share profile
-        document.getElementById('shareProfileBtn')?.addEventListener('click', () => {
-            if (navigator.share) {
-                navigator.share({
-                    title: document.getElementById('gamerTagDisplay').textContent + "'s Gamer Profile",
-                    text: 'Check out this gamer profile on WhipRoom!',
-                    url: window.location.href
-                }).catch(err => {
-                    console.error('Share failed:', err);
-                });
+        // Notification function
+        function showNotification(message, type = 'info') {
+            // This function is already defined in games.js
+            if (window.showNotification) {
+                window.showNotification(message, type);
             } else {
-                // Fallback to copying URL
-                document.getElementById('copyProfileUrlBtn').click();
+                // Fallback notification
+                alert(message);
             }
-        });
-
-        // Initialize
-        let currentUser = null;
-        let db;
-        
-        // Wait for auth and db to be available
-        document.addEventListener('DOMContentLoaded', async () => {
-            // These should be imported from app.js
-            // For now, we'll check if they're available globally
-            if (typeof auth !== 'undefined') {
-                onAuthStateChanged(auth, (user) => {
-                    currentUser = user;
-                });
-            }
-            
-            if (typeof app !== 'undefined') {
-                // Get db from the imported app
-                // This assumes app.js has initialized Firebase
-                db = getFirestore(app);
-            }
-            
-            // Load the profile
-            setTimeout(loadGamerProfile, 1000);
-        });
+        }
     </script>
 </body>
 </html>
