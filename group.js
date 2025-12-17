@@ -1,5 +1,5 @@
-// group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
-// UPDATED VERSION: Added group photo upload, restricted words, and video support
+// group.js - COMPLETE Group Chat System with Voice Channels
+// UPDATED VERSION: Added voice channel support with persistent mini player
 
 import { 
     getFirestore, 
@@ -106,7 +106,12 @@ class GroupChat {
         this.sentMessageIds = new Set();
         
         // Restricted users tracking
-        this.restrictedUsers = new Map(); // groupId -> Map(userId -> restrictionEndTime)
+        this.restrictedUsers = new Map();
+        
+        // Voice channels
+        this.voiceChannels = new Map(); // groupId -> channels array
+        this.unsubscribeVoiceChannels = new Map();
+        this.userVoiceChannel = null;
         
         this.setupAuthListener();
         this.createMessageContextMenu();
@@ -165,7 +170,7 @@ class GroupChat {
                     this.restrictedUsers.delete(groupId);
                 }
             }
-        }, 60000); // Check every minute
+        }, 60000);
     }
 
     async restrictUser(groupId, userId, durationHours = 2) {
@@ -176,7 +181,6 @@ class GroupChat {
         const restrictionEnd = Date.now() + (durationHours * 60 * 60 * 1000);
         this.restrictedUsers.get(groupId).set(userId, restrictionEnd);
         
-        // Store restriction in Firebase for persistence
         try {
             const restrictionRef = doc(db, 'groups', groupId, 'restricted_users', userId);
             await setDoc(restrictionRef, {
@@ -192,7 +196,6 @@ class GroupChat {
     }
 
     async isUserRestricted(groupId, userId) {
-        // Check local cache first
         if (this.restrictedUsers.has(groupId)) {
             const restrictionEnd = this.restrictedUsers.get(groupId).get(userId);
             if (restrictionEnd && Date.now() < restrictionEnd) {
@@ -200,7 +203,6 @@ class GroupChat {
             }
         }
         
-        // Check Firebase
         try {
             const restrictionRef = doc(db, 'groups', groupId, 'restricted_users', userId);
             const restrictionSnap = await getDoc(restrictionRef);
@@ -210,14 +212,12 @@ class GroupChat {
                 const restrictedUntil = data.restrictedUntil?.toDate ? data.restrictedUntil.toDate() : new Date(data.restrictedUntil);
                 
                 if (Date.now() < restrictedUntil.getTime()) {
-                    // Update local cache
                     if (!this.restrictedUsers.has(groupId)) {
                         this.restrictedUsers.set(groupId, new Map());
                     }
                     this.restrictedUsers.get(groupId).set(userId, restrictedUntil.getTime());
                     return true;
                 } else {
-                    // Restriction expired, delete it
                     await deleteDoc(restrictionRef);
                 }
             }
@@ -260,7 +260,6 @@ class GroupChat {
         formData.append('file', file);
         formData.append('upload_preset', cloudinaryConfig.uploadPreset);
         
-        // Determine resource type
         const isVideo = file.type.startsWith('video/');
         formData.append('resource_type', isVideo ? 'video' : 'image');
         
@@ -292,7 +291,7 @@ class GroupChat {
     }
 
     validateImageFile(file) {
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        const maxSize = 10 * 1024 * 1024;
         if (file.size > maxSize) {
             throw new Error('Image file must be less than 10MB');
         }
@@ -306,7 +305,7 @@ class GroupChat {
     }
 
     validateVideoFile(file) {
-        const maxSize = 50 * 1024 * 1024; // 50MB
+        const maxSize = 50 * 1024 * 1024;
         if (file.size > maxSize) {
             throw new Error('Video file must be less than 50MB');
         }
@@ -1729,6 +1728,41 @@ class GroupChat {
         }
     }
 
+    // NEW: Listen to voice channels
+    listenToVoiceChannels(groupId, callback) {
+        try {
+            if (this.unsubscribeVoiceChannels.has(groupId)) {
+                this.unsubscribeVoiceChannels.get(groupId)();
+            }
+            
+            const channelsRef = collection(db, 'voice_channels', groupId, 'channels');
+            const q = query(channelsRef, orderBy('createdAt', 'desc'));
+            
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const channels = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    channels.push({
+                        id: doc.id,
+                        ...data,
+                        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+                        participants: data.participants || []
+                    });
+                });
+                
+                this.voiceChannels.set(groupId, channels);
+                callback(channels);
+            });
+            
+            this.unsubscribeVoiceChannels.set(groupId, unsubscribe);
+            return unsubscribe;
+            
+        } catch (error) {
+            console.error('Error listening to voice channels:', error);
+            throw error;
+        }
+    }
+
     async updateLastActive(groupId) {
         try {
             if (!this.firebaseUser) return;
@@ -2127,6 +2161,12 @@ class GroupChat {
             this.unsubscribeAuth();
             this.unsubscribeAuth = null;
         }
+        
+        // Clean up voice channel listeners
+        this.unsubscribeVoiceChannels.forEach(unsubscribe => {
+            if (unsubscribe) unsubscribe();
+        });
+        this.unsubscribeVoiceChannels.clear();
         
         this.areListenersSetup = false;
         this.sentMessageIds.clear();
@@ -2786,6 +2826,7 @@ function initGroupPage() {
     const chatSubtitle = document.getElementById('chatSubtitle');
     const membersList = document.getElementById('membersList');
     const rulesList = document.getElementById('rulesList');
+    const groupVoiceCallBtn = document.getElementById('groupVoiceCallBtn');
     
     const urlParams = new URLSearchParams(window.location.search);
     const groupId = urlParams.get('id');
@@ -2795,6 +2836,7 @@ function initGroupPage() {
     let groupData = null;
     let tempMessages = new Map();
     let isInitialLoad = true;
+    let voiceChannels = [];
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -2824,6 +2866,7 @@ function initGroupPage() {
         
         loadGroupData();
         setupListeners();
+        setupVoiceChannels();
     })();
     
     backBtn.addEventListener('click', () => {
@@ -2868,6 +2911,16 @@ function initGroupPage() {
                     sidebar.classList.add('active');
                     createSidebarOverlay();
                 }
+            }
+        });
+    }
+    
+    if (groupVoiceCallBtn) {
+        groupVoiceCallBtn.addEventListener('click', () => {
+            if (window.callsModule) {
+                window.callsModule.initiateGroupCall(groupId);
+            } else {
+                window.location.href = `calls.html?type=group&groupId=${groupId}&incoming=false`;
             }
         });
     }
@@ -2950,6 +3003,208 @@ function initGroupPage() {
             displayMessages();
         }
     });
+    
+    // NEW: Setup voice channels
+    function setupVoiceChannels() {
+        // Create voice channels UI if not exists
+        createVoiceChannelsUI();
+        
+        // Listen to voice channels
+        groupChat.listenToVoiceChannels(groupId, (channels) => {
+            voiceChannels = channels;
+            updateVoiceChannelsUI(channels);
+        });
+    }
+    
+    // NEW: Create voice channels UI
+    function createVoiceChannelsUI() {
+        // Check if container already exists
+        if (document.getElementById('voiceChannelsContainer')) return;
+        
+        const voiceChannelsSection = document.createElement('div');
+        voiceChannelsSection.id = 'voiceChannelsSection';
+        voiceChannelsSection.className = 'voice-channels-section';
+        voiceChannelsSection.innerHTML = `
+            <div class="voice-channels-header">
+                <h3><i class="fas fa-volume-up"></i> Voice Channels</h3>
+                <button id="toggleVoiceChannels" class="toggle-channels-btn">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div id="voiceChannelsContainer" class="voice-channels-container">
+                <div class="loading-channels">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading voice channels...</p>
+                </div>
+            </div>
+        `;
+        
+        const chatHeader = document.querySelector('.chat-header');
+        if (chatHeader) {
+            chatHeader.parentNode.insertBefore(voiceChannelsSection, chatHeader.nextSibling);
+        } else {
+            document.querySelector('.chat-container').insertBefore(voiceChannelsSection, document.querySelector('.messages-container'));
+        }
+        
+        // Add toggle functionality
+        const toggleBtn = document.getElementById('toggleVoiceChannels');
+        const container = document.getElementById('voiceChannelsContainer');
+        
+        toggleBtn.addEventListener('click', () => {
+            const isVisible = container.style.display !== 'none';
+            container.style.display = isVisible ? 'none' : 'block';
+            toggleBtn.innerHTML = isVisible ? 
+                '<i class="fas fa-chevron-down"></i>' : 
+                '<i class="fas fa-chevron-up"></i>';
+        });
+        
+        // Initialize with channels visible
+        container.style.display = 'block';
+    }
+    
+    // NEW: Update voice channels UI
+    function updateVoiceChannelsUI(channels) {
+        const container = document.getElementById('voiceChannelsContainer');
+        if (!container) return;
+        
+        if (channels.length === 0) {
+            container.innerHTML = `
+                <div class="no-voice-channels">
+                    <i class="fas fa-volume-mute"></i>
+                    <p>No active voice channels</p>
+                    <button id="startFirstVoiceChannel" class="start-voice-channel-btn">
+                        <i class="fas fa-plus"></i> Start First Voice Channel
+                    </button>
+                </div>
+            `;
+            
+            const startBtn = document.getElementById('startFirstVoiceChannel');
+            if (startBtn) {
+                startBtn.addEventListener('click', () => {
+                    if (window.callsModule && window.callsModule.createVoiceChannel) {
+                        window.callsModule.createVoiceChannel(groupId);
+                    } else {
+                        showNotification('Voice channel system not loaded. Please refresh the page.', 'error');
+                    }
+                });
+            }
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        channels.forEach(channel => {
+            const channelElement = document.createElement('div');
+            channelElement.className = 'voice-channel-card';
+            
+            // Check if user is in this channel
+            const isUserInChannel = window.callsModule?.isUserInChannel?.(channel.id);
+            
+            channelElement.innerHTML = `
+                <div class="channel-header">
+                    <div class="channel-icon">
+                        <i class="fas fa-volume-up"></i>
+                    </div>
+                    <div class="channel-info">
+                        <h4 class="channel-name">${channel.name || 'Voice Channel'}</h4>
+                        <div class="channel-meta">
+                            <span class="channel-creator">
+                                <i class="fas fa-user"></i> ${channel.createdBy || 'Unknown'}
+                            </span>
+                            <span class="channel-time">
+                                <i class="fas fa-clock"></i> ${formatTimeAgo(channel.createdAt)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="channel-participants">
+                    <div class="participants-count">
+                        <i class="fas fa-users"></i>
+                        <span>${channel.participants?.length || 0} / 30</span>
+                    </div>
+                    <div class="participants-list">
+                        ${(channel.participants || []).slice(0, 5).map(() => 
+                            `<span class="participant-dot"></span>`
+                        ).join('')}
+                        ${(channel.participants?.length || 0) > 5 ? 
+                            `<span class="more-participants">+${(channel.participants?.length || 0) - 5}</span>` : ''
+                        }
+                    </div>
+                </div>
+                <div class="channel-actions">
+                    ${(channel.participants?.length || 0) >= 30 ? 
+                        `<button class="join-channel-btn full" disabled>
+                            <i class="fas fa-lock"></i> Channel Full
+                        </button>` :
+                        `<button class="join-channel-btn ${isUserInChannel ? 'active' : ''}" data-channel-id="${channel.id}">
+                            ${isUserInChannel ? 
+                                `<i class="fas fa-phone-slash"></i> Leave` : 
+                                `<i class="fas fa-phone-alt"></i> Join`
+                            }
+                        </button>`
+                    }
+                </div>
+            `;
+            
+            const joinBtn = channelElement.querySelector('.join-channel-btn');
+            if (joinBtn && !joinBtn.disabled) {
+                joinBtn.addEventListener('click', () => {
+                    if (window.callsModule) {
+                        if (isUserInChannel) {
+                            window.callsModule.leaveVoiceChannel(channel.id, groupId);
+                        } else {
+                            window.callsModule.joinVoiceChannel(channel.id, groupId);
+                        }
+                    } else {
+                        showNotification('Voice channel system not loaded. Please refresh the page.', 'error');
+                    }
+                });
+            }
+            
+            container.appendChild(channelElement);
+        });
+        
+        // Add "Start New Channel" button
+        const startNewChannel = document.createElement('div');
+        startNewChannel.className = 'start-new-channel';
+        startNewChannel.innerHTML = `
+            <button id="startNewVoiceChannel" class="start-new-channel-btn">
+                <i class="fas fa-plus-circle"></i> Start New Voice Channel
+            </button>
+        `;
+        
+        container.appendChild(startNewChannel);
+        
+        const startBtn = document.getElementById('startNewVoiceChannel');
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                if (window.callsModule && window.callsModule.createVoiceChannel) {
+                    window.callsModule.createVoiceChannel(groupId);
+                } else {
+                    showNotification('Voice channel system not loaded. Please refresh the page.', 'error');
+                }
+            });
+        }
+    }
+    
+    // NEW: Format time ago
+    function formatTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+        
+        if (diffDays > 0) {
+            return `${diffDays}d ago`;
+        } else if (diffHours > 0) {
+            return `${diffHours}h ago`;
+        } else if (diffMins > 0) {
+            return `${diffMins}m ago`;
+        } else {
+            return 'just now';
+        }
+    }
     
     async function loadGroupData() {
         try {
@@ -4333,6 +4588,7 @@ function initChatPage() {
     const viewProfileBtn = document.getElementById('viewProfileBtn');
     const chatTitle = document.getElementById('chatTitle');
     const chatSubtitle = document.getElementById('chatSubtitle');
+    const voiceCallBtn = document.getElementById('voiceCallBtn');
     
     const urlParams = new URLSearchParams(window.location.search);
     const partnerId = urlParams.get('id');
@@ -4391,6 +4647,16 @@ function initChatPage() {
     if (viewProfileBtn) {
         viewProfileBtn.addEventListener('click', () => {
             window.open(`user.html?id=${partnerId}`, '_blank');
+        });
+    }
+    
+    if (voiceCallBtn) {
+        voiceCallBtn.addEventListener('click', () => {
+            if (window.callsModule) {
+                window.callsModule.initiatePersonalCall(partnerId);
+            } else {
+                window.location.href = `calls.html?type=personal&partnerId=${partnerId}&incoming=false`;
+            }
         });
     }
     
