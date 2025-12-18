@@ -1,288 +1,458 @@
-// flip.js - Handles profile card flipping animations for mingles page
+// fix.js - Virtual Scroll Enhancement for Chat Messages
+// Load this file BEFORE app.js in your HTML
 
-// Firebase imports (if needed for profile data)
-import { 
-    getFirestore,
-    collection,
-    doc,
-    getDoc,
-    updateDoc,
-    arrayUnion,
-    arrayRemove,
-    serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+(function() {
+    'use strict';
 
-// Animation state variables
-let isAnimating = false;
-let currentProfileIndex = 0;
-let profiles = [];
-let currentUser = null;
-let db = null;
+    // Virtual Scroll Manager for Chat Messages
+    class VirtualScrollManager {
+        constructor() {
+            this.container = null;
+            this.messages = [];
+            this.visibleMessages = [];
+            this.messageElements = new Map();
+            this.scrollTop = 0;
+            this.containerHeight = 0;
+            this.itemHeight = 80; // Average message height
+            this.bufferItems = 5; // Items to render above/below viewport
+            this.placeholderHeight = 0;
+            this.topSpacer = null;
+            this.bottomSpacer = null;
+            this.isInitialized = false;
+            this.rafId = null;
+            this.lastScrollTime = 0;
+            this.scrollThrottle = 50; // ms
+        }
 
-// Initialize flip animations
-export function initFlipAnimations(user, firestoreDb, profileData) {
-    currentUser = user;
-    db = firestoreDb;
-    profiles = profileData;
-    
-    // Set up event listeners for action buttons
-    setupFlipButtonListeners();
-    
-    console.log("Flip animations initialized with", profiles.length, "profiles");
-}
-
-// Set up event listeners for flip actions
-function setupFlipButtonListeners() {
-    const dislikeBtn = document.getElementById('dislikeBtn');
-    const likeBtn = document.getElementById('likeBtn');
-    const viewProfileBtn = document.getElementById('viewProfileBtn');
-    const chatBtn = document.getElementById('chatBtn');
-
-    if (dislikeBtn) {
-        dislikeBtn.addEventListener('click', () => {
-            if (!isAnimating) {
-                flipProfile('dislike');
-            }
-        });
-    }
-
-    if (likeBtn) {
-        likeBtn.addEventListener('click', () => {
-            if (!isAnimating) {
-                flipProfile('like');
-            }
-        });
-    }
-
-    // These buttons don't trigger flips but should be disabled during animation
-    if (viewProfileBtn) {
-        viewProfileBtn.addEventListener('click', () => {
-            if (isAnimating) return;
-            const currentProfile = profiles[currentProfileIndex];
-            if (currentProfile) {
-                window.location.href = `profile.html?id=${currentProfile.id}`;
-            }
-        });
-    }
-
-    if (chatBtn) {
-        chatBtn.addEventListener('click', () => {
-            if (isAnimating) return;
-            const currentProfile = profiles[currentProfileIndex];
-            if (currentProfile) {
-                window.location.href = `chat.html?id=${currentProfile.id}`;
-            }
-        });
-    }
-}
-
-// Main flip function
-async function flipProfile(action) {
-    if (isAnimating || currentProfileIndex >= profiles.length) return;
-    
-    isAnimating = true;
-    const profileCard = document.querySelector('.profile-card');
-    const currentProfile = profiles[currentProfileIndex];
-    
-    // Disable all action buttons during animation
-    disableActionButtons(true);
-    
-    // Add appropriate animation class based on action
-    if (action === 'dislike') {
-        profileCard.classList.add('flipping-out');
-    } else {
-        profileCard.classList.add('flipping');
-        
-        // Handle like action - save to Firebase
-        try {
-            await addDoc(collection(db, 'users', currentUser.uid, 'liked'), {
-                userId: currentProfile.id,
-                timestamp: serverTimestamp()
-            });
+        initialize(containerId) {
+            if (this.isInitialized) return;
             
-            // Increment like count for the profile
-            const profileRef = doc(db, 'users', currentProfile.id);
-            const profileSnap = await getDoc(profileRef);
-            if (profileSnap.exists()) {
-                const currentLikes = profileSnap.data().likes || 0;
-                await updateDoc(profileRef, {
-                    likes: currentLikes + 1
+            this.container = document.getElementById(containerId);
+            if (!this.container) {
+                console.warn(`Container with ID "${containerId}" not found`);
+                return;
+            }
+
+            // Create spacers for virtual scrolling
+            this.topSpacer = document.createElement('div');
+            this.topSpacer.className = 'virtual-scroll-spacer';
+            this.topSpacer.style.height = '0px';
+            
+            this.bottomSpacer = document.createElement('div');
+            this.bottomSpacer.className = 'virtual-scroll-spacer';
+            this.bottomSpacer.style.height = '0px';
+
+            // Insert spacers
+            if (this.container.firstChild) {
+                this.container.insertBefore(this.topSpacer, this.container.firstChild);
+            } else {
+                this.container.appendChild(this.topSpacer);
+            }
+            this.container.appendChild(this.bottomSpacer);
+
+            // Add scroll listener
+            this.container.addEventListener('scroll', this.handleScroll.bind(this), { passive: true });
+            
+            // Add resize observer
+            this.resizeObserver = new ResizeObserver(() => this.calculateContainerHeight());
+            this.resizeObserver.observe(this.container);
+            
+            this.calculateContainerHeight();
+            this.isInitialized = true;
+            
+            console.log('Virtual scroll initialized for', containerId);
+        }
+
+        calculateContainerHeight() {
+            if (!this.container) return;
+            this.containerHeight = this.container.clientHeight;
+            this.updateVisibleMessages();
+        }
+
+        setMessages(messagesArray) {
+            this.messages = messagesArray || [];
+            this.updateVisibleMessages();
+            this.renderVisibleMessages();
+        }
+
+        addMessage(message) {
+            if (!message) return;
+            
+            this.messages.push(message);
+            this.updateVisibleMessages();
+            this.renderVisibleMessages();
+            
+            // Auto-scroll to bottom if user is near bottom
+            const scrollBottom = this.container.scrollHeight - this.container.scrollTop - this.containerHeight;
+            if (scrollBottom < 200) { // If within 200px of bottom
+                requestAnimationFrame(() => {
+                    this.container.scrollTop = this.container.scrollHeight;
                 });
             }
-        } catch (error) {
-            console.error("Error liking profile:", error);
         }
-    }
-    
-    // Wait for flip animation to complete
-    setTimeout(() => {
-        // Move to next profile
-        currentProfileIndex++;
-        
-        if (currentProfileIndex < profiles.length) {
-            // Update profile content
-            updateProfileContent(profiles[currentProfileIndex]);
+
+        updateMessage(message) {
+            if (!message || !message.id) return;
             
-            // Reverse the flip animation to show new profile
-            setTimeout(() => {
-                if (action === 'dislike') {
-                    profileCard.classList.remove('flipping-out');
-                    profileCard.classList.add('flipping-in');
+            const index = this.messages.findIndex(m => m.id === message.id);
+            if (index !== -1) {
+                this.messages[index] = message;
+                
+                // Update if visible
+                const visibleIndex = this.visibleMessages.findIndex(m => m.id === message.id);
+                if (visibleIndex !== -1) {
+                    this.renderMessage(message, index);
+                }
+            }
+        }
+
+        removeMessage(messageId) {
+            this.messages = this.messages.filter(m => m.id !== messageId);
+            
+            // Remove from DOM if rendered
+            const element = this.messageElements.get(messageId);
+            if (element && element.parentNode) {
+                element.parentNode.removeChild(element);
+                this.messageElements.delete(messageId);
+            }
+            
+            this.updateVisibleMessages();
+        }
+
+        updateVisibleMessages() {
+            if (!this.container || this.messages.length === 0) {
+                this.visibleMessages = [];
+                return;
+            }
+
+            this.scrollTop = this.container.scrollTop;
+            const startIndex = Math.max(0, Math.floor(this.scrollTop / this.itemHeight) - this.bufferItems);
+            const endIndex = Math.min(
+                this.messages.length - 1,
+                Math.floor((this.scrollTop + this.containerHeight) / this.itemHeight) + this.bufferItems
+            );
+
+            this.visibleMessages = this.messages.slice(startIndex, endIndex + 1);
+            
+            // Update spacers
+            const topHeight = startIndex * this.itemHeight;
+            const bottomHeight = Math.max(0, (this.messages.length - endIndex - 1) * this.itemHeight);
+            
+            this.topSpacer.style.height = `${topHeight}px`;
+            this.bottomSpacer.style.height = `${bottomHeight}px`;
+        }
+
+        renderVisibleMessages() {
+            if (!this.container || this.visibleMessages.length === 0) {
+                return;
+            }
+
+            const startIndex = Math.max(0, Math.floor(this.scrollTop / this.itemHeight) - this.bufferItems);
+            
+            // Remove messages that are no longer visible
+            Array.from(this.messageElements.keys()).forEach(messageId => {
+                const visibleMessage = this.visibleMessages.find(m => m.id === messageId);
+                if (!visibleMessage) {
+                    const element = this.messageElements.get(messageId);
+                    if (element && element.parentNode) {
+                        element.parentNode.removeChild(element);
+                    }
+                    this.messageElements.delete(messageId);
+                }
+            });
+
+            // Add or update visible messages
+            this.visibleMessages.forEach((message, relativeIndex) => {
+                const absoluteIndex = startIndex + relativeIndex;
+                this.renderMessage(message, absoluteIndex);
+            });
+        }
+
+        renderMessage(message, index) {
+            if (!message) return;
+
+            let element = this.messageElements.get(message.id);
+            
+            if (!element) {
+                // Create new message element using existing displayMessage logic
+                element = this.createMessageElement(message);
+                if (!element) return;
+                
+                this.messageElements.set(message.id, element);
+                
+                // Insert at correct position
+                const nextSibling = this.getNextVisibleSibling(index);
+                if (nextSibling) {
+                    this.container.insertBefore(element, nextSibling);
                 } else {
-                    profileCard.classList.remove('flipping');
-                    profileCard.classList.add('flipping-back');
+                    // Insert before bottom spacer
+                    this.container.insertBefore(element, this.bottomSpacer);
+                }
+            } else {
+                // Update existing element if needed
+                this.updateMessageElement(element, message);
+            }
+            
+            // Set data attribute for positioning
+            element.dataset.virtualIndex = index;
+        }
+
+        createMessageElement(message) {
+            // This will be overridden by your app's displayMessage function
+            // For now, create a placeholder that will be replaced
+            const div = document.createElement('div');
+            div.className = `message ${message.senderId === window.currentUser?.uid ? 'sent' : 'received'}`;
+            div.dataset.messageId = message.id;
+            div.dataset.virtualRender = 'true';
+            
+            // Add temporary content
+            div.innerHTML = `
+                <div class="message-content">
+                    ${message.text || message.imageUrl ? '📷' : message.audioUrl ? '🎤' : message.videoUrl ? '🎥' : ''}
+                    ${message.text || ''}
+                </div>
+            `;
+            
+            return div;
+        }
+
+        updateMessageElement(element, message) {
+            // Update element if needed
+            // This is a minimal implementation - your app will handle the actual updates
+            if (message.status === 'sending') {
+                element.style.opacity = '0.7';
+            } else {
+                element.style.opacity = '1';
+            }
+        }
+
+        getNextVisibleSibling(index) {
+            for (let i = index + 1; i < this.messages.length; i++) {
+                const element = this.messageElements.get(this.messages[i]?.id);
+                if (element && element.parentNode) {
+                    return element;
+                }
+            }
+            return this.bottomSpacer;
+        }
+
+        handleScroll() {
+            const now = Date.now();
+            if (now - this.lastScrollTime < this.scrollThrottle) {
+                if (this.rafId) cancelAnimationFrame(this.rafId);
+                this.rafId = requestAnimationFrame(() => this.handleScrollThrottled());
+                return;
+            }
+            
+            this.handleScrollThrottled();
+            this.lastScrollTime = now;
+        }
+
+        handleScrollThrottled() {
+            this.updateVisibleMessages();
+            this.renderVisibleMessages();
+        }
+
+        scrollToBottom() {
+            if (!this.container) return;
+            
+            requestAnimationFrame(() => {
+                this.container.scrollTop = this.container.scrollHeight;
+                this.updateVisibleMessages();
+                this.renderVisibleMessages();
+            });
+        }
+
+        scrollToMessage(messageId) {
+            if (!this.container) return;
+            
+            const index = this.messages.findIndex(m => m.id === messageId);
+            if (index !== -1) {
+                const scrollPosition = index * this.itemHeight;
+                this.container.scrollTop = scrollPosition;
+                this.updateVisibleMessages();
+                this.renderVisibleMessages();
+            }
+        }
+
+        destroy() {
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+            }
+            
+            if (this.resizeObserver) {
+                this.resizeObserver.disconnect();
+            }
+            
+            if (this.container) {
+                this.container.removeEventListener('scroll', this.handleScroll.bind(this));
+                
+                // Remove spacers
+                if (this.topSpacer && this.topSpacer.parentNode) {
+                    this.topSpacer.parentNode.removeChild(this.topSpacer);
+                }
+                if (this.bottomSpacer && this.bottomSpacer.parentNode) {
+                    this.bottomSpacer.parentNode.removeChild(this.bottomSpacer);
                 }
                 
-                // Complete the animation
-                setTimeout(() => {
-                    profileCard.classList.remove('flipping-in', 'flipping-back');
-                    isAnimating = false;
-                    disableActionButtons(false);
-                    
-                    // Update UI with new profile data
-                    showProfile(currentProfileIndex);
-                }, 400);
-            }, 100);
-        } else {
-            // No more profiles
-            showNoProfilesMessage();
-            profileCard.classList.remove('flipping', 'flipping-out');
-            isAnimating = false;
-            disableActionButtons(false);
+                // Remove all virtual message elements
+                this.messageElements.forEach((element, messageId) => {
+                    if (element.parentNode && element.dataset.virtualRender === 'true') {
+                        element.parentNode.removeChild(element);
+                    }
+                });
+                
+                this.messageElements.clear();
+            }
+            
+            this.isInitialized = false;
+            console.log('Virtual scroll destroyed');
         }
-    }, 500);
-}
-
-// Update profile content during flip
-function updateProfileContent(profile) {
-    const profileImage = document.getElementById('currentProfileImage');
-    const profileName = document.getElementById('profileName');
-    const profileAgeLocation = document.getElementById('profileAgeLocation');
-    const profileBio = document.getElementById('profileBio');
-    const likeCount = document.getElementById('likeCount');
-    
-    // Create a subtle loading effect
-    profileImage.style.opacity = '0.7';
-    profileImage.style.filter = 'blur(2px)';
-    
-    // Update content
-    setTimeout(() => {
-        profileImage.src = profile.profileImage || 'images-default-profile.jpg';
-        profileName.textContent = profile.name || 'Unknown';
-        
-        let ageLocation = '';
-        if (profile.age) ageLocation += `${profile.age} • `;
-        if (profile.location) ageLocation += profile.location;
-        profileAgeLocation.textContent = ageLocation;
-        
-        profileBio.textContent = profile.bio || 'No bio available';
-        likeCount.textContent = profile.likes || 0;
-        
-        // Remove loading effect
-        setTimeout(() => {
-            profileImage.style.opacity = '1';
-            profileImage.style.filter = 'blur(0)';
-        }, 200);
-    }, 300);
-}
-
-// Show profile function
-function showProfile(index) {
-    if (index >= 0 && index < profiles.length) {
-        const profile = profiles[index];
-        
-        document.getElementById('currentProfileImage').src = profile.profileImage || 'images-default-profile.jpg';
-        document.getElementById('profileName').textContent = profile.name || 'Unknown';
-        
-        let ageLocation = '';
-        if (profile.age) ageLocation += `${profile.age} • `;
-        if (profile.location) ageLocation += profile.location;
-        document.getElementById('profileAgeLocation').textContent = ageLocation;
-        
-        document.getElementById('profileBio').textContent = profile.bio || 'No bio available';
-        document.getElementById('likeCount').textContent = profile.likes || 0;
-        
-        // Update online status indicator
-        updateProfileOnlineStatus(profile.id);
     }
-}
 
-// Update online status
-function updateProfileOnlineStatus(userId) {
-    const statusRef = doc(db, 'status', userId);
+    // Create global instance
+    window.virtualScrollManager = new VirtualScrollManager();
+
+    // Override your app's displayMessage function to use virtual scrolling
+    const originalDisplayMessage = window.displayMessage;
     
-    onSnapshot(statusRef, (doc) => {
-        const status = doc.data()?.state || 'offline';
-        const statusIndicator = document.getElementById('profileStatusIndicator');
-        
-        if (statusIndicator) {
-            statusIndicator.className = `online-status ${status}`;
+    if (typeof originalDisplayMessage === 'function') {
+        window.displayMessage = function(message, currentUserId) {
+            // Initialize virtual scroll if not already initialized
+            if (!window.virtualScrollManager.isInitialized) {
+                const container = document.getElementById('chatMessages');
+                if (container) {
+                    window.virtualScrollManager.initialize('chatMessages');
+                }
+            }
+            
+            // Add message to virtual scroll manager
+            window.virtualScrollManager.addMessage({
+                ...message,
+                _currentUserId: currentUserId
+            });
+            
+            // Also call original function for backward compatibility
+            return originalDisplayMessage(message, currentUserId);
+        };
+    }
+
+    // Override updateMessagesDisplay function
+    const originalUpdateMessagesDisplay = window.updateMessagesDisplay;
+    
+    if (typeof originalUpdateMessagesDisplay === 'function') {
+        window.updateMessagesDisplay = function(newMessages, currentUserId) {
+            // Initialize virtual scroll if not already initialized
+            if (!window.virtualScrollManager.isInitialized) {
+                const container = document.getElementById('chatMessages');
+                if (container) {
+                    window.virtualScrollManager.initialize('chatMessages');
+                }
+            }
+            
+            // Set all messages in virtual scroll manager
+            window.virtualScrollManager.setMessages(newMessages.map(msg => ({
+                ...msg,
+                _currentUserId: currentUserId
+            })));
+            
+            // Also call original function for backward compatibility
+            return originalUpdateMessagesDisplay(newMessages, currentUserId);
+        };
+    }
+
+    // Override displayCachedMessages function
+    const originalDisplayCachedMessages = window.displayCachedMessages;
+    
+    if (typeof originalDisplayCachedMessages === 'function') {
+        window.displayCachedMessages = function(messages) {
+            // Initialize virtual scroll if not already initialized
+            if (!window.virtualScrollManager.isInitialized) {
+                const container = document.getElementById('chatMessages');
+                if (container) {
+                    window.virtualScrollManager.initialize('chatMessages');
+                }
+            }
+            
+            // Set cached messages in virtual scroll manager
+            window.virtualScrollManager.setMessages(messages.map(msg => ({
+                ...msg,
+                _currentUserId: window.currentUser?.uid
+            })));
+            
+            // Also call original function for backward compatibility
+            return originalDisplayCachedMessages(messages);
+        };
+    }
+
+    // Add CSS for virtual scrolling
+    const style = document.createElement('style');
+    style.textContent = `
+        .virtual-scroll-spacer {
+            width: 100%;
+            transition: height 0.2s ease;
         }
-    });
-}
-
-// Show no profiles message
-function showNoProfilesMessage() {
-    document.getElementById('currentProfileImage').src = 'images/default-profile.jpg';
-    document.getElementById('profileName').textContent = 'No profiles found';
-    document.getElementById('profileAgeLocation').textContent = '';
-    document.getElementById('profileBio').textContent = 'Check back later for new profiles';
-    document.getElementById('likeCount').textContent = '0';
-    
-    // Hide action buttons when no profiles
-    disableActionButtons(true);
-}
-
-// Enable/disable action buttons
-function disableActionButtons(disabled) {
-    const dislikeBtn = document.getElementById('dislikeBtn');
-    const likeBtn = document.getElementById('likeBtn');
-    const viewProfileBtn = document.getElementById('viewProfileBtn');
-    const chatBtn = document.getElementById('chatBtn');
-    
-    [dislikeBtn, likeBtn, viewProfileBtn, chatBtn].forEach(btn => {
-        if (btn) {
-            btn.disabled = disabled;
-            btn.style.opacity = disabled ? '0.5' : '1';
-            btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+        
+        #chatMessages {
+            overflow-anchor: none; /* Prevent browser auto-scroll */
         }
-    });
-}
+        
+        .message[data-virtual-render="true"] {
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0.5; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Optimize rendering for virtual scroll */
+        .message {
+            contain: content;
+            will-change: transform;
+            backface-visibility: hidden;
+        }
+        
+        /* Smooth scrolling */
+        #chatMessages {
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+    `;
+    document.head.appendChild(style);
 
-// Manual profile navigation (if needed)
-export function goToNextProfile() {
-    if (!isAnimating) {
-        flipProfile('dislike');
-    }
-}
+    // Listen for page changes to clean up
+    let lastPage = '';
+    
+    const observePageChange = () => {
+        const currentPage = window.location.pathname.split('/').pop().split('.')[0];
+        
+        if (lastPage === 'chat' && currentPage !== 'chat') {
+            // Leaving chat page, destroy virtual scroll
+            window.virtualScrollManager.destroy();
+        }
+        
+        lastPage = currentPage;
+    };
+    
+    // Observe URL changes
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    
+    history.pushState = function() {
+        originalPushState.apply(this, arguments);
+        setTimeout(observePageChange, 0);
+    };
+    
+    history.replaceState = function() {
+        originalReplaceState.apply(this, arguments);
+        setTimeout(observePageChange, 0);
+    };
+    
+    window.addEventListener('popstate', observePageChange);
+    
+    // Initial check
+    setTimeout(observePageChange, 100);
 
-export function goToPreviousProfile() {
-    if (!isAnimating && currentProfileIndex > 0) {
-        isAnimating = true;
-        currentProfileIndex--;
-        showProfile(currentProfileIndex);
-        isAnimating = false;
-    }
-}
-
-// Get current profile index
-export function getCurrentProfileIndex() {
-    return currentProfileIndex;
-}
-
-// Get total profiles count
-export function getTotalProfilesCount() {
-    return profiles.length;
-}
-
-// Check if animation is in progress
-export function isAnimationInProgress() {
-    return isAnimating;
-}
-
-// Force reset animation state (for error recovery)
-export function resetAnimationState() {
-    isAnimating = false;
-    disableActionButtons(false);
-}
-
+    console.log('Virtual scroll fix.js loaded successfully');
+})();
