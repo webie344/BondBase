@@ -51,249 +51,6 @@ const cloudinaryConfig = {
 // Emoji reactions
 const EMOJI_REACTIONS = ['👍', '❤️', '🔥', '😘', '👎', '🤘', '💯'];
 
-// NEW: Message Virtualization for smooth scrolling
-class MessageVirtualizer {
-    constructor(container, messages, currentUserId) {
-        this.container = container;
-        this.messages = messages;
-        this.currentUserId = currentUserId;
-        this.visibleMessages = new Set();
-        this.messageCache = new Map();
-        this.buffer = 10; // Number of extra messages to render above/below viewport
-        this.messageHeight = 100; // Estimated message height in pixels
-        
-        // Bind methods
-        this.handleScroll = this.handleScroll.bind(this);
-        this.renderVisibleMessages = this.renderVisibleMessages.bind(this);
-        
-        // Initialize
-        this.init();
-    }
-    
-    init() {
-        // Add scroll listener
-        this.container.addEventListener('scroll', this.handleScroll);
-        
-        // Initial render
-        this.renderVisibleMessages();
-    }
-    
-    handleScroll() {
-        requestAnimationFrame(this.renderVisibleMessages);
-    }
-    
-    renderVisibleMessages() {
-        const scrollTop = this.container.scrollTop;
-        const containerHeight = this.container.clientHeight;
-        const startIndex = Math.max(0, Math.floor(scrollTop / this.messageHeight) - this.buffer);
-        const endIndex = Math.min(this.messages.length - 1, 
-            Math.floor((scrollTop + containerHeight) / this.messageHeight) + this.buffer);
-        
-        // Hide messages outside viewport
-        this.visibleMessages.forEach(msgId => {
-            if (msgId < startIndex || msgId > endIndex) {
-                const element = this.container.querySelector(`[data-virtual-index="${msgId}"]`);
-                if (element) {
-                    element.style.display = 'none';
-                }
-                this.visibleMessages.delete(msgId);
-            }
-        });
-        
-        // Show messages in viewport
-        for (let i = startIndex; i <= endIndex; i++) {
-            if (!this.visibleMessages.has(i)) {
-                this.renderMessage(i);
-                this.visibleMessages.add(i);
-            }
-        }
-    }
-    
-    renderMessage(index) {
-        const message = this.messages[index];
-        
-        // Check if message already exists
-        let messageElement = this.container.querySelector(`[data-message-id="${message.id}"]`);
-        
-        if (!messageElement) {
-            // Create new message element
-            messageElement = this.createMessageElement(message);
-            messageElement.dataset.virtualIndex = index;
-            
-            // Insert at correct position
-            const nextIndex = index + 1;
-            const nextElement = this.container.querySelector(`[data-virtual-index="${nextIndex}"]`);
-            
-            if (nextElement) {
-                this.container.insertBefore(messageElement, nextElement);
-            } else {
-                this.container.appendChild(messageElement);
-            }
-            
-            this.messageCache.set(message.id, messageElement);
-        } else {
-            // Show existing message
-            messageElement.style.display = '';
-            messageElement.dataset.virtualIndex = index;
-            
-            // Move to correct position if needed
-            const currentIndex = parseInt(messageElement.dataset.virtualIndex);
-            if (currentIndex !== index) {
-                const nextIndex = index + 1;
-                const nextElement = this.container.querySelector(`[data-virtual-index="${nextIndex}"]`);
-                
-                if (nextElement && messageElement.nextElementSibling !== nextElement) {
-                    this.container.insertBefore(messageElement, nextElement);
-                }
-            }
-        }
-    }
-    
-    createMessageElement(message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${message.senderId === this.currentUserId ? 'sent' : 'received'}`;
-        messageDiv.dataset.messageId = message.id;
-        
-        if (message.id && (message.id.startsWith('temp_') || message.status === 'sending')) {
-            messageDiv.style.opacity = '0.7';
-            messageDiv.classList.add('sending');
-        }
-        
-        let content = '';
-        
-        // Add reply preview if exists
-        if (message.replyTo) {
-            const repliedMessage = this.getRepliedMessage(message.replyTo);
-            if (repliedMessage) {
-                const senderName = repliedMessage.senderId === this.currentUserId ? 'You' : 
-                                  document.getElementById('chatPartnerName')?.textContent || 'User';
-                let previewText = '';
-                
-                if (repliedMessage.text) previewText = repliedMessage.text;
-                else if (repliedMessage.imageUrl) previewText = '📷 Photo';
-                else if (repliedMessage.audioUrl) previewText = '🎤 Voice message';
-                else if (repliedMessage.videoUrl) previewText = '🎥 Video message';
-                
-                content += `
-                    <div class="reply-indicator">
-                        <i class="fas fa-reply"></i> Replying to ${senderName}
-                    </div>
-                    <div class="reply-message-preview">${previewText}</div>
-                `;
-            }
-        }
-        
-        // Add message content
-        if (message.imageUrl) {
-            const isSending = message.id && (message.id.startsWith('temp_') || message.status === 'sending');
-            content += `
-                <div style="position: relative; display: inline-block;">
-                    <img src="${message.imageUrl}" alt="Message image" 
-                         class="message-image ${isSending ? 'sending' : ''}" 
-                         loading="lazy" 
-                         onload="this.style.opacity='1'"
-                         style="opacity: 0; transition: opacity 0.3s;">
-                    ${isSending ? '<div class="sending-indicator"><i class="fas fa-spinner"></i> Sending...</div>' : ''}
-                </div>
-            `;
-        } else if (message.text) {
-            content += `<p>${message.text}</p>`;
-        }
-        
-        // Add reactions
-        if (message.reactions && Object.keys(message.reactions).length > 0) {
-            content += `<div class="message-reactions">`;
-            for (const [emoji, users] of Object.entries(message.reactions)) {
-                content += `<span class="reaction">${emoji} <span class="reaction-count">${users.length}</span></span>`;
-            }
-            content += `</div>`;
-        }
-        
-        // Add timestamp
-        let timestampText = '';
-        if (message.id && message.id.startsWith('temp_') || message.status === 'sending') {
-            timestampText = 'Sending...';
-        } else {
-            timestampText = formatTime(message.timestamp);
-            if (message.senderId === this.currentUserId && message.read) {
-                timestampText += ' ✓✓';
-            }
-        }
-        
-        content += `<span class="message-time">${timestampText}</span>`;
-        
-        messageDiv.innerHTML = content;
-        
-        // Add voice message if exists
-        if (message.audioUrl || (message.id && message.id.startsWith('temp_voice'))) {
-            const voiceMessageDiv = document.createElement('div');
-            voiceMessageDiv.className = `voice-message ${message.senderId === this.currentUserId ? 'sent' : 'received'}`;
-            
-            if (message.id && message.id.startsWith('temp_voice') || message.status === 'sending') {
-                voiceMessageDiv.classList.add('sending');
-                const sendingOverlay = document.createElement('div');
-                sendingOverlay.className = 'sending-overlay';
-                sendingOverlay.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-                voiceMessageDiv.appendChild(sendingOverlay);
-            }
-            
-            const audioPlayer = createAudioPlayer(message.audioUrl || '', message.duration || 0);
-            voiceMessageDiv.appendChild(audioPlayer);
-            
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'message-time';
-            timeSpan.textContent = timestampText;
-            voiceMessageDiv.appendChild(timeSpan);
-            
-            messageDiv.appendChild(voiceMessageDiv);
-        }
-        
-        // Add video message if exists
-        if (message.videoUrl || (message.id && message.id.startsWith('temp_video'))) {
-            const videoPlayer = createVideoPlayer(message.videoUrl || '', message.duration || 0);
-            
-            if (message.id && message.id.startsWith('temp_video') || message.status === 'sending') {
-                videoPlayer.classList.add('sending');
-                const sendingOverlay = document.createElement('div');
-                sendingOverlay.className = 'sending-overlay';
-                sendingOverlay.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-                videoPlayer.appendChild(sendingOverlay);
-            }
-            
-            messageDiv.appendChild(videoPlayer);
-        }
-        
-        return messageDiv;
-    }
-    
-    getRepliedMessage(messageId) {
-        return this.messages.find(m => m.id === messageId);
-    }
-    
-    updateMessages(newMessages) {
-        this.messages = newMessages;
-        this.messageCache.clear();
-        this.visibleMessages.clear();
-        
-        // Clear container but keep some structure for smooth transition
-        const fragment = document.createDocumentFragment();
-        this.container.innerHTML = '';
-        this.container.appendChild(fragment);
-        
-        // Re-render
-        this.renderVisibleMessages();
-    }
-    
-    destroy() {
-        this.container.removeEventListener('scroll', this.handleScroll);
-        this.messageCache.clear();
-        this.visibleMessages.clear();
-    }
-}
-
-// Global virtualizer instance
-let messageVirtualizer = null;
-
 // NEW: IndexedDB for offline storage
 class IndexedDBCache {
     constructor() {
@@ -605,6 +362,60 @@ class LocalCache {
 
 const cache = new LocalCache();
 
+// NEW: Service Worker Registration for offline functionality with proper error handling
+async function registerServiceWorker() {
+    // Only register in production environment (not local file protocol)
+    if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('Service Worker registered successfully');
+            
+            // Set up background sync
+            if ('sync' in registration) {
+                try {
+                    await registration.sync.register('send-pending-messages');
+                    console.log('Background sync registered');
+                } catch (syncError) {
+                    console.log('Background sync not supported:', syncError);
+                }
+            }
+            
+            return registration;
+        } catch (error) {
+            console.log('Service Worker registration failed:', error);
+            // Don't show error to user - app will work without Service Worker
+            return null;
+        }
+    } else {
+        
+        return null;
+    }
+}
+
+// NEW: Enhanced offline support without Service Worker dependency
+function setupOfflineSupport() {
+    // Use localStorage and IndexedDB for offline support
+    
+    
+    // Process pending messages when coming online
+    window.addEventListener('online', async () => {
+        await processPendingMessages();
+    });
+}
+
+// NEW: Background Sync for offline messages
+async function setupBackgroundSync() {
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('send-pending-messages');
+            console.log('Background sync registered');
+        } catch (error) {
+            console.log('Background sync registration failed:', error);
+        }
+    }
+}
+
 // State variables for reactions and replies
 let selectedMessageForReaction = null;
 let selectedMessageForReply = null;
@@ -697,7 +508,7 @@ async function preloadChatData() {
         if (cachedMessages && cachedMessages.length > 0) {
             // Sort by timestamp and display
             cachedMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-            displayCachedMessages(cachedMessages);
+            updateMessagesDisplay(cachedMessages, currentUser.uid);
         }
         
         // Try to load partner data from cache
@@ -824,6 +635,11 @@ async function preloadMicrophonePermission() {
     } catch (error) {
         console.log('Microphone pre-load not supported:', error);
     }
+}
+
+// Call pre-load on page load for chat page
+if (currentPage === 'chat') {
+    setTimeout(preloadMicrophonePermission, 1000);
 }
 
 // File validation functions
@@ -1271,12 +1087,6 @@ function cleanupAllListeners() {
     
     eventManager.clearAll();
     optimisticUpdates.cleanupOldUpdates();
-    
-    // Destroy virtualizer
-    if (messageVirtualizer) {
-        messageVirtualizer.destroy();
-        messageVirtualizer = null;
-    }
 }
 
 // Enhanced logout function
@@ -1311,6 +1121,12 @@ async function handleLogout() {
 
 // UPDATED: DOM Content Loaded with Service Worker and preloading
 document.addEventListener('DOMContentLoaded', async () => {
+    // Try to register Service Worker (will fail gracefully if not supported)
+    await registerServiceWorker();
+    
+    // Always set up offline support even without Service Worker
+    setupOfflineSupport();
+    
     // Add loader styles immediately
     const style = document.createElement('style');
     style.textContent = `
@@ -1386,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         .offline-indicator {
-            position: fixed;
+            position: ;
             top: 0;
             left: 0;
             right: 0;
@@ -1395,7 +1211,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             text-align: center;
             padding: 10px;
             z-index: 10001;
-            font-size: 14px;
+            font-size: 5px;
             display: none;
         }
         
@@ -1449,7 +1265,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             margin-top: 5px;
         }
         .voice-message-play-btn {
-            background: var(--accent-color);
+            background: blue;
             border: none;
             border-radius: 50%;
             color: white;
@@ -1498,14 +1314,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             position: relative;
             background: #000;
             margin: 2px 0;
+           min-width:180px;
         }
 
         .video-message video {
-            width: 100%;
+            width: 260px;
             height: auto;
             max-height: 400px;
             border-radius: 12px;
             object-fit: cover;
+          min-width:260px;
         }
 
         .video-message-controls {
@@ -1587,7 +1405,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         .reply-indicator {
             font-size: 12px;
-            color: var(--accent-color);
+            color:white;
             margin-bottom: 4px;
             display: flex;
             align-items: center;
@@ -1794,6 +1612,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             border-radius: 12px;
             object-fit: cover;
             transition: opacity 0.3s ease;
+         min-width: 180px;
+        min-width: 180px;
         }
 
         .message-image.sending {
@@ -1869,6 +1689,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             .video-message video {
                 max-height: 300px;
+              min-width:200px;
             }
             
             .message-image {
@@ -1887,6 +1708,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             width: auto;
             height: 400px;
             border-radius: 12px;
+            padding-top:2px;
         }
         .video-message-controls {
             position: absolute;
@@ -2132,7 +1954,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             width: 40px;
             height: 40px;
             display: flex;
-            align-items: center;
+            alignItems: center;
             justify-content: center;
             cursor: pointer;
             transition: background-color 0.2s;
@@ -2154,7 +1976,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             50% { opacity: 0.3; }
         }
 
-        .profile-grid-status {
+       .profile-grid-status {
             position: absolute;
             top: 10px;
             right: 10px;
@@ -2179,100 +2001,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             color: #666;
             font-size: 16px;
         }
-        
-        .mingle-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
-            padding: 20px;
-        }
-        
-        .profile-grid-card {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            position: relative;
-        }
-        
-        .profile-grid-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-        
-        .profile-grid-image {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
-        }
-        
-        .profile-grid-content {
-            padding: 15px;
-        }
-        
-        .profile-grid-name {
-            margin: 0 0 5px 0;
-            font-size: 18px;
-            color: #333;
-        }
-        
-        .profile-grid-details {
-            margin: 0 0 10px 0;
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .profile-grid-bio {
-            margin: 0 0 15px 0;
-            color: #777;
-            font-size: 14px;
-            line-height: 1.4;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-        
-        .profile-grid-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .profile-grid-likes {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            color: #ff4757;
-            font-size: 14px;
-        }
-        
-        .profile-grid-like-btn {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: background-color 0.3s;
-        }
-        
-        .profile-grid-like-btn:hover {
-            background: var(--accent-dark);
-        }
-        
-        .profile-grid-like-btn.liked {
-            background: #ff4757;
-        }
-        
-        .profile-grid-like-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
+
+
         }
     `;
     document.head.appendChild(style);
@@ -3208,12 +2938,8 @@ async function sendVoiceNote() {
             status: 'sending'
         };
 
-        // Display message immediately
-        if (messageVirtualizer) {
-            const messages = [...messageVirtualizer.messages, tempMessage];
-            messageVirtualizer.updateMessages(messages);
-        }
-
+        displayMessage(tempMessage, currentUser.uid);
+        
         const messagesContainer = document.getElementById('chatMessages');
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
@@ -3248,6 +2974,11 @@ async function sendVoiceNote() {
     } catch (error) {
         logError(error, 'sending voice note');
         showNotification('Failed to send voice note. Please try again.', 'error');
+        
+        const tempMessageElement = document.querySelector(`[data-message-id="temp_voice_"]`);
+        if (tempMessageElement) {
+            tempMessageElement.remove();
+        }
         
         document.getElementById('sendVoiceNoteBtn').innerHTML = 
             '<i class="fas fa-paper-plane"></i> Send';
@@ -3397,12 +3128,8 @@ async function sendVideoMessage(videoBlob) {
             status: 'sending'
         };
 
-        // Display message immediately
-        if (messageVirtualizer) {
-            const messages = [...messageVirtualizer.messages, tempMessage];
-            messageVirtualizer.updateMessages(messages);
-        }
-
+        displayMessage(tempMessage, currentUser.uid);
+        
         const messagesContainer = document.getElementById('chatMessages');
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
@@ -3434,6 +3161,11 @@ async function sendVideoMessage(videoBlob) {
     } catch (error) {
         logError(error, 'sending video message');
         showNotification('Failed to send video message. Please try again.', 'error');
+        
+        const tempMessageElement = document.querySelector(`[data-message-id="temp_video_"]`);
+        if (tempMessageElement) {
+            tempMessageElement.remove();
+        }
     }
 }
 
@@ -3574,12 +3306,8 @@ async function sendImageMessage(file) {
             status: 'sending'
         };
 
-        // Display message immediately
-        if (messageVirtualizer) {
-            const messages = [...messageVirtualizer.messages, tempMessage];
-            messageVirtualizer.updateMessages(messages);
-        }
-
+        displayMessage(tempMessage, currentUser.uid);
+        
         const messagesContainer = document.getElementById('chatMessages');
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
@@ -3604,6 +3332,11 @@ async function sendImageMessage(file) {
     } catch (error) {
         logError(error, 'sending image message');
         showNotification('Failed to send image. Please try again.', 'error');
+        
+        const tempMessageElement = document.querySelector(`[data-message-id="temp_image_"]`);
+        if (tempMessageElement) {
+            tempMessageElement.remove();
+        }
     }
 }
 
@@ -3695,6 +3428,137 @@ function createVideoPlayer(videoUrl, duration) {
     `;
     
     return container;
+}
+
+// UPDATED: Display message function to handle image, voice, and video sending states with offline support
+function displayMessage(message, currentUserId) {
+    const messagesContainer = document.getElementById('chatMessages');
+    
+    const noMessagesDiv = messagesContainer.querySelector('.no-messages');
+    if (noMessagesDiv) {
+        noMessagesDiv.remove();
+    }
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${message.senderId === currentUserId ? 'sent' : 'received'}`;
+    messageDiv.dataset.messageId = message.id;
+    
+    if (message.id && (message.id.startsWith('temp_') || message.status === 'sending')) {
+        messageDiv.style.opacity = '0.7';
+        messageDiv.classList.add('sending');
+    }
+    
+    let messageContent = '';
+    
+    if (message.replyTo) {
+        const repliedMessage = getRepliedMessage(message.replyTo);
+        if (repliedMessage) {
+            const senderName = repliedMessage.senderId === currentUserId ? 'You' : document.getElementById('chatPartnerName').textContent;
+            let previewText = '';
+            
+            if (repliedMessage.text) {
+                previewText = repliedMessage.text;
+            } else if (repliedMessage.imageUrl) {
+                previewText = '📷 Photo';
+            } else if (repliedMessage.audioUrl) {
+                previewText = '🎤 Voice message';
+            } else if (repliedMessage.videoUrl) {
+                previewText = '🎥 Video message';
+            }
+            
+            messageContent += `
+                <div class="reply-indicator">
+                    <i class="fas fa-reply"></i> Replying to ${senderName}
+                </div>
+                <div class="reply-message-preview">${previewText}</div>
+            `;
+        }
+    }
+    
+    if (message.imageUrl) {
+        const imageContainer = document.createElement('div');
+        imageContainer.style.position = 'relative';
+        imageContainer.style.display = 'inline-block';
+        
+        const img = document.createElement('img');
+        img.src = message.imageUrl;
+        img.alt = "Message image";
+        img.className = 'message-image';
+        
+        if (message.id && message.id.startsWith('temp_') || message.status === 'sending') {
+            img.classList.add('sending');
+            
+            const sendingIndicator = document.createElement('div');
+            sendingIndicator.className = 'sending-indicator';
+            sendingIndicator.innerHTML = '<i class="fas fa-spinner"></i> Sending...';
+            imageContainer.appendChild(sendingIndicator);
+        }
+        
+        imageContainer.appendChild(img);
+        messageContent += imageContainer.outerHTML;
+    } else if (message.text) {
+        messageContent += `<p>${message.text}</p>`;
+    }
+    
+    if (message.reactions && Object.keys(message.reactions).length > 0) {
+        messageContent += `<div class="message-reactions">`;
+        for (const [emoji, users] of Object.entries(message.reactions)) {
+            messageContent += `<span class="reaction">${emoji} <span class="reaction-count">${users.length}</span></span>`;
+        }
+        messageContent += `</div>`;
+    }
+    
+    let timestampText = '';
+    if (message.id && message.id.startsWith('temp_') || message.status === 'sending') {
+        timestampText = 'Sending...';
+    } else {
+        timestampText = formatTime(message.timestamp);
+        if (message.senderId === currentUserId && message.read) {
+            timestampText += ' ✓✓';
+        }
+    }
+    
+    messageContent += `<span class="message-time">${timestampText}</span>`;
+    
+    messageDiv.innerHTML = messageContent;
+    
+    if (message.audioUrl || (message.id && message.id.startsWith('temp_voice'))) {
+        const voiceMessageDiv = document.createElement('div');
+        voiceMessageDiv.className = `voice-message ${message.senderId === currentUserId ? 'sent' : 'received'}`;
+        
+        if (message.id && message.id.startsWith('temp_voice') || message.status === 'sending') {
+            voiceMessageDiv.classList.add('sending');
+            const sendingOverlay = document.createElement('div');
+            sendingOverlay.className = 'sending-overlay';
+            sendingOverlay.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            voiceMessageDiv.appendChild(sendingOverlay);
+        }
+        
+        const audioPlayer = createAudioPlayer(message.audioUrl || '', message.duration || 0);
+        voiceMessageDiv.appendChild(audioPlayer);
+        
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'message-time';
+        timeSpan.textContent = timestampText;
+        
+        messageDiv.appendChild(voiceMessageDiv);
+    }
+    
+    if (message.videoUrl || (message.id && message.id.startsWith('temp_video'))) {
+        const videoPlayer = createVideoPlayer(message.videoUrl || '', message.duration || 0);
+        
+        if (message.id && message.id.startsWith('temp_video') || message.status === 'sending') {
+            videoPlayer.classList.add('sending');
+            const sendingOverlay = document.createElement('div');
+            sendingOverlay.className = 'sending-overlay';
+            sendingOverlay.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            videoPlayer.appendChild(sendingOverlay);
+        }
+        
+        messageDiv.appendChild(videoPlayer);
+    }
+    
+    messagesContainer.appendChild(messageDiv);
 }
 
 // Loading message functions
@@ -3802,12 +3666,6 @@ function cleanupChatPage() {
     if (videoRecordingTimer) clearInterval(videoRecordingTimer);
     if (longPressTimer) clearTimeout(longPressTimer);
     
-    // Destroy virtualizer
-    if (messageVirtualizer) {
-        messageVirtualizer.destroy();
-        messageVirtualizer = null;
-    }
-    
     chatPartnerId = null;
 }
 
@@ -3817,12 +3675,6 @@ function loadChatMessages(userId, partnerId) {
     
     if (unsubscribeChat) {
         unsubscribeChat();
-    }
-    
-    // Destroy existing virtualizer
-    if (messageVirtualizer) {
-        messageVirtualizer.destroy();
-        messageVirtualizer = null;
     }
     
     const threadId = [userId, partnerId].sort().join('_');
@@ -3879,18 +3731,12 @@ function loadChatMessages(userId, partnerId) {
                 cache.set(cacheKey, messages, 'short');
                 await cache.setMessages(threadId, messages);
                 
-                // Use virtualizer for display
-                if (!messageVirtualizer) {
-                    messageVirtualizer = new MessageVirtualizer(messagesContainer, messages, userId);
-                } else {
-                    messageVirtualizer.updateMessages(messages);
-                }
+                updateMessagesDisplay(messages, userId);
                 
                 if (hasUnreadMessages) {
                     await markMessagesAsRead(threadId, partnerId, userId);
                 }
                 
-                // Scroll to bottom
                 setTimeout(() => {
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 }, 100);
@@ -3947,38 +3793,35 @@ async function markMessagesAsRead(threadId, partnerId, userId) {
     }
 }
 
-// FIXED: Optimized message display for cached messages
-function displayCachedMessages(messages) {
+// FIXED: Updated message display function to prevent duplicates
+function updateMessagesDisplay(newMessages, currentUserId) {
     const messagesContainer = document.getElementById('chatMessages');
+    
+    const tempMessages = messagesContainer.querySelectorAll('[data-message-id^="temp_"]');
+    tempMessages.forEach(msg => msg.remove());
     
     hideChatLoadingMessage();
     
-    if (messages.length === 0) {
-        messagesContainer.innerHTML = '<div class="no-messages">No messages yet. Start the conversation!</div>';
-        return;
+    const existingMessages = messagesContainer.querySelectorAll('.message:not([data-message-id^="temp_"])');
+    if (existingMessages.length === 0 && newMessages.length > 0) {
+        messagesContainer.innerHTML = '';
     }
     
-    messages.sort((a, b) => {
-        const timeA = new Date(a.timestamp).getTime();
-        const timeB = new Date(b.timestamp).getTime();
-        return timeA - timeB;
+    newMessages.forEach(message => {
+        const existingMessage = messagesContainer.querySelector(`[data-message-id="${message.id}"]`);
+        if (!existingMessage) {
+            displayMessage(message, currentUserId);
+        } else {
+            updateExistingMessage(existingMessage, message, currentUserId);
+        }
     });
     
-    // Use virtualizer for cached messages too
-    if (!messageVirtualizer) {
-        messageVirtualizer = new MessageVirtualizer(messagesContainer, messages, currentUser.uid);
-    } else {
-        messageVirtualizer.updateMessages(messages);
+    if (newMessages.length === 0 && messagesContainer.children.length === 0) {
+        const noMessagesDiv = document.createElement('div');
+        noMessagesDiv.className = 'no-messages';
+        noMessagesDiv.textContent = 'No messages yet. Start the conversation!';
+        messagesContainer.appendChild(noMessagesDiv);
     }
-    
-    setTimeout(() => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }, 100);
-}
-
-function getRepliedMessage(messageId) {
-    const cachedMessages = cache.get(`messages_${currentUser.uid}_${chatPartnerId}`) || [];
-    return cachedMessages.find(m => m.id === messageId);
 }
 
 // UPDATED: Add message function with offline support and optimistic updates
@@ -4001,6 +3844,33 @@ async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDu
         
         if (selectedMessageForReply) {
             messageData.replyTo = selectedMessageForReply;
+        }
+        
+        const tempMessageId = 'temp_' + Date.now();
+        const tempMessage = {
+            id: tempMessageId,
+            ...messageData,
+            timestamp: new Date().toISOString()
+        };
+        
+        window.lastTempMessageId = tempMessageId;
+        
+        displayMessage(tempMessage, currentUser.uid);
+        
+        const messagesContainer = document.getElementById('chatMessages');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // NEW: Add to pending messages if offline
+        if (!isOnline) {
+            await cache.addPendingMessage({
+                type: 'text',
+                tempId: tempMessageId,
+                data: messageData,
+                threadId: threadId,
+                timestamp: new Date().toISOString()
+            });
+            showNotification('Message saved offline. Will send when connection is restored.', 'info');
+            return;
         }
         
         const docRef = await addDoc(collection(db, 'conversations', threadId, 'messages'), messageData);
@@ -4026,15 +3896,135 @@ async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDu
     } catch (error) {
         logError(error, 'adding message');
         showNotification('Error sending message. Please try again.', 'error');
+        
+        const tempMessageElement = document.querySelector(`[data-message-id="${window.lastTempMessageId}"]`);
+        if (tempMessageElement) {
+            tempMessageElement.remove();
+        }
     }
 }
 
-// Initialize landing page
+// FIXED: Update existing message without recreating it
+function updateExistingMessage(existingElement, message, currentUserId) {
+    updateMessageReactions(existingElement, message);
+    
+    if (message.senderId === currentUserId && message.read) {
+        const timeElement = existingElement.querySelector('.message-time');
+        if (timeElement && !timeElement.textContent.includes('✓✓')) {
+            timeElement.textContent = timeElement.textContent.replace('✓', '✓✓');
+        }
+    }
+    
+    if (existingElement.classList.contains('sending')) {
+        const timeElement = existingElement.querySelector('.message-time');
+        if (timeElement && timeElement.textContent === 'Sending...') {
+            timeElement.textContent = formatTime(message.timestamp);
+            existingElement.style.opacity = '1';
+            existingElement.classList.remove('sending');
+            
+            const sendingIndicator = existingElement.querySelector('.sending-indicator');
+            if (sendingIndicator) {
+                sendingIndicator.remove();
+            }
+            
+            const image = existingElement.querySelector('.message-image.sending');
+            if (image) {
+                image.classList.remove('sending');
+            }
+            
+            const sendingOverlay = existingElement.querySelector('.sending-overlay');
+            if (sendingOverlay) {
+                sendingOverlay.remove();
+            }
+            
+            const voiceMessage = existingElement.querySelector('.voice-message.sending');
+            if (voiceMessage) {
+                voiceMessage.classList.remove('sending');
+            }
+            
+            const videoMessage = existingElement.querySelector('.video-message.sending');
+            if (videoMessage) {
+                videoMessage.classList.remove('sending');
+            }
+        }
+    }
+}
+
+// FIXED: Update only the reactions part of a message
+function updateMessageReactions(messageElement, message) {
+    let reactionsContainer = messageElement.querySelector('.message-reactions');
+    const reactions = message.reactions || {};
+    
+    if (Object.keys(reactions).length === 0) {
+        if (reactionsContainer) {
+            reactionsContainer.remove();
+        }
+        return;
+    }
+    
+    if (!reactionsContainer) {
+        reactionsContainer = document.createElement('div');
+        reactionsContainer.className = 'message-reactions';
+        
+        const timeElement = messageElement.querySelector('.message-time');
+        if (timeElement) {
+            messageElement.insertBefore(reactionsContainer, timeElement);
+        } else {
+            messageElement.appendChild(reactionsContainer);
+        }
+    }
+    
+    reactionsContainer.innerHTML = '';
+    for (const [emoji, users] of Object.entries(reactions)) {
+        const reactionElement = document.createElement('span');
+        reactionElement.className = 'reaction';
+        reactionElement.innerHTML = `${emoji} <span class="reaction-count">${users.length}</span>`;
+        reactionsContainer.appendChild(reactionElement);
+    }
+}
+
+// FIXED: Updated displayCachedMessages function to handle loading state properly
+function displayCachedMessages(messages) {
+    const messagesContainer = document.getElementById('chatMessages');
+    
+    hideChatLoadingMessage();
+    
+    if (messages.length === 0) {
+        const noMessagesDiv = document.createElement('div');
+        noMessagesDiv.className = 'no-messages';
+        noMessagesDiv.textContent = 'No messages yet. Start the conversation!';
+        messagesContainer.appendChild(noMessagesDiv);
+        return;
+    }
+    
+    messages.sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime();
+        const timeB = new Date(b.timestamp).getTime();
+        return timeA - timeB;
+    });
+    
+    messages.forEach(message => {
+        const existingMessage = document.querySelector(`[data-message-id="${message.id}"]`);
+        if (!existingMessage) {
+            displayMessage(message, currentUser.uid);
+        }
+    });
+    
+    setTimeout(() => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }, 100);
+}
+
+function getRepliedMessage(messageId) {
+    const cachedMessages = cache.get(`messages_${currentUser.uid}_${chatPartnerId}`) || [];
+    return cachedMessages.find(m => m.id === messageId);
+}
+
+// UPDATED: Page Initialization Functions with preloading
 function initLandingPage() {
     showFastLoadingMessage();
 }
 
-// Initialize login page
 function initLoginPage() {
     const loginForm = document.getElementById('loginForm');
     const togglePassword = document.getElementById('toggleLoginPassword');
@@ -4094,7 +4084,6 @@ function initLoginPage() {
     }
 }
 
-// Initialize signup page
 function initSignupPage() {
     const signupForm = document.getElementById('signupForm');
     const togglePassword = document.getElementById('toggleSignupPassword');
@@ -4147,7 +4136,6 @@ function initSignupPage() {
     }
 }
 
-// Initialize dashboard page
 function initDashboardPage() {
     const logoutBtn = document.getElementById('logoutBtn');
     const mingleBtn = document.getElementById('mingleBtn');
@@ -4193,7 +4181,6 @@ function initDashboardPage() {
     }
 }
 
-// Initialize payment page
 function initPaymentPage() {
     const logoutBtn = document.getElementById('logoutBtn');
     const backBtn = document.getElementById('backBtn');
@@ -4281,7 +4268,6 @@ function initPaymentPage() {
     }
 }
 
-// Initialize admin page
 function initAdminPage() {
     const loginForm = document.getElementById('adminLoginForm');
     const paymentList = document.getElementById('paymentList');
@@ -4517,7 +4503,8 @@ async function loadProfiles(forceRefresh = false) {
     }
 }
 
-// Display profiles in grid format
+// NEW: Display profiles in grid format
+// NEW: Display profiles in grid format
 function displayProfilesGrid() {
     const mingleGrid = document.getElementById('mingleGrid');
     if (!mingleGrid) return;
@@ -4579,7 +4566,8 @@ function displayProfilesGrid() {
     });
 }
 
-// Handle like in grid view
+
+// NEW: Handle like in grid view
 async function handleGridLike(profileId, likeButton) {
     if (!currentUser) {
         showNotification('Please log in to like profiles', 'error');
@@ -5154,9 +5142,6 @@ function initChatPage() {
             fileInput.click();
         });
     }
-
-    // Call pre-load microphone on chat page
-    setTimeout(preloadMicrophonePermission, 1000);
 
     if (voiceNoteBtn) {
         eventManager.addListener(voiceNoteBtn, 'mousedown', async () => {
