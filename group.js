@@ -1728,7 +1728,7 @@ class GroupChat {
         }
     }
 
-    // NEW: Listen to voice channels
+    // Listen to voice channels (NEW)
     listenToVoiceChannels(groupId, callback) {
         try {
             if (this.unsubscribeVoiceChannels.has(groupId)) {
@@ -3016,141 +3016,433 @@ function initGroupPage() {
         });
     }
     
-    // NEW: Create voice channels UI
+    // NEW: Create voice channels UI (Like WhatsApp messages)
     function createVoiceChannelsUI() {
         // Check if container already exists
-        if (document.getElementById('voiceChannelsContainer')) return;
+        if (document.getElementById('voiceChannelMessagesContainer')) return;
         
-        const voiceChannelsSection = document.createElement('div');
-        voiceChannelsSection.id = 'voiceChannelsSection';
-        voiceChannelsSection.className = 'voice-channels-section';
-        voiceChannelsSection.innerHTML = `
+        const voiceChannelSection = document.createElement('div');
+        voiceChannelSection.id = 'voiceChannelMessagesContainer';
+        voiceChannelSection.className = 'voice-channel-messages-section';
+        voiceChannelSection.innerHTML = `
             <div class="voice-channels-header">
                 <h3><i class="fas fa-volume-up"></i> Voice Channels</h3>
-                <button id="toggleVoiceChannels" class="toggle-channels-btn">
-                    <i class="fas fa-chevron-down"></i>
+                <button id="createVoiceChannelBtn" class="create-voice-channel-btn">
+                    <i class="fas fa-plus"></i> Create
                 </button>
             </div>
-            <div id="voiceChannelsContainer" class="voice-channels-container">
-                <div class="loading-channels">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>Loading voice channels...</p>
-                </div>
+            <div id="voiceChannelsMessages" class="voice-channels-messages">
+                <!-- Voice channels will be displayed as messages here -->
             </div>
         `;
         
-        const chatHeader = document.querySelector('.chat-header');
-        if (chatHeader) {
-            chatHeader.parentNode.insertBefore(voiceChannelsSection, chatHeader.nextSibling);
+        // Add styles for WhatsApp-style voice channel messages
+        const styles = document.createElement('style');
+        styles.id = 'voice-channel-message-styles';
+        styles.textContent = `
+            .voice-channel-messages-section {
+                padding: 10px 15px;
+                background: transparent;
+            }
+            
+            .voice-channels-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 15px;
+            }
+            
+            .voice-channels-header h3 {
+                margin: 0;
+                font-size: 16px;
+                color: #333;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .create-voice-channel-btn {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                transition: all 0.3s ease;
+            }
+            
+            .create-voice-channel-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            }
+            
+            .voice-channels-messages {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .voice-channel-message {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 12px 16px;
+                border-radius: 18px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                cursor: pointer;
+                transition: all 0.3s ease;
+                animation: slideIn 0.3s ease;
+            }
+            
+            .voice-channel-message:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            }
+            
+            .voice-channel-content {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            
+            .voice-channel-icon {
+                width: 40px;
+                height: 40px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 18px;
+                flex-shrink: 0;
+            }
+            
+            .voice-channel-info {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .voice-channel-title {
+                font-weight: 600;
+                font-size: 14px;
+                margin-bottom: 4px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .voice-channel-name {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            .voice-channel-status {
+                font-size: 11px;
+                padding: 2px 8px;
+                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.2);
+            }
+            
+            .voice-channel-meta {
+                display: flex;
+                justify-content: space-between;
+                font-size: 12px;
+                opacity: 0.9;
+            }
+            
+            .voice-channel-creator {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 120px;
+            }
+            
+            .voice-channel-time {
+                font-size: 11px;
+                opacity: 0.8;
+            }
+            
+            .voice-channel-join-btn {
+                background: white;
+                color: #667eea;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-weight: 600;
+                font-size: 12px;
+                cursor: pointer;
+                transition: all 0.3s;
+                flex-shrink: 0;
+                margin-left: 10px;
+            }
+            
+            .voice-channel-join-btn:hover {
+                background: #f5f5f5;
+                transform: scale(1.05);
+            }
+            
+            .voice-channel-join-btn.joined {
+                background: #4CAF50;
+                color: white;
+            }
+            
+            .voice-channel-join-btn.joined:hover {
+                background: #45a049;
+            }
+            
+            .voice-channel-join-btn.full {
+                background: #dc3545;
+                color: white;
+                cursor: not-allowed;
+            }
+            
+            .header-mini-player {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 25px;
+                padding: 8px 16px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+                z-index: 1000;
+                color: white;
+                display: none;
+                align-items: center;
+                gap: 10px;
+                cursor: pointer;
+                transition: all 0.3s;
+                max-width: 300px;
+                animation: slideDown 0.3s ease;
+            }
+            
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            @keyframes slideDown {
+                from {
+                    opacity: 0;
+                    transform: translateY(-20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            .header-mini-player:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            }
+            
+            .header-player-icon {
+                width: 24px;
+                height: 24px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+            }
+            
+            .header-player-info {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .header-player-channel {
+                font-size: 11px;
+                font-weight: 600;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            .header-player-participants {
+                font-size: 10px;
+                opacity: 0.8;
+            }
+            
+            .header-player-controls {
+                display: flex;
+                gap: 5px;
+            }
+            
+            .header-player-btn {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                color: white;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                transition: background 0.3s;
+            }
+            
+            .header-player-btn:hover {
+                background: rgba(255, 255, 255, 0.3);
+            }
+            
+            .header-player-btn.mute.active {
+                background: rgba(244, 67, 54, 0.3);
+                color: #f44336;
+            }
+            
+            .header-player-btn.leave {
+                background: rgba(220, 53, 69, 0.3);
+                color: #dc3545;
+            }
+            
+            .header-player-btn.leave:hover {
+                background: rgba(220, 53, 69, 0.4);
+            }
+        `;
+        
+        document.head.appendChild(styles);
+        
+        // Insert voice channels after the first message or at the top
+        const messagesContainer = document.querySelector('.messages-container');
+        if (messagesContainer) {
+            messagesContainer.parentNode.insertBefore(voiceChannelSection, messagesContainer);
         } else {
-            document.querySelector('.chat-container').insertBefore(voiceChannelsSection, document.querySelector('.messages-container'));
+            const chatContainer = document.querySelector('.chat-container');
+            if (chatContainer) {
+                chatContainer.insertBefore(voiceChannelSection, document.querySelector('.message-input-container'));
+            }
         }
         
-        // Add toggle functionality
-        const toggleBtn = document.getElementById('toggleVoiceChannels');
-        const container = document.getElementById('voiceChannelsContainer');
-        
-        toggleBtn.addEventListener('click', () => {
-            const isVisible = container.style.display !== 'none';
-            container.style.display = isVisible ? 'none' : 'block';
-            toggleBtn.innerHTML = isVisible ? 
-                '<i class="fas fa-chevron-down"></i>' : 
-                '<i class="fas fa-chevron-up"></i>';
-        });
-        
-        // Initialize with channels visible
-        container.style.display = 'block';
+        // Add create button event listener
+        const createBtn = document.getElementById('createVoiceChannelBtn');
+        if (createBtn) {
+            createBtn.addEventListener('click', () => {
+                if (window.callsModule && window.callsModule.createVoiceChannel) {
+                    window.callsModule.createVoiceChannel(groupId);
+                } else {
+                    showNotification('Voice channel system not loaded. Please refresh the page.', 'error');
+                }
+            });
+        }
     }
     
-    // NEW: Update voice channels UI
+    // NEW: Format time ago for voice channels
+    function formatTimeAgo(date) {
+        if (!date) return 'Unknown';
+        
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+        
+        if (diffDays > 0) {
+            return `${diffDays}d`;
+        } else if (diffHours > 0) {
+            return `${diffHours}h`;
+        } else if (diffMins > 0) {
+            return `${diffMins}m`;
+        } else {
+            return 'now';
+        }
+    }
+    
+    // NEW: Get short name for display
+    function getUserShortName(userId) {
+        if (!userId) return 'Unknown';
+        if (userId === groupChat.firebaseUser?.uid) return 'You';
+        
+        // Get first 8 characters of user ID for display
+        return `User ${userId.substring(0, 8)}...`;
+    }
+    
+    // NEW: Update voice channels UI as messages
     function updateVoiceChannelsUI(channels) {
-        const container = document.getElementById('voiceChannelsContainer');
+        const container = document.getElementById('voiceChannelsMessages');
         if (!container) return;
         
         if (channels.length === 0) {
             container.innerHTML = `
-                <div class="no-voice-channels">
-                    <i class="fas fa-volume-mute"></i>
-                    <p>No active voice channels</p>
-                    <button id="startFirstVoiceChannel" class="start-voice-channel-btn">
-                        <i class="fas fa-plus"></i> Start First Voice Channel
-                    </button>
+                <div class="voice-channel-message" style="background: rgba(102, 126, 234, 0.1); color: #666; cursor: default;">
+                    <div class="voice-channel-content">
+                        <div class="voice-channel-icon" style="background: rgba(102, 126, 234, 0.2); color: #667eea;">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                        <div class="voice-channel-info">
+                            <div class="voice-channel-title">
+                                <span class="voice-channel-name">No active voice channels</span>
+                            </div>
+                            <div class="voice-channel-meta">
+                                <span class="voice-channel-creator">Click "Create" to start your first voice channel</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
-            
-            const startBtn = document.getElementById('startFirstVoiceChannel');
-            if (startBtn) {
-                startBtn.addEventListener('click', () => {
-                    if (window.callsModule && window.callsModule.createVoiceChannel) {
-                        window.callsModule.createVoiceChannel(groupId);
-                    } else {
-                        showNotification('Voice channel system not loaded. Please refresh the page.', 'error');
-                    }
-                });
-            }
             return;
         }
         
         container.innerHTML = '';
         
         channels.forEach(channel => {
-            const channelElement = document.createElement('div');
-            channelElement.className = 'voice-channel-card';
+            const channelMessage = document.createElement('div');
+            channelMessage.className = 'voice-channel-message';
             
-            // Check if user is in this channel
-            const isUserInChannel = window.callsModule?.isUserInChannel?.(channel.id);
+            const isUserInThisChannel = window.callsModule?.isUserInChannel?.(channel.id);
+            const participantCount = channel.participants?.length || 0;
+            const isFull = participantCount >= 30;
             
-            channelElement.innerHTML = `
-                <div class="channel-header">
-                    <div class="channel-icon">
-                        <i class="fas fa-volume-up"></i>
+            channelMessage.innerHTML = `
+                <div class="voice-channel-content">
+                    <div class="voice-channel-icon" style="background: ${isUserInThisChannel ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255, 255, 255, 0.2)'}">
+                        <i class="fas ${isUserInThisChannel ? 'fa-headphones' : 'fa-volume-up'}"></i>
                     </div>
-                    <div class="channel-info">
-                        <h4 class="channel-name">${channel.name || 'Voice Channel'}</h4>
-                        <div class="channel-meta">
-                            <span class="channel-creator">
-                                <i class="fas fa-user"></i> ${channel.createdBy || 'Unknown'}
+                    <div class="voice-channel-info">
+                        <div class="voice-channel-title">
+                            <span class="voice-channel-name">${channel.name || 'Voice Channel'}</span>
+                            <span class="voice-channel-status">${participantCount}/30</span>
+                        </div>
+                        <div class="voice-channel-meta">
+                            <span class="voice-channel-creator">
+                                <i class="fas fa-user"></i> ${getUserShortName(channel.createdBy)}
                             </span>
-                            <span class="channel-time">
+                            <span class="voice-channel-time">
                                 <i class="fas fa-clock"></i> ${formatTimeAgo(channel.createdAt)}
                             </span>
                         </div>
                     </div>
-                </div>
-                <div class="channel-participants">
-                    <div class="participants-count">
-                        <i class="fas fa-users"></i>
-                        <span>${channel.participants?.length || 0} / 30</span>
-                    </div>
-                    <div class="participants-list">
-                        ${(channel.participants || []).slice(0, 5).map(() => 
-                            `<span class="participant-dot"></span>`
-                        ).join('')}
-                        ${(channel.participants?.length || 0) > 5 ? 
-                            `<span class="more-participants">+${(channel.participants?.length || 0) - 5}</span>` : ''
+                    <button class="voice-channel-join-btn ${isUserInThisChannel ? 'joined' : ''} ${isFull ? 'full' : ''}" 
+                            ${isFull && !isUserInThisChannel ? 'disabled' : ''}>
+                        ${isUserInThisChannel ? 
+                            '<i class="fas fa-phone-slash"></i> Leave' : 
+                            isFull ? '<i class="fas fa-lock"></i> Full' : 
+                            '<i class="fas fa-phone-alt"></i> Join'
                         }
-                    </div>
-                </div>
-                <div class="channel-actions">
-                    ${(channel.participants?.length || 0) >= 30 ? 
-                        `<button class="join-channel-btn full" disabled>
-                            <i class="fas fa-lock"></i> Channel Full
-                        </button>` :
-                        `<button class="join-channel-btn ${isUserInChannel ? 'active' : ''}" data-channel-id="${channel.id}">
-                            ${isUserInChannel ? 
-                                `<i class="fas fa-phone-slash"></i> Leave` : 
-                                `<i class="fas fa-phone-alt"></i> Join`
-                            }
-                        </button>`
-                    }
+                    </button>
                 </div>
             `;
             
-            const joinBtn = channelElement.querySelector('.join-channel-btn');
+            const joinBtn = channelMessage.querySelector('.voice-channel-join-btn');
             if (joinBtn && !joinBtn.disabled) {
-                joinBtn.addEventListener('click', () => {
+                joinBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     if (window.callsModule) {
-                        if (isUserInChannel) {
+                        if (isUserInThisChannel) {
                             window.callsModule.leaveVoiceChannel(channel.id, groupId);
                         } else {
                             window.callsModule.joinVoiceChannel(channel.id, groupId);
@@ -3161,49 +3453,280 @@ function initGroupPage() {
                 });
             }
             
-            container.appendChild(channelElement);
-        });
-        
-        // Add "Start New Channel" button
-        const startNewChannel = document.createElement('div');
-        startNewChannel.className = 'start-new-channel';
-        startNewChannel.innerHTML = `
-            <button id="startNewVoiceChannel" class="start-new-channel-btn">
-                <i class="fas fa-plus-circle"></i> Start New Voice Channel
-            </button>
-        `;
-        
-        container.appendChild(startNewChannel);
-        
-        const startBtn = document.getElementById('startNewVoiceChannel');
-        if (startBtn) {
-            startBtn.addEventListener('click', () => {
-                if (window.callsModule && window.callsModule.createVoiceChannel) {
-                    window.callsModule.createVoiceChannel(groupId);
-                } else {
-                    showNotification('Voice channel system not loaded. Please refresh the page.', 'error');
+            // Click on message to view details
+            channelMessage.addEventListener('click', (e) => {
+                if (!e.target.closest('.voice-channel-join-btn')) {
+                    showVoiceChannelDetails(channel, groupId);
                 }
             });
-        }
+            
+            container.appendChild(channelMessage);
+        });
     }
     
-    // NEW: Format time ago
-    function formatTimeAgo(date) {
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
+    // NEW: Show voice channel details modal
+    function showVoiceChannelDetails(channel, groupId) {
+        const modal = document.createElement('div');
+        modal.className = 'voice-channel-details-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
+        `;
         
-        if (diffDays > 0) {
-            return `${diffDays}d ago`;
-        } else if (diffHours > 0) {
-            return `${diffHours}h ago`;
-        } else if (diffMins > 0) {
-            return `${diffMins}m ago`;
-        } else {
-            return 'just now';
+        const participantCount = channel.participants?.length || 0;
+        const isUserInThisChannel = window.callsModule?.isUserInChannel?.(channel.id);
+        
+        modal.innerHTML = `
+            <div class="channel-details-content" style="
+                background: white;
+                border-radius: 20px;
+                padding: 25px;
+                max-width: 400px;
+                width: 90%;
+                animation: scaleIn 0.3s ease;
+            ">
+                <div class="channel-details-header" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                    margin-bottom: 20px;
+                ">
+                    <div class="channel-details-icon" style="
+                        width: 60px;
+                        height: 60px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-size: 24px;
+                    ">
+                        <i class="fas fa-volume-up"></i>
+                    </div>
+                    <div class="channel-details-title" style="flex: 1;">
+                        <h3 style="margin: 0 0 5px 0; color: #333;">${channel.name || 'Voice Channel'}</h3>
+                        <p style="margin: 0; color: #666; font-size: 14px;">
+                            <i class="fas fa-users"></i> ${participantCount} participant${participantCount !== 1 ? 's' : ''}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="channel-details-info" style="
+                    background: #f8f9fa;
+                    border-radius: 12px;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                ">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="color: #666; font-size: 13px;">Created by:</span>
+                        <span style="color: #333; font-weight: 500;">${getUserShortName(channel.createdBy)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="color: #666; font-size: 13px;">Created:</span>
+                        <span style="color: #333; font-weight: 500;">${formatTimeAgo(channel.createdAt)} ago</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #666; font-size: 13px;">Status:</span>
+                        <span style="color: ${participantCount >= 30 ? '#dc3545' : '#28a745'}; font-weight: 500;">
+                            ${participantCount >= 30 ? 'Channel Full' : 'Accepting Participants'}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="channel-details-participants" style="margin-bottom: 25px;">
+                    <h4 style="margin: 0 0 15px 0; color: #333; font-size: 16px;">
+                        <i class="fas fa-users"></i> Participants (${participantCount})
+                    </h4>
+                    <div class="participants-list" style="
+                        max-height: 150px;
+                        overflow-y: auto;
+                        padding-right: 10px;
+                    ">
+                        ${channel.participants && channel.participants.length > 0 ? 
+                            channel.participants.slice(0, 10).map(userId => `
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 10px;
+                                    padding: 8px 0;
+                                    border-bottom: 1px solid #eee;
+                                ">
+                                    <div style="
+                                        width: 32px;
+                                        height: 32px;
+                                        background: ${userId === groupChat.firebaseUser?.uid ? '#4CAF50' : '#667eea'};
+                                        border-radius: 50%;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        color: white;
+                                        font-size: 14px;
+                                    ">
+                                        <i class="fas ${userId === groupChat.firebaseUser?.uid ? 'fa-user-check' : 'fa-user'}"></i>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 500; color: #333;">${getUserShortName(userId)}</div>
+                                        <div style="font-size: 11px; color: #666;">
+                                            ${userId === groupChat.firebaseUser?.uid ? 'You' : 'Member'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('') :
+                            `<div style="text-align: center; color: #666; padding: 20px; font-size: 14px;">
+                                <i class="fas fa-user-slash" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
+                                No participants yet
+                            </div>`
+                        }
+                        ${channel.participants && channel.participants.length > 10 ? 
+                            `<div style="text-align: center; padding: 10px; color: #666; font-size: 13px;">
+                                and ${channel.participants.length - 10} more...
+                            </div>` : ''
+                        }
+                    </div>
+                </div>
+                
+                <div class="channel-details-actions" style="
+                    display: flex;
+                    gap: 12px;
+                ">
+                    <button class="modal-close-btn" style="
+                        flex: 1;
+                        background: #6c757d;
+                        color: white;
+                        border: none;
+                        padding: 12px;
+                        border-radius: 25px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: background 0.3s;
+                    ">Close</button>
+                    
+                    ${participantCount >= 30 && !isUserInThisChannel ? 
+                        `<button style="
+                            flex: 1;
+                            background: #dc3545;
+                            color: white;
+                            border: none;
+                            padding: 12px;
+                            border-radius: 25px;
+                            font-weight: 600;
+                            cursor: not-allowed;
+                            opacity: 0.7;
+                        " disabled>
+                            <i class="fas fa-lock"></i> Channel Full
+                        </button>` :
+                        `<button class="modal-action-btn" style="
+                            flex: 1;
+                            background: ${isUserInThisChannel ? '#dc3545' : '#28a745'};
+                            color: white;
+                            border: none;
+                            padding: 12px;
+                            border-radius: 25px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: background 0.3s;
+                        " data-action="${isUserInThisChannel ? 'leave' : 'join'}">
+                            <i class="fas ${isUserInThisChannel ? 'fa-phone-slash' : 'fa-phone-alt'}"></i>
+                            ${isUserInThisChannel ? 'Leave Channel' : 'Join Channel'}
+                        </button>`
+                    }
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Add animation styles
+        const animationStyles = document.createElement('style');
+        animationStyles.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes scaleIn {
+                from { transform: scale(0.9); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(animationStyles);
+        
+        // Event listeners
+        modal.querySelector('.modal-close-btn').addEventListener('click', () => {
+            modal.style.animation = 'fadeOut 0.3s ease';
+            setTimeout(() => modal.remove(), 300);
+        });
+        
+        const actionBtn = modal.querySelector('.modal-action-btn');
+        if (actionBtn) {
+            actionBtn.addEventListener('click', () => {
+                const action = actionBtn.getAttribute('data-action');
+                if (action === 'join') {
+                    if (window.callsModule) {
+                        window.callsModule.joinVoiceChannel(channel.id, groupId);
+                    }
+                } else if (action === 'leave') {
+                    if (window.callsModule) {
+                        window.callsModule.leaveVoiceChannel(channel.id, groupId);
+                    }
+                }
+                modal.remove();
+            });
         }
+        
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+    
+    // NEW: Show notification
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff'};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 350px;
+            animation: slideIn 0.3s ease;
+        `;
+        
+        notification.innerHTML = `
+            <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : type === 'success' ? 'fa-check-circle' : 'fa-info-circle'}"></i>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
     }
     
     async function loadGroupData() {
