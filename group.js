@@ -1,5 +1,5 @@
 // group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
-// UPDATED VERSION: Added swipe-to-reply, reaction system, and 100 emojis
+// UPDATED VERSION: Fixed back button, emoji display, image/video sizing
 
 import { 
     getFirestore, 
@@ -131,6 +131,7 @@ class GroupChat {
         
         this.setupAuthListener();
         this.createReactionModal();
+        this.checkRestrictedUsers();
     }
 
     getCachedItem(cacheKey, cacheMap) {
@@ -3119,6 +3120,7 @@ function initGroupPage() {
     let tempMessages = new Map();
     let isInitialLoad = true;
     let reactionUnsubscribers = new Map();
+    let reactionsCache = new Map();
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -3150,10 +3152,12 @@ function initGroupPage() {
         setupListeners();
     })();
     
+    // FIXED BACK BUTTON - Go back to groups page
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
         reactionUnsubscribers.forEach(unsub => unsub());
         reactionUnsubscribers.clear();
+        removeSidebarOverlay();
         window.location.href = 'groups.html';
     });
     
@@ -3313,6 +3317,8 @@ function initGroupPage() {
             
             if (isInitialLoad) {
                 messages = await groupChat.getMessages(groupId);
+                // Load reactions for all messages on initial load
+                await loadInitialReactions();
                 displayMessages();
                 isInitialLoad = false;
             }
@@ -3320,6 +3326,13 @@ function initGroupPage() {
         } catch (error) {
             console.error('Error loading group data:', error);
             alert('Error loading group data. Please try again.');
+        }
+    }
+    
+    async function loadInitialReactions() {
+        for (const message of messages) {
+            const reactions = await groupChat.getMessageReactions(groupId, message.id);
+            reactionsCache.set(message.id, reactions);
         }
     }
     
@@ -3555,6 +3568,10 @@ function initGroupPage() {
             });
             
             messages = uniqueMessages;
+            
+            // Set up reaction listeners for new messages
+            setupReactionListeners();
+            
             displayMessages();
         });
         
@@ -3727,7 +3744,9 @@ function initGroupPage() {
                                     <img src="${msg.imageUrl}" 
                                          alt="Shared image" 
                                          class="message-image"
-                                         style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer;"
+                                         style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
+                                         onload="this.style.opacity='1';"
+                                         onerror="this.style.display='none';"
                                          onclick="openImageModal('${msg.imageUrl}')">
                                     ${isUploading ? `
                                         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
@@ -3741,7 +3760,9 @@ function initGroupPage() {
                         } else if (msg.videoUrl) {
                             messageContent = `
                                 <div class="message-video-container" style="position: relative;">
-                                    <video controls style="max-width: 300px; max-height: 300px; border-radius: 8px;">
+                                    <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
+                                           onload="this.style.opacity='1';"
+                                           onerror="this.style.display='none';">
                                         <source src="${msg.videoUrl}" type="video/mp4">
                                         Your browser does not support the video tag.
                                     </video>
@@ -3766,11 +3787,26 @@ function initGroupPage() {
                         
                         const messageDivId = `message-${msg.id}`;
                         
+                        // Get reactions from cache
+                        const cachedReactions = reactionsCache.get(msg.id) || [];
+                        
                         return `
                             <div class="${messageDivClass}" data-message-id="${msg.id}" id="${messageDivId}">
                                 ${replyHtml}
                                 ${messageContent}
-                                <div class="message-reactions" id="reactions-${msg.id}"></div>
+                                ${cachedReactions.length > 0 ? `
+                                    <div class="message-reactions" id="reactions-${msg.id}">
+                                        ${cachedReactions.map(reaction => {
+                                            const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+                                            return `
+                                                <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
+                                                    <span class="reaction-emoji">${reaction.emoji}</span>
+                                                    <span class="reaction-count">${reaction.count}</span>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                ` : ''}
                                 ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
                             </div>
                         `;
@@ -3786,6 +3822,22 @@ function initGroupPage() {
                 const userId = e.target.dataset.userId;
                 if (userId && userId !== groupChat.firebaseUser?.uid) {
                     window.open(`user.html?id=${userId}`, '_blank');
+                }
+            });
+        });
+        
+        // Setup reaction bubble click handlers
+        document.querySelectorAll('.reaction-bubble').forEach(bubble => {
+            bubble.addEventListener('click', (e) => {
+                const messageElement = e.target.closest('.message-text, .system-message');
+                if (messageElement) {
+                    const messageId = messageElement.dataset.messageId;
+                    const message = messages.find(m => m.id === messageId);
+                    if (message) {
+                        const emoji = e.currentTarget.dataset.emoji;
+                        groupChat.currentMessageForReaction = message;
+                        groupChat.addReactionToMessage(emoji);
+                    }
                 }
             });
         });
@@ -3806,6 +3858,7 @@ function initGroupPage() {
             }
             
             const unsubscribe = groupChat.listenToMessageReactions(groupId, message.id, (reactions) => {
+                reactionsCache.set(message.id, reactions);
                 const reactionsContainer = document.getElementById(`reactions-${message.id}`);
                 if (reactionsContainer) {
                     updateReactionsDisplay(reactionsContainer, reactions, message.id);
@@ -3823,14 +3876,18 @@ function initGroupPage() {
             const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
             const bubble = document.createElement('div');
             bubble.className = `reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}`;
+            bubble.dataset.emoji = reaction.emoji;
             bubble.innerHTML = `
                 <span class="reaction-emoji">${reaction.emoji}</span>
                 <span class="reaction-count">${reaction.count}</span>
             `;
             
             bubble.addEventListener('click', () => {
-                groupChat.currentMessageForReaction = { id: messageId };
-                groupChat.addReactionToMessage(reaction.emoji);
+                const message = messages.find(m => m.id === messageId);
+                if (message) {
+                    groupChat.currentMessageForReaction = message;
+                    groupChat.addReactionToMessage(reaction.emoji);
+                }
             });
             
             container.appendChild(bubble);
@@ -4984,7 +5041,9 @@ function initChatPage() {
                                     <img src="${msg.imageUrl}" 
                                          alt="Shared image" 
                                          class="message-image"
-                                         style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer;"
+                                         style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
+                                         onload="this.style.opacity='1';"
+                                         onerror="this.style.display='none';"
                                          onclick="openImageModal('${msg.imageUrl}')">
                                     ${isUploading ? `
                                         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
@@ -4998,7 +5057,9 @@ function initChatPage() {
                         } else if (msg.videoUrl) {
                             messageContent = `
                                 <div class="message-video-container" style="position: relative;">
-                                    <video controls style="max-width: 300px; max-height: 300px; border-radius: 8px;">
+                                    <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
+                                           onload="this.style.opacity='1';"
+                                           onerror="this.style.display='none';">
                                         <source src="${msg.videoUrl}" type="video/mp4">
                                         Your browser does not support the video tag.
                                     </video>
