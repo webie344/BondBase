@@ -1,5 +1,5 @@
-// calls.js - COMPLETE Voice Call System with Voice Channels
-// FIXED VERSION: All issues resolved - notifications, UI display, persistent calls
+is :// calls.js - Complete Voice Call System for Personal & Group Chats
+// FIXED VERSION - Working Private Calls & Optimized Group Calls
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -20,9 +20,7 @@ import {
     query,
     where,
     updateDoc,
-    increment,
-    arrayUnion,
-    arrayRemove
+    increment
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Use existing Firebase config
@@ -35,7 +33,7 @@ const firebaseConfig = {
     appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
 };
 
-// WebRTC configuration
+// WebRTC configuration - OPTIMIZED for larger groups
 const rtcConfiguration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -43,7 +41,14 @@ const rtcConfiguration = {
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' }
-    ]
+    ],
+    iceCandidatePoolSize: 10,
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require',
+    // Optimize for audio-only
+    sdpSemantics: 'unified-plan',
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: false
 };
 
 // Global variables
@@ -57,6 +62,7 @@ let activeCallId = null;
 let currentCallType = null;
 let currentCallPartnerId = null;
 let currentGroupId = null;
+let callParticipants = new Set();
 let isCaller = false;
 let isMuted = false;
 let callStartTime = null;
@@ -67,24 +73,22 @@ let isRinging = false;
 let callRingtone = null;
 let callNotificationSound = null;
 let userCache = new Map();
+let pendingSignals = [];
 let currentCallData = null;
 let isCallActive = false;
 
-// NEW: Voice Channel System Variables
-let activeVoiceChannels = new Map(); // groupId -> array of channel objects
-let userVoiceChannel = new Map(); // userId -> { groupId, channelId, joinedAt }
-let voiceChannelListeners = new Map(); // groupId -> unsubscribe function
-let miniPlayer = null;
-let persistentMiniPlayer = null;
-let isInVoiceChannel = false;
-let currentVoiceChannel = null;
-let channelParticipants = new Map(); // channelId -> Set of userIds
-let MAX_CHANNELS_PER_GROUP = 20;
-let MAX_USERS_PER_CHANNEL = 30;
+// NEW: Group call optimization variables
+let connectionPriority = new Map();
+let maxSimultaneousConnections = 15; // Increased for 100+ users
+let connectionQueue = [];
+let activeConnections = new Set();
+let connectionRetryCount = new Map();
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('calls.js: DOM loaded - Voice Channel System');
+    console.log('calls.js: DOM loaded');
+    
+    const isCallPage = window.location.pathname.includes('calls.html');
     
     // Initialize Firebase
     try {
@@ -106,9 +110,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (user) {
             currentUser = user;
             
-            // Check if we're on call page
-            const isCallPage = window.location.pathname.includes('calls.html');
-            
             if (isCallPage) {
                 console.log('calls.js: On call page, handling call');
                 handleCallPage();
@@ -116,1313 +117,131 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('calls.js: On chat page, setting up listeners');
                 setupCallButtonListeners();
                 setupCallNotificationsListener();
-                
-                // Setup voice channel listeners for all groups user is in
-                setupVoiceChannelListeners();
-                
-                // Check if user is in a voice channel
-                checkUserVoiceChannelStatus();
-                
-                // Create message-style voice channel display
-                createMessageStyleVoiceChannels();
             }
         } else {
-            showNotification('Please log in to use voice channels.', 'error');
-            removePersistentMiniPlayer();
+            showNotification('Please log in to make calls.', 'error');
         }
     });
 });
 
-// NEW: Create message-style voice channel display (like WhatsApp)
-function createMessageStyleVoiceChannels() {
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
-    
-    // Add styles for voice channel messages
-    const styles = document.createElement('style');
-    styles.id = 'voice-channel-message-styles';
-    styles.textContent = `
-        .voice-channel-message {
-            display: flex;
-            align-items: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 12px 16px;
-            margin: 10px 15px;
-            border-radius: 18px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            animation: slideIn 0.3s ease;
-        }
-        
-        .voice-channel-message:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        
-        .voice-channel-icon {
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            margin-right: 12px;
-            flex-shrink: 0;
-        }
-        
-        .voice-channel-info {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .voice-channel-title {
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .voice-channel-name {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .voice-channel-status {
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.2);
-        }
-        
-        .voice-channel-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            opacity: 0.9;
-        }
-        
-        .voice-channel-creator {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 120px;
-        }
-        
-        .voice-channel-time {
-            font-size: 11px;
-            opacity: 0.8;
-        }
-        
-        .voice-channel-join-btn {
-            background: white;
-            color: #667eea;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.3s;
-            flex-shrink: 0;
-            margin-left: 10px;
-        }
-        
-        .voice-channel-join-btn:hover {
-            background: #f5f5f5;
-            transform: scale(1.05);
-        }
-        
-        .voice-channel-join-btn.joined {
-            background: #4CAF50;
-            color: white;
-        }
-        
-        .voice-channel-join-btn.joined:hover {
-            background: #45a049;
-        }
-        
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .header-mini-player {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 25px;
-            padding: 8px 16px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            color: white;
-            display: none;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            max-width: 300px;
-            animation: slideDown 0.3s ease;
-        }
-        
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .header-mini-player:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .header-player-icon {
-            width: 24px;
-            height: 24px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-        }
-        
-        .header-player-info {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .header-player-channel {
-            font-size: 11px;
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .header-player-participants {
-            font-size: 10px;
-            opacity: 0.8;
-        }
-        
-        .header-player-controls {
-            display: flex;
-            gap: 5px;
-        }
-        
-        .header-player-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            transition: background 0.3s;
-        }
-        
-        .header-player-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        
-        .header-player-btn.mute.active {
-            background: rgba(244, 67, 54, 0.3);
-            color: #f44336;
-        }
-        
-        .header-player-btn.leave {
-            background: rgba(220, 53, 69, 0.3);
-            color: #dc3545;
-        }
-        
-        .header-player-btn.leave:hover {
-            background: rgba(220, 53, 69, 0.4);
-        }
-    `;
-    
-    if (!document.getElementById('voice-channel-message-styles')) {
-        document.head.appendChild(styles);
-    }
-}
-
-// NEW: Display voice channels as WhatsApp-style messages
-function displayVoiceChannelsAsMessages(groupId, channels) {
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
-    
-    // Remove existing voice channel messages
-    const existingMessages = chatMessages.querySelectorAll('.voice-channel-message');
-    existingMessages.forEach(msg => msg.remove());
-    
-    if (channels.length === 0) {
-        // No channels, show create button as message
-        const noChannelsMsg = document.createElement('div');
-        noChannelsMsg.className = 'voice-channel-message';
-        noChannelsMsg.innerHTML = `
-            <div class="voice-channel-icon">
-                <i class="fas fa-plus"></i>
-            </div>
-            <div class="voice-channel-info">
-                <div class="voice-channel-title">
-                    <span class="voice-channel-name">Create Voice Channel</span>
-                </div>
-                <div class="voice-channel-meta">
-                    <span class="voice-channel-creator">Click to start your first voice channel</span>
-                </div>
-            </div>
-            <button class="voice-channel-join-btn" onclick="window.callsModule.createVoiceChannel('${groupId}')">
-                <i class="fas fa-plus"></i> Create
-            </button>
-        `;
-        chatMessages.appendChild(noChannelsMsg);
+// NEW: Connection queue processor
+function processConnectionQueue() {
+    if (connectionQueue.length === 0 || activeConnections.size >= maxSimultaneousConnections) {
         return;
     }
     
-    // Add each channel as a message
-    channels.forEach(channel => {
-        const channelMessage = document.createElement('div');
-        channelMessage.className = 'voice-channel-message';
-        
-        const isUserInThisChannel = isUserInChannel(channel.id);
-        const participantCount = channel.participants?.length || 0;
-        const isFull = participantCount >= MAX_USERS_PER_CHANNEL;
-        
-        channelMessage.innerHTML = `
-            <div class="voice-channel-icon" style="background: ${isUserInThisChannel ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255, 255, 255, 0.2)'}">
-                <i class="fas ${isUserInThisChannel ? 'fa-headphones' : 'fa-volume-up'}"></i>
-            </div>
-            <div class="voice-channel-info">
-                <div class="voice-channel-title">
-                    <span class="voice-channel-name">${channel.name || 'Voice Channel'}</span>
-                    <span class="voice-channel-status">${participantCount}/${MAX_USERS_PER_CHANNEL}</span>
-                </div>
-                <div class="voice-channel-meta">
-                    <span class="voice-channel-creator">
-                        <i class="fas fa-user"></i> ${channel.createdBy ? getUserShortName(channel.createdBy) : 'Unknown'}
-                    </span>
-                    <span class="voice-channel-time">
-                        <i class="fas fa-clock"></i> ${formatTimeAgo(channel.createdAt)}
-                    </span>
-                </div>
-            </div>
-            <button class="voice-channel-join-btn ${isUserInThisChannel ? 'joined' : ''} ${isFull ? 'full' : ''}" 
-                    data-channel-id="${channel.id}"
-                    ${isFull && !isUserInThisChannel ? 'disabled' : ''}>
-                ${isUserInThisChannel ? 
-                    '<i class="fas fa-phone-slash"></i> Leave' : 
-                    isFull ? '<i class="fas fa-lock"></i> Full' : 
-                    '<i class="fas fa-phone-alt"></i> Join'
-                }
-            </button>
-        `;
-        
-        const joinBtn = channelMessage.querySelector('.voice-channel-join-btn');
-        if (joinBtn && !joinBtn.disabled) {
-            joinBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (isUserInThisChannel) {
-                    leaveVoiceChannel(channel.id, groupId);
-                } else {
-                    joinVoiceChannel(channel.id, groupId);
-                }
-            });
-        }
-        
-        // Click on message to view details
-        channelMessage.addEventListener('click', (e) => {
-            if (!e.target.closest('.voice-channel-join-btn')) {
-                showVoiceChannelDetails(channel, groupId);
-            }
-        });
-        
-        chatMessages.appendChild(channelMessage);
+    const availableSlots = maxSimultaneousConnections - activeConnections.size;
+    const toConnect = connectionQueue.splice(0, Math.min(availableSlots, 5)); // Connect 5 at a time
+    
+    toConnect.forEach(memberId => {
+        setTimeout(() => {
+            createAndConnect(memberId);
+        }, Math.random() * 1000); // Random delay to avoid congestion
     });
 }
 
-// NEW: Show voice channel details modal
-function showVoiceChannelDetails(channel, groupId) {
-    const modal = document.createElement('div');
-    modal.className = 'voice-channel-details-modal';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-        animation: fadeIn 0.3s ease;
-    `;
-    
-    const participantCount = channel.participants?.length || 0;
-    const isUserInThisChannel = isUserInChannel(channel.id);
-    
-    modal.innerHTML = `
-        <div class="channel-details-content" style="
-            background: white;
-            border-radius: 20px;
-            padding: 25px;
-            max-width: 400px;
-            width: 90%;
-            animation: scaleIn 0.3s ease;
-        ">
-            <div class="channel-details-header" style="
-                display: flex;
-                align-items: center;
-                gap: 15px;
-                margin-bottom: 20px;
-            ">
-                <div class="channel-details-icon" style="
-                    width: 60px;
-                    height: 60px;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    font-size: 24px;
-                ">
-                    <i class="fas fa-volume-up"></i>
-                </div>
-                <div class="channel-details-title" style="flex: 1;">
-                    <h3 style="margin: 0 0 5px 0; color: #333;">${channel.name || 'Voice Channel'}</h3>
-                    <p style="margin: 0; color: #666; font-size: 14px;">
-                        <i class="fas fa-users"></i> ${participantCount} participant${participantCount !== 1 ? 's' : ''}
-                    </p>
-                </div>
-            </div>
-            
-            <div class="channel-details-info" style="
-                background: #f8f9fa;
-                border-radius: 12px;
-                padding: 15px;
-                margin-bottom: 20px;
-            ">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <span style="color: #666; font-size: 13px;">Created by:</span>
-                    <span style="color: #333; font-weight: 500;">${channel.createdBy ? getUserShortName(channel.createdBy) : 'Unknown'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <span style="color: #666; font-size: 13px;">Created:</span>
-                    <span style="color: #333; font-weight: 500;">${formatDetailedTime(channel.createdAt)}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="color: #666; font-size: 13px;">Status:</span>
-                    <span style="color: ${participantCount >= MAX_USERS_PER_CHANNEL ? '#dc3545' : '#28a745'}; font-weight: 500;">
-                        ${participantCount >= MAX_USERS_PER_CHANNEL ? 'Channel Full' : 'Accepting Participants'}
-                    </span>
-                </div>
-            </div>
-            
-            <div class="channel-details-participants" style="margin-bottom: 25px;">
-                <h4 style="margin: 0 0 15px 0; color: #333; font-size: 16px;">
-                    <i class="fas fa-users"></i> Participants (${participantCount})
-                </h4>
-                <div class="participants-list" style="
-                    max-height: 150px;
-                    overflow-y: auto;
-                    padding-right: 10px;
-                ">
-                    ${channel.participants && channel.participants.length > 0 ? 
-                        channel.participants.slice(0, 10).map(userId => `
-                            <div style="
-                                display: flex;
-                                align-items: center;
-                                gap: 10px;
-                                padding: 8px 0;
-                                border-bottom: 1px solid #eee;
-                            ">
-                                <div style="
-                                    width: 32px;
-                                    height: 32px;
-                                    background: ${userId === currentUser?.uid ? '#4CAF50' : '#667eea'};
-                                    border-radius: 50%;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    color: white;
-                                    font-size: 14px;
-                                ">
-                                    <i class="fas ${userId === currentUser?.uid ? 'fa-user-check' : 'fa-user'}"></i>
-                                </div>
-                                <div style="flex: 1;">
-                                    <div style="font-weight: 500; color: #333;">${getUserShortName(userId)}</div>
-                                    <div style="font-size: 11px; color: #666;">
-                                        ${userId === currentUser?.uid ? 'You' : 'Member'}
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('') :
-                        `<div style="text-align: center; color: #666; padding: 20px; font-size: 14px;">
-                            <i class="fas fa-user-slash" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
-                            No participants yet
-                        </div>`
-                    }
-                    ${channel.participants && channel.participants.length > 10 ? 
-                        `<div style="text-align: center; padding: 10px; color: #666; font-size: 13px;">
-                            and ${channel.participants.length - 10} more...
-                        </div>` : ''
-                    }
-                </div>
-            </div>
-            
-            <div class="channel-details-actions" style="
-                display: flex;
-                gap: 12px;
-            ">
-                <button class="modal-close-btn" style="
-                    flex: 1;
-                    background: #6c757d;
-                    color: white;
-                    border: none;
-                    padding: 12px;
-                    border-radius: 25px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: background 0.3s;
-                ">Close</button>
-                
-                ${participantCount >= MAX_USERS_PER_CHANNEL && !isUserInThisChannel ? 
-                    `<button style="
-                        flex: 1;
-                        background: #dc3545;
-                        color: white;
-                        border: none;
-                        padding: 12px;
-                        border-radius: 25px;
-                        font-weight: 600;
-                        cursor: not-allowed;
-                        opacity: 0.7;
-                    " disabled>
-                        <i class="fas fa-lock"></i> Channel Full
-                    </button>` :
-                    `<button class="modal-action-btn" style="
-                        flex: 1;
-                        background: ${isUserInThisChannel ? '#dc3545' : '#28a745'};
-                        color: white;
-                        border: none;
-                        padding: 12px;
-                        border-radius: 25px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: background 0.3s;
-                    " data-action="${isUserInThisChannel ? 'leave' : 'join'}">
-                        <i class="fas ${isUserInThisChannel ? 'fa-phone-slash' : 'fa-phone-alt'}"></i>
-                        ${isUserInThisChannel ? 'Leave Channel' : 'Join Channel'}
-                    </button>`
-                }
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Add animation styles
-    const animationStyles = document.createElement('style');
-    animationStyles.textContent = `
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes scaleIn {
-            from { transform: scale(0.9); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-    `;
-    document.head.appendChild(animationStyles);
-    
-    // Event listeners
-    modal.querySelector('.modal-close-btn').addEventListener('click', () => {
-        modal.style.animation = 'fadeOut 0.3s ease';
-        setTimeout(() => modal.remove(), 300);
-    });
-    
-    const actionBtn = modal.querySelector('.modal-action-btn');
-    if (actionBtn) {
-        actionBtn.addEventListener('click', () => {
-            const action = actionBtn.getAttribute('data-action');
-            if (action === 'join') {
-                joinVoiceChannel(channel.id, groupId);
-            } else if (action === 'leave') {
-                leaveVoiceChannel(channel.id, groupId);
-            }
-            modal.remove();
-        });
-    }
-    
-    // Close on background click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.remove();
-        }
-    });
-}
-
-// NEW: Get short name for display
-function getUserShortName(userId) {
-    if (!userId) return 'Unknown';
-    if (userId === currentUser?.uid) return 'You';
-    
-    // Get first 8 characters of user ID for display
-    return `User ${userId.substring(0, 8)}...`;
-}
-
-// NEW: Format detailed time
-function formatDetailedTime(date) {
-    if (!date) return 'Unknown time';
-    
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffDays > 0) {
-        return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-    } else if (diffHours > 0) {
-        return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-    } else if (diffMins > 0) {
-        return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-    } else {
-        return 'Just now';
-    }
-}
-
-// Setup voice channel listeners for all groups
-async function setupVoiceChannelListeners() {
-    if (!currentUser || !db) return;
-    
-    console.log('calls.js: Setting up voice channel listeners');
-    
-    try {
-        // Get all groups user is member of
-        const groupsRef = collection(db, 'groups');
-        const groupsSnapshot = await getDocs(groupsRef);
-        
-        for (const groupDoc of groupsSnapshot.docs) {
-            const groupId = groupDoc.id;
-            const memberRef = doc(db, 'groups', groupId, 'members', currentUser.uid);
-            const memberSnap = await getDoc(memberRef);
-            
-            if (memberSnap.exists()) {
-                setupVoiceChannelListenerForGroup(groupId);
-            }
-        }
-    } catch (error) {
-        console.error('calls.js: Error setting up voice channel listeners:', error);
-    }
-}
-
-// Setup listener for voice channels in a specific group
-function setupVoiceChannelListenerForGroup(groupId) {
-    if (voiceChannelListeners.has(groupId)) {
-        voiceChannelListeners.get(groupId)();
-    }
-    
-    const channelsRef = collection(db, 'voice_channels', groupId, 'channels');
-    const unsubscribe = onSnapshot(channelsRef, (snapshot) => {
-        console.log(`calls.js: Voice channels update for group ${groupId}:`, snapshot.docs.length);
-        
-        const channels = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            channels.push({
-                id: doc.id,
-                ...data,
-                createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
-                participants: data.participants || []
-            });
-        });
-        
-        // Sort by participant count (most active first)
-        channels.sort((a, b) => b.participants.length - a.participants.length);
-        
-        activeVoiceChannels.set(groupId, channels);
-        
-        // Update UI if on group page
-        if (window.location.pathname.includes('group.html')) {
-            const urlParams = new URLSearchParams(window.location.search);
-            const currentGroupId = urlParams.get('id');
-            if (currentGroupId === groupId) {
-                displayVoiceChannelsAsMessages(groupId, channels);
-            }
-        }
-        
-        // Check if user is in any voice channel
-        checkUserVoiceChannelStatus();
-    });
-    
-    voiceChannelListeners.set(groupId, unsubscribe);
-}
-
-// Check if user is in a voice channel
-function isUserInChannel(channelId) {
-    const userChannel = userVoiceChannel.get(currentUser?.uid);
-    return userChannel && userChannel.channelId === channelId;
-}
-
-// Check user voice channel status
-async function checkUserVoiceChannelStatus() {
-    if (!currentUser) return;
-    
-    try {
-        const userChannelRef = doc(db, 'voice_channel_users', currentUser.uid);
-        const userChannelSnap = await getDoc(userChannelRef);
-        
-        if (userChannelSnap.exists()) {
-            const data = userChannelSnap.data();
-            userVoiceChannel.set(currentUser.uid, {
-                groupId: data.groupId,
-                channelId: data.channelId,
-                joinedAt: data.joinedAt?.toDate ? data.joinedAt.toDate() : new Date(data.joinedAt)
-            });
-            
-            // Get channel info
-            const channelRef = doc(db, 'voice_channels', data.groupId, 'channels', data.channelId);
-            const channelSnap = await getDoc(channelRef);
-            
-            if (channelSnap.exists()) {
-                const channelData = channelSnap.data();
-                currentVoiceChannel = {
-                    id: data.channelId,
-                    groupId: data.groupId,
-                    ...channelData
-                };
-                
-                // Get group name
-                const groupRef = doc(db, 'groups', data.groupId);
-                const groupSnap = await getDoc(groupRef);
-                const groupName = groupSnap.exists() ? groupSnap.data().name : 'Unknown Group';
-                
-                // Show header mini player
-                showHeaderMiniPlayer(groupName, channelData.name || 'Voice Channel', channelData.participants?.length || 1);
-                
-                // Connect to voice channel if not already connected
-                if (!isCallActive) {
-                    connectToVoiceChannel(data.groupId, data.channelId);
-                }
-            }
-        } else {
-            // User not in voice channel
-            userVoiceChannel.delete(currentUser.uid);
-            currentVoiceChannel = null;
-            removeHeaderMiniPlayer();
-            stopVoiceChannel();
-        }
-    } catch (error) {
-        console.error('calls.js: Error checking voice channel status:', error);
-    }
-}
-
-// NEW: Show header mini player (top right corner)
-function showHeaderMiniPlayer(groupName, channelName, participantCount) {
-    if (persistentMiniPlayer) {
-        updateHeaderMiniPlayer(groupName, channelName, participantCount);
-        persistentMiniPlayer.style.display = 'flex';
+// NEW: Create and connect with retry logic
+async function createAndConnect(userId) {
+    if (activeConnections.has(userId) || peerConnections.has(userId)) {
         return;
     }
     
-    persistentMiniPlayer = document.createElement('div');
-    persistentMiniPlayer.className = 'header-mini-player';
-    persistentMiniPlayer.innerHTML = `
-        <div class="header-player-icon">
-            <i class="fas fa-volume-up"></i>
-        </div>
-        <div class="header-player-info">
-            <div class="header-player-channel">${channelName}</div>
-            <div class="header-player-participants">${groupName} • ${participantCount} in voice</div>
-        </div>
-        <div class="header-player-controls">
-            <button class="header-player-btn mute" id="headerMuteBtn">
-                <i class="fas fa-microphone"></i>
-            </button>
-            <button class="header-player-btn leave" id="headerLeaveBtn">
-                <i class="fas fa-phone-slash"></i>
-            </button>
-        </div>
-    `;
-    
-    document.body.appendChild(persistentMiniPlayer);
-    persistentMiniPlayer.style.display = 'flex';
-    
-    // Add event listeners
-    document.getElementById('headerMuteBtn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleMute();
-    });
-    
-    document.getElementById('headerLeaveBtn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (currentVoiceChannel) {
-            const confirmLeave = confirm('Leave voice channel?');
-            if (confirmLeave) {
-                leaveVoiceChannel(currentVoiceChannel.id, currentVoiceChannel.groupId);
-            }
-        }
-    });
-    
-    // Click to open full call view
-    persistentMiniPlayer.addEventListener('click', () => {
-        if (currentVoiceChannel) {
-            window.open(`calls.html?type=channel&groupId=${currentVoiceChannel.groupId}&channelId=${currentVoiceChannel.id}`, '_blank');
-        }
-    });
-}
-
-// NEW: Update header mini player
-function updateHeaderMiniPlayer(groupName, channelName, participantCount) {
-    if (!persistentMiniPlayer) return;
-    
-    const channelElement = persistentMiniPlayer.querySelector('.header-player-channel');
-    const participantsElement = persistentMiniPlayer.querySelector('.header-player-participants');
-    
-    if (channelElement) {
-        channelElement.textContent = channelName;
-    }
-    
-    if (participantsElement) {
-        participantsElement.textContent = `${groupName} • ${participantCount} in voice`;
-    }
-    
-    // Update mute button
-    const muteBtn = persistentMiniPlayer.querySelector('.header-player-btn.mute');
-    if (muteBtn) {
-        muteBtn.classList.toggle('active', isMuted);
-        muteBtn.innerHTML = isMuted ? 
-            '<i class="fas fa-microphone-slash"></i>' : 
-            '<i class="fas fa-microphone"></i>';
-    }
-}
-
-// NEW: Remove header mini player
-function removeHeaderMiniPlayer() {
-    if (persistentMiniPlayer) {
-        persistentMiniPlayer.style.display = 'none';
-        persistentMiniPlayer.remove();
-        persistentMiniPlayer = null;
-    }
-}
-
-// Create voice channel
-async function createVoiceChannel(groupId) {
-    if (!currentUser || !groupId) return;
-    
-    try {
-        // Check if user is already in a voice channel
-        if (userVoiceChannel.has(currentUser.uid)) {
-            const confirmLeave = confirm('You are already in a voice channel. Leave current channel and create new one?');
-            if (confirmLeave) {
-                const current = userVoiceChannel.get(currentUser.uid);
-                await leaveVoiceChannel(current.channelId, current.groupId);
-            } else {
-                return;
-            }
-        }
-        
-        // Check channel limit
-        const channelsRef = collection(db, 'voice_channels', groupId, 'channels');
-        const channelsSnap = await getDocs(channelsRef);
-        
-        if (channelsSnap.size >= MAX_CHANNELS_PER_GROUP) {
-            showNotification(`Maximum ${MAX_CHANNELS_PER_GROUP} voice channels allowed per group.`, 'error');
-            return;
-        }
-        
-        // Create channel
-        const channelRef = doc(channelsRef);
-        const channelData = {
-            id: channelRef.id,
-            name: `Voice Channel ${channelsSnap.size + 1}`,
-            createdBy: currentUser.uid,
-            createdAt: serverTimestamp(),
-            participants: [currentUser.uid],
-            maxParticipants: MAX_USERS_PER_CHANNEL
-        };
-        
-        await setDoc(channelRef, channelData);
-        
-        // Set user's voice channel
-        await setDoc(doc(db, 'voice_channel_users', currentUser.uid), {
-            groupId: groupId,
-            channelId: channelRef.id,
-            joinedAt: serverTimestamp()
-        });
-        
-        // Store locally
-        userVoiceChannel.set(currentUser.uid, {
-            groupId: groupId,
-            channelId: channelRef.id,
-            joinedAt: new Date()
-        });
-        
-        currentVoiceChannel = {
-            id: channelRef.id,
-            groupId: groupId,
-            ...channelData
-        };
-        
-        // Get group name for mini player
-        const groupRef = doc(db, 'groups', groupId);
-        const groupSnap = await getDoc(groupRef);
-        const groupName = groupSnap.exists() ? groupSnap.data().name : 'Unknown Group';
-        
-        // Show header mini player
-        showHeaderMiniPlayer(groupName, channelData.name || 'Voice Channel', 1);
-        
-        // Start voice call
-        startVoiceChannel(groupId, channelRef.id);
-        
-        showNotification('Voice channel created!', 'success');
-        
-    } catch (error) {
-        console.error('calls.js: Error creating voice channel:', error);
-        showNotification('Failed to create voice channel', 'error');
-    }
-}
-
-// Join voice channel
-async function joinVoiceChannel(channelId, groupId) {
-    if (!currentUser || !channelId || !groupId) return;
-    
-    try {
-        // Check if user is already in a voice channel
-        if (userVoiceChannel.has(currentUser.uid)) {
-            const confirmLeave = confirm('You are already in a voice channel. Leave current channel and join new one?');
-            if (confirmLeave) {
-                const current = userVoiceChannel.get(currentUser.uid);
-                await leaveVoiceChannel(current.channelId, current.groupId);
-            } else {
-                return;
-            }
-        }
-        
-        const channelRef = doc(db, 'voice_channels', groupId, 'channels', channelId);
-        const channelSnap = await getDoc(channelRef);
-        
-        if (!channelSnap.exists()) {
-            showNotification('Voice channel not found', 'error');
-            return;
-        }
-        
-        const channelData = channelSnap.data();
-        
-        // Check if channel is full
-        if (channelData.participants && channelData.participants.length >= MAX_USERS_PER_CHANNEL) {
-            showNotification('Voice channel is full', 'error');
-            return;
-        }
-        
-        // Add user to channel
-        await updateDoc(channelRef, {
-            participants: arrayUnion(currentUser.uid)
-        });
-        
-        // Set user's voice channel
-        await setDoc(doc(db, 'voice_channel_users', currentUser.uid), {
-            groupId: groupId,
-            channelId: channelId,
-            joinedAt: serverTimestamp()
-        });
-        
-        // Store locally
-        userVoiceChannel.set(currentUser.uid, {
-            groupId: groupId,
-            channelId: channelId,
-            joinedAt: new Date()
-        });
-        
-        currentVoiceChannel = {
-            id: channelId,
-            groupId: groupId,
-            ...channelData
-        };
-        
-        // Get group name for mini player
-        const groupRef = doc(db, 'groups', groupId);
-        const groupSnap = await getDoc(groupRef);
-        const groupName = groupSnap.exists() ? groupSnap.data().name : 'Unknown Group';
-        
-        // Show header mini player
-        showHeaderMiniPlayer(groupName, channelData.name || 'Voice Channel', 
-                           (channelData.participants?.length || 0) + 1);
-        
-        // Start voice call
-        startVoiceChannel(groupId, channelId);
-        
-        showNotification('Joined voice channel!', 'success');
-        
-    } catch (error) {
-        console.error('calls.js: Error joining voice channel:', error);
-        showNotification('Failed to join voice channel', 'error');
-    }
-}
-
-// Leave voice channel
-async function leaveVoiceChannel(channelId, groupId) {
-    if (!currentUser || !channelId || !groupId) return;
-    
-    try {
-        const channelRef = doc(db, 'voice_channels', groupId, 'channels', channelId);
-        
-        // Remove user from channel
-        await updateDoc(channelRef, {
-            participants: arrayRemove(currentUser.uid)
-        });
-        
-        // Remove user from voice channel users
-        await deleteDoc(doc(db, 'voice_channel_users', currentUser.uid));
-        
-        // Check if channel is empty, delete it
-        const channelSnap = await getDoc(channelRef);
-        if (channelSnap.exists()) {
-            const channelData = channelSnap.data();
-            if (!channelData.participants || channelData.participants.length === 0) {
-                await deleteDoc(channelRef);
-            }
-        }
-        
-        // Clear locally
-        userVoiceChannel.delete(currentUser.uid);
-        currentVoiceChannel = null;
-        
-        // Stop voice call
-        stopVoiceChannel();
-        
-        // Remove mini player
-        removeHeaderMiniPlayer();
-        
-        showNotification('Left voice channel', 'info');
-        
-    } catch (error) {
-        console.error('calls.js: Error leaving voice channel:', error);
-        showNotification('Failed to leave voice channel', 'error');
-    }
-}
-
-// Start voice channel call
-async function startVoiceChannel(groupId, channelId) {
-    if (!currentUser || !groupId || !channelId) return;
-    
-    try {
-        // Get channel participants
-        const channelRef = doc(db, 'voice_channels', groupId, 'channels', channelId);
-        const channelSnap = await getDoc(channelRef);
-        
-        if (!channelSnap.exists()) {
-            showNotification('Voice channel not found', 'error');
-            return;
-        }
-        
-        const channelData = channelSnap.data();
-        const participants = channelData.participants || [];
-        
-        // Setup media
-        await setupMediaForVoiceChannel();
-        
-        // Connect to other participants
-        for (const participantId of participants) {
-            if (participantId !== currentUser.uid) {
-                setTimeout(() => {
-                    connectToParticipant(participantId, groupId, channelId);
-                }, Math.random() * 1000); // Stagger connections
-            }
-        }
-        
-        isCallActive = true;
-        console.log('calls.js: Voice channel started');
-        
-    } catch (error) {
-        console.error('calls.js: Error starting voice channel:', error);
-        showNotification('Failed to start voice channel', 'error');
-    }
-}
-
-// Connect to voice channel
-async function connectToVoiceChannel(groupId, channelId) {
-    if (!currentUser || !groupId || !channelId) return;
-    
-    try {
-        // Get channel participants
-        const channelRef = doc(db, 'voice_channels', groupId, 'channels', channelId);
-        const channelSnap = await getDoc(channelRef);
-        
-        if (!channelSnap.exists()) {
-            showNotification('Voice channel not found', 'error');
-            return;
-        }
-        
-        const channelData = channelSnap.data();
-        const participants = channelData.participants || [];
-        
-        // Setup media if not already
-        if (!localStream) {
-            await setupMediaForVoiceChannel();
-        }
-        
-        // Connect to other participants
-        for (const participantId of participants) {
-            if (participantId !== currentUser.uid) {
-                setTimeout(() => {
-                    connectToParticipant(participantId, groupId, channelId);
-                }, Math.random() * 1000);
-            }
-        }
-        
-        isCallActive = true;
-        
-    } catch (error) {
-        console.error('calls.js: Error connecting to voice channel:', error);
-    }
-}
-
-// Setup media for voice channel
-async function setupMediaForVoiceChannel() {
-    try {
-        if (localStream) {
-            return; // Already have stream
-        }
-        
-        console.log('calls.js: Requesting microphone for voice channel...');
-        localStream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            },
-            video: false
-        });
-        console.log('calls.js: Microphone access granted for voice channel');
-        
-    } catch (error) {
-        console.error('calls.js: Failed to access microphone:', error);
-        if (error.name === 'NotAllowedError') {
-            showNotification('Microphone access denied. Please check your permissions.', 'error');
-        } else if (error.name === 'NotFoundError') {
-            showNotification('No microphone found.', 'error');
-        } else {
-            showNotification('Failed to access microphone: ' + error.message, 'error');
-        }
-        throw error;
-    }
-}
-
-// Connect to a participant in voice channel
-async function connectToParticipant(userId, groupId, channelId) {
-    if (peerConnections.has(userId)) {
-        console.log('calls.js: Already connected to', userId);
+    const retryCount = connectionRetryCount.get(userId) || 0;
+    if (retryCount > 3) {
+        console.log(`Max retries exceeded for ${userId}, skipping`);
         return;
     }
     
     try {
-        console.log('calls.js: Connecting to participant:', userId);
+        activeConnections.add(userId);
+        connectionRetryCount.set(userId, retryCount + 1);
+        
+        console.log(`Creating connection to ${userId} (attempt ${retryCount + 1})`);
         
         // Create peer connection
-        const peerConnection = new RTCPeerConnection(rtcConfiguration);
-        peerConnections.set(userId, peerConnection);
+        createPeerConnection(userId);
         
         // Add local stream
         if (localStream) {
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
+            const pc = peerConnections.get(userId);
+            if (pc) {
+                localStream.getTracks().forEach(track => {
+                    pc.addTrack(track, localStream);
+                });
+            }
         }
-        
-        // Handle remote stream
-        peerConnection.ontrack = (event) => {
-            console.log('calls.js: Received remote track from:', userId);
-            if (event.streams && event.streams[0]) {
-                const remoteStream = event.streams[0];
-                remoteStreams.set(userId, remoteStream);
-                
-                // Create audio element for this participant
-                createChannelAudioElement(userId, remoteStream);
-                
-                // Update participants UI
-                updateChannelParticipantsUI(channelId);
-            }
-        };
-        
-        // Handle ICE candidates
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                sendSignal({
-                    type: 'voice-channel-ice',
-                    candidate: event.candidate,
-                    from: currentUser.uid,
-                    groupId: groupId,
-                    channelId: channelId
-                }, userId);
-            }
-        };
-        
-        // Handle connection state
-        peerConnection.onconnectionstatechange = () => {
-            console.log(`calls.js: Connection state with ${userId}:`, peerConnection.connectionState);
-            
-            if (peerConnection.connectionState === 'connected') {
-                console.log('calls.js: Connected to', userId);
-            } else if (peerConnection.connectionState === 'disconnected' || 
-                       peerConnection.connectionState === 'failed') {
-                console.log('calls.js: Connection lost with', userId);
-                cleanupParticipant(userId);
-            }
-        };
         
         // Create and send offer
-        const offer = await peerConnection.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: false
-        });
-        await peerConnection.setLocalDescription(offer);
+        const peerConnection = peerConnections.get(userId);
+        if (peerConnection) {
+            const offer = await peerConnection.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: false
+            });
+            await peerConnection.setLocalDescription(offer);
+            
+            await sendSignal({
+                type: 'offer',
+                offer: offer,
+                callType: 'group',
+                from: currentUser.uid,
+                callId: activeCallId,
+                groupId: currentGroupId
+            }, userId);
+            
+            console.log(`Offer sent to ${userId}`);
+        }
         
-        await sendSignal({
-            type: 'voice-channel-offer',
-            offer: offer,
-            from: currentUser.uid,
-            groupId: groupId,
-            channelId: channelId
-        }, userId);
-        
-        console.log('calls.js: Offer sent to', userId);
+        // Reset retry count on success
+        connectionRetryCount.set(userId, 0);
         
     } catch (error) {
-        console.error(`calls.js: Error connecting to ${userId}:`, error);
-    }
-}
-
-// Create audio element for channel participant
-function createChannelAudioElement(userId, remoteStream) {
-    // Remove existing element if present
-    const existingElement = document.getElementById(`channelAudio_${userId}`);
-    if (existingElement) {
-        existingElement.remove();
-    }
-    
-    const audioElement = document.createElement('audio');
-    audioElement.id = `channelAudio_${userId}`;
-    audioElement.autoplay = true;
-    audioElement.controls = false;
-    audioElement.style.display = 'none';
-    audioElement.srcObject = remoteStream;
-    
-    const playPromise = audioElement.play();
-    if (playPromise !== undefined) {
-        playPromise.catch(error => {
-            console.error('calls.js: Error playing channel audio:', error);
-        });
-    }
-    
-    document.body.appendChild(audioElement);
-}
-
-// Update channel participants UI
-function updateChannelParticipantsUI(channelId) {
-    if (!persistentMiniPlayer) return;
-    
-    const participantsCount = persistentMiniPlayer.querySelector('.header-player-participants');
-    if (participantsCount) {
-        const count = peerConnections.size + 1; // +1 for local user
-        const groupName = currentVoiceChannel?.groupId ? 'Voice Channel' : 'Unknown';
-        participantsCount.textContent = `${groupName} • ${count} in voice`;
-    }
-}
-
-// Stop voice channel
-function stopVoiceChannel() {
-    console.log('calls.js: Stopping voice channel');
-    
-    // Close all peer connections
-    peerConnections.forEach((pc, userId) => {
-        if (pc) {
-            pc.close();
+        console.error(`Failed to connect to ${userId}:`, error);
+        activeConnections.delete(userId);
+        
+        // Retry after delay
+        if (retryCount < 3) {
+            setTimeout(() => {
+                connectionQueue.unshift(userId);
+                processConnectionQueue();
+            }, 2000 * (retryCount + 1));
         }
-    });
-    peerConnections.clear();
-    
-    // Stop local stream
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-    
-    // Clear remote streams
-    remoteStreams.clear();
-    
-    // Remove all channel audio elements
-    document.querySelectorAll('[id^="channelAudio_"]').forEach(el => {
-        el.pause();
-        el.srcObject = null;
-        el.remove();
-    });
-    
-    isCallActive = false;
-}
-
-// Cleanup participant
-function cleanupParticipant(userId) {
-    const pc = peerConnections.get(userId);
-    if (pc) {
-        pc.close();
-    }
-    peerConnections.delete(userId);
-    remoteStreams.delete(userId);
-    
-    const audioElement = document.getElementById(`channelAudio_${userId}`);
-    if (audioElement) {
-        audioElement.remove();
-    }
-    
-    updateChannelParticipantsUI(currentVoiceChannel?.id);
-}
-
-// Format time ago
-function formatTimeAgo(date) {
-    if (!date) return 'Unknown';
-    
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffDays > 0) {
-        return `${diffDays}d`;
-    } else if (diffHours > 0) {
-        return `${diffHours}h`;
-    } else if (diffMins > 0) {
-        return `${diffMins}m`;
-    } else {
-        return 'now';
     }
 }
 
-// Setup call button listeners
+// Preload notification sounds
+function preloadNotificationSounds() {
+    try {
+        callNotificationSound = new Audio('sounds/notification.mp3');
+        callRingtone = new Audio('ringingtone.mp3');
+        callRingtone.loop = true;
+        console.log('calls.js: Notification sounds preloaded');
+    } catch (error) {
+        console.error('calls.js: Failed to preload sounds:', error);
+    }
+}
+
+// Get user name with caching
+async function getUserName(userId) {
+    if (userCache.has(userId)) {
+        return userCache.get(userId);
+    }
+    
+    try {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists()) {
+            const userName = userDoc.data().name || 'Unknown User';
+            userCache.set(userId, userName);
+            return userName;
+        }
+    } catch (error) {
+        console.error('calls.js: Error getting user name:', error);
+    }
+    
+    return 'Unknown User';
+}
+
+// Setup call button listeners on chat/group pages
 function setupCallButtonListeners() {
     console.log('calls.js: Setting up call button listeners');
     
@@ -1457,516 +276,6 @@ function setupCallButtonListeners() {
             }
         });
     }
-}
-
-// Handle call page
-async function handleCallPage() {
-    console.log('calls.js: handleCallPage called');
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    const callType = urlParams.get('type');
-    const partnerId = urlParams.get('partnerId');
-    const groupId = urlParams.get('groupId');
-    const channelId = urlParams.get('channelId');
-    const isIncoming = urlParams.get('incoming') === 'true';
-    const callId = urlParams.get('callId');
-    
-    console.log('calls.js: Call page params:', { 
-        callType, 
-        partnerId, 
-        groupId, 
-        channelId,
-        isIncoming, 
-        callId 
-    });
-    
-    if (!callType) {
-        console.error('calls.js: Invalid call parameters');
-        showError('Invalid call parameters');
-        return;
-    }
-    
-    currentCallType = callType;
-    activeCallId = callId || `${currentUser.uid}_${Date.now()}`;
-    isCaller = !isIncoming;
-    
-    if (callType === 'personal') {
-        currentCallPartnerId = partnerId;
-    } else if (callType === 'group') {
-        currentGroupId = groupId;
-    } else if (callType === 'channel') {
-        currentGroupId = groupId;
-        currentVoiceChannel = { id: channelId, groupId: groupId };
-    }
-    
-    // Update UI based on call type
-    try {
-        if (callType === 'personal') {
-            const partnerName = await getUserName(partnerId);
-            document.getElementById('callTitle').textContent = partnerName;
-            document.getElementById('callTypeText').textContent = 'Voice Call';
-        } else if (callType === 'group') {
-            const groupDoc = await getDoc(doc(db, 'groups', groupId));
-            if (groupDoc.exists()) {
-                const groupName = groupDoc.data().name;
-                document.getElementById('callTitle').textContent = groupName;
-                document.getElementById('callTypeText').textContent = 'Group Voice Call';
-            }
-        } else if (callType === 'channel') {
-            const groupDoc = await getDoc(doc(db, 'groups', groupId));
-            const channelDoc = await getDoc(doc(db, 'voice_channels', groupId, 'channels', channelId));
-            
-            let title = 'Voice Channel';
-            if (groupDoc.exists() && channelDoc.exists()) {
-                const groupName = groupDoc.data().name;
-                const channelName = channelDoc.data().name;
-                title = `${groupName}: ${channelName}`;
-            }
-            
-            document.getElementById('callTitle').textContent = title;
-            document.getElementById('callTypeText').textContent = 'Voice Channel';
-        }
-    } catch (error) {
-        console.error('calls.js: Error updating UI:', error);
-    }
-    
-    // Set up event listeners
-    const muteBtn = document.getElementById('muteBtn');
-    const endCallBtn = document.getElementById('endCallBtn');
-    const backToChatBtn = document.getElementById('backToChat');
-    
-    if (muteBtn) {
-        muteBtn.addEventListener('click', toggleMute);
-    }
-    
-    if (endCallBtn) {
-        endCallBtn.addEventListener('click', endCall);
-    }
-    
-    if (backToChatBtn) {
-        backToChatBtn.addEventListener('click', goBackToChat);
-    }
-    
-    // Setup signaling listener
-    setupSignalingListener();
-    
-    // Start the call process
-    if (isCaller || callType === 'channel') {
-        console.log('calls.js: Starting call...');
-        startCall();
-    } else {
-        console.log('calls.js: We are the receiver, waiting for offer');
-        setupMediaForReceiver();
-    }
-}
-
-// End call
-async function endCall() {
-    console.log('calls.js: Ending call');
-    
-    try {
-        // Clear any timeout
-        if (callTimeout) {
-            clearTimeout(callTimeout);
-            callTimeout = null;
-        }
-        
-        // Stop call timer
-        stopCallTimer();
-        
-        // Stop ringtone if playing
-        stopRingtone();
-        
-        // If in voice channel, leave it
-        if (currentCallType === 'channel' && currentVoiceChannel) {
-            await leaveVoiceChannel(currentVoiceChannel.id, currentVoiceChannel.groupId);
-        } else {
-            // Send end call signals for personal/group calls
-            if (currentCallType === 'personal' && currentCallPartnerId) {
-                await sendSignal({
-                    type: 'end-call',
-                    from: currentUser.uid,
-                    callId: activeCallId
-                }, currentCallPartnerId);
-            } else if (currentCallType === 'group' && currentGroupId) {
-                // Send to all participants
-                for (const [userId] of peerConnections) {
-                    await sendSignal({
-                        type: 'end-call',
-                        from: currentUser.uid,
-                        callId: activeCallId,
-                        groupId: currentGroupId
-                    }, userId);
-                }
-            }
-        }
-        
-        cleanupCallResources();
-        showCallEnded();
-        
-        console.log('calls.js: Call ended successfully');
-        
-    } catch (error) {
-        console.error('calls.js: Error ending call:', error);
-        cleanupCallResources();
-    }
-}
-
-// Cleanup call resources
-function cleanupCallResources() {
-    console.log('calls.js: Cleaning up call resources');
-    
-    // Only stop voice channel if we're not staying in it
-    if (currentCallType === 'channel' && currentVoiceChannel) {
-        // Don't stop the voice channel if user is staying in it
-        console.log('calls.js: Staying in voice channel, not stopping resources');
-        return;
-    }
-    
-    // Close all peer connections
-    peerConnections.forEach((pc, userId) => {
-        if (pc) {
-            pc.close();
-        }
-    });
-    peerConnections.clear();
-    
-    // Stop local stream
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-    
-    // Clear remote streams
-    remoteStreams.clear();
-    
-    // Remove all audio elements
-    document.querySelectorAll('[id^="remoteAudio_"], [id^="channelAudio_"]').forEach(el => {
-        el.pause();
-        el.srcObject = null;
-        el.remove();
-    });
-    
-    // Clear signaling listeners
-    signalingUnsubscribers.forEach(unsubscribe => {
-        if (unsubscribe) unsubscribe();
-    });
-    signalingUnsubscribers.clear();
-    
-    // Clear variables
-    activeCallId = null;
-    currentCallType = null;
-    currentCallPartnerId = null;
-    currentGroupId = null;
-    currentCallData = null;
-    
-    // Only clear voice channel data if not in a channel
-    if (!userVoiceChannel.has(currentUser?.uid)) {
-        currentVoiceChannel = null;
-        isCallActive = false;
-    }
-    
-    console.log('calls.js: Call resources cleaned up');
-}
-
-// Go back to chat
-function goBackToChat() {
-    console.log('calls.js: Going back to chat');
-    
-    if (currentCallType === 'channel' && currentVoiceChannel) {
-        // User stays in voice channel, just close call page
-        window.close();
-        return;
-    }
-    
-    cleanupCallResources();
-    
-    if (currentCallType === 'personal' && currentCallPartnerId) {
-        window.location.href = 'chat.html?id=' + currentCallPartnerId;
-    } else if (currentCallType === 'group' && currentGroupId) {
-        window.location.href = 'group.html?id=' + currentGroupId;
-    } else {
-        window.location.href = 'groups.html';
-    }
-}
-
-// Toggle mute
-function toggleMute() {
-    if (!localStream) return;
-    
-    const audioTracks = localStream.getAudioTracks();
-    if (audioTracks.length > 0) {
-        isMuted = !isMuted;
-        audioTracks[0].enabled = !isMuted;
-        
-        // Update main mute button
-        const muteBtn = document.getElementById('muteBtn');
-        if (muteBtn) {
-            muteBtn.classList.toggle('active', isMuted);
-            muteBtn.innerHTML = isMuted ? 
-                '<i class="fas fa-microphone-slash"></i>' : 
-                '<i class="fas fa-microphone"></i>';
-        }
-        
-        // Update header mini player mute button
-        const headerMuteBtn = document.getElementById('headerMuteBtn');
-        if (headerMuteBtn) {
-            headerMuteBtn.classList.toggle('active', isMuted);
-            headerMuteBtn.innerHTML = isMuted ? 
-                '<i class="fas fa-microphone-slash"></i>' : 
-                '<i class="fas fa-microphone"></i>';
-        }
-        
-        console.log('calls.js: Mute toggled:', isMuted);
-    }
-}
-
-// Handle signaling message
-async function handleSignalingMessage(data) {
-    try {
-        console.log('calls.js: Handling signal:', data.type, 'from:', data.from);
-        
-        switch (data.type) {
-            case 'offer':
-                await handleIncomingOffer(data);
-                break;
-                
-            case 'answer':
-                await handleAnswer(data);
-                break;
-                
-            case 'ice-candidate':
-                await handleIceCandidate(data);
-                break;
-                
-            case 'voice-channel-offer':
-                await handleVoiceChannelOffer(data);
-                break;
-                
-            case 'voice-channel-answer':
-                await handleVoiceChannelAnswer(data);
-                break;
-                
-            case 'voice-channel-ice':
-                await handleVoiceChannelIce(data);
-                break;
-                
-            case 'call-accepted':
-                console.log('calls.js: Call accepted by remote user');
-                hideLoader();
-                updateCallStatus('Connecting...');
-                break;
-                
-            case 'call-rejected':
-                console.log('calls.js: Call rejected by remote user');
-                showError('Call was rejected.');
-                setTimeout(goBackToChat, 2000);
-                break;
-                
-            case 'end-call':
-                console.log('calls.js: Call ended by remote user');
-                showCallEnded();
-                break;
-                
-            default:
-                console.log('calls.js: Unknown signal type:', data.type);
-        }
-    } catch (error) {
-        console.error('calls.js: Error handling signaling message:', error);
-        showNotification('Error handling call request: ' + error.message, 'error');
-    }
-}
-
-// Handle voice channel offer
-async function handleVoiceChannelOffer(data) {
-    console.log('calls.js: Handling voice channel offer from:', data.from);
-    
-    // Check if we're in the same channel
-    if (currentVoiceChannel?.id !== data.channelId || 
-        currentVoiceChannel?.groupId !== data.groupId) {
-        console.log('calls.js: Not in same voice channel, ignoring offer');
-        return;
-    }
-    
-    // Setup media if not already
-    if (!localStream) {
-        await setupMediaForVoiceChannel();
-    }
-    
-    // Create peer connection if it doesn't exist
-    if (!peerConnections.has(data.from)) {
-        createVoiceChannelConnection(data.from, data.groupId, data.channelId);
-    }
-    
-    const peerConnection = peerConnections.get(data.from);
-    if (!peerConnection) {
-        console.error('calls.js: No peer connection for:', data.from);
-        return;
-    }
-    
-    // Set remote description
-    try {
-        const offerDescription = new RTCSessionDescription({
-            type: 'offer',
-            sdp: data.offer.sdp
-        });
-        
-        console.log('calls.js: Setting remote description for voice channel');
-        await peerConnection.setRemoteDescription(offerDescription);
-        
-        // Create and send answer
-        const answer = await peerConnection.createAnswer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: false
-        });
-        await peerConnection.setLocalDescription(answer);
-        
-        await sendSignal({
-            type: 'voice-channel-answer',
-            answer: answer,
-            from: currentUser.uid,
-            groupId: data.groupId,
-            channelId: data.channelId
-        }, data.from);
-        
-        console.log('calls.js: Voice channel answer sent');
-        
-    } catch (error) {
-        console.error('calls.js: Error handling voice channel offer:', error);
-    }
-}
-
-// Handle voice channel answer
-async function handleVoiceChannelAnswer(data) {
-    console.log('calls.js: Handling voice channel answer from:', data.from);
-    
-    const peerConnection = peerConnections.get(data.from);
-    if (peerConnection) {
-        try {
-            const answerDescription = new RTCSessionDescription({
-                type: 'answer',
-                sdp: data.answer.sdp
-            });
-            
-            console.log('calls.js: Setting remote answer for voice channel');
-            await peerConnection.setRemoteDescription(answerDescription);
-            
-            console.log('calls.js: Voice channel connected with:', data.from);
-            
-        } catch (error) {
-            console.error('calls.js: Error setting remote answer for voice channel:', error);
-        }
-    }
-}
-
-// Handle voice channel ICE candidate
-async function handleVoiceChannelIce(data) {
-    const peerConnection = peerConnections.get(data.from);
-    if (peerConnection && data.candidate) {
-        try {
-            const iceCandidate = new RTCIceCandidate(data.candidate);
-            console.log('calls.js: Adding ICE candidate for voice channel from:', data.from);
-            await peerConnection.addIceCandidate(iceCandidate);
-        } catch (error) {
-            console.error('calls.js: Error adding ICE candidate for voice channel:', error);
-        }
-    }
-}
-
-// Create voice channel connection
-function createVoiceChannelConnection(userId, groupId, channelId) {
-    try {
-        console.log('calls.js: Creating voice channel connection for:', userId);
-        const peerConnection = new RTCPeerConnection(rtcConfiguration);
-        peerConnections.set(userId, peerConnection);
-        
-        // Handle remote stream
-        peerConnection.ontrack = (event) => {
-            console.log('calls.js: Received remote track from voice channel:', userId);
-            if (event.streams && event.streams[0]) {
-                const remoteStream = event.streams[0];
-                remoteStreams.set(userId, remoteStream);
-                
-                // Create audio element
-                createChannelAudioElement(userId, remoteStream);
-                
-                // Update participants UI
-                updateChannelParticipantsUI(channelId);
-            }
-        };
-        
-        // Handle ICE candidates
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                sendSignal({
-                    type: 'voice-channel-ice',
-                    candidate: event.candidate,
-                    from: currentUser.uid,
-                    groupId: groupId,
-                    channelId: channelId
-                }, userId);
-            }
-        };
-        
-        // Handle connection state changes
-        peerConnection.onconnectionstatechange = () => {
-            console.log(`calls.js: Voice channel connection state changed for ${userId}:`, peerConnection.connectionState);
-            
-            if (peerConnection.connectionState === 'connected') {
-                console.log('calls.js: Voice channel connected with:', userId);
-                updateChannelParticipantsUI(channelId);
-                
-            } else if (peerConnection.connectionState === 'disconnected' || 
-                       peerConnection.connectionState === 'failed') {
-                console.log(`calls.js: Voice channel connection lost for ${userId}`);
-                cleanupParticipant(userId);
-            }
-        };
-        
-        // Add local stream if available
-        if (localStream) {
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
-        }
-        
-        console.log('calls.js: Voice channel connection created for:', userId);
-        
-    } catch (error) {
-        console.error('calls.js: Failed to create voice channel connection:', error);
-    }
-}
-
-// Preload notification sounds
-function preloadNotificationSounds() {
-    try {
-        callNotificationSound = new Audio('sounds/notification.mp3');
-        callRingtone = new Audio('ringingtone.mp3');
-        callRingtone.loop = true;
-        console.log('calls.js: Notification sounds preloaded');
-    } catch (error) {
-        console.error('calls.js: Failed to preload sounds:', error);
-    }
-}
-
-// Get user name with caching
-async function getUserName(userId) {
-    if (userCache.has(userId)) {
-        return userCache.get(userId);
-    }
-    
-    try {
-        const userDoc = await getDoc(doc(db, 'users', userId));
-        if (userDoc.exists()) {
-            const userName = userDoc.data().name || 'Unknown User';
-            userCache.set(userId, userName);
-            return userName;
-        }
-    } catch (error) {
-        console.error('calls.js: Error getting user name:', error);
-    }
-    
-    return 'Unknown User';
 }
 
 // Setup listener for incoming call notifications
@@ -2386,6 +695,131 @@ function stopRingtone() {
     }
 }
 
+// Handle the call page - this runs when calls.html loads
+async function handleCallPage() {
+    console.log('calls.js: handleCallPage called');
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const callType = urlParams.get('type');
+    const partnerId = urlParams.get('partnerId');
+    const groupId = urlParams.get('groupId');
+    const isIncoming = urlParams.get('incoming') === 'true';
+    const callId = urlParams.get('callId');
+    
+    console.log('calls.js: Call page params:', { 
+        callType, 
+        partnerId, 
+        groupId, 
+        isIncoming, 
+        callId 
+    });
+    
+    if (!callType || (!partnerId && !groupId)) {
+        console.error('calls.js: Invalid call parameters');
+        showError('Invalid call parameters');
+        return;
+    }
+    
+    currentCallType = callType;
+    activeCallId = callId || `${currentUser.uid}_${Date.now()}`;
+    isCaller = !isIncoming;
+    
+    if (callType === 'personal') {
+        currentCallPartnerId = partnerId;
+        // For personal calls, always add partner to participants
+        callParticipants.add(partnerId);
+    } else if (callType === 'group') {
+        currentGroupId = groupId;
+        callParticipants.add(currentUser.uid);
+    }
+    
+    // Store in session storage for cleanup
+    sessionStorage.setItem('currentCallType', currentCallType);
+    sessionStorage.setItem('activeCallId', activeCallId);
+    if (currentCallPartnerId) sessionStorage.setItem('currentCallPartnerId', currentCallPartnerId);
+    if (currentGroupId) sessionStorage.setItem('currentGroupId', currentGroupId);
+    
+    console.log('calls.js: Call initialized:', {
+        currentCallType,
+        activeCallId,
+        isCaller,
+        currentCallPartnerId,
+        currentGroupId
+    });
+    
+    // Update UI with call info
+    try {
+        if (callType === 'personal') {
+            const partnerName = await getUserName(partnerId);
+            document.getElementById('callTitle').textContent = partnerName;
+            document.getElementById('callTypeText').textContent = 'Voice Call';
+        } else if (callType === 'group') {
+            const groupDoc = await getDoc(doc(db, 'groups', groupId));
+            if (groupDoc.exists()) {
+                const groupName = groupDoc.data().name;
+                document.getElementById('callTitle').textContent = groupName;
+                document.getElementById('callTypeText').textContent = 'Group Voice Call';
+            }
+        }
+    } catch (error) {
+        console.error('calls.js: Error updating UI:', error);
+    }
+    
+    // Show/hide participants section based on call type
+    if (callType === 'group') {
+        const participantsSection = document.getElementById('participantsSection');
+        if (participantsSection) {
+            participantsSection.style.display = 'block';
+        }
+        const remoteAudioLabel = document.getElementById('remoteAudioLabel');
+        if (remoteAudioLabel) {
+            remoteAudioLabel.textContent = 'Others';
+        }
+    } else {
+        const participantsSection = document.getElementById('participantsSection');
+        if (participantsSection) {
+            participantsSection.style.display = 'none';
+        }
+        const remoteAudioLabel = document.getElementById('remoteAudioLabel');
+        if (remoteAudioLabel) {
+            remoteAudioLabel.textContent = 'Partner';
+        }
+    }
+    
+    // Set up event listeners for call controls
+    const muteBtn = document.getElementById('muteBtn');
+    const endCallBtn = document.getElementById('endCallBtn');
+    const backToChatBtn = document.getElementById('backToChat');
+    
+    if (muteBtn) {
+        console.log('calls.js: Adding mute button listener');
+        muteBtn.addEventListener('click', toggleMute);
+    }
+    
+    if (endCallBtn) {
+        console.log('calls.js: Adding end call button listener');
+        endCallBtn.addEventListener('click', endCall);
+    }
+    
+    if (backToChatBtn) {
+        console.log('calls.js: Adding back to chat button listener');
+        backToChatBtn.addEventListener('click', goBackToChat);
+    }
+    
+    // Setup signaling listener FIRST
+    console.log('calls.js: Setting up signaling listener');
+    setupSignalingListener();
+    
+    // Start the call process
+    if (isCaller) {
+        console.log('calls.js: We are the caller, initiating call');
+        startCall();
+    } else {
+        console.log('calls.js: We are the receiver, waiting for offer');
+        setupMediaForReceiver();
+    }
+}
+
 // Setup media for receiver
 async function setupMediaForReceiver() {
     console.log('calls.js: setupMediaForReceiver called');
@@ -2505,7 +939,9 @@ async function startCall() {
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
-                    autoGainControl: true
+                    autoGainControl: true,
+                    sampleRate: 44100,
+                    channelCount: 1
                 },
                 video: false
             });
@@ -2544,9 +980,6 @@ async function startCall() {
         } else if (currentCallType === 'group') {
             // Group call - connect to all members
             await startGroupCall();
-        } else if (currentCallType === 'channel') {
-            // Voice channel - connect to channel participants
-            await connectToVoiceChannel(currentGroupId, currentVoiceChannel.id);
         }
         
         hideLoader();
@@ -2614,9 +1047,9 @@ async function startPersonalCall() {
     }
 }
 
-// Start group call
+// Start group call - OPTIMIZED VERSION
 async function startGroupCall() {
-    console.log('calls.js: Starting group call');
+    console.log('calls.js: Starting OPTIMIZED group call');
     
     // Get all group members
     try {
@@ -2637,12 +1070,20 @@ async function startGroupCall() {
             return;
         }
         
-        // Connect to all members
-        for (const memberId of members) {
+        // Initialize connection queue
+        connectionQueue = [...members];
+        
+        // Connect to first batch of members
+        const initialBatch = connectionQueue.splice(0, maxSimultaneousConnections);
+        
+        for (const memberId of initialBatch) {
             setTimeout(() => {
                 createAndConnect(memberId);
-            }, Math.random() * 1000);
+            }, Math.random() * 500); // Stagger connections
         }
+        
+        // Set up periodic queue processing
+        setInterval(processConnectionQueue, 2000);
         
         // Set timeout for initial connections
         callTimeout = setTimeout(() => {
@@ -2661,59 +1102,14 @@ async function startGroupCall() {
             }
         }, 30000);
         
-        console.log('calls.js: Group call started');
+        // Update participants UI
+        updateParticipantsUI();
+        
+        console.log('calls.js: Optimized group call started');
         
     } catch (error) {
         console.error('calls.js: Failed to start group call:', error);
         showError('Failed to start group call: ' + error.message);
-    }
-}
-
-// Create and connect
-async function createAndConnect(userId) {
-    if (peerConnections.has(userId)) {
-        return;
-    }
-    
-    try {
-        console.log(`Creating connection to ${userId}`);
-        
-        // Create peer connection
-        createPeerConnection(userId);
-        
-        // Add local stream
-        if (localStream) {
-            const pc = peerConnections.get(userId);
-            if (pc) {
-                localStream.getTracks().forEach(track => {
-                    pc.addTrack(track, localStream);
-                });
-            }
-        }
-        
-        // Create and send offer
-        const peerConnection = peerConnections.get(userId);
-        if (peerConnection) {
-            const offer = await peerConnection.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: false
-            });
-            await peerConnection.setLocalDescription(offer);
-            
-            await sendSignal({
-                type: 'offer',
-                offer: offer,
-                callType: 'group',
-                from: currentUser.uid,
-                callId: activeCallId,
-                groupId: currentGroupId
-            }, userId);
-            
-            console.log(`Offer sent to ${userId}`);
-        }
-        
-    } catch (error) {
-        console.error(`Failed to connect to ${userId}:`, error);
     }
 }
 
@@ -2748,9 +1144,13 @@ function createPeerConnection(userId) {
                         }
                     }
                 } else if (currentCallType === 'group') {
-                    // For group calls, create a new audio element
+                    // For group calls, create a new audio element for each participant
                     createGroupAudioElement(userId, remoteStream);
                 }
+                
+                // Add participant to UI
+                callParticipants.add(userId);
+                updateParticipantsUI();
                 
                 hideLoader();
                 updateCallStatus('Connected');
@@ -2785,6 +1185,9 @@ function createPeerConnection(userId) {
                 startCallTimer();
                 isCallActive = true;
                 
+                // Update active connections
+                activeConnections.delete(userId);
+                
                 // Clear timeout if call is connected
                 if (callTimeout) {
                     clearTimeout(callTimeout);
@@ -2797,8 +1200,15 @@ function createPeerConnection(userId) {
                        peerConnection.connectionState === 'failed') {
                 console.log(`calls.js: Connection lost for ${userId}`);
                 
+                // Remove from active connections
+                activeConnections.delete(userId);
+                
+                // Remove from participants
+                callParticipants.delete(userId);
+                updateParticipantsUI();
+                
                 // If all participants disconnected, end call
-                if (currentCallType === 'personal') {
+                if (currentCallType === 'personal' || callParticipants.size <= 1) {
                     console.log('calls.js: Call disconnected');
                     showCallEnded();
                 }
@@ -2859,6 +1269,60 @@ function createGroupAudioElement(userId, remoteStream) {
     document.body.appendChild(audioElement);
 }
 
+// Update participants UI for group calls
+async function updateParticipantsUI() {
+    const participantsContainer = document.getElementById('participantsContainer');
+    if (!participantsContainer) return;
+    
+    participantsContainer.innerHTML = '';
+    
+    // Add local participant (current user)
+    const localParticipant = document.createElement('div');
+    localParticipant.className = 'participant';
+    localParticipant.innerHTML = `
+        <div class="participant-avatar local">
+            <i class="fas fa-user"></i>
+        </div>
+        <div class="participant-name">You</div>
+        <div class="participant-status ${isMuted ? 'muted' : 'speaking'}">
+            <i class="fas ${isMuted ? 'fa-microphone-slash' : 'fa-microphone'}"></i>
+        </div>
+    `;
+    participantsContainer.appendChild(localParticipant);
+    
+    // Add remote participants
+    for (const userId of callParticipants) {
+        if (userId === currentUser.uid) continue;
+        
+        try {
+            const userName = await getUserName(userId);
+            const participant = document.createElement('div');
+            participant.className = 'participant';
+            participant.innerHTML = `
+                <div class="participant-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="participant-name">${userName}</div>
+                <div class="participant-status speaking">
+                    <i class="fas fa-microphone"></i>
+                </div>
+            `;
+            participantsContainer.appendChild(participant);
+        } catch (error) {
+            console.error('calls.js: Error adding participant to UI:', error);
+        }
+    }
+    
+    // Update participant count
+    const participantCount = document.getElementById('participantCount');
+    if (participantCount) {
+        const totalParticipants = callParticipants.size;
+        participantCount.textContent = `${totalParticipants} participant${totalParticipants !== 1 ? 's' : ''}`;
+    }
+    
+    console.log('calls.js: Participants UI updated, count:', callParticipants.size);
+}
+
 // Setup signaling listener
 function setupSignalingListener() {
     if (!currentUser || !db) {
@@ -2913,7 +1377,59 @@ function setupSignalingListener() {
     console.log('calls.js: Signaling listener set up');
 }
 
-// Handle incoming offer
+// Handle incoming signaling messages
+async function handleSignalingMessage(data) {
+    try {
+        console.log('calls.js: Handling signal:', data.type, 'from:', data.from);
+        
+        switch (data.type) {
+            case 'offer':
+                if (data.callType === 'personal' || data.callType === 'group') {
+                    await handleIncomingOffer(data);
+                }
+                break;
+                
+            case 'answer':
+                await handleAnswer(data);
+                break;
+                
+            case 'ice-candidate':
+                await handleIceCandidate(data);
+                break;
+                
+            case 'call-accepted':
+                console.log('calls.js: Call accepted by remote user');
+                hideLoader();
+                updateCallStatus('Connecting...');
+                break;
+                
+            case 'call-rejected':
+                console.log('calls.js: Call rejected by remote user');
+                showError('Call was rejected.');
+                setTimeout(goBackToChat, 2000);
+                break;
+                
+            case 'call-timeout':
+                console.log('calls.js: Call timeout');
+                showError('Call timed out.');
+                setTimeout(goBackToChat, 2000);
+                break;
+                
+            case 'end-call':
+                console.log('calls.js: Call ended by remote user');
+                showCallEnded();
+                break;
+                
+            default:
+                console.log('calls.js: Unknown signal type:', data.type);
+        }
+    } catch (error) {
+        console.error('calls.js: Error handling signaling message:', error);
+        showNotification('Error handling call request: ' + error.message, 'error');
+    }
+}
+
+// Handle incoming offer (both personal and group)
 async function handleIncomingOffer(data) {
     console.log('calls.js: Handling incoming offer from:', data.from);
     
@@ -2931,7 +1447,9 @@ async function handleIncomingOffer(data) {
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
-                    autoGainControl: true
+                    autoGainControl: true,
+                    sampleRate: 44100,
+                    channelCount: 1
                 },
                 video: false
             });
@@ -3046,6 +1564,10 @@ async function handleAnswer(data) {
                 callTimeout = null;
             }
             
+            // Add to participants
+            callParticipants.add(data.from);
+            updateParticipantsUI();
+            
             hideLoader();
             updateCallStatus('Connected');
             startCallTimer();
@@ -3073,7 +1595,7 @@ async function handleIceCandidate(data) {
     }
 }
 
-// Send signaling message
+// Send signaling message - PROPERLY SERIALIZED VERSION
 async function sendSignal(data, targetUserId) {
     if (!targetUserId || !db) {
         console.error('calls.js: Cannot send signal - missing target or db');
@@ -3163,6 +1685,148 @@ function stopCallTimer() {
     return 0;
 }
 
+// Toggle mute
+function toggleMute() {
+    if (!localStream) return;
+    
+    const audioTracks = localStream.getAudioTracks();
+    if (audioTracks.length > 0) {
+        isMuted = !isMuted;
+        audioTracks[0].enabled = !isMuted;
+        
+        const muteBtn = document.getElementById('muteBtn');
+        if (muteBtn) {
+            muteBtn.classList.toggle('active', isMuted);
+            muteBtn.innerHTML = isMuted ? 
+                '<i class="fas fa-microphone-slash"></i>' : 
+                '<i class="fas fa-microphone"></i>';
+        }
+        
+        // Update participants UI for group calls
+        if (currentCallType === 'group') {
+            updateParticipantsUI();
+        }
+        
+        console.log('calls.js: Mute toggled:', isMuted);
+    }
+}
+
+// End the current call
+async function endCall() {
+    console.log('calls.js: Ending call');
+    
+    try {
+        // Clear any timeout
+        if (callTimeout) {
+            clearTimeout(callTimeout);
+            callTimeout = null;
+        }
+        
+        // Stop call timer and get duration
+        const callDuration = stopCallTimer();
+        
+        // Stop ringtone if playing
+        stopRingtone();
+        
+        console.log('calls.js: Sending end call signals');
+        
+        // Send end call signals to all connected peers
+        if (currentCallType === 'personal' && currentCallPartnerId) {
+            await sendSignal({
+                type: 'end-call',
+                from: currentUser.uid,
+                callId: activeCallId,
+                duration: callDuration
+            }, currentCallPartnerId);
+        } else if (currentCallType === 'group' && currentGroupId) {
+            // Send to all participants
+            for (const userId of callParticipants) {
+                if (userId !== currentUser.uid) {
+                    await sendSignal({
+                        type: 'end-call',
+                        from: currentUser.uid,
+                        callId: activeCallId,
+                        duration: callDuration,
+                        groupId: currentGroupId
+                    }, userId);
+                }
+            }
+        }
+        
+        cleanupCallResources();
+        showCallEnded();
+        
+        console.log('calls.js: Call ended successfully');
+        
+    } catch (error) {
+        console.error('calls.js: Error ending call:', error);
+        cleanupCallResources();
+    }
+}
+
+// Clean up call resources
+function cleanupCallResources() {
+    console.log('calls.js: Cleaning up call resources');
+    
+    // Close all peer connections
+    peerConnections.forEach((pc, userId) => {
+        if (pc) {
+            pc.close();
+        }
+    });
+    peerConnections.clear();
+    
+    // Stop local stream
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    
+    // Clear remote streams
+    remoteStreams.clear();
+    
+    // Remove all group audio elements
+    document.querySelectorAll('[id^="remoteAudio_"]').forEach(el => {
+        el.pause();
+        el.srcObject = null;
+        el.remove();
+    });
+    
+    // Clear signaling listeners
+    signalingUnsubscribers.forEach(unsubscribe => {
+        if (unsubscribe) unsubscribe();
+    });
+    signalingUnsubscribers.clear();
+    
+    // Clear participants
+    callParticipants.clear();
+    
+    // Clear connection queues
+    connectionQueue = [];
+    activeConnections.clear();
+    connectionRetryCount.clear();
+    connectionPriority.clear();
+    
+    // Clear pending signals
+    pendingSignals = [];
+    
+    // Clear session storage
+    sessionStorage.removeItem('currentCallType');
+    sessionStorage.removeItem('activeCallId');
+    sessionStorage.removeItem('currentCallPartnerId');
+    sessionStorage.removeItem('currentGroupId');
+    
+    // Clear global variables
+    activeCallId = null;
+    currentCallType = null;
+    currentCallPartnerId = null;
+    currentGroupId = null;
+    currentCallData = null;
+    isCallActive = false;
+    
+    console.log('calls.js: Call resources cleaned up');
+}
+
 // Show call ended screen
 function showCallEnded() {
     console.log('calls.js: Showing call ended screen');
@@ -3178,6 +1842,20 @@ function showCallEnded() {
         console.log('calls.js: Auto-redirecting to chat');
         goBackToChat();
     }, 2000);
+}
+
+// Go back to chat
+function goBackToChat() {
+    console.log('calls.js: Going back to chat');
+    cleanupCallResources();
+    
+    if (currentCallType === 'personal' && currentCallPartnerId) {
+        window.location.href = 'chat.html?id=' + currentCallPartnerId;
+    } else if (currentCallType === 'group' && currentGroupId) {
+        window.location.href = 'group.html?id=' + currentGroupId;
+    } else {
+        window.location.href = 'groups.html';
+    }
 }
 
 // Update call status
@@ -3261,13 +1939,6 @@ function showNotification(message, type = 'info') {
 
 // Clean up when leaving the page
 window.addEventListener('beforeunload', () => {
-    if (currentCallType === 'channel' && currentVoiceChannel) {
-        console.log('calls.js: Page unloading, staying in voice channel');
-        // Don't end voice channel calls when leaving page
-        // The persistent mini player will keep the connection alive
-        return;
-    }
-    
     if (peerConnections.size > 0 || localStream) {
         console.log('calls.js: Page unloading, ending call');
         endCall();
@@ -3278,9 +1949,6 @@ window.addEventListener('beforeunload', () => {
 window.callsModule = {
     initiatePersonalCall,
     initiateGroupCall,
-    createVoiceChannel,
-    joinVoiceChannel,
-    leaveVoiceChannel,
     endCall,
     toggleMute
 };

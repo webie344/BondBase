@@ -12,7 +12,1098 @@
     
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Add these styles to your existing CSS or create a new style section -->
+<style>
+/* ==========================================================================
+   VOICE CHANNELS SECTION STYLES
+   ========================================================================== */
+
+/* Voice Channels Main Section */
+.voice-channels-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    margin: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Header Styles */
+.voice-channels-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    color: white;
+    position: relative;
+    z-index: 2;
+}
+
+.voice-channels-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    letter-spacing: 0.5px;
+}
+
+.voice-channels-header h3 i {
+    font-size: 20px;
+    color: #ffdd59;
+}
+
+.toggle-channels-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    font-size: 16px;
+}
+
+.toggle-channels-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(180deg);
+}
+
+/* Voice Channels Container */
+.voice-channels-container {
+    display: block;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 2;
+}
+
+/* Voice Channel Card */
+.voice-channel-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.voice-channel-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+    background: white;
+}
+
+/* Channel Header */
+.channel-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.channel-icon {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+}
+
+.channel-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.channel-name {
+    margin: 0 0 6px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #333;
+    line-height: 1.3;
+}
+
+.channel-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 13px;
+    color: #666;
+}
+
+.channel-meta span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.channel-meta i {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+/* Channel Participants */
+.channel-participants {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    padding: 12px 0;
+    border-top: 1px solid #f0f0f0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.participants-count {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #555;
+    font-weight: 600;
+}
+
+.participants-count i {
+    color: #667eea;
+}
+
+.participants-list {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.participant-dot {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    position: relative;
+    box-shadow: 0 2px 5px rgba(102, 126, 234, 0.3);
+}
+
+.participant-dot::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background: #4CAF50;
+    border: 2px solid white;
+    border-radius: 50%;
+    display: none;
+}
+
+.participant-dot.active::after {
+    display: block;
+}
+
+.more-participants {
+    font-size: 12px;
+    color: #888;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+/* Channel Actions */
+.channel-actions {
+    display: flex;
+    justify-content: center;
+}
+
+.join-channel-btn {
+    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s;
+    width: 100%;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+.join-channel-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.join-channel-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.join-channel-btn.active {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.join-channel-btn.active:hover:not(:disabled) {
+    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+}
+
+.join-channel-btn.full {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.8;
+    box-shadow: none;
+}
+
+.join-channel-btn.full:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Start New Channel Button */
+.start-new-channel {
+    margin-top: 25px;
+    text-align: center;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.start-new-channel-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 2px dashed rgba(255, 255, 255, 0.5);
+    padding: 15px 30px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.3s;
+    width: 100%;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+    letter-spacing: 0.5px;
+}
+
+.start-new-channel-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
+}
+
+.start-new-channel-btn:active {
+    transform: translateY(0);
+}
+
+/* No Voice Channels State */
+.no-voice-channels {
+    text-align: center;
+    padding: 40px 20px;
+    color: white;
+    position: relative;
+    z-index: 2;
+}
+
+.no-voice-channels i {
+    font-size: 60px;
+    margin-bottom: 20px;
+    opacity: 0.8;
+    display: block;
+}
+
+.no-voice-channels p {
+    margin-bottom: 25px;
+    font-size: 16px;
+    opacity: 0.9;
+    line-height: 1.5;
+}
+
+.start-voice-channel-btn {
+    background: rgba(255, 255, 255, 0.95);
+    color: #667eea;
+    border: none;
+    padding: 15px 35px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.start-voice-channel-btn:hover {
+    background: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Loading State */
+.loading-channels {
+    text-align: center;
+    padding: 40px 20px;
+    color: white;
+    position: relative;
+    z-index: 2;
+}
+
+.loading-channels i {
+    font-size: 32px;
+    margin-bottom: 15px;
+    display: block;
+    animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-channels p {
+    font-size: 15px;
+    opacity: 0.9;
+}
+
+/* ==========================================================================
+   MINI CALL PLAYER STYLES (For persistent player)
+   ========================================================================== */
+
+.mini-call-player {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    width: 320px;
+    color: white;
+    display: none;
+    animation: slideUp 0.4s ease;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
+/* Mini Player Header */
+.mini-player-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.mini-player-title {
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    letter-spacing: 0.5px;
+}
+
+.mini-player-title i {
+    color: #ffdd59;
+}
+
+.mini-player-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s;
+    font-size: 14px;
+}
+
+.mini-player-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Mini Player Content */
+.mini-player-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.mini-player-icon {
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.mini-player-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.mini-player-channel {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 5px;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mini-player-participants {
+    font-size: 12px;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mini-player-participants i {
+    font-size: 11px;
+}
+
+/* Mini Player Controls */
+.mini-player-controls {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.mini-player-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    font-size: 16px;
+    flex: 1;
+    max-width: 42px;
+}
+
+.mini-player-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.mini-player-btn.active {
+    background: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+}
+
+.mini-player-btn.mute {
+    color: #ff6b6b;
+}
+
+.mini-player-btn.mute.active {
+    background: rgba(255, 107, 107, 0.2);
+}
+
+.mini-player-btn.open {
+    background: rgba(76, 175, 80, 0.8);
+    flex: 2;
+    max-width: none;
+    border-radius: 25px;
+    font-size: 14px;
+    font-weight: 600;
+    gap: 8px;
+}
+
+.mini-player-btn.open:hover {
+    background: rgba(76, 175, 80, 0.9);
+}
+
+/* ==========================================================================
+   PERSISTENT MINI PLAYER STYLES (Always visible when in voice)
+   ========================================================================== */
+
+.persistent-mini-player {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50px;
+    padding: 12px 25px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 9998;
+    color: white;
+    display: none;
+    align-items: center;
+    gap: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+    max-width: 320px;
+    animation: slideUp 0.4s ease;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.persistent-mini-player:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
+    padding-right: 30px;
+}
+
+.persistent-player-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.persistent-player-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.persistent-player-channel {
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+    margin-bottom: 2px;
+}
+
+.persistent-player-participants {
+    font-size: 11px;
+    opacity: 0.9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.persistent-player-participants i {
+    font-size: 10px;
+}
+
+.persistent-player-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    transition: background 0.3s;
+    margin-left: 5px;
+}
+
+.persistent-player-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* ==========================================================================
+   RESPONSIVE STYLES
+   ========================================================================== */
+
+/* Tablet and smaller screens */
+@media (max-width: 768px) {
+    .voice-channels-section {
+        margin: 10px;
+        padding: 15px;
+        border-radius: 12px;
+    }
     
+    .voice-channels-header h3 {
+        font-size: 16px;
+    }
+    
+    .voice-channel-card {
+        padding: 15px;
+    }
+    
+    .channel-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+    }
+    
+    .channel-name {
+        font-size: 15px;
+    }
+    
+    .channel-meta {
+        font-size: 12px;
+        gap: 10px;
+    }
+    
+    .join-channel-btn {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+    
+    .mini-call-player {
+        width: 280px;
+        padding: 15px;
+        bottom: 20px;
+        right: 20px;
+    }
+    
+    .persistent-mini-player {
+        max-width: 280px;
+        padding: 10px 20px;
+        bottom: 20px;
+        right: 20px;
+    }
+    
+    .persistent-player-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+    
+    .persistent-player-channel {
+        font-size: 12px;
+    }
+}
+
+/* Mobile screens */
+@media (max-width: 480px) {
+    .voice-channels-section {
+        margin: 8px;
+        padding: 12px;
+        border-radius: 10px;
+    }
+    
+    .voice-channels-header {
+        margin-bottom: 15px;
+    }
+    
+    .voice-channels-header h3 {
+        font-size: 15px;
+        gap: 8px;
+    }
+    
+    .voice-channels-header h3 i {
+        font-size: 16px;
+    }
+    
+    .toggle-channels-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+    
+    .channel-header {
+        gap: 12px;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+    }
+    
+    .channel-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
+    
+    .channel-name {
+        font-size: 14px;
+        margin-bottom: 4px;
+    }
+    
+    .channel-meta {
+        font-size: 11px;
+        gap: 8px;
+    }
+    
+    .channel-participants {
+        margin-bottom: 15px;
+        padding: 10px 0;
+    }
+    
+    .participants-count {
+        font-size: 13px;
+        gap: 6px;
+    }
+    
+    .participant-dot {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
+    
+    .start-new-channel-btn {
+        padding: 12px 20px;
+        font-size: 14px;
+        gap: 8px;
+    }
+    
+    .mini-call-player {
+        width: 260px;
+        padding: 12px;
+        bottom: 15px;
+        right: 15px;
+    }
+    
+    .mini-player-header {
+        margin-bottom: 15px;
+    }
+    
+    .mini-player-title {
+        font-size: 14px;
+        gap: 8px;
+    }
+    
+    .mini-player-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 20px;
+    }
+    
+    .mini-player-channel {
+        font-size: 13px;
+    }
+    
+    .mini-player-participants {
+        font-size: 11px;
+    }
+    
+    .mini-player-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 15px;
+    }
+    
+    .mini-player-btn.open {
+        font-size: 13px;
+    }
+    
+    .persistent-mini-player {
+        max-width: 260px;
+        padding: 8px 16px;
+        bottom: 15px;
+        right: 15px;
+    }
+    
+    .persistent-player-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 13px;
+    }
+    
+    .persistent-player-channel {
+        font-size: 11px;
+    }
+    
+    .persistent-player-participants {
+        font-size: 10px;
+    }
+    
+    .persistent-player-close {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 360px) {
+    .mini-call-player {
+        width: 240px;
+        padding: 10px;
+    }
+    
+    .persistent-mini-player {
+        max-width: 240px;
+        padding: 8px 14px;
+    }
+    
+    .persistent-player-icon {
+        width: 26px;
+        height: 26px;
+        font-size: 12px;
+    }
+    
+    .persistent-player-channel {
+        font-size: 10px;
+    }
+}
+
+/* ==========================================================================
+   ANIMATIONS AND EFFECTS
+   ========================================================================== */
+
+/* Pulse animation for active voice channels */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+    }
+}
+
+.voice-channel-card.active-channel {
+    animation: pulse 2s infinite;
+    border: 2px solid #4CAF50;
+}
+
+/* Floating animation for voice icon */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+.channel-icon i {
+    animation: float 3s ease-in-out infinite;
+}
+
+/* Fade in animation for new channels */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.voice-channel-card {
+    animation: fadeIn 0.5s ease;
+}
+
+/* ==========================================================================
+   DARK MODE SUPPORT (if applicable)
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+    .voice-channel-card {
+        background: rgba(30, 30, 40, 0.95);
+        color: #e0e0e0;
+    }
+    
+    .channel-name {
+        color: #ffffff;
+    }
+    
+    .channel-meta {
+        color: #aaaaaa;
+    }
+    
+    .channel-participants {
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .start-voice-channel-btn {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+    }
+    
+    .start-voice-channel-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+}
+
+/* ==========================================================================
+   ACCESSIBILITY
+   ========================================================================== */
+
+/* Focus styles for keyboard navigation */
+.voice-channel-card:focus,
+.join-channel-btn:focus,
+.toggle-channels-btn:focus,
+.start-new-channel-btn:focus,
+.mini-player-btn:focus,
+.persistent-mini-player:focus,
+.persistent-player-close:focus {
+    outline: 2px solid #4CAF50;
+    outline-offset: 2px;
+}
+
+/* Screen reader only text */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+/* Text truncation */
+.text-truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Flex utilities */
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.flex-start {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Spacing utilities */
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.mt-4 { margin-top: 16px; }
+.mt-5 { margin-top: 20px; }
+
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mb-5 { margin-bottom: 20px; }
+
+/* Hide/show utilities */
+.hidden {
+    display: none !important;
+}
+
+.visible {
+    display: block !important;
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    border-radius: inherit;
+}
+
+/* Error state */
+.error-state {
+    color: #ff6b6b;
+    text-align: center;
+    padding: 20px;
+}
+
+.error-state i {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.7;
+}
+
+/* Success state */
+.success-state {
+    color: #4CAF50;
+    text-align: center;
+    padding: 20px;
+}
+
+.success-state i {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.7;
+}
+</style>
     <style>
         :root {
             --primary: #b3004b;
@@ -107,7 +1198,7 @@
             color: var(--text-light);
         }
 
-        /* CALL BUTTONS STYLES */
+        /* CALL BUTTONS STYLES - ADDED SECTION */
         .call-buttons {
             display: flex;
             gap: 10px;
@@ -264,7 +1355,7 @@
             color: var(--text-light);
         }
 
-        /* CHAT HEADER ACTIONS */
+        /* CHAT HEADER ACTIONS WITH CALL BUTTON - UPDATED */
         .chat-header-actions {
             display: flex;
             gap: 10px;
@@ -303,7 +1394,7 @@
             display: none;
         }
 
-        /* Skeleton Loading Styles */
+        /* Skeleton Loading Styles - LIKE POST.HTML */
         .messages-loading {
             padding: 20px;
             margin-bottom: 20px;
@@ -457,7 +1548,7 @@
             flex-shrink: 0;
         }
 
-        /* Reply Indicator */
+        /* Reply Indicator (shown when replying to a message) */
         .reply-indicator {
             background: rgba(114, 137, 218, 0.1);
             border-left: 3px solid #7289da;
@@ -758,225 +1849,9 @@
             box-shadow: none !important;
         }
 
-        /* Voice Channel Messages Styles - ADDED FOR WHATSAPP-STYLE */
-        .voice-channel-message {
-            display: flex;
-            align-items: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 12px 16px;
-            margin: 10px 15px;
-            border-radius: 18px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            animation: slideIn 0.3s ease;
-        }
-        
-        .voice-channel-message:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        
-        .voice-channel-icon {
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            margin-right: 12px;
-            flex-shrink: 0;
-        }
-        
-        .voice-channel-info {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .voice-channel-title {
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .voice-channel-name {
-            white-space: nowrap;
+        /* Prevent scrolling when modal is open */
+        body.modal-open {
             overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .voice-channel-status {
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.2);
-        }
-        
-        .voice-channel-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            opacity: 0.9;
-        }
-        
-        .voice-channel-creator {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 120px;
-        }
-        
-        .voice-channel-time {
-            font-size: 11px;
-            opacity: 0.8;
-        }
-        
-        .voice-channel-join-btn {
-            background: white;
-            color: #667eea;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.3s;
-            flex-shrink: 0;
-            margin-left: 10px;
-        }
-        
-        .voice-channel-join-btn:hover {
-            background: #f5f5f5;
-            transform: scale(1.05);
-        }
-        
-        .voice-channel-join-btn.joined {
-            background: #4CAF50;
-            color: white;
-        }
-        
-        .voice-channel-join-btn.joined:hover {
-            background: #45a049;
-        }
-        
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        /* Header Mini Player Styles - ADDED FOR TOP-RIGHT */
-        .header-mini-player {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 25px;
-            padding: 8px 16px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            color: white;
-            display: none;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            max-width: 300px;
-            animation: slideDown 0.3s ease;
-        }
-        
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .header-mini-player:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .header-player-icon {
-            width: 24px;
-            height: 24px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-        }
-        
-        .header-player-info {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .header-player-channel {
-            font-size: 11px;
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .header-player-participants {
-            font-size: 10px;
-            opacity: 0.8;
-        }
-        
-        .header-player-controls {
-            display: flex;
-            gap: 5px;
-        }
-        
-        .header-player-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            transition: background 0.3s;
-        }
-        
-        .header-player-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        
-        .header-player-btn.mute.active {
-            background: rgba(244, 67, 54, 0.3);
-            color: #f44336;
-        }
-        
-        .header-player-btn.leave {
-            background: rgba(220, 53, 69, 0.3);
-            color: #dc3545;
-        }
-        
-        .header-player-btn.leave:hover {
-            background: rgba(220, 53, 69, 0.4);
         }
 
         /* Input Area */
@@ -1163,34 +2038,6 @@
                 padding: 8px 16px;
                 font-size: 0.8rem;
             }
-            
-            /* Header mini player responsive */
-            .header-mini-player {
-                top: 5px;
-                right: 5px;
-                padding: 6px 12px;
-                max-width: 250px;
-            }
-            
-            .header-player-icon {
-                width: 20px;
-                height: 20px;
-                font-size: 10px;
-            }
-            
-            .header-player-channel {
-                font-size: 10px;
-            }
-            
-            .header-player-participants {
-                font-size: 9px;
-            }
-            
-            .header-player-btn {
-                width: 20px;
-                height: 20px;
-                font-size: 9px;
-            }
         }
 
         @media (max-width: 480px) {
@@ -1231,33 +2078,6 @@
                 justify-content: center;
                 padding: 10px;
             }
-            
-            /* Voice channel message responsive */
-            .voice-channel-message {
-                margin: 8px 10px;
-                padding: 10px 12px;
-            }
-            
-            .voice-channel-icon {
-                width: 32px;
-                height: 32px;
-                font-size: 16px;
-                margin-right: 8px;
-            }
-            
-            .voice-channel-title {
-                font-size: 12px;
-            }
-            
-            .voice-channel-meta {
-                font-size: 10px;
-            }
-            
-            .voice-channel-join-btn {
-                padding: 6px 12px;
-                font-size: 11px;
-                margin-left: 6px;
-            }
         }
     </style>
 </head>
@@ -1275,7 +2095,7 @@
                     <h3 class="group-name-sidebar" id="groupNameSidebar"></h3>
                     <p class="group-members-count" id="groupMembersCount"></p>
                     
-                    <!-- CALL BUTTONS IN SIDEBAR -->
+                    <!-- CALL BUTTONS IN SIDEBAR - ADDED -->
                     <div class="call-buttons">
                         <button id="groupVoiceCallBtn" class="call-btn group-call">
                             <i class="fas fa-phone-alt"></i>
@@ -1308,7 +2128,7 @@
                     <p class="chat-subtitle" id="chatSubtitle">..</p>
                 </div>
                 <div class="chat-header-actions">
-                    <!-- CALL BUTTON IN HEADER -->
+                    <!-- CALL BUTTON IN HEADER - ADDED -->
                     <button id="groupVoiceCallBtnMobile" class="call-btn group-call" style="padding: 8px 15px; font-size: 0.9rem;">
                         <i class="fas fa-phone-alt"></i>
                         Group Call
@@ -1322,7 +2142,7 @@
                 </div>
             </div>
 
-            <!-- Messages Container (Voice channels will appear here as messages) -->
+            <!-- Messages Container -->
             <div class="messages-container" id="messagesContainer">
                 <!-- Initial skeleton loading -->
                 <div id="initialLoading">
@@ -1359,7 +2179,7 @@
                     </button>
                 </div>
                 
-                <!-- Voice channels and messages will be loaded here by JavaScript -->
+                <!-- Messages will be loaded here by your JavaScript -->
             </div>
 
             <!-- No messages -->
@@ -1391,7 +2211,163 @@
         </div>
     </div>
 
-    <!-- Import the modules -->
+    <script>
+        // Lazy loading skeleton setup - just the skeleton showing functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            const loadMoreContainer = document.getElementById('loadMoreContainer');
+            const initialLoading = document.getElementById('initialLoading');
+            const noMessages = document.getElementById('noMessages');
+            
+            // Your group.js will control these variables
+            window.lazyLoadingState = {
+                currentPage: 0,
+                isLoading: false,
+                hasMoreMessages: true
+            };
+            
+            // Function to create skeleton loaders
+            window.createSkeletonLoader = function(count = 3) {
+                let skeletons = '';
+                for (let i = 0; i < count; i++) {
+                    skeletons += `
+                        <div class="message-group loading">
+                            <div class="loading-avatar"></div>
+                            <div class="loading-content">
+                                <div class="loading-line long"></div>
+                                <div class="loading-line medium"></div>
+                                <div class="loading-line short"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+                return skeletons;
+            };
+            
+            // Function to show skeleton loading
+            window.showSkeletonLoading = function() {
+                const skeletonHTML = window.createSkeletonLoader();
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'messages-loading active';
+                loadingDiv.innerHTML = skeletonHTML;
+                
+                // Insert at the top of messages
+                const firstMessage = messagesContainer.querySelector('.message-group:not(.loading)');
+                if (firstMessage) {
+                    messagesContainer.insertBefore(loadingDiv, firstMessage);
+                } else {
+                    messagesContainer.appendChild(loadingDiv);
+                }
+                
+                return loadingDiv;
+            };
+            
+            // Function to remove skeleton loading
+            window.removeSkeletonLoading = function(loadingElement) {
+                if (loadingElement && loadingElement.parentNode) {
+                    loadingElement.remove();
+                }
+            };
+            
+            // Function to clear initial loading
+            window.clearInitialLoading = function() {
+                if (initialLoading) {
+                    initialLoading.style.display = 'none';
+                }
+            };
+            
+            // Function to show/hide load more button
+            window.toggleLoadMoreButton = function(show) {
+                if (loadMoreContainer) {
+                    if (show) {
+                        loadMoreContainer.classList.add('visible');
+                    } else {
+                        loadMoreContainer.classList.remove('visible');
+                    }
+                }
+            };
+            
+            // Function to show/hide no messages
+            window.toggleNoMessages = function(show) {
+                if (noMessages) {
+                    if (show) {
+                        noMessages.style.display = 'block';
+                    } else {
+                        noMessages.style.display = 'none';
+                    }
+                }
+            };
+            
+            // Load more button click handler
+            loadMoreBtn.addEventListener('click', function() {
+                // Your group.js should handle this
+                if (typeof window.loadMoreMessages === 'function') {
+                    window.loadMoreMessages();
+                }
+            });
+            
+            // Auto-load when scrolling near top (infinite scroll)
+            messagesContainer.addEventListener('scroll', function() {
+                if (messagesContainer.scrollTop < 100 && 
+                    !window.lazyLoadingState.isLoading && 
+                    window.lazyLoadingState.hasMoreMessages) {
+                    
+                    if (typeof window.loadMoreMessages === 'function') {
+                        window.loadMoreMessages();
+                    }
+                }
+            });
+            
+            // Your existing clearLoadingStates function
+            window.clearLoadingStates = function() {
+                window.clearInitialLoading();
+                
+                // Remove any skeleton loaders
+                const skeletonLoaders = document.querySelectorAll('.messages-loading.active');
+                skeletonLoaders.forEach(loader => loader.remove());
+                
+                // Remove loading class from any message groups
+                const loadingGroups = document.querySelectorAll('.message-group.loading');
+                loadingGroups.forEach(group => group.remove());
+            };
+            
+            // CALL BUTTONS FUNCTIONALITY
+            const groupVoiceCallBtn = document.getElementById('groupVoiceCallBtn');
+            const groupVoiceCallBtnMobile = document.getElementById('groupVoiceCallBtnMobile');
+            
+            // Function to handle group voice call
+            function handleGroupVoiceCall() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const groupId = urlParams.get('id');
+                
+                if (!groupId) {
+                    alert('Cannot start group call. No group selected.');
+                    return;
+                }
+                
+                // Check if calls module is loaded
+                if (window.callsModule && window.callsModule.initiateGroupCall) {
+                    window.callsModule.initiateGroupCall(groupId);
+                } else {
+                    // Fallback to direct call if module isn't loaded yet
+                    const callId = 'temp_' + Date.now();
+                    window.location.href = `calls.html?type=group&groupId=${groupId}&incoming=false&callId=${callId}`;
+                }
+            }
+            
+            // Add event listeners to call buttons
+            if (groupVoiceCallBtn) {
+                groupVoiceCallBtn.addEventListener('click', handleGroupVoiceCall);
+            }
+            
+            if (groupVoiceCallBtnMobile) {
+                groupVoiceCallBtnMobile.addEventListener('click', handleGroupVoiceCall);
+            }
+        });
+    </script>
+    
+    <!-- Import the calls module for voice calls -->
     <script type="module" src="calls.js"></script>
     <script type="module" src="group.js"></script>
 </body>

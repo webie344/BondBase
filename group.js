@@ -1,5 +1,5 @@
-// group.js - COMPLETE Group Chat System with Voice Channels
-// UPDATED VERSION: Added voice channel support with persistent mini player
+// group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
+// UPDATED VERSION: Added swipe-to-reply, reaction system, and 100 emojis
 
 import { 
     getFirestore, 
@@ -67,6 +67,20 @@ const CACHE_DURATION = {
     MEMBERS_LIST: 1 * 60 * 1000
 };
 
+// Emojis for reactions (100 emojis like Discord)
+const REACTION_EMOJIS = [
+    '😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '❤️', '🔥', '✨',
+    '😊', '😍', '🤩', '😜', '😋', '😇', '🥳', '😏', '😒', '🥺',
+    '😭', '😡', '🤯', '😱', '🤢', '🤮', '🤠', '🥶', '😈', '👻',
+    '💀', '🤖', '👽', '👾', '🤡', '💩', '🙈', '🙉', '🙊', '💋',
+    '💌', '💘', '💝', '💖', '💗', '💓', '💞', '💕', '💟', '❣️',
+    '💔', '❤️‍🔥', '❤️‍🩹', '💤', '💢', '💬', '👁️‍🗨️', '🗨️', '🗯️', '💭',
+    '💐', '🌸', '💮', '🏵️', '🌹', '🥀', '🌺', '🌻', '🌼', '🌷',
+    '⚡', '💥', '💫', '⭐', '🌟', '🌠', '🌈', '☀️', '🌤️', '⛈️',
+    '❄️', '☃️', '⛄', '💧', '💦', '💨', '🕳️', '🎃', '🎄', '🎆',
+    '🎇', '🧨', '✨', '🎈', '🎉', '🎊', '🎋', '🎍', '🎎', '🎏'
+];
+
 class GroupChat {
     constructor() {
         this.currentUser = null;
@@ -105,19 +119,18 @@ class GroupChat {
         
         this.sentMessageIds = new Set();
         
-        // Restricted users tracking
         this.restrictedUsers = new Map();
         
-        // Voice channels
-        this.voiceChannels = new Map(); // groupId -> channels array
-        this.unsubscribeVoiceChannels = new Map();
-        this.userVoiceChannel = null;
+        this.reactionModal = null;
+        this.currentMessageForReaction = null;
+        
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        this.isSwiping = false;
+        this.swipeThreshold = 50;
         
         this.setupAuthListener();
-        this.createMessageContextMenu();
-        
-        // Initialize restricted users check
-        this.checkRestrictedUsers();
+        this.createReactionModal();
     }
 
     getCachedItem(cacheKey, cacheMap) {
@@ -156,7 +169,6 @@ class GroupChat {
         };
     }
 
-    // Check for restricted users periodically
     checkRestrictedUsers() {
         setInterval(() => {
             const now = Date.now();
@@ -1509,7 +1521,6 @@ class GroupChat {
                 throw new Error('You must be logged in to send messages');
             }
             
-            // Check if user is restricted
             const isRestricted = await this.isUserRestricted(groupId, this.firebaseUser.uid);
             if (isRestricted) {
                 throw new Error('You are restricted from sending messages in this group for 2 hours due to using restricted words.');
@@ -1519,11 +1530,9 @@ class GroupChat {
                 throw new Error('Message cannot be empty');
             }
             
-            // Check for restricted words in text messages
             if (text) {
                 const restrictedWord = await this.checkMessageForRestrictedWords(groupId, text);
                 if (restrictedWord) {
-                    // Restrict the user
                     await this.restrictUser(groupId, this.firebaseUser.uid, 2);
                     throw new Error(`Your message contains a restricted word (${restrictedWord}). You have been restricted from chatting for 2 hours.`);
                 }
@@ -1728,41 +1737,6 @@ class GroupChat {
         }
     }
 
-    // Listen to voice channels (NEW)
-    listenToVoiceChannels(groupId, callback) {
-        try {
-            if (this.unsubscribeVoiceChannels.has(groupId)) {
-                this.unsubscribeVoiceChannels.get(groupId)();
-            }
-            
-            const channelsRef = collection(db, 'voice_channels', groupId, 'channels');
-            const q = query(channelsRef, orderBy('createdAt', 'desc'));
-            
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const channels = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    channels.push({
-                        id: doc.id,
-                        ...data,
-                        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
-                        participants: data.participants || []
-                    });
-                });
-                
-                this.voiceChannels.set(groupId, channels);
-                callback(channels);
-            });
-            
-            this.unsubscribeVoiceChannels.set(groupId, unsubscribe);
-            return unsubscribe;
-            
-        } catch (error) {
-            console.error('Error listening to voice channels:', error);
-            throw error;
-        }
-    }
-
     async updateLastActive(groupId) {
         try {
             if (!this.firebaseUser) return;
@@ -1789,101 +1763,517 @@ class GroupChat {
         }
     }
 
-    createMessageContextMenu() {
-        const existingMenu = document.getElementById('messageContextMenu');
-        if (existingMenu) {
-            existingMenu.remove();
+    createReactionModal() {
+        const existingModal = document.getElementById('reactionModal');
+        if (existingModal) {
+            existingModal.remove();
         }
         
-        this.messageContextMenu = document.createElement('div');
-        this.messageContextMenu.id = 'messageContextMenu';
-        this.messageContextMenu.className = 'message-context-menu';
-        this.messageContextMenu.innerHTML = `
-            <div class="menu-item" id="replyMenuItem">
-                <i class="fas fa-reply"></i>
-                <span>Reply</span>
+        this.reactionModal = document.createElement('div');
+        this.reactionModal.id = 'reactionModal';
+        this.reactionModal.className = 'reaction-modal';
+        
+        let emojiGrid = '';
+        const emojisPerRow = 10;
+        const totalRows = Math.ceil(REACTION_EMOJIS.length / emojisPerRow);
+        
+        for (let row = 0; row < totalRows; row++) {
+            emojiGrid += '<div class="emoji-row">';
+            for (let col = 0; col < emojisPerRow; col++) {
+                const index = row * emojisPerRow + col;
+                if (index < REACTION_EMOJIS.length) {
+                    emojiGrid += `<span class="emoji-item" data-emoji="${REACTION_EMOJIS[index]}">${REACTION_EMOJIS[index]}</span>`;
+                }
+            }
+            emojiGrid += '</div>';
+        }
+        
+        this.reactionModal.innerHTML = `
+            <div class="reaction-modal-content">
+                <div class="reaction-header">
+                    <h3>Add Reaction</h3>
+                    <button class="close-reaction-modal">&times;</button>
+                </div>
+                <div class="emoji-grid">
+                    ${emojiGrid}
+                </div>
             </div>
         `;
         
-        const contextMenuStyles = document.createElement('style');
-        contextMenuStyles.id = 'context-menu-styles';
-        contextMenuStyles.textContent = `
-            .message-context-menu {
+        document.body.appendChild(this.reactionModal);
+        
+        const reactionModalStyles = document.createElement('style');
+        reactionModalStyles.id = 'reaction-modal-styles';
+        reactionModalStyles.textContent = `
+            .reaction-modal {
                 position: fixed;
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                z-index: 9998;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.7);
                 display: none;
-                min-width: 120px;
-                overflow: hidden;
+                justify-content: center;
+                align-items: center;
+                z-index: 9999;
             }
             
-            .menu-item {
-                padding: 12px 16px;
+            .reaction-modal.active {
+                display: flex;
+            }
+            
+            .reaction-modal-content {
+                background: white;
+                border-radius: 12px;
+                width: 90%;
+                max-width: 500px;
+                max-height: 80vh;
+                overflow: hidden;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            }
+            
+            .reaction-header {
+                padding: 15px 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .reaction-header h3 {
+                margin: 0;
+                font-size: 18px;
+            }
+            
+            .close-reaction-modal {
+                background: none;
+                border: none;
+                color: white;
+                font-size: 28px;
+                cursor: pointer;
+                line-height: 1;
+                padding: 0;
+                width: 30px;
+                height: 30px;
                 display: flex;
                 align-items: center;
-                gap: 10px;
-                cursor: pointer;
+                justify-content: center;
+                border-radius: 50%;
                 transition: background 0.2s;
             }
             
-            .menu-item:hover {
-                background: #f5f5f5;
+            .close-reaction-modal:hover {
+                background: rgba(255, 255, 255, 0.2);
             }
             
-            .menu-item i {
-                width: 20px;
+            .emoji-grid {
+                padding: 20px;
+                max-height: 60vh;
+                overflow-y: auto;
+            }
+            
+            .emoji-row {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 10px;
+            }
+            
+            .emoji-item {
+                font-size: 24px;
+                cursor: pointer;
+                padding: 8px;
+                border-radius: 8px;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 40px;
+                min-height: 40px;
+            }
+            
+            .emoji-item:hover {
+                background: #f0f0f0;
+                transform: scale(1.2);
+            }
+            
+            .message-reactions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                margin-top: 6px;
+            }
+            
+            .reaction-bubble {
+                background: rgba(0, 0, 0, 0.05);
+                border-radius: 12px;
+                padding: 2px 8px;
+                font-size: 12px;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                cursor: pointer;
+                transition: background 0.2s;
+                border: 1px solid rgba(0, 0, 0, 0.1);
+            }
+            
+            .reaction-bubble:hover {
+                background: rgba(0, 0, 0, 0.1);
+            }
+            
+            .reaction-bubble.user-reacted {
+                background: rgba(29, 155, 240, 0.1);
+                border-color: rgba(29, 155, 240, 0.3);
+            }
+            
+            .reaction-emoji {
+                font-size: 14px;
+            }
+            
+            .reaction-count {
+                font-weight: 500;
                 color: #666;
+            }
+            
+            .reaction-bubble.user-reacted .reaction-count {
+                color: #1d9bf0;
+            }
+            
+            .swipe-reply-indicator {
+                position: fixed;
+                bottom: 80px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 25px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 14px;
+                font-weight: 500;
+                box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+                z-index: 1000;
+                opacity: 0;
+                transition: opacity 0.3s;
+            }
+            
+            .swipe-reply-indicator.show {
+                opacity: 1;
+            }
+            
+            .swipe-reply-indicator i {
+                font-size: 16px;
+            }
+            
+            .replying-to {
+                background: rgba(102, 126, 234, 0.1);
+                border-left: 3px solid #667eea;
+                padding: 6px 10px;
+                margin-bottom: 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            
+            .reply-label {
+                color: #667eea;
+                font-weight: 500;
+            }
+            
+            .reply-sender {
+                font-weight: 600;
+                color: #764ba2;
+            }
+            
+            .reply-separator {
+                color: #999;
+            }
+            
+            .reply-message {
+                color: #666;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                flex: 1;
+                min-width: 0;
             }
         `;
         
-        document.head.appendChild(contextMenuStyles);
-        document.body.appendChild(this.messageContextMenu);
+        document.head.appendChild(reactionModalStyles);
         
-        document.getElementById('replyMenuItem').addEventListener('click', () => {
-            this.handleReply();
-            this.hideContextMenu();
+        this.reactionModal.querySelector('.close-reaction-modal').addEventListener('click', () => {
+            this.hideReactionModal();
         });
         
-        document.addEventListener('click', (e) => {
-            if (this.messageContextMenu && !this.messageContextMenu.contains(e.target)) {
-                this.hideContextMenu();
+        this.reactionModal.querySelectorAll('.emoji-item').forEach(emoji => {
+            emoji.addEventListener('click', () => {
+                const emojiChar = emoji.dataset.emoji;
+                this.addReactionToMessage(emojiChar);
+                this.hideReactionModal();
+            });
+        });
+        
+        this.reactionModal.addEventListener('click', (e) => {
+            if (e.target === this.reactionModal) {
+                this.hideReactionModal();
+            }
+        });
+    }
+
+    showReactionModal(message) {
+        this.currentMessageForReaction = message;
+        this.reactionModal.classList.add('active');
+    }
+
+    hideReactionModal() {
+        this.reactionModal.classList.remove('active');
+        this.currentMessageForReaction = null;
+    }
+
+    async addReactionToMessage(emoji) {
+        try {
+            if (!this.currentMessageForReaction || !this.firebaseUser) {
+                return;
+            }
+            
+            const groupId = this.currentGroupId;
+            const messageId = this.currentMessageForReaction.id;
+            const userId = this.firebaseUser.uid;
+            
+            const reactionRef = doc(db, 'groups', groupId, 'messages', messageId, 'reactions', emoji);
+            const reactionSnap = await getDoc(reactionRef);
+            
+            if (reactionSnap.exists()) {
+                const reactionData = reactionSnap.data();
+                if (reactionData.users && reactionData.users.includes(userId)) {
+                    await updateDoc(reactionRef, {
+                        count: increment(-1),
+                        users: arrayRemove(userId),
+                        lastUpdated: serverTimestamp()
+                    });
+                    
+                    if (reactionData.count <= 1) {
+                        await deleteDoc(reactionRef);
+                    }
+                } else {
+                    await updateDoc(reactionRef, {
+                        count: increment(1),
+                        users: arrayUnion(userId),
+                        lastUpdated: serverTimestamp()
+                    });
+                }
+            } else {
+                await setDoc(reactionRef, {
+                    emoji: emoji,
+                    count: 1,
+                    users: [userId],
+                    lastUpdated: serverTimestamp()
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error adding reaction:', error);
+        }
+    }
+
+    async getMessageReactions(groupId, messageId) {
+        try {
+            const reactionsRef = collection(db, 'groups', groupId, 'messages', messageId, 'reactions');
+            const q = query(reactionsRef);
+            const querySnapshot = await getDocs(q);
+            
+            const reactions = [];
+            querySnapshot.forEach(doc => {
+                const data = doc.data();
+                reactions.push({
+                    emoji: data.emoji,
+                    count: data.count || 0,
+                    users: data.users || [],
+                    id: doc.id
+                });
+            });
+            
+            return reactions;
+        } catch (error) {
+            console.error('Error getting reactions:', error);
+            return [];
+        }
+    }
+
+    async listenToMessageReactions(groupId, messageId, callback) {
+        try {
+            const reactionsRef = collection(db, 'groups', groupId, 'messages', messageId, 'reactions');
+            const q = query(reactionsRef);
+            
+            return onSnapshot(q, (snapshot) => {
+                const reactions = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    reactions.push({
+                        emoji: data.emoji,
+                        count: data.count || 0,
+                        users: data.users || [],
+                        id: doc.id
+                    });
+                });
+                callback(reactions);
+            });
+        } catch (error) {
+            console.error('Error listening to reactions:', error);
+            return () => {};
+        }
+    }
+
+    setupSwipeToReply(messagesContainer) {
+        if (!messagesContainer) return;
+        
+        let startX = 0;
+        let startY = 0;
+        let currentMessage = null;
+        let swipeIndicator = null;
+        
+        const handleTouchStart = (e) => {
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+            
+            let element = e.target;
+            while (element && !element.classList.contains('message-text') && 
+                   element !== messagesContainer) {
+                element = element.parentElement;
+            }
+            
+            if (element && element.classList.contains('message-text')) {
+                currentMessage = element;
+            }
+        };
+        
+        const handleTouchMove = (e) => {
+            if (!currentMessage) return;
+            
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - startX;
+            const deltaY = touch.clientY - startY;
+            
+            if (Math.abs(deltaY) > Math.abs(deltaX) || deltaX < 0) {
+                return;
+            }
+            
+            if (deltaX > this.swipeThreshold) {
+                e.preventDefault();
+                
+                if (!swipeIndicator) {
+                    swipeIndicator = document.createElement('div');
+                    swipeIndicator.className = 'swipe-reply-indicator';
+                    swipeIndicator.innerHTML = `
+                        <i class="fas fa-reply"></i>
+                        <span>Swipe right to reply</span>
+                    `;
+                    document.body.appendChild(swipeIndicator);
+                }
+                
+                swipeIndicator.classList.add('show');
+            }
+        };
+        
+        const handleTouchEnd = (e) => {
+            if (!currentMessage) return;
+            
+            const touch = e.changedTouches[0];
+            const deltaX = touch.clientX - startX;
+            const deltaY = touch.clientY - startY;
+            
+            if (deltaX > this.swipeThreshold && Math.abs(deltaY) < this.swipeThreshold) {
+                const messageId = currentMessage.dataset.messageId;
+                const message = window.currentMessages?.find(m => m.id === messageId);
+                if (message) {
+                    this.handleReply(message);
+                }
+            }
+            
+            if (swipeIndicator) {
+                swipeIndicator.classList.remove('show');
+                setTimeout(() => {
+                    if (swipeIndicator && swipeIndicator.parentNode) {
+                        swipeIndicator.parentNode.removeChild(swipeIndicator);
+                        swipeIndicator = null;
+                    }
+                }, 300);
+            }
+            
+            currentMessage = null;
+        };
+        
+        const handleLongPress = (e) => {
+            let element = e.target;
+            while (element && !element.classList.contains('message-text') && 
+                   element !== messagesContainer) {
+                element = element.parentElement;
+            }
+            
+            if (element && element.classList.contains('message-text')) {
+                const messageId = element.dataset.messageId;
+                const message = window.currentMessages?.find(m => m.id === messageId);
+                if (message) {
+                    e.preventDefault();
+                    this.showReactionModal(message);
+                }
+            }
+        };
+        
+        let longPressTimer = null;
+        
+        messagesContainer.addEventListener('touchstart', (e) => {
+            handleTouchStart(e);
+            longPressTimer = setTimeout(() => {
+                handleLongPress(e);
+            }, 500);
+        });
+        
+        messagesContainer.addEventListener('touchmove', (e) => {
+            handleTouchMove(e);
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
             }
         });
         
-        this.messageContextMenu.addEventListener('wheel', (e) => {
+        messagesContainer.addEventListener('touchend', (e) => {
+            handleTouchEnd(e);
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        });
+        
+        messagesContainer.addEventListener('touchcancel', () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            if (swipeIndicator) {
+                swipeIndicator.classList.remove('show');
+                setTimeout(() => {
+                    if (swipeIndicator && swipeIndicator.parentNode) {
+                        swipeIndicator.parentNode.removeChild(swipeIndicator);
+                        swipeIndicator = null;
+                    }
+                }, 300);
+            }
+        });
+        
+        messagesContainer.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });
     }
 
-    showContextMenu(x, y, message) {
-        this.selectedMessage = message;
-        
-        this.messageContextMenu.style.left = x + 'px';
-        this.messageContextMenu.style.top = y + 'px';
-        this.messageContextMenu.style.display = 'block';
-        
-        const rect = this.messageContextMenu.getBoundingClientRect();
-        if (rect.right > window.innerWidth) {
-            this.messageContextMenu.style.left = (x - rect.width) + 'px';
-        }
-        if (rect.bottom > window.innerHeight) {
-            this.messageContextMenu.style.top = (y - rect.height) + 'px';
-        }
-    }
-
-    hideContextMenu() {
-        if (this.messageContextMenu) {
-            this.messageContextMenu.style.display = 'none';
-        }
-        this.selectedMessage = null;
-    }
-
-    handleReply() {
-        if (!this.selectedMessage) return;
-        
-        this.replyingToMessage = this.selectedMessage;
+    handleReply(message) {
+        this.replyingToMessage = message;
         this.showReplyIndicator();
         
         const messageInput = document.getElementById('messageInput');
@@ -2026,102 +2416,6 @@ class GroupChat {
         this.removeReplyIndicator();
     }
 
-    setupMessageLongPress(messagesContainer) {
-        if (!messagesContainer) return;
-        
-        messagesContainer.onmousedown = null;
-        messagesContainer.ontouchstart = null;
-        messagesContainer.onmouseup = null;
-        messagesContainer.ontouchend = null;
-        messagesContainer.oncontextmenu = null;
-        
-        let isDragging = false;
-        let startX = 0;
-        let startY = 0;
-        const dragThreshold = 10;
-        
-        const handleStart = (e) => {
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            
-            if (!clientX || !clientY) return;
-            
-            startX = clientX;
-            startY = clientY;
-            isDragging = false;
-            
-            this.longPressTimer = setTimeout(() => {
-                if (!isDragging) {
-                    let messageElement = e.target;
-                    while (messageElement && !messageElement.classList.contains('message-text') && 
-                           !messageElement.classList.contains('message-group') && 
-                           messageElement !== messagesContainer) {
-                        messageElement = messageElement.parentElement;
-                    }
-                    
-                    if (messageElement && messageElement !== messagesContainer) {
-                        const messageId = this.findMessageIdFromElement(messageElement);
-                        if (messageId) {
-                            const message = window.currentMessages?.find(m => m.id === messageId);
-                            if (message) {
-                                e.preventDefault();
-                                this.showContextMenu(clientX, clientY, message);
-                            }
-                        }
-                    }
-                }
-            }, 500);
-        };
-        
-        const handleMove = (e) => {
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            
-            if (!clientX || !clientY) return;
-            
-            const deltaX = Math.abs(clientX - startX);
-            const deltaY = Math.abs(clientY - startY);
-            
-            if (deltaX > dragThreshold || deltaY > dragThreshold) {
-                isDragging = true;
-                if (this.longPressTimer) {
-                    clearTimeout(this.longPressTimer);
-                    this.longPressTimer = null;
-                }
-            }
-        };
-        
-        const handleEnd = () => {
-            if (this.longPressTimer) {
-                clearTimeout(this.longPressTimer);
-                this.longPressTimer = null;
-            }
-        };
-        
-        messagesContainer.addEventListener('mousedown', handleStart);
-        messagesContainer.addEventListener('touchstart', handleStart);
-        messagesContainer.addEventListener('mousemove', handleMove);
-        messagesContainer.addEventListener('touchmove', handleMove);
-        messagesContainer.addEventListener('mouseup', handleEnd);
-        messagesContainer.addEventListener('touchend', handleEnd);
-        messagesContainer.addEventListener('touchcancel', handleEnd);
-        
-        messagesContainer.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-        });
-    }
-
-    findMessageIdFromElement(element) {
-        let current = element;
-        while (current && current !== document.body) {
-            if (current.dataset && current.dataset.messageId) {
-                return current.dataset.messageId;
-            }
-            current = current.parentElement;
-        }
-        return null;
-    }
-
     async logout() {
         try {
             await signOut(auth);
@@ -2161,12 +2455,6 @@ class GroupChat {
             this.unsubscribeAuth();
             this.unsubscribeAuth = null;
         }
-        
-        // Clean up voice channel listeners
-        this.unsubscribeVoiceChannels.forEach(unsubscribe => {
-            if (unsubscribe) unsubscribe();
-        });
-        this.unsubscribeVoiceChannels.clear();
         
         this.areListenersSetup = false;
         this.sentMessageIds.clear();
@@ -2253,7 +2541,6 @@ function initCreateGroupPage() {
     let rules = [''];
     let groupPhotoFile = null;
     
-    // Photo upload functionality
     photoPreview.addEventListener('click', () => {
         groupPhotoInput.click();
     });
@@ -2265,14 +2552,12 @@ function initCreateGroupPage() {
     groupPhotoInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
-            // Validate file type
             const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
             if (!validTypes.includes(file.type)) {
                 alert('Please upload a valid image file (JPEG, PNG, GIF, WebP)');
                 return;
             }
 
-            // Validate file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {
                 alert('Image must be less than 5MB');
                 return;
@@ -2420,7 +2705,6 @@ function initCreateGroupPage() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        // Get restricted words from input
         const restrictedWordsText = restrictedWordsInput.value.trim();
         const restrictedWords = restrictedWordsText ? 
             restrictedWordsText.split(',').map(word => word.trim()).filter(word => word.length > 0) : 
@@ -2610,7 +2894,6 @@ function initGroupsPage() {
                 
                 if (!groupChat.firebaseUser) {
                     window.location.href = 'login.html';
-                    return;
                 }
                 
                 const needsSetup = await groupChat.needsProfileSetup();
@@ -2826,7 +3109,6 @@ function initGroupPage() {
     const chatSubtitle = document.getElementById('chatSubtitle');
     const membersList = document.getElementById('membersList');
     const rulesList = document.getElementById('rulesList');
-    const groupVoiceCallBtn = document.getElementById('groupVoiceCallBtn');
     
     const urlParams = new URLSearchParams(window.location.search);
     const groupId = urlParams.get('id');
@@ -2836,7 +3118,7 @@ function initGroupPage() {
     let groupData = null;
     let tempMessages = new Map();
     let isInitialLoad = true;
-    let voiceChannels = [];
+    let reactionUnsubscribers = new Map();
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -2866,11 +3148,12 @@ function initGroupPage() {
         
         loadGroupData();
         setupListeners();
-        setupVoiceChannels();
     })();
     
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
+        reactionUnsubscribers.forEach(unsub => unsub());
+        reactionUnsubscribers.clear();
         window.location.href = 'groups.html';
     });
     
@@ -2911,16 +3194,6 @@ function initGroupPage() {
                     sidebar.classList.add('active');
                     createSidebarOverlay();
                 }
-            }
-        });
-    }
-    
-    if (groupVoiceCallBtn) {
-        groupVoiceCallBtn.addEventListener('click', () => {
-            if (window.callsModule) {
-                window.callsModule.initiateGroupCall(groupId);
-            } else {
-                window.location.href = `calls.html?type=group&groupId=${groupId}&incoming=false`;
             }
         });
     }
@@ -3003,731 +3276,6 @@ function initGroupPage() {
             displayMessages();
         }
     });
-    
-    // NEW: Setup voice channels
-    function setupVoiceChannels() {
-        // Create voice channels UI if not exists
-        createVoiceChannelsUI();
-        
-        // Listen to voice channels
-        groupChat.listenToVoiceChannels(groupId, (channels) => {
-            voiceChannels = channels;
-            updateVoiceChannelsUI(channels);
-        });
-    }
-    
-    // NEW: Create voice channels UI (Like WhatsApp messages)
-    function createVoiceChannelsUI() {
-        // Check if container already exists
-        if (document.getElementById('voiceChannelMessagesContainer')) return;
-        
-        const voiceChannelSection = document.createElement('div');
-        voiceChannelSection.id = 'voiceChannelMessagesContainer';
-        voiceChannelSection.className = 'voice-channel-messages-section';
-        voiceChannelSection.innerHTML = `
-            <div class="voice-channels-header">
-                <h3><i class="fas fa-volume-up"></i> Voice Channels</h3>
-                <button id="createVoiceChannelBtn" class="create-voice-channel-btn">
-                    <i class="fas fa-plus"></i> Create
-                </button>
-            </div>
-            <div id="voiceChannelsMessages" class="voice-channels-messages">
-                <!-- Voice channels will be displayed as messages here -->
-            </div>
-        `;
-        
-        // Add styles for WhatsApp-style voice channel messages
-        const styles = document.createElement('style');
-        styles.id = 'voice-channel-message-styles';
-        styles.textContent = `
-            .voice-channel-messages-section {
-                padding: 10px 15px;
-                background: transparent;
-            }
-            
-            .voice-channels-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 15px;
-            }
-            
-            .voice-channels-header h3 {
-                margin: 0;
-                font-size: 16px;
-                color: #333;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            
-            .create-voice-channel-btn {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 20px;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                transition: all 0.3s ease;
-            }
-            
-            .create-voice-channel-btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-            }
-            
-            .voice-channels-messages {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .voice-channel-message {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 12px 16px;
-                border-radius: 18px;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-                cursor: pointer;
-                transition: all 0.3s ease;
-                animation: slideIn 0.3s ease;
-            }
-            
-            .voice-channel-message:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            }
-            
-            .voice-channel-content {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-            }
-            
-            .voice-channel-icon {
-                width: 40px;
-                height: 40px;
-                background: rgba(255, 255, 255, 0.2);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 18px;
-                flex-shrink: 0;
-            }
-            
-            .voice-channel-info {
-                flex: 1;
-                min-width: 0;
-            }
-            
-            .voice-channel-title {
-                font-weight: 600;
-                font-size: 14px;
-                margin-bottom: 4px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-            
-            .voice-channel-name {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            .voice-channel-status {
-                font-size: 11px;
-                padding: 2px 8px;
-                border-radius: 10px;
-                background: rgba(255, 255, 255, 0.2);
-            }
-            
-            .voice-channel-meta {
-                display: flex;
-                justify-content: space-between;
-                font-size: 12px;
-                opacity: 0.9;
-            }
-            
-            .voice-channel-creator {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: 120px;
-            }
-            
-            .voice-channel-time {
-                font-size: 11px;
-                opacity: 0.8;
-            }
-            
-            .voice-channel-join-btn {
-                background: white;
-                color: #667eea;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 20px;
-                font-weight: 600;
-                font-size: 12px;
-                cursor: pointer;
-                transition: all 0.3s;
-                flex-shrink: 0;
-                margin-left: 10px;
-            }
-            
-            .voice-channel-join-btn:hover {
-                background: #f5f5f5;
-                transform: scale(1.05);
-            }
-            
-            .voice-channel-join-btn.joined {
-                background: #4CAF50;
-                color: white;
-            }
-            
-            .voice-channel-join-btn.joined:hover {
-                background: #45a049;
-            }
-            
-            .voice-channel-join-btn.full {
-                background: #dc3545;
-                color: white;
-                cursor: not-allowed;
-            }
-            
-            .header-mini-player {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                border-radius: 25px;
-                padding: 8px 16px;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-                z-index: 1000;
-                color: white;
-                display: none;
-                align-items: center;
-                gap: 10px;
-                cursor: pointer;
-                transition: all 0.3s;
-                max-width: 300px;
-                animation: slideDown 0.3s ease;
-            }
-            
-            @keyframes slideIn {
-                from {
-                    opacity: 0;
-                    transform: translateY(10px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-            }
-            
-            @keyframes slideDown {
-                from {
-                    opacity: 0;
-                    transform: translateY(-20px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-            }
-            
-            .header-mini-player:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-            }
-            
-            .header-player-icon {
-                width: 24px;
-                height: 24px;
-                background: rgba(255, 255, 255, 0.2);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 12px;
-            }
-            
-            .header-player-info {
-                flex: 1;
-                min-width: 0;
-            }
-            
-            .header-player-channel {
-                font-size: 11px;
-                font-weight: 600;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            .header-player-participants {
-                font-size: 10px;
-                opacity: 0.8;
-            }
-            
-            .header-player-controls {
-                display: flex;
-                gap: 5px;
-            }
-            
-            .header-player-btn {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                color: white;
-                width: 24px;
-                height: 24px;
-                border-radius: 50%;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 10px;
-                transition: background 0.3s;
-            }
-            
-            .header-player-btn:hover {
-                background: rgba(255, 255, 255, 0.3);
-            }
-            
-            .header-player-btn.mute.active {
-                background: rgba(244, 67, 54, 0.3);
-                color: #f44336;
-            }
-            
-            .header-player-btn.leave {
-                background: rgba(220, 53, 69, 0.3);
-                color: #dc3545;
-            }
-            
-            .header-player-btn.leave:hover {
-                background: rgba(220, 53, 69, 0.4);
-            }
-        `;
-        
-        document.head.appendChild(styles);
-        
-        // Insert voice channels after the first message or at the top
-        const messagesContainer = document.querySelector('.messages-container');
-        if (messagesContainer) {
-            messagesContainer.parentNode.insertBefore(voiceChannelSection, messagesContainer);
-        } else {
-            const chatContainer = document.querySelector('.chat-container');
-            if (chatContainer) {
-                chatContainer.insertBefore(voiceChannelSection, document.querySelector('.message-input-container'));
-            }
-        }
-        
-        // Add create button event listener
-        const createBtn = document.getElementById('createVoiceChannelBtn');
-        if (createBtn) {
-            createBtn.addEventListener('click', () => {
-                if (window.callsModule && window.callsModule.createVoiceChannel) {
-                    window.callsModule.createVoiceChannel(groupId);
-                } else {
-                    showNotification('Voice channel system not loaded. Please refresh the page.', 'error');
-                }
-            });
-        }
-    }
-    
-    // NEW: Format time ago for voice channels
-    function formatTimeAgo(date) {
-        if (!date) return 'Unknown';
-        
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
-        
-        if (diffDays > 0) {
-            return `${diffDays}d`;
-        } else if (diffHours > 0) {
-            return `${diffHours}h`;
-        } else if (diffMins > 0) {
-            return `${diffMins}m`;
-        } else {
-            return 'now';
-        }
-    }
-    
-    // NEW: Get short name for display
-    function getUserShortName(userId) {
-        if (!userId) return 'Unknown';
-        if (userId === groupChat.firebaseUser?.uid) return 'You';
-        
-        // Get first 8 characters of user ID for display
-        return `User ${userId.substring(0, 8)}...`;
-    }
-    
-    // NEW: Update voice channels UI as messages
-    function updateVoiceChannelsUI(channels) {
-        const container = document.getElementById('voiceChannelsMessages');
-        if (!container) return;
-        
-        if (channels.length === 0) {
-            container.innerHTML = `
-                <div class="voice-channel-message" style="background: rgba(102, 126, 234, 0.1); color: #666; cursor: default;">
-                    <div class="voice-channel-content">
-                        <div class="voice-channel-icon" style="background: rgba(102, 126, 234, 0.2); color: #667eea;">
-                            <i class="fas fa-plus"></i>
-                        </div>
-                        <div class="voice-channel-info">
-                            <div class="voice-channel-title">
-                                <span class="voice-channel-name">No active voice channels</span>
-                            </div>
-                            <div class="voice-channel-meta">
-                                <span class="voice-channel-creator">Click "Create" to start your first voice channel</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-        
-        container.innerHTML = '';
-        
-        channels.forEach(channel => {
-            const channelMessage = document.createElement('div');
-            channelMessage.className = 'voice-channel-message';
-            
-            const isUserInThisChannel = window.callsModule?.isUserInChannel?.(channel.id);
-            const participantCount = channel.participants?.length || 0;
-            const isFull = participantCount >= 30;
-            
-            channelMessage.innerHTML = `
-                <div class="voice-channel-content">
-                    <div class="voice-channel-icon" style="background: ${isUserInThisChannel ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255, 255, 255, 0.2)'}">
-                        <i class="fas ${isUserInThisChannel ? 'fa-headphones' : 'fa-volume-up'}"></i>
-                    </div>
-                    <div class="voice-channel-info">
-                        <div class="voice-channel-title">
-                            <span class="voice-channel-name">${channel.name || 'Voice Channel'}</span>
-                            <span class="voice-channel-status">${participantCount}/30</span>
-                        </div>
-                        <div class="voice-channel-meta">
-                            <span class="voice-channel-creator">
-                                <i class="fas fa-user"></i> ${getUserShortName(channel.createdBy)}
-                            </span>
-                            <span class="voice-channel-time">
-                                <i class="fas fa-clock"></i> ${formatTimeAgo(channel.createdAt)}
-                            </span>
-                        </div>
-                    </div>
-                    <button class="voice-channel-join-btn ${isUserInThisChannel ? 'joined' : ''} ${isFull ? 'full' : ''}" 
-                            ${isFull && !isUserInThisChannel ? 'disabled' : ''}>
-                        ${isUserInThisChannel ? 
-                            '<i class="fas fa-phone-slash"></i> Leave' : 
-                            isFull ? '<i class="fas fa-lock"></i> Full' : 
-                            '<i class="fas fa-phone-alt"></i> Join'
-                        }
-                    </button>
-                </div>
-            `;
-            
-            const joinBtn = channelMessage.querySelector('.voice-channel-join-btn');
-            if (joinBtn && !joinBtn.disabled) {
-                joinBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (window.callsModule) {
-                        if (isUserInThisChannel) {
-                            window.callsModule.leaveVoiceChannel(channel.id, groupId);
-                        } else {
-                            window.callsModule.joinVoiceChannel(channel.id, groupId);
-                        }
-                    } else {
-                        showNotification('Voice channel system not loaded. Please refresh the page.', 'error');
-                    }
-                });
-            }
-            
-            // Click on message to view details
-            channelMessage.addEventListener('click', (e) => {
-                if (!e.target.closest('.voice-channel-join-btn')) {
-                    showVoiceChannelDetails(channel, groupId);
-                }
-            });
-            
-            container.appendChild(channelMessage);
-        });
-    }
-    
-    // NEW: Show voice channel details modal
-    function showVoiceChannelDetails(channel, groupId) {
-        const modal = document.createElement('div');
-        modal.className = 'voice-channel-details-modal';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            animation: fadeIn 0.3s ease;
-        `;
-        
-        const participantCount = channel.participants?.length || 0;
-        const isUserInThisChannel = window.callsModule?.isUserInChannel?.(channel.id);
-        
-        modal.innerHTML = `
-            <div class="channel-details-content" style="
-                background: white;
-                border-radius: 20px;
-                padding: 25px;
-                max-width: 400px;
-                width: 90%;
-                animation: scaleIn 0.3s ease;
-            ">
-                <div class="channel-details-header" style="
-                    display: flex;
-                    align-items: center;
-                    gap: 15px;
-                    margin-bottom: 20px;
-                ">
-                    <div class="channel-details-icon" style="
-                        width: 60px;
-                        height: 60px;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        color: white;
-                        font-size: 24px;
-                    ">
-                        <i class="fas fa-volume-up"></i>
-                    </div>
-                    <div class="channel-details-title" style="flex: 1;">
-                        <h3 style="margin: 0 0 5px 0; color: #333;">${channel.name || 'Voice Channel'}</h3>
-                        <p style="margin: 0; color: #666; font-size: 14px;">
-                            <i class="fas fa-users"></i> ${participantCount} participant${participantCount !== 1 ? 's' : ''}
-                        </p>
-                    </div>
-                </div>
-                
-                <div class="channel-details-info" style="
-                    background: #f8f9fa;
-                    border-radius: 12px;
-                    padding: 15px;
-                    margin-bottom: 20px;
-                ">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <span style="color: #666; font-size: 13px;">Created by:</span>
-                        <span style="color: #333; font-weight: 500;">${getUserShortName(channel.createdBy)}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <span style="color: #666; font-size: 13px;">Created:</span>
-                        <span style="color: #333; font-weight: 500;">${formatTimeAgo(channel.createdAt)} ago</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="color: #666; font-size: 13px;">Status:</span>
-                        <span style="color: ${participantCount >= 30 ? '#dc3545' : '#28a745'}; font-weight: 500;">
-                            ${participantCount >= 30 ? 'Channel Full' : 'Accepting Participants'}
-                        </span>
-                    </div>
-                </div>
-                
-                <div class="channel-details-participants" style="margin-bottom: 25px;">
-                    <h4 style="margin: 0 0 15px 0; color: #333; font-size: 16px;">
-                        <i class="fas fa-users"></i> Participants (${participantCount})
-                    </h4>
-                    <div class="participants-list" style="
-                        max-height: 150px;
-                        overflow-y: auto;
-                        padding-right: 10px;
-                    ">
-                        ${channel.participants && channel.participants.length > 0 ? 
-                            channel.participants.slice(0, 10).map(userId => `
-                                <div style="
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 10px;
-                                    padding: 8px 0;
-                                    border-bottom: 1px solid #eee;
-                                ">
-                                    <div style="
-                                        width: 32px;
-                                        height: 32px;
-                                        background: ${userId === groupChat.firebaseUser?.uid ? '#4CAF50' : '#667eea'};
-                                        border-radius: 50%;
-                                        display: flex;
-                                        align-items: center;
-                                        justify-content: center;
-                                        color: white;
-                                        font-size: 14px;
-                                    ">
-                                        <i class="fas ${userId === groupChat.firebaseUser?.uid ? 'fa-user-check' : 'fa-user'}"></i>
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <div style="font-weight: 500; color: #333;">${getUserShortName(userId)}</div>
-                                        <div style="font-size: 11px; color: #666;">
-                                            ${userId === groupChat.firebaseUser?.uid ? 'You' : 'Member'}
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('') :
-                            `<div style="text-align: center; color: #666; padding: 20px; font-size: 14px;">
-                                <i class="fas fa-user-slash" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
-                                No participants yet
-                            </div>`
-                        }
-                        ${channel.participants && channel.participants.length > 10 ? 
-                            `<div style="text-align: center; padding: 10px; color: #666; font-size: 13px;">
-                                and ${channel.participants.length - 10} more...
-                            </div>` : ''
-                        }
-                    </div>
-                </div>
-                
-                <div class="channel-details-actions" style="
-                    display: flex;
-                    gap: 12px;
-                ">
-                    <button class="modal-close-btn" style="
-                        flex: 1;
-                        background: #6c757d;
-                        color: white;
-                        border: none;
-                        padding: 12px;
-                        border-radius: 25px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: background 0.3s;
-                    ">Close</button>
-                    
-                    ${participantCount >= 30 && !isUserInThisChannel ? 
-                        `<button style="
-                            flex: 1;
-                            background: #dc3545;
-                            color: white;
-                            border: none;
-                            padding: 12px;
-                            border-radius: 25px;
-                            font-weight: 600;
-                            cursor: not-allowed;
-                            opacity: 0.7;
-                        " disabled>
-                            <i class="fas fa-lock"></i> Channel Full
-                        </button>` :
-                        `<button class="modal-action-btn" style="
-                            flex: 1;
-                            background: ${isUserInThisChannel ? '#dc3545' : '#28a745'};
-                            color: white;
-                            border: none;
-                            padding: 12px;
-                            border-radius: 25px;
-                            font-weight: 600;
-                            cursor: pointer;
-                            transition: background 0.3s;
-                        " data-action="${isUserInThisChannel ? 'leave' : 'join'}">
-                            <i class="fas ${isUserInThisChannel ? 'fa-phone-slash' : 'fa-phone-alt'}"></i>
-                            ${isUserInThisChannel ? 'Leave Channel' : 'Join Channel'}
-                        </button>`
-                    }
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Add animation styles
-        const animationStyles = document.createElement('style');
-        animationStyles.textContent = `
-            @keyframes fadeIn {
-                from { opacity: 0; }
-                to { opacity: 1; }
-            }
-            @keyframes scaleIn {
-                from { transform: scale(0.9); opacity: 0; }
-                to { transform: scale(1); opacity: 1; }
-            }
-        `;
-        document.head.appendChild(animationStyles);
-        
-        // Event listeners
-        modal.querySelector('.modal-close-btn').addEventListener('click', () => {
-            modal.style.animation = 'fadeOut 0.3s ease';
-            setTimeout(() => modal.remove(), 300);
-        });
-        
-        const actionBtn = modal.querySelector('.modal-action-btn');
-        if (actionBtn) {
-            actionBtn.addEventListener('click', () => {
-                const action = actionBtn.getAttribute('data-action');
-                if (action === 'join') {
-                    if (window.callsModule) {
-                        window.callsModule.joinVoiceChannel(channel.id, groupId);
-                    }
-                } else if (action === 'leave') {
-                    if (window.callsModule) {
-                        window.callsModule.leaveVoiceChannel(channel.id, groupId);
-                    }
-                }
-                modal.remove();
-            });
-        }
-        
-        // Close on background click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
-        });
-    }
-    
-    // NEW: Show notification
-    function showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff'};
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 10000;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            max-width: 350px;
-            animation: slideIn 0.3s ease;
-        `;
-        
-        notification.innerHTML = `
-            <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : type === 'success' ? 'fa-check-circle' : 'fa-info-circle'}"></i>
-            <span>${message}</span>
-        `;
-        
-        document.body.appendChild(notification);
-        
-        // Auto remove after 3 seconds
-        setTimeout(() => {
-            notification.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
-        }, 3000);
-    }
     
     async function loadGroupData() {
         try {
@@ -4032,6 +3580,8 @@ function initGroupPage() {
         
         window.addEventListener('beforeunload', () => {
             clearInterval(activeInterval);
+            reactionUnsubscribers.forEach(unsub => unsub());
+            reactionUnsubscribers.clear();
             removeSidebarOverlay();
         });
         
@@ -4169,64 +3719,61 @@ function initGroupPage() {
                         
                         const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
                         
+                        let messageContent = '';
+                        
                         if (msg.imageUrl) {
-                            return `
-                                <div class="${messageDivClass}" data-message-id="${msg.id}">
-                                    ${replyHtml}
-                                    <div class="message-image-container" style="position: relative;">
-                                        <img src="${msg.imageUrl}" 
-                                             alt="Shared image" 
-                                             class="message-image"
-                                             style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer;"
-                                             onclick="openImageModal('${msg.imageUrl}')">
-                                        ${isUploading ? `
-                                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                                   background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                                   font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                                <i class="fas fa-spinner fa-spin"></i> Uploading...
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                    ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                            messageContent = `
+                                <div class="message-image-container" style="position: relative;">
+                                    <img src="${msg.imageUrl}" 
+                                         alt="Shared image" 
+                                         class="message-image"
+                                         style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer;"
+                                         onclick="openImageModal('${msg.imageUrl}')">
+                                    ${isUploading ? `
+                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                                            <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                        </div>
+                                    ` : ''}
                                 </div>
                             `;
                         } else if (msg.videoUrl) {
-                            return `
-                                <div class="${messageDivClass}" data-message-id="${msg.id}">
-                                    ${replyHtml}
-                                    <div class="message-video-container" style="position: relative;">
-                                        <video controls style="max-width: 300px; max-height: 300px; border-radius: 8px;">
-                                            <source src="${msg.videoUrl}" type="video/mp4">
-                                            Your browser does not support the video tag.
-                                        </video>
-                                        ${isUploading ? `
-                                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                                   background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                                   font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                                <i class="fas fa-spinner fa-spin"></i> Uploading...
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                    ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                            messageContent = `
+                                <div class="message-video-container" style="position: relative;">
+                                    <video controls style="max-width: 300px; max-height: 300px; border-radius: 8px;">
+                                        <source src="${msg.videoUrl}" type="video/mp4">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                    ${isUploading ? `
+                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                                            <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                        </div>
+                                    ` : ''}
                                 </div>
                             `;
                         } else if (msg.type === 'system') {
-                            return `
-                                <div class="${messageDivClass}" data-message-id="${msg.id}">
-                                    <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
-                                        ${msg.text}
-                                    </div>
+                            messageContent = `
+                                <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
+                                    ${msg.text}
                                 </div>
                             `;
                         } else {
-                            return `
-                                <div class="${messageDivClass}" data-message-id="${msg.id}">
-                                    ${replyHtml}
-                                    ${msg.text || ''}
-                                    ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
-                                </div>
-                            `;
+                            messageContent = msg.text || '';
                         }
+                        
+                        const messageDivId = `message-${msg.id}`;
+                        
+                        return `
+                            <div class="${messageDivClass}" data-message-id="${msg.id}" id="${messageDivId}">
+                                ${replyHtml}
+                                ${messageContent}
+                                <div class="message-reactions" id="reactions-${msg.id}"></div>
+                                ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                            </div>
+                        `;
                     }).join('')}
                 </div>
             `;
@@ -4243,11 +3790,51 @@ function initGroupPage() {
             });
         });
         
-        groupChat.setupMessageLongPress(messagesContainer);
+        groupChat.setupSwipeToReply(messagesContainer);
+        
+        setupReactionListeners();
         
         setTimeout(() => {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }, 100);
+    }
+    
+    function setupReactionListeners() {
+        messages.forEach(message => {
+            if (reactionUnsubscribers.has(message.id)) {
+                return;
+            }
+            
+            const unsubscribe = groupChat.listenToMessageReactions(groupId, message.id, (reactions) => {
+                const reactionsContainer = document.getElementById(`reactions-${message.id}`);
+                if (reactionsContainer) {
+                    updateReactionsDisplay(reactionsContainer, reactions, message.id);
+                }
+            });
+            
+            reactionUnsubscribers.set(message.id, unsubscribe);
+        });
+    }
+    
+    function updateReactionsDisplay(container, reactions, messageId) {
+        container.innerHTML = '';
+        
+        reactions.forEach(reaction => {
+            const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+            const bubble = document.createElement('div');
+            bubble.className = `reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}`;
+            bubble.innerHTML = `
+                <span class="reaction-emoji">${reaction.emoji}</span>
+                <span class="reaction-count">${reaction.count}</span>
+            `;
+            
+            bubble.addEventListener('click', () => {
+                groupChat.currentMessageForReaction = { id: messageId };
+                groupChat.addReactionToMessage(reaction.emoji);
+            });
+            
+            container.appendChild(bubble);
+        });
     }
     
     async function sendMessage() {
@@ -4259,7 +3846,7 @@ function initGroupPage() {
         sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         
         try {
-            await groupChat.sendMessage(groupId, text);
+            await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
             
             messageInput.value = '';
             messageInput.style.height = 'auto';
@@ -4298,6 +3885,8 @@ function initGroupPage() {
     
     window.addEventListener('beforeunload', () => {
         groupChat.cleanup();
+        reactionUnsubscribers.forEach(unsub => unsub());
+        reactionUnsubscribers.clear();
         removeSidebarOverlay();
     });
     
@@ -5111,7 +4700,6 @@ function initChatPage() {
     const viewProfileBtn = document.getElementById('viewProfileBtn');
     const chatTitle = document.getElementById('chatTitle');
     const chatSubtitle = document.getElementById('chatSubtitle');
-    const voiceCallBtn = document.getElementById('voiceCallBtn');
     
     const urlParams = new URLSearchParams(window.location.search);
     const partnerId = urlParams.get('id');
@@ -5170,16 +4758,6 @@ function initChatPage() {
     if (viewProfileBtn) {
         viewProfileBtn.addEventListener('click', () => {
             window.open(`user.html?id=${partnerId}`, '_blank');
-        });
-    }
-    
-    if (voiceCallBtn) {
-        voiceCallBtn.addEventListener('click', () => {
-            if (window.callsModule) {
-                window.callsModule.initiatePersonalCall(partnerId);
-            } else {
-                window.location.href = `calls.html?type=personal&partnerId=${partnerId}&incoming=false`;
-            }
         });
     }
     
@@ -5286,7 +4864,7 @@ function initChatPage() {
             displayMessages();
             
             if (messagesContainer) {
-                groupChat.setupMessageLongPress(messagesContainer);
+                groupChat.setupSwipeToReply(messagesContainer);
             }
             
             const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
@@ -5398,56 +4976,52 @@ function initChatPage() {
                         
                         const messageDivClass = 'message-text';
                         
+                        let messageContent = '';
+                        
                         if (msg.imageUrl) {
-                            return `
-                                <div class="${messageDivClass}" data-message-id="${msg.id}">
-                                    ${replyHtml}
-                                    <div class="message-image-container" style="position: relative;">
-                                        <img src="${msg.imageUrl}" 
-                                             alt="Shared image" 
-                                             class="message-image"
-                                             style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer;"
-                                             onclick="openImageModal('${msg.imageUrl}')">
-                                        ${isUploading ? `
-                                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                                   background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                                   font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                                <i class="fas fa-spinner fa-spin"></i> Uploading...
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                    ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                            messageContent = `
+                                <div class="message-image-container" style="position: relative;">
+                                    <img src="${msg.imageUrl}" 
+                                         alt="Shared image" 
+                                         class="message-image"
+                                         style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer;"
+                                         onclick="openImageModal('${msg.imageUrl}')">
+                                    ${isUploading ? `
+                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                                            <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                        </div>
+                                    ` : ''}
                                 </div>
                             `;
                         } else if (msg.videoUrl) {
-                            return `
-                                <div class="${messageDivClass}" data-message-id="${msg.id}">
-                                    ${replyHtml}
-                                    <div class="message-video-container" style="position: relative;">
-                                        <video controls style="max-width: 300px; max-height: 300px; border-radius: 8px;">
-                                            <source src="${msg.videoUrl}" type="video/mp4">
-                                            Your browser does not support the video tag.
-                                        </video>
-                                        ${isUploading ? `
-                                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                                   background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                                   font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                                <i class="fas fa-spinner fa-spin"></i> Uploading...
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                    ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                            messageContent = `
+                                <div class="message-video-container" style="position: relative;">
+                                    <video controls style="max-width: 300px; max-height: 300px; border-radius: 8px;">
+                                        <source src="${msg.videoUrl}" type="video/mp4">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                    ${isUploading ? `
+                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                                            <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                        </div>
+                                    ` : ''}
                                 </div>
                             `;
                         } else {
-                            return `
-                                <div class="${messageDivClass}" data-message-id="${msg.id}">
-                                    ${replyHtml}
-                                    ${msg.text || ''}
-                                    ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
-                                </div>
-                            `;
+                            messageContent = msg.text || '';
                         }
+                        
+                        return `
+                            <div class="${messageDivClass}" data-message-id="${msg.id}">
+                                ${replyHtml}
+                                ${messageContent}
+                                ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                            </div>
+                        `;
                     }).join('')}
                 </div>
             `;
