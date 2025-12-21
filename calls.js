@@ -1,4 +1,4 @@
-is :// calls.js - Complete Voice Call System for Personal & Group Chats
+// calls.js - Complete Voice Call System for Personal & Group Chats
 // FIXED VERSION - Working Private Calls & Optimized Group Calls
 
 // Firebase imports

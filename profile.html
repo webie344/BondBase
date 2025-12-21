@@ -556,6 +556,169 @@
             border: 1px solid rgba(179, 0, 75, 0.3);
         }
 
+        /* NEW: User Videos Grid Section - TikTok Style */
+        .user-videos-section {
+            margin: 3rem 0;
+            padding: 2rem 0;
+            border-top: 2px solid var(--border);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .user-videos-section h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .user-videos-section h2 i {
+            color: var(--primary-light);
+        }
+
+        .user-videos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .profile-video-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .profile-video-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary);
+        }
+
+        .profile-video-thumbnail {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .profile-video-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .profile-video-card:hover .profile-video-image {
+            transform: scale(1.05);
+        }
+
+        .profile-video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .profile-video-card:hover .profile-video-overlay {
+            opacity: 1;
+        }
+
+        .profile-video-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .video-stat {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        .video-stat i {
+            font-size: 0.75rem;
+        }
+
+        .profile-video-play {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .profile-video-play i {
+            font-size: 2.5rem;
+            color: white;
+            background: rgba(179, 0, 75, 0.8);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .profile-video-info {
+            padding: 1rem;
+        }
+
+        .profile-video-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .profile-video-time {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .videos-loading, .videos-error, .no-videos {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-light);
+            font-size: 1rem;
+        }
+
+        .videos-loading i, .videos-error i, .no-videos i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--primary-light);
+        }
+
+        .videos-error i {
+            color: var(--secondary);
+        }
+
         /* Profile Actions */
         .profile-actions {
             display: flex;
@@ -891,6 +1054,16 @@
             .gamer-stats-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
+
+            /* Responsive video grid */
+            .user-videos-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 0.75rem;
+            }
+
+            .profile-video-thumbnail {
+                height: 300px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -918,6 +1091,26 @@
 
             .gamer-stats-grid {
                 grid-template-columns: 1fr;
+            }
+
+            /* Mobile video grid */
+            .user-videos-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 0.5rem;
+            }
+
+            .profile-video-thumbnail {
+                height: 250px;
+            }
+
+            .profile-video-stats {
+                font-size: 0.75rem;
+            }
+
+            .profile-video-play i {
+                width: 50px;
+                height: 50px;
+                font-size: 2rem;
             }
         }
     </style>
@@ -1084,6 +1277,14 @@
                 </button>
             </div>
 
+            <!-- NEW: User Videos Section - TikTok Style Grid -->
+            <div class="user-videos-section" id="userVideosSection">
+                <h2><i class="fas fa-video"></i> My Videos</h2>
+                <div class="user-videos-grid" id="userVideosGrid">
+                    <!-- Videos will be dynamically loaded here by stream.js -->
+                </div>
+            </div>
+
             <!-- ALL USER POSTS SECTION AT BOTTOM -->
             <div class="profile-posts-section">
                 <h2><i class="fas fa-graduation-cap"></i> Educational Resources</h2>
@@ -1103,5 +1304,7 @@
     <script type="module" src="creative.js"></script>
     <script type="module" src="social.js"></script>
     <script type="module" src="games.js"></script>
+    <!-- NEW: Add stream.js for video functionality -->
+    <script type="module" src="stream.js"></script>
 </body>
 </html>

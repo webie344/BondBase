@@ -56,6 +56,9 @@ let viewedStreams = new Set();
 // TikTok Feed Instance
 let tiktokFeedInstance = null;
 
+// Video Modal Instance
+let videoModalInstance = null;
+
 // Rendering control
 let isRendering = false;
 let lastRenderTime = 0;
@@ -169,6 +172,62 @@ class StreamManager {
             return streamRef.id;
         } catch (error) {
             throw error;
+        }
+    }
+
+    // NEW: Get all videos posted by a specific user
+    async getUserVideos(userId) {
+        try {
+            const videosQuery = query(
+                collection(db, 'streams'),
+                where('authorId', '==', userId),
+                where('isActive', '==', true)
+            );
+            
+            const videosSnap = await getDocs(videosQuery);
+            const videos = [];
+            
+            videosSnap.forEach(doc => {
+                const data = doc.data();
+                videos.push({
+                    id: doc.id,
+                    ...data,
+                    thumbnailUrl: this.getStreamThumbnail(data),
+                    createdAt: data.createdAt || new Date(),
+                    timestamp: data.createdAt?.toDate?.()?.getTime() || new Date().getTime()
+                });
+            });
+
+            // Sort by newest first
+            videos.sort((a, b) => b.timestamp - a.timestamp);
+            
+            return videos;
+        } catch (error) {
+            console.error('Error getting user videos:', error);
+            return [];
+        }
+    }
+
+    // NEW: Get specific video by ID
+    async getVideoById(videoId) {
+        try {
+            const videoRef = doc(db, 'streams', videoId);
+            const videoSnap = await getDoc(videoRef);
+            
+            if (videoSnap.exists()) {
+                const data = videoSnap.data();
+                return {
+                    id: videoSnap.id,
+                    ...data,
+                    thumbnailUrl: this.getStreamThumbnail(data),
+                    createdAt: data.createdAt || new Date(),
+                    timestamp: data.createdAt?.toDate?.()?.getTime() || new Date().getTime()
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error('Error getting video by ID:', error);
+            return null;
         }
     }
 
@@ -395,17 +454,24 @@ class StreamManager {
                 filteredStreams = streams.filter(stream => stream.category === category);
             }
 
-            filteredStreams.sort((a, b) => {
-                const timeA = a.timestamp || 0;
-                const timeB = b.timestamp || 0;
-                return timeB - timeA;
-            });
+            // NEW: Shuffle videos for random order
+            filteredStreams = this.shuffleArray(filteredStreams);
 
             return filteredStreams;
         } catch (error) {
             console.error('Error getting streams:', error);
             return [];
         }
+    }
+
+    // NEW: Shuffle array function
+    shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
     }
 
     // Helper function to get thumbnail for a stream
@@ -761,11 +827,8 @@ class StreamManager {
                     filteredStreams = streams.filter(stream => stream.category === category);
                 }
 
-                filteredStreams.sort((a, b) => {
-                    const timeA = a.timestamp || 0;
-                    const timeB = b.timestamp || 0;
-                    return timeB - timeA;
-                });
+                // NEW: Shuffle videos when they load
+                filteredStreams = this.shuffleArray(filteredStreams);
 
                 callback(filteredStreams);
             }, (error) => {
@@ -874,6 +937,220 @@ class StreamManager {
 
 // Initialize Stream Manager
 const streamManager = new StreamManager();
+
+// NEW: Video Modal Class for profile page videos
+class VideoModal {
+    constructor() {
+        this.modal = null;
+        this.videoElement = null;
+        this.currentVideo = null;
+        this.isOpen = false;
+        this.init();
+    }
+
+    init() {
+        // Create modal element
+        this.modal = document.createElement('div');
+        this.modal.className = 'video-modal';
+        this.modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        `;
+
+        // Modal content
+        this.modal.innerHTML = `
+            <div class="video-modal-content" style="width: 90%; max-width: 800px; position: relative;">
+                <button class="video-modal-close" style="position: absolute; top: -40px; right: 0; background: none; border: none; color: white; font-size: 24px; cursor: pointer; z-index: 10001;">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="video-modal-player" style="width: 100%; background: #000; border-radius: 12px; overflow: hidden;">
+                    <video id="modalVideoPlayer" style="width: 100%; height: auto; max-height: 80vh;" controls playsinline></video>
+                </div>
+                <div class="video-modal-info" style="background: #1a1a1a; padding: 1.5rem; border-radius: 0 0 12px 12px; margin-top: -5px;">
+                    <div class="video-modal-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <div>
+                            <h3 id="modalVideoTitle" style="color: white; margin: 0 0 0.5rem 0; font-size: 1.25rem;"></h3>
+                            <p id="modalVideoAuthor" style="color: #b3004b; margin: 0; font-size: 0.9rem;"></p>
+                        </div>
+                        <div class="video-modal-stats" style="display: flex; gap: 1rem; color: #9ca3af; font-size: 0.9rem;">
+                            <span id="modalVideoViews"><i class="fas fa-eye"></i> 0</span>
+                            <span id="modalVideoLikes"><i class="fas fa-heart"></i> 0</span>
+                        </div>
+                    </div>
+                    <p id="modalVideoDescription" style="color: #d1d5db; margin: 0 0 1rem 0; line-height: 1.5;"></p>
+                    <div class="video-modal-actions" style="display: flex; gap: 1rem;">
+                        <button class="video-modal-like" style="background: #b3004b; color: white; border: none; padding: 0.5rem 1rem; border-radius: 20px; cursor: pointer; font-weight: 600;">
+                            <i class="fas fa-heart"></i> Like
+                        </button>
+                        <button class="video-modal-share" style="background: #2e2e2e; color: white; border: none; padding: 0.5rem 1rem; border-radius: 20px; cursor: pointer; font-weight: 600;">
+                            <i class="fas fa-share"></i> Share
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Append to body
+        document.body.appendChild(this.modal);
+
+        // Get elements
+        this.videoElement = this.modal.querySelector('#modalVideoPlayer');
+        this.closeButton = this.modal.querySelector('.video-modal-close');
+        this.likeButton = this.modal.querySelector('.video-modal-like');
+        this.shareButton = this.modal.querySelector('.video-modal-share');
+
+        // Add event listeners
+        this.closeButton.addEventListener('click', () => this.close());
+        this.likeButton.addEventListener('click', () => this.handleLike());
+        this.shareButton.addEventListener('click', () => this.handleShare());
+
+        // Close modal when clicking outside
+        this.modal.addEventListener('click', (e) => {
+            if (e.target === this.modal) {
+                this.close();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isOpen) {
+                this.close();
+            }
+        });
+
+        // Handle video end
+        this.videoElement.addEventListener('ended', () => {
+            // Auto-close after 2 seconds if video ends
+            setTimeout(() => {
+                this.close();
+            }, 2000);
+        });
+    }
+
+    async open(videoId) {
+        try {
+            // Show loading state
+            this.modal.style.display = 'flex';
+            this.isOpen = true;
+            document.body.style.overflow = 'hidden';
+
+            // Get video data
+            this.currentVideo = await streamManager.getVideoById(videoId);
+            if (!this.currentVideo) {
+                throw new Error('Video not found');
+            }
+
+            // Update modal content
+            const titleElement = this.modal.querySelector('#modalVideoTitle');
+            const authorElement = this.modal.querySelector('#modalVideoAuthor');
+            const viewsElement = this.modal.querySelector('#modalVideoViews');
+            const likesElement = this.modal.querySelector('#modalVideoLikes');
+            const descElement = this.modal.querySelector('#modalVideoDescription');
+
+            titleElement.textContent = this.currentVideo.headline;
+            authorElement.textContent = `By ${this.currentVideo.authorName}`;
+            viewsElement.innerHTML = `<i class="fas fa-eye"></i> ${this.currentVideo.viewCount || 0}`;
+            likesElement.innerHTML = `<i class="fas fa-heart"></i> ${this.currentVideo.likes || 0}`;
+            descElement.textContent = this.currentVideo.description || 'No description';
+
+            // Set video source
+            this.videoElement.src = this.currentVideo.videoUrl;
+            this.videoElement.load();
+
+            // Update like button state
+            this.updateLikeButton();
+
+            // Play video
+            await this.videoElement.play().catch(e => {
+                console.log('Auto-play prevented:', e);
+            });
+
+            // Add viewer count
+            streamManager.addViewer(videoId);
+
+        } catch (error) {
+            console.error('Error opening video modal:', error);
+            alert('Error loading video: ' + error.message);
+            this.close();
+        }
+    }
+
+    close() {
+        if (this.videoElement) {
+            this.videoElement.pause();
+            this.videoElement.src = '';
+        }
+        this.modal.style.display = 'none';
+        this.isOpen = false;
+        document.body.style.overflow = 'auto';
+
+        // Remove viewer count
+        if (this.currentVideo) {
+            streamManager.removeViewer(this.currentVideo.id);
+        }
+        this.currentVideo = null;
+    }
+
+    updateLikeButton() {
+        if (!this.currentVideo) return;
+
+        const isLiked = likedStreams.has(this.currentVideo.id);
+        this.likeButton.innerHTML = isLiked ? 
+            '<i class="fas fa-heart"></i> Liked' : 
+            '<i class="far fa-heart"></i> Like';
+    }
+
+    async handleLike() {
+        if (!this.currentVideo) return;
+
+        try {
+            const result = await streamManager.handleLike(this.currentVideo.id, this.likeButton);
+            if (result) {
+                this.updateLikeButton();
+                const likesElement = this.modal.querySelector('#modalVideoLikes');
+                likesElement.innerHTML = `<i class="fas fa-heart"></i> ${result.likes}`;
+            }
+        } catch (error) {
+            console.error('Error liking video:', error);
+        }
+    }
+
+    async handleShare() {
+        if (!this.currentVideo) return;
+
+        const shareText = `Check out this video: ${this.currentVideo.headline}`;
+        const shareUrl = window.location.origin + '/stream.html';
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: this.currentVideo.headline,
+                    text: this.currentVideo.description || shareText,
+                    url: shareUrl
+                });
+            } catch (error) {
+                console.log('Share cancelled:', error);
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+                alert('Link copied to clipboard!');
+            } catch (err) {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy link. Please try again.');
+            }
+        }
+    }
+}
 
 // TikTok Feed Class
 class TikTokFeed {
@@ -1183,7 +1460,10 @@ class TikTokFeed {
             const streams = await streamManager.getStreams('all');
             this.videos = streams;
             this.renderVideos();
-            this.showVideo(0);
+            
+            // NEW: Start from random video
+            const randomIndex = Math.floor(Math.random() * this.videos.length);
+            this.showVideo(randomIndex);
             
             const loadingOverlay = document.getElementById('loadingOverlay');
             if (loadingOverlay) {
@@ -1284,7 +1564,8 @@ class TikTokFeed {
                 </div>
                 
                 <div class="video-info-overlay">
-                    <div class="video-author">
+                    <!-- UPDATED: Profile picture now links to user's profile -->
+                    <div class="video-author" onclick="navigateToUserProfile('${video.authorId}')" style="cursor: pointer;">
                         <img src="${video.authorImage || 'images-defaultse-profile.jpg'}" 
                              alt="${video.authorName}" 
                              class="video-author-avatar">
@@ -1768,6 +2049,108 @@ function markStreamAsViewed(streamId) {
     saveViewedStreams();
 }
 
+// NEW: Function to navigate to user profile
+function navigateToUserProfile(userId) {
+    if (userId && userId !== currentUser?.uid) {
+        window.location.href = `profile.html?id=${userId}`;
+    } else if (userId === currentUser?.uid) {
+        window.location.href = 'profile.html';
+    }
+}
+
+// NEW: Function to load user videos in profile page
+async function loadUserVideos(userId) {
+    try {
+        const videosContainer = document.getElementById('userVideosGrid');
+        if (!videosContainer) return;
+        
+        // Show loading state
+        videosContainer.innerHTML = `
+            <div class="videos-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Loading videos...</span>
+            </div>
+        `;
+        
+        const videos = await streamManager.getUserVideos(userId);
+        
+        if (videos.length === 0) {
+            videosContainer.innerHTML = `
+                <div class="no-videos">
+                    <i class="fas fa-video-slash"></i>
+                    <p>No videos posted yet</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Create TikTok-like grid layout
+        videosContainer.innerHTML = '';
+        videos.forEach(video => {
+            const videoCard = document.createElement('div');
+            videoCard.className = 'profile-video-card';
+            videoCard.dataset.videoId = video.id;
+            
+            const thumbnailUrl = getVideoThumbnail(video);
+            const viewCount = video.viewCount || 0;
+            const likeCount = video.likes || 0;
+            
+            videoCard.innerHTML = `
+                <div class="profile-video-thumbnail">
+                    <img src="${thumbnailUrl}" 
+                         alt="${video.headline}"
+                         class="profile-video-image"
+                         onerror="this.src='images-defaultse-profile.jpg'">
+                    <div class="profile-video-overlay">
+                        <div class="profile-video-stats">
+                            <span class="video-stat">
+                                <i class="fas fa-play"></i> ${viewCount}
+                            </span>
+                            <span class="video-stat">
+                                <i class="fas fa-heart"></i> ${likeCount}
+                            </span>
+                        </div>
+                        <div class="profile-video-play">
+                            <i class="fas fa-play"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="profile-video-info">
+                    <p class="profile-video-title">${video.headline}</p>
+                    <p class="profile-video-time">${formatTime(video.createdAt)}</p>
+                </div>
+            `;
+            
+            // NEW: Open video in modal instead of redirecting to stream page
+            videoCard.addEventListener('click', () => {
+                openVideoModal(video.id);
+            });
+            
+            videosContainer.appendChild(videoCard);
+        });
+        
+    } catch (error) {
+        console.error('Error loading user videos:', error);
+        const videosContainer = document.getElementById('userVideosGrid');
+        if (videosContainer) {
+            videosContainer.innerHTML = `
+                <div class="videos-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error loading videos</p>
+                </div>
+            `;
+        }
+    }
+}
+
+// NEW: Function to open video modal
+function openVideoModal(videoId) {
+    if (!videoModalInstance) {
+        videoModalInstance = new VideoModal();
+    }
+    videoModalInstance.open(videoId);
+}
+
 // Get video thumbnail
 function getVideoThumbnail(stream) {
     if (!stream) {
@@ -1856,6 +2239,36 @@ async function initializeStreamPage() {
                 initializeStreamsPage();
             }
             break;
+        case 'profile':
+            // NEW: Initialize profile page video grid if available
+            initializeProfilePageVideos();
+            break;
+    }
+}
+
+// NEW: Initialize profile page videos
+function initializeProfilePageVideos() {
+    // Check if we're on a profile page and have the videos container
+    const urlParams = new URLSearchParams(window.location.search);
+    const profileId = urlParams.get('id') || currentUser?.uid;
+    
+    if (profileId && document.getElementById('userVideosGrid')) {
+        // Load user's videos
+        loadUserVideos(profileId);
+        
+        // Also add click handler to profile pictures in comments
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('comment-avatar') || 
+                e.target.closest('.comment-avatar')) {
+                const commentItem = e.target.closest('.comment-item');
+                if (commentItem) {
+                    const userId = commentItem.dataset.userId;
+                    if (userId && userId !== currentUser?.uid) {
+                        navigateToUserProfile(userId);
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -2124,7 +2537,7 @@ function renderStreams(streams) {
         
         return `
         <div class="stream-card" data-stream-id="${stream.id}">
-            <div class="video-preview-container" onclick="playStream('${stream.id}')">
+            <div class="video-preview-container" onclick="openVideoModal('${stream.id}')">
                 <img src="${thumbnailUrl}" 
                      alt="${stream.headline}" 
                      class="video-preview"
@@ -2173,7 +2586,8 @@ function renderStreams(streams) {
                     <div class="comments-list" id="comments-list-${stream.id}"></div>
                 </div>
 
-                <div class="stream-author">
+                <!-- UPDATED: Profile now links to user's profile -->
+                <div class="stream-author" onclick="navigateToUserProfile('${stream.authorId}')" style="cursor: pointer;">
                     <img src="${stream.authorImage || 'images-defaultse-profile.jpg'}" alt="${stream.authorName}" 
                          class="author-avatar"
                          style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
@@ -2397,6 +2811,15 @@ window.retryTikTokVideo = (videoId) => {
         tiktokFeedInstance.retryVideo(videoId);
     }
 };
+
+// NEW: Make video modal function globally available
+window.openVideoModal = openVideoModal;
+
+// NEW: Make profile navigation function globally available
+window.navigateToUserProfile = navigateToUserProfile;
+
+// NEW: Make user videos loading function globally available
+window.loadUserVideos = loadUserVideos;
 
 window.getVideoThumbnail = getVideoThumbnail;
 window.formatCategory = formatCategory;
