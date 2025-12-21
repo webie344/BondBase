@@ -414,7 +414,7 @@
 
         .post-image {
             width: 100%;
-            height: 300px;
+            height: 100%;
             object-fit: cover;
             display: block;
             transition: transform 0.3s ease;
@@ -752,7 +752,7 @@
 
         @media (max-width: 360px) {
             .post-image {
-                height: 180px;
+                height: 300px;
             }
             
             .post-actions {
@@ -775,10 +775,9 @@
             
             <!-- Notification Badge -->
             <li class="nav-item">
-                <a href="notification.html" class="nav-links">
+                <a href="notification.html" class="notification-link">
                     <i class="fas fa-bell"></i>
                     <span class="notification-badge">0</span>
-                    <span>Alerts</span>
                 </a>
             </li>
             
@@ -834,13 +833,8 @@
             <!-- Header -->
             <div class="posts-header">
                 <div class="header-content">
-                    <h1 class="page-title">
-                        <i class="fas fa-graduation-cap"></i>
-                        Educational Resources
-                    </h1>
-                    <p class="page-subtitle">Discover educational content from our community of sexual health experts</p>
+                    
                 </div>
-                
                 <!-- Create Post Button -->
                 <div class="create-post-container">
                     <a href="create.html" class="create-post-btn">
@@ -895,6 +889,7 @@
     <!-- Your JavaScript -->
     <script type="module" src="social.js"></script>
     <script type="module" src="app.js"></script>
+    <script type="module" src="notification.js"></script>
     
     <script>
         
