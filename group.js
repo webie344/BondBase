@@ -1,5 +1,6 @@
 // group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
 // UPDATED VERSION: Fixed back button, emoji display, image/video sizing
+// FIXED: 1. Allow reactions on all messages, 2. Increased max group limit to 1000
 
 import { 
     getFirestore, 
@@ -1254,7 +1255,8 @@ class GroupChat {
                 topics: groupData.topics || [],
                 rules: groupData.rules || [],
                 restrictedWords: groupData.restrictedWords || [],
-                maxMembers: groupData.maxMembers || 50,
+                // FIXED: Increased max members to 1000
+                maxMembers: groupData.maxMembers || 1000,
                 privacy: groupData.privacy || 'public',
                 createdBy: this.firebaseUser.uid,
                 creatorName: this.currentUser.name,
@@ -1459,6 +1461,7 @@ class GroupChat {
                 return true;
             }
             
+            // FIXED: Now checking against 1000 instead of 50
             if (group.memberCount >= group.maxMembers) {
                 throw new Error('Group is full');
             }
@@ -2841,7 +2844,7 @@ function initGroupsPage() {
                     <div class="group-meta">
                         <span class="group-members">
                             <i class="fas fa-users"></i>
-                            ${group.memberCount || 0} / ${group.maxMembers || 50}
+                            ${group.memberCount || 0} / ${group.maxMembers || 1000} <!-- FIXED: Changed from 50 to 1000 -->
                         </span>
                         <span class="group-privacy">
                             <i class="fas ${group.privacy === 'private' ? 'fa-lock' : 'fa-globe'}"></i>
@@ -3790,23 +3793,26 @@ function initGroupPage() {
                         // Get reactions from cache
                         const cachedReactions = reactionsCache.get(msg.id) || [];
                         
+                        // FIXED: Always show reactions container, even if no reactions yet
                         return `
                             <div class="${messageDivClass}" data-message-id="${msg.id}" id="${messageDivId}">
                                 ${replyHtml}
                                 ${messageContent}
-                                ${cachedReactions.length > 0 ? `
-                                    <div class="message-reactions" id="reactions-${msg.id}">
-                                        ${cachedReactions.map(reaction => {
-                                            const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
-                                            return `
-                                                <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
-                                                    <span class="reaction-emoji">${reaction.emoji}</span>
-                                                    <span class="reaction-count">${reaction.count}</span>
-                                                </div>
-                                            `;
-                                        }).join('')}
+                                <div class="message-reactions" id="reactions-${msg.id}">
+                                    ${cachedReactions.map(reaction => {
+                                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+                                        return `
+                                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
+                                                <span class="reaction-emoji">${reaction.emoji}</span>
+                                                <span class="reaction-count">${reaction.count}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                    <!-- Always show empty reaction area for long press -->
+                                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
+                                        +
                                     </div>
-                                ` : ''}
+                                </div>
                                 ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
                             </div>
                         `;
@@ -3829,6 +3835,10 @@ function initGroupPage() {
         // Setup reaction bubble click handlers
         document.querySelectorAll('.reaction-bubble').forEach(bubble => {
             bubble.addEventListener('click', (e) => {
+                // Don't trigger for the empty add-reaction bubble
+                if (e.currentTarget.classList.contains('add-reaction')) {
+                    return;
+                }
                 const messageElement = e.target.closest('.message-text, .system-message');
                 if (messageElement) {
                     const messageId = messageElement.dataset.messageId;
@@ -3840,6 +3850,35 @@ function initGroupPage() {
                     }
                 }
             });
+        });
+        
+        // Setup long press on all messages for reaction modal
+        document.querySelectorAll('.message-text, .system-message').forEach(messageElement => {
+            let longPressTimer;
+            const messageId = messageElement.dataset.messageId;
+            const message = messages.find(m => m.id === messageId);
+            
+            if (message) {
+                messageElement.addEventListener('touchstart', (e) => {
+                    longPressTimer = setTimeout(() => {
+                        groupChat.showReactionModal(message);
+                    }, 500);
+                });
+                
+                messageElement.addEventListener('touchend', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                messageElement.addEventListener('touchmove', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                // Also support right-click/context menu on desktop
+                messageElement.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    groupChat.showReactionModal(message);
+                });
+            }
         });
         
         groupChat.setupSwipeToReply(messagesContainer);
@@ -3892,6 +3931,13 @@ function initGroupPage() {
             
             container.appendChild(bubble);
         });
+        
+        // Always add empty reaction area for long press
+        const emptyBubble = document.createElement('div');
+        emptyBubble.className = 'reaction-bubble add-reaction';
+        emptyBubble.style.cssText = 'opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;';
+        emptyBubble.innerHTML = '+';
+        container.appendChild(emptyBubble);
     }
     
     async function sendMessage() {
@@ -4406,7 +4452,7 @@ function initJoinPage() {
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.name)}&backgroundColor=00897b&backgroundType=gradientLinear`;
             
             const memberCount = group.memberCount || 0;
-            const maxMembers = group.maxMembers || 50;
+            const maxMembers = group.maxMembers || 1000; // FIXED: Changed from 50 to 1000
             const memberPercentage = Math.round((memberCount / maxMembers) * 100);
             
             if (groupInfo) {
