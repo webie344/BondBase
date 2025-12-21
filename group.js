@@ -1,6 +1,5 @@
 // group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
-// UPDATED VERSION: Fixed back button, emoji display, image/video sizing
-// FIXED: 1. Allow reactions on all messages, 2. Increased max group limit to 1000
+// UPGRADED VERSION: Fixed private message reactions, user blocking, improved caching, duplicate message prevention, and optimized UI refresh
 
 import { 
     getFirestore, 
@@ -65,7 +64,8 @@ const AVATAR_OPTIONS = [
 const CACHE_DURATION = {
     USER_PROFILE: 5 * 60 * 1000,
     GROUP_DATA: 2 * 60 * 1000,
-    MEMBERS_LIST: 1 * 60 * 1000
+    MEMBERS_LIST: 1 * 60 * 1000,
+    BLOCKED_USERS: 10 * 60 * 1000
 };
 
 // Emojis for reactions (100 emojis like Discord)
@@ -100,7 +100,9 @@ class GroupChat {
             joinedGroups: new Map(),
             groupData: new Map(),
             groupMembers: new Map(),
-            profileSetupChecked: false
+            profileSetupChecked: false,
+            blockedUsers: new Map(),
+            messageReactions: new Map()
         };
         
         this.replyingToMessage = null;
@@ -119,6 +121,7 @@ class GroupChat {
         this.privateChatImageInput = null;
         
         this.sentMessageIds = new Set();
+        this.pendingMessages = new Set();
         
         this.restrictedUsers = new Map();
         
@@ -130,9 +133,16 @@ class GroupChat {
         this.isSwiping = false;
         this.swipeThreshold = 50;
         
+        this.lastDisplayedMessages = new Set();
+        this.messageRenderQueue = [];
+        this.isRendering = false;
+        
+        this.blockedUsers = new Map();
+        
         this.setupAuthListener();
         this.createReactionModal();
         this.checkRestrictedUsers();
+        this.loadBlockedUsers();
     }
 
     getCachedItem(cacheKey, cacheMap) {
@@ -158,6 +168,7 @@ class GroupChat {
         this.cache.groupData.delete(groupId);
         this.cache.groupMembers.delete(groupId);
         this.cache.joinedGroups.delete(groupId);
+        this.cache.messageReactions.delete(groupId);
     }
 
     clearAllCache() {
@@ -167,8 +178,74 @@ class GroupChat {
             joinedGroups: new Map(),
             groupData: new Map(),
             groupMembers: new Map(),
-            profileSetupChecked: false
+            profileSetupChecked: false,
+            blockedUsers: new Map(),
+            messageReactions: new Map()
         };
+        this.lastDisplayedMessages.clear();
+        this.messageRenderQueue = [];
+    }
+
+    async loadBlockedUsers() {
+        try {
+            if (!this.firebaseUser) return;
+            
+            const blockedRef = collection(db, 'blocked_users');
+            const q = query(blockedRef, where('blockedById', '==', this.firebaseUser.uid));
+            const snapshot = await getDocs(q);
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                this.blockedUsers.set(data.userId, data);
+            });
+        } catch (error) {
+            console.error('Error loading blocked users:', error);
+        }
+    }
+
+    async blockUser(userId) {
+        try {
+            if (!this.firebaseUser) return;
+            
+            const blockRef = doc(collection(db, 'blocked_users'));
+            await setDoc(blockRef, {
+                userId: userId,
+                blockedById: this.firebaseUser.uid,
+                blockedAt: serverTimestamp(),
+                reason: 'Removed from group by admin'
+            });
+            
+            this.blockedUsers.set(userId, {
+                userId: userId,
+                blockedById: this.firebaseUser.uid,
+                blockedAt: new Date()
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('Error blocking user:', error);
+            return false;
+        }
+    }
+
+    async isUserBlocked(userId) {
+        if (this.blockedUsers.has(userId)) {
+            return true;
+        }
+        
+        try {
+            const blockedRef = collection(db, 'blocked_users');
+            const q = query(blockedRef, 
+                where('userId', '==', userId),
+                where('blockedById', '==', this.firebaseUser.uid)
+            );
+            const snapshot = await getDocs(q);
+            
+            return !snapshot.empty;
+        } catch (error) {
+            console.error('Error checking if user is blocked:', error);
+            return false;
+        }
     }
 
     checkRestrictedUsers() {
@@ -334,10 +411,13 @@ class GroupChat {
 
     async getUserProfile(userId, forceRefresh = false) {
         try {
-            if (!forceRefresh && this.cache.userProfile && 
-                this.cache.userProfile.id === userId && 
-                Date.now() < this.cache.userProfileExpiry) {
-                return this.cache.userProfile;
+            const cacheKey = `user_${userId}`;
+            
+            if (!forceRefresh) {
+                const cached = this.getCachedItem(cacheKey, this.cache.userProfiles || new Map());
+                if (cached) {
+                    return cached;
+                }
             }
 
             const userRef = doc(db, 'group_users', userId);
@@ -360,8 +440,10 @@ class GroupChat {
                     profileComplete: userData.displayName && userData.avatar ? true : false
                 };
                 
-                this.cache.userProfile = profile;
-                this.cache.userProfileExpiry = Date.now() + CACHE_DURATION.USER_PROFILE;
+                if (!this.cache.userProfiles) {
+                    this.cache.userProfiles = new Map();
+                }
+                this.setCachedItem(cacheKey, profile, this.cache.userProfiles, CACHE_DURATION.USER_PROFILE);
                 
                 return profile;
             }
@@ -374,6 +456,10 @@ class GroupChat {
 
     async getMutualGroups(userId1, userId2) {
         try {
+            const cacheKey = `mutual_${userId1}_${userId2}`;
+            const cached = this.getCachedItem(cacheKey, this.cache.mutualGroups || new Map());
+            if (cached) return cached;
+
             const groupsRef = collection(db, 'groups');
             const user1Groups = [];
             const querySnapshot = await getDocs(groupsRef);
@@ -406,6 +492,11 @@ class GroupChat {
                 }
             }
             
+            if (!this.cache.mutualGroups) {
+                this.cache.mutualGroups = new Map();
+            }
+            this.setCachedItem(cacheKey, mutualGroups, this.cache.mutualGroups, CACHE_DURATION.GROUP_DATA);
+            
             return mutualGroups;
         } catch (error) {
             console.error('Error getting mutual groups:', error);
@@ -429,6 +520,15 @@ class GroupChat {
             }
             
             const chatId = this.getPrivateChatId(this.firebaseUser.uid, toUserId);
+            const messageId = `${chatId}_${this.firebaseUser.uid}_${Date.now()}`;
+            
+            if (this.sentMessageIds.has(messageId)) {
+                console.log('Duplicate private message prevented:', messageId);
+                return true;
+            }
+            
+            this.sentMessageIds.add(messageId);
+            
             const messagesRef = collection(db, 'private_chats', chatId, 'messages');
             
             const messageData = {
@@ -436,7 +536,8 @@ class GroupChat {
                 senderName: this.currentUser.name,
                 senderAvatar: this.currentUser.avatar,
                 timestamp: serverTimestamp(),
-                read: false
+                read: false,
+                chatType: 'private'
             };
             
             if (replyTo) {
@@ -474,6 +575,7 @@ class GroupChat {
             return true;
         } catch (error) {
             console.error('Error sending private message:', error);
+            this.sentMessageIds.delete(messageId);
             throw error;
         }
     }
@@ -519,7 +621,8 @@ class GroupChat {
                 [isVideo ? 'videoUrl' : 'imageUrl']: tempMediaUrl,
                 timestamp: new Date().toISOString(),
                 type: isVideo ? 'video' : 'image',
-                status: 'uploading'
+                status: 'uploading',
+                chatType: 'private'
             });
             
             const event = new CustomEvent('tempPrivateMediaMessage', { 
@@ -552,13 +655,14 @@ class GroupChat {
                 messages.push({ 
                     id: doc.id, 
                     ...data,
+                    chatType: 'private',
                     timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
                 });
             });
             
             this.tempPrivateMessages.forEach((tempMsg, tempId) => {
                 if (!messages.some(m => m.id === tempId)) {
-                    messages.push(tempMsg);
+                    messages.push({...tempMsg, chatType: 'private'});
                 }
             });
             
@@ -571,38 +675,51 @@ class GroupChat {
 
     listenToPrivateMessages(otherUserId, callback) {
         try {
+            // First, unsubscribe from any existing listener
             if (this.unsubscribePrivateMessages) {
-                this.unsubscribePrivateMessages();
+                try {
+                    this.unsubscribePrivateMessages();
+                } catch (err) {
+                    console.log('Error unsubscribing from previous private messages:', err);
+                }
+                this.unsubscribePrivateMessages = null;
             }
             
             const chatId = this.getPrivateChatId(this.firebaseUser.uid, otherUserId);
             const messagesRef = collection(db, 'private_chats', chatId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
             
-            this.unsubscribePrivateMessages = onSnapshot(q, (snapshot) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
                 const messages = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     messages.push({ 
                         id: doc.id, 
                         ...data,
+                        chatType: 'private',
                         timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
                     });
                 });
                 
+                // Add temp messages
                 this.tempPrivateMessages.forEach((tempMsg, tempId) => {
                     if (!messages.some(m => m.id === tempId)) {
-                        messages.push(tempMsg);
+                        messages.push({...tempMsg, chatType: 'private'});
                     }
                 });
                 
                 callback(messages);
+            }, (error) => {
+                console.error('Error in private messages listener:', error);
             });
             
-            return this.unsubscribePrivateMessages;
+            this.unsubscribePrivateMessages = unsubscribe;
+            
+            return unsubscribe;
         } catch (error) {
             console.error('Error listening to private messages:', error);
-            throw error;
+            // Return a dummy unsubscribe function to prevent errors
+            return () => {};
         }
     }
 
@@ -610,6 +727,10 @@ class GroupChat {
         try {
             if (!this.firebaseUser) return [];
             
+            const cacheKey = `private_chats_${this.firebaseUser.uid}`;
+            const cached = this.getCachedItem(cacheKey, this.cache.privateChats || new Map());
+            if (cached) return cached;
+
             const privateChatsRef = collection(db, 'private_chats');
             const q = query(privateChatsRef, where('participants', 'array-contains', this.firebaseUser.uid));
             const querySnapshot = await getDocs(q);
@@ -644,6 +765,11 @@ class GroupChat {
             
             chats.sort((a, b) => b.updatedAt - a.updatedAt);
             
+            if (!this.cache.privateChats) {
+                this.cache.privateChats = new Map();
+            }
+            this.setCachedItem(cacheKey, chats, this.cache.privateChats, CACHE_DURATION.GROUP_DATA);
+            
             return chats;
         } catch (error) {
             console.error('Error getting private chats:', error);
@@ -653,6 +779,10 @@ class GroupChat {
 
     async getUnreadMessageCount(chatId, otherUserId) {
         try {
+            const cacheKey = `unread_${chatId}_${otherUserId}`;
+            const cached = this.getCachedItem(cacheKey, this.cache.unreadCounts || new Map());
+            if (cached !== null) return cached;
+
             const messagesRef = collection(db, 'private_chats', chatId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'desc'));
             const querySnapshot = await getDocs(q);
@@ -664,6 +794,11 @@ class GroupChat {
                     unreadCount++;
                 }
             });
+            
+            if (!this.cache.unreadCounts) {
+                this.cache.unreadCounts = new Map();
+            }
+            this.setCachedItem(cacheKey, unreadCount, this.cache.unreadCounts, CACHE_DURATION.USER_PROFILE);
             
             return unreadCount;
         } catch (error) {
@@ -690,6 +825,10 @@ class GroupChat {
             
             if (hasUpdates) {
                 await batch.commit();
+                
+                if (this.cache.unreadCounts) {
+                    this.cache.unreadCounts.delete(`unread_${chatId}_${senderId}`);
+                }
             }
             
             return true;
@@ -703,6 +842,10 @@ class GroupChat {
         try {
             if (!this.firebaseUser) return [];
             
+            const cacheKey = `group_chats_${this.firebaseUser.uid}`;
+            const cached = this.getCachedItem(cacheKey, this.cache.groupChats || new Map());
+            if (cached) return cached;
+
             const groupsRef = collection(db, 'groups');
             const querySnapshot = await getDocs(groupsRef);
             
@@ -748,6 +891,11 @@ class GroupChat {
                 return timeB - timeA;
             });
             
+            if (!this.cache.groupChats) {
+                this.cache.groupChats = new Map();
+            }
+            this.setCachedItem(cacheKey, groupChats, this.cache.groupChats, CACHE_DURATION.GROUP_DATA);
+            
             return groupChats;
         } catch (error) {
             console.error('Error getting group chats:', error);
@@ -766,6 +914,10 @@ class GroupChat {
 
     async getGroupByInviteCode(inviteCode) {
         try {
+            const cacheKey = `group_invite_${inviteCode}`;
+            const cached = this.getCachedItem(cacheKey, this.cache.groupInvites || new Map());
+            if (cached) return cached;
+
             const groupsRef = collection(db, 'groups');
             const q = query(groupsRef, where('inviteCode', '==', inviteCode));
             const querySnapshot = await getDocs(q);
@@ -773,12 +925,19 @@ class GroupChat {
             if (!querySnapshot.empty) {
                 const doc = querySnapshot.docs[0];
                 const data = doc.data();
-                return { 
+                const group = { 
                     id: doc.id, 
                     ...data,
                     createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate() : data.createdAt) : new Date(),
                     updatedAt: data.updatedAt ? (data.updatedAt.toDate ? data.updatedAt.toDate() : data.updatedAt) : new Date()
                 };
+                
+                if (!this.cache.groupInvites) {
+                    this.cache.groupInvites = new Map();
+                }
+                this.setCachedItem(cacheKey, group, this.cache.groupInvites, CACHE_DURATION.GROUP_DATA);
+                
+                return group;
             }
             return null;
         } catch (error) {
@@ -815,6 +974,10 @@ class GroupChat {
             });
 
             this.clearGroupCache(groupId);
+            
+            if (this.cache.groupInvites) {
+                this.cache.groupInvites.delete(`group_invite_${groupData.inviteCode}`);
+            }
 
             return newInviteLink;
         } catch (error) {
@@ -871,6 +1034,10 @@ class GroupChat {
                 throw new Error('You must be logged in to view admin groups');
             }
 
+            const cacheKey = `admin_groups_${this.firebaseUser.uid}`;
+            const cached = this.getCachedItem(cacheKey, this.cache.adminGroups || new Map());
+            if (cached) return cached;
+
             const groupsRef = collection(db, 'groups');
             const q = query(groupsRef, orderBy('createdAt', 'desc'));
             
@@ -888,6 +1055,11 @@ class GroupChat {
                     });
                 }
             });
+            
+            if (!this.cache.adminGroups) {
+                this.cache.adminGroups = new Map();
+            }
+            this.setCachedItem(cacheKey, groups, this.cache.adminGroups, CACHE_DURATION.GROUP_DATA);
             
             return groups;
         } catch (error) {
@@ -980,6 +1152,8 @@ class GroupChat {
                 groupId, 
                 `${memberName} has been removed from the group by admin.`
             );
+
+            await this.blockUser(memberId);
 
             return true;
         } catch (error) {
@@ -1179,6 +1353,10 @@ class GroupChat {
             this.cache.userProfileExpiry = Date.now() + CACHE_DURATION.USER_PROFILE;
             this.cache.profileSetupChecked = true;
             
+            if (this.cache.userProfiles) {
+                this.cache.userProfiles.delete(`user_${this.firebaseUser.uid}`);
+            }
+            
             return true;
         } catch (error) {
             console.error('Error updating user profile:', error);
@@ -1255,7 +1433,6 @@ class GroupChat {
                 topics: groupData.topics || [],
                 rules: groupData.rules || [],
                 restrictedWords: groupData.restrictedWords || [],
-                // FIXED: Increased max members to 1000
                 maxMembers: groupData.maxMembers || 1000,
                 privacy: groupData.privacy || 'public',
                 createdBy: this.firebaseUser.uid,
@@ -1287,6 +1464,11 @@ class GroupChat {
         try {
             if (!this.firebaseUser || !this.currentUser) {
                 throw new Error('You must be logged in to join a group');
+            }
+            
+            const isBlocked = await this.isUserBlocked(this.firebaseUser.uid);
+            if (isBlocked) {
+                throw new Error('You have been blocked from joining this group');
             }
             
             const memberRef = doc(collection(db, 'groups', groupId, 'members'), this.firebaseUser.uid);
@@ -1326,6 +1508,10 @@ class GroupChat {
 
     async getAllGroups() {
         try {
+            const cacheKey = 'all_groups';
+            const cached = this.getCachedItem(cacheKey, this.cache.allGroups || new Map());
+            if (cached) return cached;
+
             const groupsRef = collection(db, 'groups');
             const q = query(groupsRef, orderBy('lastActivity', 'desc'));
             const querySnapshot = await getDocs(q);
@@ -1344,6 +1530,11 @@ class GroupChat {
                 
                 this.setCachedItem(doc.id, group, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
             });
+            
+            if (!this.cache.allGroups) {
+                this.cache.allGroups = new Map();
+            }
+            this.setCachedItem(cacheKey, groups, this.cache.allGroups, CACHE_DURATION.GROUP_DATA);
             
             return groups;
         } catch (error) {
@@ -1461,7 +1652,6 @@ class GroupChat {
                 return true;
             }
             
-            // FIXED: Now checking against 1000 instead of 50
             if (group.memberCount >= group.maxMembers) {
                 throw new Error('Group is full');
             }
@@ -1544,12 +1734,13 @@ class GroupChat {
             
             const messageId = `${groupId}_${this.firebaseUser.uid}_${Date.now()}`;
             
-            if (this.sentMessageIds.has(messageId)) {
+            if (this.sentMessageIds.has(messageId) || this.pendingMessages.has(messageId)) {
                 console.log('Duplicate message prevented:', messageId);
                 return true;
             }
             
             this.sentMessageIds.add(messageId);
+            this.pendingMessages.add(messageId);
             
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const messageData = {
@@ -1594,9 +1785,13 @@ class GroupChat {
             
             this.clearReply();
             
+            this.pendingMessages.delete(messageId);
+            
             return true;
         } catch (error) {
             console.error('Error sending message:', error);
+            this.sentMessageIds.delete(messageId);
+            this.pendingMessages.delete(messageId);
             throw error;
         }
     }
@@ -1657,6 +1852,10 @@ class GroupChat {
 
     async getMessages(groupId, limitCount = 50) {
         try {
+            const cacheKey = `messages_${groupId}_${limitCount}`;
+            const cached = this.getCachedItem(cacheKey, this.cache.messages || new Map());
+            if (cached) return cached;
+
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(limitCount));
             const querySnapshot = await getDocs(q);
@@ -1671,7 +1870,14 @@ class GroupChat {
                 });
             });
             
-            return messages.reverse();
+            const result = messages.reverse();
+            
+            if (!this.cache.messages) {
+                this.cache.messages = new Map();
+            }
+            this.setCachedItem(cacheKey, result, this.cache.messages, 30000);
+            
+            return result;
         } catch (error) {
             console.error('Error getting messages:', error);
             throw error;
@@ -1680,15 +1886,20 @@ class GroupChat {
 
     listenToMessages(groupId, callback) {
         try {
+            // First, unsubscribe from any existing listener
             if (this.unsubscribeMessages) {
-                this.unsubscribeMessages();
+                try {
+                    this.unsubscribeMessages();
+                } catch (err) {
+                    console.log('Error unsubscribing from previous messages:', err);
+                }
                 this.unsubscribeMessages = null;
             }
             
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
             
-            this.unsubscribeMessages = onSnapshot(q, (snapshot) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
                 const messages = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -1698,27 +1909,43 @@ class GroupChat {
                         timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
                     });
                 });
+                
+                if (this.cache.messages) {
+                    const cacheKey = `messages_${groupId}_${messages.length}`;
+                    this.setCachedItem(cacheKey, messages, this.cache.messages, 30000);
+                }
+                
                 callback(messages);
+            }, (error) => {
+                console.error('Error in messages listener:', error);
             });
             
-            return this.unsubscribeMessages;
+            this.unsubscribeMessages = unsubscribe;
+            
+            return unsubscribe;
         } catch (error) {
             console.error('Error listening to messages:', error);
-            throw error;
+            // Return a dummy unsubscribe function to prevent errors
+            return () => {};
         }
     }
 
     listenToMembers(groupId, callback) {
         try {
+            // First, unsubscribe from any existing listener
             if (this.unsubscribeMembers) {
-                this.unsubscribeMembers();
+                try {
+                    this.unsubscribeMembers();
+                } catch (err) {
+                    console.log('Error unsubscribing from previous members:', err);
+                }
                 this.unsubscribeMembers = null;
             }
             
             const membersRef = collection(db, 'groups', groupId, 'members');
             const q = query(membersRef, orderBy('joinedAt', 'asc'));
             
-            this.unsubscribeMembers = onSnapshot(q, (snapshot) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
                 const members = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -1732,12 +1959,17 @@ class GroupChat {
                 callback(members);
                 
                 this.setCachedItem(groupId, members, this.cache.groupMembers, CACHE_DURATION.MEMBERS_LIST);
+            }, (error) => {
+                console.error('Error in members listener:', error);
             });
             
-            return this.unsubscribeMembers;
+            this.unsubscribeMembers = unsubscribe;
+            
+            return unsubscribe;
         } catch (error) {
             console.error('Error listening to members:', error);
-            throw error;
+            // Return a dummy unsubscribe function to prevent errors
+            return () => {};
         }
     }
 
@@ -2045,9 +2277,48 @@ class GroupChat {
                 return;
             }
             
+        const message = this.currentMessageForReaction;
+        const userId = this.firebaseUser.uid;
+        
+        if (message.chatType === 'private') {
+            const chatId = this.getPrivateChatId(
+                message.senderId === userId ? message.senderId : this.currentChatPartnerId,
+                message.senderId === userId ? this.currentChatPartnerId : message.senderId
+            );
+            
+            const reactionRef = doc(db, 'private_chats', chatId, 'messages', message.id, 'reactions', emoji);
+            const reactionSnap = await getDoc(reactionRef);
+            
+            if (reactionSnap.exists()) {
+                const reactionData = reactionSnap.data();
+                if (reactionData.users && reactionData.users.includes(userId)) {
+                    await updateDoc(reactionRef, {
+                        count: increment(-1),
+                        users: arrayRemove(userId),
+                        lastUpdated: serverTimestamp()
+                    });
+                    
+                    if (reactionData.count <= 1) {
+                        await deleteDoc(reactionRef);
+                    }
+                } else {
+                    await updateDoc(reactionRef, {
+                        count: increment(1),
+                        users: arrayUnion(userId),
+                        lastUpdated: serverTimestamp()
+                    });
+                }
+            } else {
+                await setDoc(reactionRef, {
+                    emoji: emoji,
+                    count: 1,
+                    users: [userId],
+                    lastUpdated: serverTimestamp()
+                });
+            }
+        } else {
             const groupId = this.currentGroupId;
-            const messageId = this.currentMessageForReaction.id;
-            const userId = this.firebaseUser.uid;
+            const messageId = message.id;
             
             const reactionRef = doc(db, 'groups', groupId, 'messages', messageId, 'reactions', emoji);
             const reactionSnap = await getDoc(reactionRef);
@@ -2079,6 +2350,7 @@ class GroupChat {
                     lastUpdated: serverTimestamp()
                 });
             }
+        }
             
         } catch (error) {
             console.error('Error adding reaction:', error);
@@ -2087,6 +2359,10 @@ class GroupChat {
 
     async getMessageReactions(groupId, messageId) {
         try {
+            const cacheKey = `reactions_${groupId}_${messageId}`;
+            const cached = this.getCachedItem(cacheKey, this.cache.messageReactions);
+            if (cached) return cached;
+
             const reactionsRef = collection(db, 'groups', groupId, 'messages', messageId, 'reactions');
             const q = query(reactionsRef);
             const querySnapshot = await getDocs(q);
@@ -2102,9 +2378,41 @@ class GroupChat {
                 });
             });
             
+            this.setCachedItem(cacheKey, reactions, this.cache.messageReactions, 60000);
+            
             return reactions;
         } catch (error) {
             console.error('Error getting reactions:', error);
+            return [];
+        }
+    }
+
+    async getPrivateMessageReactions(chatId, messageId) {
+        try {
+            const cacheKey = `private_reactions_${chatId}_${messageId}`;
+            const cached = this.getCachedItem(cacheKey, this.cache.messageReactions);
+            if (cached) return cached;
+
+            const reactionsRef = collection(db, 'private_chats', chatId, 'messages', messageId, 'reactions');
+            const q = query(reactionsRef);
+            const querySnapshot = await getDocs(q);
+            
+            const reactions = [];
+            querySnapshot.forEach(doc => {
+                const data = doc.data();
+                reactions.push({
+                    emoji: data.emoji,
+                    count: data.count || 0,
+                    users: data.users || [],
+                    id: doc.id
+                });
+            });
+            
+            this.setCachedItem(cacheKey, reactions, this.cache.messageReactions, 60000);
+            
+            return reactions;
+        } catch (error) {
+            console.error('Error getting private message reactions:', error);
             return [];
         }
     }
@@ -2125,10 +2433,42 @@ class GroupChat {
                         id: doc.id
                     });
                 });
+                
+                const cacheKey = `reactions_${groupId}_${messageId}`;
+                this.setCachedItem(cacheKey, reactions, this.cache.messageReactions, 60000);
+                
                 callback(reactions);
             });
         } catch (error) {
             console.error('Error listening to reactions:', error);
+            return () => {};
+        }
+    }
+
+    async listenToPrivateMessageReactions(chatId, messageId, callback) {
+        try {
+            const reactionsRef = collection(db, 'private_chats', chatId, 'messages', messageId, 'reactions');
+            const q = query(reactionsRef);
+            
+            return onSnapshot(q, (snapshot) => {
+                const reactions = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    reactions.push({
+                        emoji: data.emoji,
+                        count: data.count || 0,
+                        users: data.users || [],
+                        id: doc.id
+                    });
+                });
+                
+                const cacheKey = `private_reactions_${chatId}_${messageId}`;
+                this.setCachedItem(cacheKey, reactions, this.cache.messageReactions, 60000);
+                
+                callback(reactions);
+            });
+        } catch (error) {
+            console.error('Error listening to private message reactions:', error);
             return () => {};
         }
     }
@@ -2436,32 +2776,53 @@ class GroupChat {
 
     cleanup() {
         if (this.unsubscribeMessages) {
-            this.unsubscribeMessages();
+            try {
+                this.unsubscribeMessages();
+            } catch (err) {
+                console.log('Error unsubscribing from messages:', err);
+            }
             this.unsubscribeMessages = null;
         }
         
         if (this.unsubscribeMembers) {
-            this.unsubscribeMembers();
+            try {
+                this.unsubscribeMembers();
+            } catch (err) {
+                console.log('Error unsubscribing from members:', err);
+            }
             this.unsubscribeMembers = null;
         }
         
         if (this.unsubscribePrivateMessages) {
-            this.unsubscribePrivateMessages();
+            try {
+                this.unsubscribePrivateMessages();
+            } catch (err) {
+                console.log('Error unsubscribing from private messages:', err);
+            }
             this.unsubscribePrivateMessages = null;
         }
         
         if (this.unsubscribePrivateChats) {
-            this.unsubscribePrivateChats();
+            try {
+                this.unsubscribePrivateChats();
+            } catch (err) {
+                console.log('Error unsubscribing from private chats:', err);
+            }
             this.unsubscribePrivateChats = null;
         }
         
         if (this.unsubscribeAuth) {
-            this.unsubscribeAuth();
+            try {
+                this.unsubscribeAuth();
+            } catch (err) {
+                console.log('Error unsubscribing from auth:', err);
+            }
             this.unsubscribeAuth = null;
         }
         
         this.areListenersSetup = false;
         this.sentMessageIds.clear();
+        this.pendingMessages.clear();
     }
 }
 
@@ -2844,7 +3205,7 @@ function initGroupsPage() {
                     <div class="group-meta">
                         <span class="group-members">
                             <i class="fas fa-users"></i>
-                            ${group.memberCount || 0} / ${group.maxMembers || 1000} <!-- FIXED: Changed from 50 to 1000 -->
+                            ${group.memberCount || 0} / ${group.maxMembers || 1000}
                         </span>
                         <span class="group-privacy">
                             <i class="fas ${group.privacy === 'private' ? 'fa-lock' : 'fa-globe'}"></i>
@@ -3124,6 +3485,8 @@ function initGroupPage() {
     let isInitialLoad = true;
     let reactionUnsubscribers = new Map();
     let reactionsCache = new Map();
+    let isRendering = false;
+    let renderQueue = [];
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -3155,7 +3518,6 @@ function initGroupPage() {
         setupListeners();
     })();
     
-    // FIXED BACK BUTTON - Go back to groups page
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
         reactionUnsubscribers.forEach(unsub => unsub());
@@ -3269,7 +3631,7 @@ function initGroupPage() {
         const tempMsgIndex = messages.findIndex(m => m.id === tempMessage.id);
         if (tempMsgIndex === -1) {
             messages.push(tempMessage);
-            displayMessages();
+            queueRender();
         }
     });
     
@@ -3280,7 +3642,7 @@ function initGroupPage() {
         const tempMsgIndex = messages.findIndex(m => m.id === tempId);
         if (tempMsgIndex !== -1) {
             messages.splice(tempMsgIndex, 1);
-            displayMessages();
+            queueRender();
         }
     });
     
@@ -3320,9 +3682,8 @@ function initGroupPage() {
             
             if (isInitialLoad) {
                 messages = await groupChat.getMessages(groupId);
-                // Load reactions for all messages on initial load
                 await loadInitialReactions();
-                displayMessages();
+                queueRender();
                 isInitialLoad = false;
             }
             
@@ -3336,6 +3697,23 @@ function initGroupPage() {
         for (const message of messages) {
             const reactions = await groupChat.getMessageReactions(groupId, message.id);
             reactionsCache.set(message.id, reactions);
+        }
+    }
+    
+    function queueRender() {
+        if (!isRendering) {
+            isRendering = true;
+            requestAnimationFrame(() => {
+                displayMessages();
+                isRendering = false;
+                
+                if (renderQueue.length > 0) {
+                    renderQueue = [];
+                    queueRender();
+                }
+            });
+        } else {
+            renderQueue.push(true);
         }
     }
     
@@ -3546,11 +3924,14 @@ function initGroupPage() {
     }
     
     function setupListeners() {
+        // Clear any existing listeners first
         if (groupChat.areListenersSetup) {
-            console.log('Listeners already set up, skipping...');
-            return;
+            groupChat.cleanup();
+            reactionUnsubscribers.forEach(unsub => unsub());
+            reactionUnsubscribers.clear();
         }
         
+        // Set up new listeners
         groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Received messages:', newMessages.length);
             
@@ -3572,10 +3953,9 @@ function initGroupPage() {
             
             messages = uniqueMessages;
             
-            // Set up reaction listeners for new messages
             setupReactionListeners();
             
-            displayMessages();
+            queueRender();
         });
         
         groupChat.listenToMembers(groupId, (newMembers) => {
@@ -3790,10 +4170,8 @@ function initGroupPage() {
                         
                         const messageDivId = `message-${msg.id}`;
                         
-                        // Get reactions from cache
                         const cachedReactions = reactionsCache.get(msg.id) || [];
                         
-                        // FIXED: Always show reactions container, even if no reactions yet
                         return `
                             <div class="${messageDivClass}" data-message-id="${msg.id}" id="${messageDivId}">
                                 ${replyHtml}
@@ -3808,7 +4186,6 @@ function initGroupPage() {
                                             </div>
                                         `;
                                     }).join('')}
-                                    <!-- Always show empty reaction area for long press -->
                                     <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
                                         +
                                     </div>
@@ -3832,10 +4209,8 @@ function initGroupPage() {
             });
         });
         
-        // Setup reaction bubble click handlers
         document.querySelectorAll('.reaction-bubble').forEach(bubble => {
             bubble.addEventListener('click', (e) => {
-                // Don't trigger for the empty add-reaction bubble
                 if (e.currentTarget.classList.contains('add-reaction')) {
                     return;
                 }
@@ -3852,7 +4227,6 @@ function initGroupPage() {
             });
         });
         
-        // Setup long press on all messages for reaction modal
         document.querySelectorAll('.message-text, .system-message').forEach(messageElement => {
             let longPressTimer;
             const messageId = messageElement.dataset.messageId;
@@ -3873,7 +4247,6 @@ function initGroupPage() {
                     clearTimeout(longPressTimer);
                 });
                 
-                // Also support right-click/context menu on desktop
                 messageElement.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     groupChat.showReactionModal(message);
@@ -3932,7 +4305,6 @@ function initGroupPage() {
             container.appendChild(bubble);
         });
         
-        // Always add empty reaction area for long press
         const emptyBubble = document.createElement('div');
         emptyBubble.className = 'reaction-bubble add-reaction';
         emptyBubble.style.cssText = 'opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;';
@@ -4367,7 +4739,7 @@ function initAdminGroupsPage() {
     }
     
     window.confirmRemoveMember = function(groupId, memberId, memberName) {
-        if (confirm(`Are you sure you want to remove "${memberName}" from this group?\n\nThey will be notified and will lose access to all group messages.`)) {
+        if (confirm(`Are you sure you want to remove "${memberName}" from this group?\n\nThey will be notified and will lose access to all group messages. They will also be blocked from rejoining.`)) {
             removeMember(groupId, memberId, memberName);
         }
     };
@@ -4382,7 +4754,7 @@ function initAdminGroupsPage() {
             
             await groupChat.removeMemberFromGroup(groupId, memberId, memberName);
             
-            alert(`"${memberName}" has been removed from the group.`);
+            alert(`"${memberName}" has been removed from the group and blocked from rejoining.`);
             
             const groupName = document.getElementById('membersTitle')?.textContent.replace('Members of ', '') || '';
             viewGroupMembers(groupId, groupName);
@@ -4452,7 +4824,7 @@ function initJoinPage() {
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.name)}&backgroundColor=00897b&backgroundType=gradientLinear`;
             
             const memberCount = group.memberCount || 0;
-            const maxMembers = group.maxMembers || 1000; // FIXED: Changed from 50 to 1000
+            const maxMembers = group.maxMembers || 1000;
             const memberPercentage = Math.round((memberCount / maxMembers) * 100);
             
             if (groupInfo) {
@@ -4810,6 +5182,10 @@ function initChatPage() {
     let messages = [];
     let partnerProfile = null;
     let isListening = false;
+    let reactionUnsubscribers = new Map();
+    let reactionsCache = new Map();
+    let isRendering = false;
+    let renderQueue = [];
     
     if (!partnerId) {
         alert('No chat partner specified');
@@ -4832,6 +5208,8 @@ function initChatPage() {
     
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
+        reactionUnsubscribers.forEach(unsub => unsub());
+        reactionUnsubscribers.clear();
         window.location.href = 'message.html';
     });
     
@@ -4929,7 +5307,7 @@ function initChatPage() {
             const tempMsgIndex = messages.findIndex(m => m.id === tempId);
             if (tempMsgIndex === -1) {
                 messages.push(message);
-                displayMessages();
+                queueRender();
             }
         }
     });
@@ -4940,11 +5318,28 @@ function initChatPage() {
         const tempMsgIndex = messages.findIndex(m => m.id === tempId);
         if (tempMsgIndex !== -1) {
             messages.splice(tempMsgIndex, 1);
-            displayMessages();
+            queueRender();
         }
     });
     
     loadChatData();
+    
+    function queueRender() {
+        if (!isRendering) {
+            isRendering = true;
+            requestAnimationFrame(() => {
+                displayMessages();
+                isRendering = false;
+                
+                if (renderQueue.length > 0) {
+                    renderQueue = [];
+                    queueRender();
+                }
+            });
+        } else {
+            renderQueue.push(true);
+        }
+    }
     
     async function loadChatData() {
         try {
@@ -4964,7 +5359,8 @@ function initChatPage() {
             if (chatSubtitle) chatSubtitle.textContent = 'Private Chat';
             
             messages = await groupChat.getPrivateMessages(partnerId);
-            displayMessages();
+            await loadInitialPrivateReactions();
+            queueRender();
             
             if (messagesContainer) {
                 groupChat.setupSwipeToReply(messagesContainer);
@@ -4976,7 +5372,7 @@ function initChatPage() {
             if (!isListening) {
                 groupChat.listenToPrivateMessages(partnerId, (newMessages) => {
                     messages = newMessages;
-                    displayMessages();
+                    queueRender();
                     
                     if (newMessages.length > 0) {
                         groupChat.markMessagesAsRead(chatId, partnerId);
@@ -4988,6 +5384,14 @@ function initChatPage() {
         } catch (error) {
             console.error('Error loading chat data:', error);
             alert('Error loading chat data');
+        }
+    }
+    
+    async function loadInitialPrivateReactions() {
+        const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
+        for (const message of messages) {
+            const reactions = await groupChat.getPrivateMessageReactions(chatId, message.id);
+            reactionsCache.set(message.id, reactions);
         }
     }
     
@@ -5122,10 +5526,28 @@ function initChatPage() {
                             messageContent = msg.text || '';
                         }
                         
+                        const messageDivId = `message-${msg.id}`;
+                        
+                        const cachedReactions = reactionsCache.get(msg.id) || [];
+                        
                         return `
-                            <div class="${messageDivClass}" data-message-id="${msg.id}">
+                            <div class="${messageDivClass}" data-message-id="${msg.id}" id="${messageDivId}">
                                 ${replyHtml}
                                 ${messageContent}
+                                <div class="message-reactions" id="reactions-${msg.id}">
+                                    ${cachedReactions.map(reaction => {
+                                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+                                        return `
+                                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
+                                                <span class="reaction-emoji">${reaction.emoji}</span>
+                                                <span class="reaction-count">${reaction.count}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
+                                        +
+                                    </div>
+                                </div>
                                 ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
                             </div>
                         `;
@@ -5145,9 +5567,109 @@ function initChatPage() {
             });
         });
         
+        document.querySelectorAll('.reaction-bubble').forEach(bubble => {
+            bubble.addEventListener('click', (e) => {
+                if (e.currentTarget.classList.contains('add-reaction')) {
+                    return;
+                }
+                const messageElement = e.target.closest('.message-text');
+                if (messageElement) {
+                    const messageId = messageElement.dataset.messageId;
+                    const message = messages.find(m => m.id === messageId);
+                    if (message) {
+                        const emoji = e.currentTarget.dataset.emoji;
+                        groupChat.currentMessageForReaction = message;
+                        groupChat.addReactionToMessage(emoji);
+                    }
+                }
+            });
+        });
+        
+        document.querySelectorAll('.message-text').forEach(messageElement => {
+            let longPressTimer;
+            const messageId = messageElement.dataset.messageId;
+            const message = messages.find(m => m.id === messageId);
+            
+            if (message) {
+                messageElement.addEventListener('touchstart', (e) => {
+                    longPressTimer = setTimeout(() => {
+                        groupChat.showReactionModal(message);
+                    }, 500);
+                });
+                
+                messageElement.addEventListener('touchend', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                messageElement.addEventListener('touchmove', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                messageElement.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    groupChat.showReactionModal(message);
+                });
+            }
+        });
+        
+        groupChat.setupSwipeToReply(messagesContainer);
+        
+        setupPrivateReactionListeners();
+        
         setTimeout(() => {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }, 100);
+    }
+    
+    function setupPrivateReactionListeners() {
+        const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
+        
+        messages.forEach(message => {
+            if (reactionUnsubscribers.has(message.id)) {
+                return;
+            }
+            
+            const unsubscribe = groupChat.listenToPrivateMessageReactions(chatId, message.id, (reactions) => {
+                reactionsCache.set(message.id, reactions);
+                const reactionsContainer = document.getElementById(`reactions-${message.id}`);
+                if (reactionsContainer) {
+                    updateReactionsDisplay(reactionsContainer, reactions, message.id);
+                }
+            });
+            
+            reactionUnsubscribers.set(message.id, unsubscribe);
+        });
+    }
+    
+    function updateReactionsDisplay(container, reactions, messageId) {
+        container.innerHTML = '';
+        
+        reactions.forEach(reaction => {
+            const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+            const bubble = document.createElement('div');
+            bubble.className = `reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}`;
+            bubble.dataset.emoji = reaction.emoji;
+            bubble.innerHTML = `
+                <span class="reaction-emoji">${reaction.emoji}</span>
+                <span class="reaction-count">${reaction.count}</span>
+            `;
+            
+            bubble.addEventListener('click', () => {
+                const message = messages.find(m => m.id === messageId);
+                if (message) {
+                    groupChat.currentMessageForReaction = message;
+                    groupChat.addReactionToMessage(reaction.emoji);
+                }
+            });
+            
+            container.appendChild(bubble);
+        });
+        
+        const emptyBubble = document.createElement('div');
+        emptyBubble.className = 'reaction-bubble add-reaction';
+        emptyBubble.style.cssText = 'opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;';
+        emptyBubble.innerHTML = '+';
+        container.appendChild(emptyBubble);
     }
     
     async function sendMessage() {
@@ -5240,6 +5762,8 @@ function initChatPage() {
     
     window.addEventListener('beforeunload', () => {
         groupChat.cleanup();
+        reactionUnsubscribers.forEach(unsub => unsub());
+        reactionUnsubscribers.clear();
         removeSidebarOverlay();
     });
     
