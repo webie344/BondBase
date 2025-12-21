@@ -52,23 +52,32 @@
       justify-content: center;
       align-items: center;
       background-image: 
-        radial-gradient(circle at 15% 50%, rgba(179, 0, 75, 0.03) 0%, transparent 25%),
-        radial-gradient(circle at 85% 30%, rgba(139, 0, 0, 0.03) 0%, transparent 25%);
+        radial-gradient(circle at 15% 50%, rgba(179, 0, 75, 0.05) 0%, transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(139, 0, 0, 0.05) 0%, transparent 25%);
       background-size: auto, auto;
       background-position: 0 0, 0 0;
       background-repeat: no-repeat, no-repeat;
+      overflow-x: hidden;
     }
 
     .signup-container {
       width: 100%;
       max-width: 450px;
       margin: 0 auto;
+      position: relative;
+      z-index: 10;
     }
 
     /* Brand styling */
     .brand {
       text-align: center;
       margin-bottom: 10px;
+      animation: fadeIn 1s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     .brand-text {
@@ -78,62 +87,233 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      text-shadow: 0 0 20px rgba(179, 0, 75, 0.3);
     }
 
-    .top-illustration {
+    /* Animated Connection Visualization */
+    .animated-connection {
       text-align: center;
       margin-bottom: 30px;
       position: relative;
+      height: 180px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
-    .top-illustration img {
-      width: 150px;
-      height: 150px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 3px solid var(--primary);
-      box-shadow: var(--shadow-lg);
-      background: var(--bg-card);
+    .connection-container {
+      position: relative;
+      width: 280px;
+      height: 180px;
+      margin: 0 auto;
     }
 
-    .bubble {
+    /* Center Circle */
+    .center-circle {
       position: absolute;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: var(--text-primary);
-      font-size: 14px;
-      padding: 8px 14px;
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-      font-weight: 600;
-      z-index: 10;
-      animation: float 3s ease-in-out infinite;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      top: 40px;
+      left: 90px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: var(--shadow-lg);
+      animation: pulseCenter 3s infinite ease-in-out;
+      z-index: 2;
+      border: 3px solid rgba(255, 255, 255, 0.1);
     }
 
-    .bubble1 { 
-      top: -10px; 
-      left: 20px; 
+    .plus-icon {
+      color: white;
+      font-size: 36px;
+      font-weight: bold;
+    }
+
+    /* Surrounding Circles */
+    .connection-node {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 2px solid var(--primary);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      animation: floatNode 4s infinite ease-in-out;
+      z-index: 1;
+    }
+
+    .node-icon {
+      width: 24px;
+      height: 24px;
+      filter: brightness(1.5);
+    }
+
+    .node-1 {
+      top: 10px;
+      left: 110px;
       animation-delay: 0s;
     }
-    .bubble2 { 
-      top: -15px; 
-      right: 20px; 
+
+    .node-2 {
+      top: 60px;
+      right: 40px;
       animation-delay: 0.5s;
     }
-    .bubble3 { 
-      bottom: -10px; 
-      left: 50%; 
-      transform: translateX(-50%);
+
+    .node-3 {
+      bottom: 10px;
+      left: 110px;
       animation-delay: 1s;
     }
 
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-5px); }
+    .node-4 {
+      top: 60px;
+      left: 40px;
+      animation-delay: 1.5s;
     }
 
+    /* Connection Lines */
+    .connection-line {
+      position: absolute;
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary), var(--primary-light));
+      transform-origin: left center;
+      z-index: 0;
+      opacity: 0.6;
+    }
+
+    .line-1 {
+      width: 60px;
+      top: 40px;
+      left: 140px;
+      transform: rotate(45deg);
+      animation: lineFlow 3s infinite linear;
+    }
+
+    .line-2 {
+      width: 60px;
+      top: 60px;
+      left: 140px;
+      transform: rotate(0deg);
+      animation: lineFlow 3s infinite linear 0.5s;
+    }
+
+    .line-3 {
+      width: 60px;
+      top: 80px;
+      left: 140px;
+      transform: rotate(-45deg);
+      animation: lineFlow 3s infinite linear 1s;
+    }
+
+    .line-4 {
+      width: 60px;
+      top: 60px;
+      left: 40px;
+      transform: rotate(180deg);
+      animation: lineFlow 3s infinite linear 1.5s;
+    }
+
+    /* Data Particles */
+    .data-particle {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--primary-light);
+      z-index: 1;
+      opacity: 0;
+    }
+
+    .particle-1 {
+      animation: travelLine1 3s infinite linear;
+    }
+
+    .particle-2 {
+      animation: travelLine2 3s infinite linear 0.5s;
+    }
+
+    .particle-3 {
+      animation: travelLine3 3s infinite linear 1s;
+    }
+
+    .particle-4 {
+      animation: travelLine4 3s infinite linear 1.5s;
+    }
+
+    /* Animations */
+    @keyframes pulseCenter {
+      0%, 100% { transform: scale(1); box-shadow: var(--shadow-lg); }
+      50% { transform: scale(1.05); box-shadow: 0 15px 30px rgba(179, 0, 75, 0.3); }
+    }
+
+    @keyframes floatNode {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    @keyframes lineFlow {
+      0% { opacity: 0.3; }
+      50% { opacity: 0.8; }
+      100% { opacity: 0.3; }
+    }
+
+    @keyframes travelLine1 {
+      0% { top: 40px; left: 140px; opacity: 0; }
+      10% { opacity: 1; }
+      90% { top: 10px; left: 170px; opacity: 1; }
+      100% { top: 10px; left: 170px; opacity: 0; }
+    }
+
+    @keyframes travelLine2 {
+      0% { top: 60px; left: 140px; opacity: 0; }
+      10% { opacity: 1; }
+      90% { top: 60px; left: 200px; opacity: 1; }
+      100% { top: 60px; left: 200px; opacity: 0; }
+    }
+
+    @keyframes travelLine3 {
+      0% { top: 80px; left: 140px; opacity: 0; }
+      10% { opacity: 1; }
+      90% { top: 110px; left: 170px; opacity: 1; }
+      100% { top: 110px; left: 170px; opacity: 0; }
+    }
+
+    @keyframes travelLine4 {
+      0% { top: 60px; left: 140px; opacity: 0; }
+      10% { opacity: 1; }
+      90% { top: 60px; left: 80px; opacity: 1; }
+      100% { top: 60px; left: 80px; opacity: 0; }
+    }
+
+    /* Welcome Text Animation */
+    .welcome-text {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-top: 10px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      min-height: 40px;
+    }
+
+    .welcome-text span {
+      display: inline-block;
+      position: relative;
+      animation: textGlow 2s infinite alternate;
+    }
+
+    @keyframes textGlow {
+      0% { text-shadow: 0 0 5px rgba(179, 0, 75, 0.3); }
+      100% { text-shadow: 0 0 15px rgba(179, 0, 75, 0.6); }
+    }
+
+    /* Form Section */
     .form-section {
       background-color: var(--card-bg);
       padding: 30px;
@@ -142,6 +322,18 @@
       border: 1px solid var(--border);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
+      animation: slideUp 0.8s ease-out;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .form-section h2 {
@@ -258,12 +450,33 @@
       transition: var(--transition);
       margin-top: 10px;
       box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
     }
 
     button:hover {
       background: linear-gradient(to right, var(--primary-dark), var(--primary));
       transform: translateY(-2px);
       box-shadow: var(--shadow-lg);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(0);
+      animation: ripple 0.6s linear;
+    }
+
+    @keyframes ripple {
+      to {
+        transform: scale(4);
+        opacity: 0;
+      }
     }
 
     .auth-footer {
@@ -384,22 +597,43 @@
         padding: 20px;
       }
       
-      .bubble {
-        font-size: 12px;
-        padding: 6px 12px;
+      .connection-container {
+        width: 240px;
+        height: 160px;
       }
       
-      .bubble1 { 
-        top: -5px; 
-        left: 10px; 
+      .center-circle {
+        width: 80px;
+        height: 80px;
+        top: 40px;
+        left: 80px;
       }
-      .bubble2 { 
-        top: -10px; 
-        right: 10px; 
+      
+      .connection-node {
+        width: 50px;
+        height: 50px;
       }
+      
+      .node-1 { top: 15px; left: 95px; }
+      .node-2 { top: 65px; right: 30px; }
+      .node-3 { bottom: 15px; left: 95px; }
+      .node-4 { top: 65px; left: 30px; }
+      
+      .line-1, .line-2, .line-3, .line-4 {
+        width: 50px;
+      }
+      
+      .line-1 { top: 40px; left: 120px; }
+      .line-2 { top: 60px; left: 120px; }
+      .line-3 { top: 80px; left: 120px; }
+      .line-4 { top: 60px; left: 50px; }
       
       .form-section h2 {
         font-size: 22px;
+      }
+      
+      .animated-connection {
+        height: 160px;
       }
     }
   </style>
@@ -412,12 +646,56 @@
       <div class="brand-text">BondBase</div>
     </div>
 
-    <!-- Top Illustration -->
-    <div class="top-illustration">
-      <img src="Bondbase.png" alt="SafeConnect" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiByeD0iNzUiIGZpbGw9IiMxQTFBMUEiLz4KPHBhdGggZD0iTTc1IDM3LjVDODcuODA1NiAzNy41IDk4LjI1IDQ3Ljk0NDQgOTguMjUgNjAuNzVDOTguMjUgNzMuNTU1NiA4Ny44MDU2IDg0IDc1IDg0QzYyLjE5NDQgODQgNTEuNzUgNzMuNTU1NiA1MS43NSA2MC43NUM1MS43NSA0Ny45NDQ0IDYyLjE5NDQgMzcuNSA3NSAzNy41WiIgZmlsbD0iI2IzMDA0YiIvPgo8cGF0aCBkPSJNNTEuNzUgMTA1LjI1QzUxLjc1IDkyLjQ0NDQgNjIuMTk0NCA4MiA3NSA4MkM4Ny44MDU2IDgyIDk4LjI1IDkyLjQ0NDQgOTguMjUgMTA1LjI1VjExMi41Qzk4LjI1IDExMi45MTQgOTcuOTE0IDExMy4yNSA5Ny41IDExMy4yNUg1Mi41QzUyLjA4NiAxMTMuMjUgNTEuNzUgMTEyLjkxNCA1MS43NSAxMTIuNVYxMDUuMjVaIiBmaWxsPSIjYjMwMDRiIi8+Cjwvc3ZnPgo='">
-      <div class="bubble bubble1">We Connect</div>
-      <div class="bubble bubble2">We Trust</div>
-      <div class="bubble bubble3">We Respect</div>
+    <!-- Animated Connection Visualization -->
+    <div class="animated-connection">
+      <div class="connection-container">
+        <!-- Center Circle (New User) -->
+        <div class="center-circle">
+          <div class="plus-icon">+</div>
+        </div>
+        
+        <!-- Connection Nodes -->
+        <div class="connection-node node-1">
+          <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+          </svg>
+        </div>
+        
+        <div class="connection-node node-2">
+          <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+        </div>
+        
+        <div class="connection-node node-3">
+          <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+          </svg>
+        </div>
+        
+        <div class="connection-node node-4">
+          <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16.5 12c1.38 0 2.49-1.12 2.49-2.5S17.88 7 16.5 7C15.12 7 14 8.12 14 9.5s1.12 2.5 2.5 2.5zM9 11c1.66 0 2.99-1.34 2.99-3S10.66 5 9 5C7.34 5 6 6.34 6 8s1.34 3 3 3zm7.5 3c-1.83 0-5.5.92-5.5 2.75V19h11v-2.25c0-1.83-3.67-2.75-5.5-2.75zM9 13c-2.33 0-7 1.17-7 3.5V19h7v-2.25c0-.85.33-2.34 2.37-3.47C10.5 13.1 9.66 13 9 13z"/>
+          </svg>
+        </div>
+        
+        <!-- Connection Lines -->
+        <div class="connection-line line-1"></div>
+        <div class="connection-line line-2"></div>
+        <div class="connection-line line-3"></div>
+        <div class="connection-line line-4"></div>
+        
+        <!-- Data Particles -->
+        <div class="data-particle particle-1"></div>
+        <div class="data-particle particle-2"></div>
+        <div class="data-particle particle-3"></div>
+        <div class="data-particle particle-4"></div>
+      </div>
+    </div>
+
+    <!-- Welcome Text -->
+    <div class="welcome-text">
+      <span>Join Our Network of Trusted Connections</span>
     </div>
 
     <!-- Sign Up Form -->
@@ -463,9 +741,6 @@
     </div>
   </div>
 
-  <script src="process.js"></script>
-  <script type="module" src="app.js"></script>
-
   <script>
     function togglePassword(id, el) {
       const input = document.getElementById(id);
@@ -497,6 +772,26 @@
         strengthBar.classList.add('strength-strong');
       }
     }
+
+    // Ripple effect for buttons
+    document.querySelectorAll('button').forEach(button => {
+      button.addEventListener('click', function(e) {
+        const rect = this.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const ripple = document.createElement('span');
+        ripple.classList.add('ripple');
+        ripple.style.left = x + 'px';
+        ripple.style.top = y + 'px';
+        
+        this.appendChild(ripple);
+        
+        setTimeout(() => {
+          ripple.remove();
+        }, 600);
+      });
+    });
 
     // Form validation and submission
     document.getElementById('signupForm').addEventListener('submit', function(e) {
@@ -564,6 +859,21 @@
         signupButton.disabled = true;
         signupButton.innerHTML = 'Creating Account...';
         
+        // Add connection animation
+        const centerCircle = document.querySelector('.center-circle');
+        const connectionLines = document.querySelectorAll('.connection-line');
+        const welcomeText = document.querySelector('.welcome-text span');
+        
+        // Enhance animations
+        centerCircle.style.animation = 'pulseCenter 0.5s ease-in-out';
+        welcomeText.textContent = 'Connecting you to the network...';
+        welcomeText.style.color = 'var(--primary-light)';
+        
+        connectionLines.forEach(line => {
+          line.style.opacity = '1';
+          line.style.animation = 'lineFlow 1s infinite linear';
+        });
+        
         // Simulate signup process
         setTimeout(() => {
           // Here you would typically make an API call to your authentication service
@@ -574,9 +884,15 @@
           signupButton.disabled = false;
           signupButton.innerHTML = 'Create Account';
           
-          // Show success message and redirect
-          alert('Account created successfully! Welcome to SafeConnect.');
-          window.location.href = 'mingle.html';
+          // Reset animations
+          centerCircle.style.animation = 'pulseCenter 3s infinite ease-in-out';
+          welcomeText.textContent = 'Connection established! Welcome to BondBase!';
+          
+          setTimeout(() => {
+            // Show success message and redirect
+            alert('Account created successfully! Welcome to BondBase.');
+            window.location.href = 'mingle.html';
+          }, 1000);
         }, 2000);
       }
     });
@@ -599,6 +915,24 @@
 
     document.querySelector('input[name="terms"]').addEventListener('change', function() {
       document.getElementById('termsError').style.display = 'none';
+    });
+
+    // Interactive hover effects
+    const centerCircle = document.querySelector('.center-circle');
+    const nodes = document.querySelectorAll('.connection-node');
+    
+    centerCircle.addEventListener('mouseenter', function() {
+      this.style.transform = 'scale(1.1)';
+      nodes.forEach(node => {
+        node.style.transform = 'scale(1.1)';
+      });
+    });
+    
+    centerCircle.addEventListener('mouseleave', function() {
+      this.style.transform = 'scale(1)';
+      nodes.forEach(node => {
+        node.style.transform = 'scale(1)';
+      });
     });
   </script>
 </body>

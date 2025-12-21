@@ -52,70 +52,224 @@
       justify-content: center;
       align-items: center;
       background-image: 
-        radial-gradient(circle at 15% 50%, rgba(179, 0, 75, 0.03) 0%, transparent 25%),
-        radial-gradient(circle at 85% 30%, rgba(139, 0, 0, 0.03) 0%, transparent 25%);
+        radial-gradient(circle at 15% 50%, rgba(179, 0, 75, 0.05) 0%, transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(139, 0, 0, 0.05) 0%, transparent 25%);
+      overflow-x: hidden;
     }
 
     .login-container {
       width: 100%;
       max-width: 450px;
       margin: 0 auto;
+      position: relative;
+      z-index: 10;
     }
 
-    .top-illustration {
+    /* Animated Login Container */
+    .animated-login {
       text-align: center;
       margin-bottom: 30px;
       position: relative;
+      height: 180px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
-    .top-illustration img {
-      width: 150px;
-      height: 150px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 3px solid var(--primary);
-      box-shadow: var(--shadow-lg);
-      background: var(--bg-card);
+    /* Lock Animation */
+    .lock-container {
+      position: relative;
+      width: 180px;
+      height: 180px;
+      margin: 0 auto;
     }
 
-    .bubble {
+    .lock-circle {
       position: absolute;
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: var(--text-primary);
-      font-size: 14px;
-      padding: 8px 14px;
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-      font-weight: 600;
-      z-index: 10;
-      animation: float 3s ease-in-out infinite;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(179, 0, 75, 0.1), rgba(139, 0, 0, 0.1));
+      border: 2px solid rgba(179, 0, 75, 0.2);
+      top: 0;
+      left: 0;
+      animation: pulse 3s infinite ease-in-out;
     }
 
-    .bubble1 { 
-      top: -10px; 
-      left: 20px; 
-      animation-delay: 0s;
+    .lock-body {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-radius: 20px;
+      top: 40px;
+      left: 40px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: var(--shadow-lg);
+      animation: bounce 2s infinite ease-in-out;
+      z-index: 2;
     }
-    .bubble2 { 
-      top: -15px; 
-      right: 20px; 
-      animation-delay: 0.5s;
+
+    .lock-shackle {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      border: 10px solid var(--primary-light);
+      border-radius: 50%;
+      top: 20px;
+      left: 55px;
+      border-bottom-color: transparent;
+      border-right-color: transparent;
+      border-left-color: transparent;
+      transform: rotate(45deg);
+      animation: shackleMove 2.5s infinite ease-in-out;
+      z-index: 1;
     }
-    .bubble3 { 
-      bottom: -10px; 
-      left: 50%; 
-      transform: translateX(-50%);
-      animation-delay: 1s;
+
+    .keyhole {
+      width: 20px;
+      height: 30px;
+      background: var(--bg-card);
+      border-radius: 10px;
+      position: relative;
+    }
+
+    .keyhole::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: var(--bg-card);
+      border-radius: 50%;
+      top: 5px;
+      left: 5px;
+    }
+
+    /* Floating Particles */
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      background: var(--primary-light);
+      opacity: 0.7;
+      z-index: 0;
+    }
+
+    .particle-1 {
+      width: 10px;
+      height: 10px;
+      top: 20px;
+      left: 30px;
+      animation: float 8s infinite ease-in-out;
+    }
+
+    .particle-2 {
+      width: 8px;
+      height: 8px;
+      top: 60px;
+      right: 40px;
+      animation: float 6s infinite ease-in-out 1s;
+    }
+
+    .particle-3 {
+      width: 12px;
+      height: 12px;
+      bottom: 30px;
+      left: 50px;
+      animation: float 7s infinite ease-in-out 0.5s;
+    }
+
+    .particle-4 {
+      width: 6px;
+      height: 6px;
+      bottom: 50px;
+      right: 30px;
+      animation: float 9s infinite ease-in-out 1.5s;
+    }
+
+    /* Connection Lines */
+    .connection-line {
+      position: absolute;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      opacity: 0.5;
+    }
+
+    .line-1 {
+      width: 80px;
+      top: 40px;
+      left: 0;
+      animation: linePulse 4s infinite ease-in-out;
+    }
+
+    .line-2 {
+      width: 60px;
+      bottom: 40px;
+      right: 0;
+      animation: linePulse 4s infinite ease-in-out 1s;
+    }
+
+    /* Animations */
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.05); opacity: 0.8; }
+    }
+
+    @keyframes shackleMove {
+      0%, 100% { transform: rotate(45deg) translateY(0); }
+      50% { transform: rotate(45deg) translateY(-5px); }
     }
 
     @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-5px); }
+      0%, 100% { transform: translateY(0) translateX(0); }
+      25% { transform: translateY(-10px) translateX(5px); }
+      50% { transform: translateY(-5px) translateX(10px); }
+      75% { transform: translateY(-15px) translateX(-5px); }
     }
 
+    @keyframes linePulse {
+      0%, 100% { opacity: 0.3; width: 60px; }
+      50% { opacity: 0.7; width: 80px; }
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200px 0; }
+      100% { background-position: 200px 0; }
+    }
+
+    /* Welcome Text Animation */
+    .welcome-text {
+      font-size: 18px;
+      color: var(--text-secondary);
+      margin-top: 10px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .welcome-text span {
+      display: inline-block;
+      position: relative;
+    }
+
+    .welcome-text span::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      animation: shimmer 3s infinite;
+    }
+
+    /* Form Section */
     .form-section {
       background-color: var(--card-bg);
       padding: 30px;
@@ -124,6 +278,18 @@
       border: 1px solid var(--border);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
+      animation: fadeInUp 0.8s ease-out;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .form-section h2 {
@@ -206,12 +372,33 @@
       transition: var(--transition);
       margin-top: 10px;
       box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
     }
 
     button:hover {
       background: linear-gradient(to right, var(--primary-dark), var(--primary));
       transform: translateY(-2px);
       box-shadow: var(--shadow-lg);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(0);
+      animation: ripple 0.6s linear;
+    }
+
+    @keyframes ripple {
+      to {
+        transform: scale(4);
+        opacity: 0;
+      }
     }
 
     .forgot-link {
@@ -318,22 +505,36 @@
         padding: 20px;
       }
       
-      .bubble {
-        font-size: 12px;
-        padding: 6px 12px;
+      .lock-container {
+        width: 150px;
+        height: 150px;
       }
       
-      .bubble1 { 
-        top: -5px; 
-        left: 10px; 
+      .lock-circle {
+        width: 150px;
+        height: 150px;
       }
-      .bubble2 { 
-        top: -10px; 
-        right: 10px; 
+      
+      .lock-body {
+        width: 80px;
+        height: 80px;
+        top: 35px;
+        left: 35px;
+      }
+      
+      .lock-shackle {
+        width: 60px;
+        height: 60px;
+        top: 15px;
+        left: 45px;
       }
       
       .form-section h2 {
         font-size: 22px;
+      }
+      
+      .animated-login {
+        height: 150px;
       }
     }
 
@@ -341,6 +542,12 @@
     .brand {
       text-align: center;
       margin-bottom: 10px;
+      animation: fadeIn 1s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     .brand-text {
@@ -350,6 +557,7 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      text-shadow: 0 0 20px rgba(179, 0, 75, 0.3);
     }
   </style>
 </head>
@@ -361,18 +569,36 @@
       <div class="brand-text">BondBase</div>
     </div>
 
-    <!-- Top Illustration -->
-    <div class="top-illustration">
-      <img src="Bondbase.png" alt="SafeConnect" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiByeD0iNzUiIGZpbGw9IiMxQTFBMUEiLz4KPHBhdGggZD0iTTc1IDM3LjVDODcuODA1NiAzNy41IDk4LjI1IDQ3Ljk0NDQgOTguMjUgNjAuNzVDOTguMjUgNzMuNTU1NiA4Ny44MDU2IDg0IDc1IDg0QzYyLjE5NDQgODQgNTEuNzUgNzMuNTU1NiA1MS43NSA2MC43NUM1MS43NSA0Ny45NDQ0IDYyLjE5NDQgMzcuNSA3NSAzNy41WiIgZmlsbD0iI2IzMDA0YiIvPgo8cGF0aCBkPSJNNTEuNzUgMTA1LjI1QzUxLjc1IDkyLjQ0NDQgNjIuMTk0NCA4MiA3NSA4MkM4Ny44MDU2IDgyIDk4LjI1IDkyLjQ0NDQgOTguMjUgMTA1LjI1VjExMi41Qzk4LjI1IDExMi45MTQgOTcuOTE0IDExMy4yNSA5Ny41IDExMy4yNUg1Mi41QzUyLjA4NiAxMTMuMjUgNTEuNzUgMTEyLjkxNCA1MS43NSAxMTIuNVYxMDUuMjVaIiBmaWxsPSIjYjMwMDRiIi8+Cjwvc3ZnPgo='">
-      <div class="bubble bubble1">We Connect</div>
-      <div class="bubble bubble2">We Trust</div>
-      <div class="bubble bubble3">We Respect</div>
+    <!-- Animated Login Illustration -->
+    <div class="animated-login">
+      <div class="lock-container">
+        <div class="lock-circle"></div>
+        <div class="lock-shackle"></div>
+        <div class="lock-body">
+          <div class="keyhole"></div>
+        </div>
+        
+        <!-- Floating Particles -->
+        <div class="particle particle-1"></div>
+        <div class="particle particle-2"></div>
+        <div class="particle particle-3"></div>
+        <div class="particle particle-4"></div>
+        
+        <!-- Connection Lines -->
+        <div class="connection-line line-1"></div>
+        <div class="connection-line line-2"></div>
+      </div>
+    </div>
+
+    <!-- Welcome Text -->
+    <div class="welcome-text">
+      <span>Unlock Your Secret Connections</span>
     </div>
 
     <!-- Login Form -->
     <div class="form-section">
       <h2>Log In</h2>
-      <p>Welcome to SafeConnect — your secure space for meaningful connections</p>
+      <p>Welcome to BondBase — your secure space for meaningful connections</p>
       
       <form id="loginForm">
         <input type="email" id="loginEmail" placeholder="Email" required>
@@ -401,8 +627,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js"></script>
-
   <script>
     function togglePassword(id, el) {
       const input = document.getElementById(id);
@@ -414,6 +638,26 @@
         el.textContent = "👁️";
       }
     }
+
+    // Ripple effect for buttons
+    document.querySelectorAll('button').forEach(button => {
+      button.addEventListener('click', function(e) {
+        const rect = this.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const ripple = document.createElement('span');
+        ripple.classList.add('ripple');
+        ripple.style.left = x + 'px';
+        ripple.style.top = y + 'px';
+        
+        this.appendChild(ripple);
+        
+        setTimeout(() => {
+          ripple.remove();
+        }, 600);
+      });
+    });
 
     // Form validation and submission
     document.getElementById('loginForm').addEventListener('submit', function(e) {
@@ -453,6 +697,15 @@
         loginButton.disabled = true;
         loginButton.innerHTML = 'Logging in...';
         
+        // Add login animation to the lock
+        const lockBody = document.querySelector('.lock-body');
+        const lockShackle = document.querySelector('.lock-shackle');
+        
+        // Unlock animation
+        lockBody.style.animation = 'bounce 0.5s ease-in-out';
+        lockShackle.style.animation = 'none';
+        lockShackle.style.transform = 'rotate(0deg) translateY(-10px)';
+        
         // Simulate login process
         setTimeout(() => {
           // Here you would typically make an API call to your authentication service
@@ -462,6 +715,10 @@
           loginButton.classList.remove('loading');
           loginButton.disabled = false;
           loginButton.innerHTML = 'Login';
+          
+          // Reset lock animation
+          lockBody.style.animation = 'bounce 2s infinite ease-in-out';
+          lockShackle.style.animation = 'shackleMove 2.5s infinite ease-in-out';
           
           // Redirect to dashboard or show success
           window.location.href = 'mingle.html';
@@ -478,6 +735,20 @@
     document.getElementById('loginPassword').addEventListener('input', function() {
       this.classList.remove('error');
       document.getElementById('passwordError').style.display = 'none';
+    });
+
+    // Interactive lock animation on hover
+    const lockBody = document.querySelector('.lock-body');
+    const lockCircle = document.querySelector('.lock-circle');
+    
+    lockBody.addEventListener('mouseenter', function() {
+      this.style.transform = 'scale(1.1)';
+      lockCircle.style.transform = 'scale(1.1)';
+    });
+    
+    lockBody.addEventListener('mouseleave', function() {
+      this.style.transform = 'scale(1)';
+      lockCircle.style.transform = 'scale(1)';
     });
   </script>
 </body>
