@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BondBase- secret hangout</title>
+    <title>BondBase - secret hangout</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* Reset and Base Styles */
@@ -35,18 +35,20 @@
             text-align: center;
         }
 
-        /* Profile Image Container */
-        .profile-container {
+        /* Illustration Container */
+        .illustration-container {
             margin: 2rem 0;
             position: relative;
             z-index: 1;
+            width: 280px;
+            height: 280px;
         }
 
-        .profile-image {
-            width: 220px;
-            height: 220px;
+        .illustration {
+            width: 100%;
+            height: 100%;
             border-radius: 50%;
-            object-fit: cover;
+            object-fit: contain;
             border: 5px solid rgba(255, 255, 255, 0.1);
             box-shadow: 
                 0 0 0 1px rgba(255, 255, 255, 0.05),
@@ -54,9 +56,21 @@
                 0 0 60px rgba(255, 85, 85, 0.1);
             transition: all 0.4s ease;
             background-color: #1a1a1a;
+            padding: 20px;
+            opacity: 0;
+            transform: scale(0.95);
+            position: absolute;
+            top: 0;
+            left: 0;
         }
 
-        .profile-image:hover {
+        .illustration.active {
+            opacity: 1;
+            transform: scale(1);
+            z-index: 2;
+        }
+
+        .illustration:hover {
             transform: scale(1.03);
             box-shadow: 
                 0 0 0 1px rgba(255, 255, 255, 0.1),
@@ -70,8 +84,48 @@
             50% { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 10px 40px rgba(0, 0, 0, 0.3), 0 0 70px rgba(255, 85, 85, 0.12); }
         }
 
-        .profile-image {
+        .illustration {
             animation: gentleGlow 4s ease-in-out infinite;
+        }
+
+        /* Illustration Controls */
+        .illustration-controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 1.5rem;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .illustration-controls button {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .illustration-controls button:hover {
+            background-color: rgba(255, 85, 85, 0.3);
+        }
+
+        .illustration-controls button.active {
+            background-color: #ff5555;
+            font-weight: bold;
+        }
+
+        /* Illustration Description */
+        .illustration-description {
+            margin-top: 1.5rem;
+            max-width: 500px;
+            min-height: 60px;
+            font-size: 1.1rem;
+            color: #aaaaaa;
+            transition: all 0.5s ease;
+            padding: 0 1rem;
         }
 
         /* Chain Logo */
@@ -185,9 +239,9 @@
                 padding: 0 1rem;
             }
 
-            .profile-image {
-                width: 200px;
-                height: 200px;
+            .illustration-container {
+                width: 240px;
+                height: 240px;
             }
             
             .container {
@@ -219,9 +273,9 @@
                 margin-bottom: 2rem;
             }
 
-            .profile-image {
-                width: 180px;
-                height: 180px;
+            .illustration-container {
+                width: 220px;
+                height: 220px;
             }
 
             .lounge-text {
@@ -237,6 +291,15 @@
                 font-size: 1rem;
                 max-width: 280px;
             }
+            
+            .illustration-controls {
+                gap: 5px;
+            }
+            
+            .illustration-controls button {
+                padding: 6px 12px;
+                font-size: 0.8rem;
+            }
         }
     </style>
 </head>
@@ -250,9 +313,32 @@
             chill & talk secret 
         </p>
         
-        <!-- Profile Image -->
-        <div class="profile-container">
-            <img src="Bondbase.png" alt="BondBase Profile" class="profile-image">
+        <!-- Illustration Container -->
+        <div class="illustration-container">
+            <!-- Illustration 1: Secure Chat -->
+            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f511.svg" alt="Secure Chat" class="illustration active" id="illustration-1">
+            
+            <!-- Illustration 2: Private Group -->
+            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f465.svg" alt="Private Group" class="illustration" id="illustration-2">
+            
+            <!-- Illustration 3: Anonymous -->
+            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f576.svg" alt="Anonymous" class="illustration" id="illustration-3">
+            
+            <!-- Illustration 4: Connections -->
+            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f9f6.svg" alt="Connections" class="illustration" id="illustration-4">
+        </div>
+        
+        <!-- Illustration Description -->
+        <div class="illustration-description" id="illustration-description">
+            Secure, encrypted conversations where only you and your chosen connections have access.
+        </div>
+        
+        <!-- Illustration Controls -->
+        <div class="illustration-controls">
+            <button class="active" data-illustration="1">Secure Chat</button>
+            <button data-illustration="2">Private Groups</button>
+            <button data-illustration="3">Stay Anonymous</button>
+            <button data-illustration="4">Build Connections</button>
         </div>
         
         <p class="lounge-text">BondBase Lounge</p>
@@ -264,13 +350,104 @@
     </div>
 
     <script>
-        // Add a subtle hover effect for the profile image
-        document.querySelector('.profile-image').addEventListener('mouseenter', function() {
-            this.style.animationPlayState = 'paused';
+        // Illustration data
+        const illustrations = [
+            {
+                id: 1,
+                emoji: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f511.svg",
+                title: "Secure Chat",
+                description: "Secure, encrypted conversations where only you and your chosen connections have access."
+            },
+            {
+                id: 2,
+                emoji: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f465.svg",
+                title: "Private Groups",
+                description: "Create private groups for your closest friends. Share thoughts, media, and moments in a safe space."
+            },
+            {
+                id: 3,
+                emoji: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f576.svg",
+                title: "Stay Anonymous",
+                description: "Choose your level of anonymity. Share what you want, when you want, with who you want."
+            },
+            {
+                id: 4,
+                emoji: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f9f6.svg",
+                title: "Build Connections",
+                description: "Forge meaningful connections in a judgment-free zone. Bond over shared interests and experiences."
+            }
+        ];
+        
+        // DOM Elements
+        const illustrationButtons = document.querySelectorAll('.illustration-controls button');
+        const illustrationDescription = document.getElementById('illustration-description');
+        
+        // Set up illustration switching
+        illustrationButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const illustrationId = this.getAttribute('data-illustration');
+                switchIllustration(illustrationId);
+            });
         });
         
-        document.querySelector('.profile-image').addEventListener('mouseleave', function() {
-            this.style.animationPlayState = 'running';
+        // Function to switch illustrations
+        function switchIllustration(id) {
+            // Update active button
+            illustrationButtons.forEach(button => {
+                button.classList.remove('active');
+                if (button.getAttribute('data-illustration') === id) {
+                    button.classList.add('active');
+                }
+            });
+            
+            // Update active illustration
+            const illustrations = document.querySelectorAll('.illustration');
+            illustrations.forEach(illustration => {
+                illustration.classList.remove('active');
+            });
+            
+            const activeIllustration = document.getElementById(`illustration-${id}`);
+            activeIllustration.classList.add('active');
+            
+            // Update description with fade effect
+            illustrationDescription.style.opacity = '0';
+            
+            setTimeout(() => {
+                const illustrationData = illustrations.find(ill => ill.id === parseInt(id));
+                illustrationDescription.textContent = getDescriptionForId(id);
+                illustrationDescription.style.opacity = '1';
+            }, 300);
+        }
+        
+        // Get description for illustration ID
+        function getDescriptionForId(id) {
+            const index = parseInt(id) - 1;
+            return illustrations[index].description;
+        }
+        
+        // Auto-cycle through illustrations
+        let currentIllustration = 1;
+        const autoCycleInterval = setInterval(() => {
+            currentIllustration = currentIllustration < 4 ? currentIllustration + 1 : 1;
+            switchIllustration(currentIllustration);
+        }, 5000);
+        
+        // Pause auto-cycling when user interacts
+        illustrationButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                clearInterval(autoCycleInterval);
+            });
+        });
+        
+        // Pause animation on hover
+        document.querySelectorAll('.illustration').forEach(illustration => {
+            illustration.addEventListener('mouseenter', function() {
+                this.style.animationPlayState = 'paused';
+            });
+            
+            illustration.addEventListener('mouseleave', function() {
+                this.style.animationPlayState = 'running';
+            });
         });
     </script>
 </body>
