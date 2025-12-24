@@ -9,9 +9,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Add this AFTER Feather Icons but BEFORE your stream.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Feather Icons (Modern Line Icons) -->
+    <script src="https://unpkg.com/feather-icons"></script>
     
     <style>
         :root {
@@ -57,6 +59,16 @@
             padding-bottom: 70px; /* Space for bottom nav */
         }
 
+        /* Icon Styling */
+        .feather {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
         /* Top Navigation Bar - Simplified with only logo and notification */
         .top-nav {
             background: rgba(255, 255, 255, 0.06);
@@ -93,8 +105,10 @@
             gap: 0.5rem;
         }
 
-        .logo::before {
-            content: "🔗";
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            color: var(--primary-light);
         }
 
         /* Notification bell at top right */
@@ -119,8 +133,9 @@
             background-color: rgba(255, 255, 255, 0.02);
         }
 
-        .notification-link i {
-            font-size: 1.25rem;
+        .notification-link .feather {
+            width: 22px;
+            height: 22px;
         }
 
         .notification-badge {
@@ -186,8 +201,20 @@
             color: #ff2d55;
         }
 
+        .nav-item.active .feather {
+            stroke: #ff2d55;
+        }
+
         .nav-icon {
-            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-icon .feather {
+            width: 22px;
+            height: 22px;
+            stroke: currentColor;
         }
 
         .nav-label {
@@ -198,7 +225,7 @@
         
         /* Special style for Stream link */
         .nav-item.stream-link .nav-label {
-            font-family: 'Great Vibes', cursive;
+            font-family: 'Inter', sans-serif; /* Changed from Great Vibes for consistency */
             font-size: 11px;
         }
 
@@ -348,9 +375,10 @@
             color: var(--text-secondary);
         }
 
-        .profile-grid-likes i {
+        .profile-grid-likes .feather {
+            width: 10px;
+            height: 10px;
             color: var(--primary-light);
-            font-size: 9px;
         }
 
         .profile-grid-like-btn {
@@ -367,6 +395,11 @@
             gap: 3px;
             min-width: 45px;
             justify-content: center;
+        }
+
+        .profile-grid-like-btn .feather {
+            width: 10px;
+            height: 10px;
         }
 
         .profile-grid-like-btn:hover {
@@ -413,11 +446,13 @@
             border: 1px solid var(--border);
         }
 
-        .no-profiles-message i {
-            font-size: 36px;
+        .no-profiles-message .feather {
+            width: 36px;
+            height: 36px;
             margin-bottom: 15px;
             color: var(--primary-light);
             display: block;
+            margin: 0 auto 15px;
         }
 
         /* Loading State */
@@ -529,8 +564,9 @@
                 font-size: 9px;
             }
             
-            .nav-icon {
-                font-size: 18px;
+            .nav-icon .feather {
+                width: 20px;
+                height: 20px;
             }
             
             .nav-item.stream-link .nav-label {
@@ -577,8 +613,9 @@
                 font-size: 8px;
             }
             
-            .nav-icon {
-                font-size: 16px;
+            .nav-icon .feather {
+                width: 18px;
+                height: 18px;
             }
             
             .nav-item.stream-link .nav-label {
@@ -591,14 +628,22 @@
     <!-- Top Navigation with Logo and Notification Bell -->
     <nav class="top-nav">
         <div class="top-nav-container">
-            <a href="index.html" class="logo">BondBase</a>
-            <div class="notification-top">
-                <a href="notification.html" class="notification-link">
-                    <i class="fas fa-bell"></i>
-                    <span class="notification-badge">0</span>
-                </a>
-            </div>
-        </div>
+            <a href="index.html" class="logo">
+                <svg class="logo-icon feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                BondBase
+            </a>
+<div class="notification-top">
+    <a href="notification.html" class="notification-link">
+        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span class="notification-badge">0</span>
+    </a>
+</div>
     </nav>
 
     <!-- Main Content -->
@@ -682,27 +727,59 @@
     <!-- Bottom Navigation - Style from stream.html -->
     <div class="bottom-nav">
         <a href="mingle.html" class="nav-item active">
-            <i class="fas fa-users nav-icon"></i>
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </div>
             <span class="nav-label">Connect</span>
         </a>
         <a href="messages.html" class="nav-item">
-            <i class="fas fa-comments nav-icon"></i>
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </div>
             <span class="nav-label">Chat</span>
         </a>
         <a href="posts.html" class="nav-item">
-            <i class="fas fa-graduation-cap nav-icon"></i>
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                </svg>
+            </div>
             <span class="nav-label">Resources</span>
         </a>
         <a href="stream.html" class="nav-item stream-link">
-            <i class="fas fa-play-circle nav-icon"></i>
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+            </div>
             <span class="nav-label">Stream</span>
         </a>
         <a href="account.html" class="nav-item">
-            <i class="fas fa-user-shield nav-icon"></i>
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
             <span class="nav-label">My Profile</span>
         </a>
         <a href="groups.html" class="nav-item">
-            <i class="fas fa-users nav-icon"></i>
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </div>
             <span class="nav-label">Groups</span>
         </a>
     </div>
@@ -717,5 +794,18 @@
     <script type="module" src="creative.js"></script>
     <script type="module" src="flip.js"></script>
     <script type="module" src="notification.js"></script>
+    
+    <!-- Initialize Feather Icons -->
+    <script>
+        // Initialize Feather Icons
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+            
+            // You can also manually replace icons with:
+            // feather.replace({ class: 'custom-feather-class' });
+        });
+    </script>
 </body>
 </html>

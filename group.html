@@ -10,1101 +10,974 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Add these styles to your existing CSS or create a new style section -->
-<style>
-/* ==========================================================================
-   VOICE CHANNELS SECTION STYLES
-   ========================================================================== */
-
-/* Voice Channels Main Section */
-.voice-channels-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 15px;
-    margin: 15px;
-    padding: 20px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    position: relative;
-    overflow: hidden;
-}
-
-/* Header Styles */
-.voice-channels-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    color: white;
-    position: relative;
-    z-index: 2;
-}
-
-.voice-channels-header h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    letter-spacing: 0.5px;
-}
-
-.voice-channels-header h3 i {
-    font-size: 20px;
-    color: #ffdd59;
-}
-
-.toggle-channels-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s;
-    font-size: 16px;
-}
-
-.toggle-channels-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: rotate(180deg);
-}
-
-/* Voice Channels Container */
-.voice-channels-container {
-    display: block;
-    transition: all 0.3s ease;
-    position: relative;
-    z-index: 2;
-}
-
-/* Voice Channel Card */
-.voice-channel-card {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 15px;
-    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(10px);
-}
-
-.voice-channel-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
-    background: white;
-}
-
-/* Channel Header */
-.channel-header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.channel-icon {
-    width: 50px;
-    height: 50px;
-    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 20px;
-    flex-shrink: 0;
-    box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
-}
-
-.channel-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.channel-name {
-    margin: 0 0 6px 0;
-    font-size: 16px;
-    font-weight: 700;
-    color: #333;
-    line-height: 1.3;
-}
-
-.channel-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    font-size: 13px;
-    color: #666;
-}
-
-.channel-meta span {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    white-space: nowrap;
-}
-
-.channel-meta i {
-    font-size: 12px;
-    opacity: 0.8;
-}
-
-/* Channel Participants */
-.channel-participants {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 18px;
-    padding: 12px 0;
-    border-top: 1px solid #f0f0f0;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.participants-count {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: #555;
-    font-weight: 600;
-}
-
-.participants-count i {
-    color: #667eea;
-}
-
-.participants-list {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.participant-dot {
-    width: 28px;
-    height: 28px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 11px;
-    font-weight: bold;
-    position: relative;
-    box-shadow: 0 2px 5px rgba(102, 126, 234, 0.3);
-}
-
-.participant-dot::after {
-    content: '';
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    width: 10px;
-    height: 10px;
-    background: #4CAF50;
-    border: 2px solid white;
-    border-radius: 50%;
-    display: none;
-}
-
-.participant-dot.active::after {
-    display: block;
-}
-
-.more-participants {
-    font-size: 12px;
-    color: #888;
-    font-weight: 600;
-    margin-left: 5px;
-}
-
-/* Channel Actions */
-.channel-actions {
-    display: flex;
-    justify-content: center;
-}
-
-.join-channel-btn {
-    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
-    color: white;
-    border: none;
-    padding: 12px 30px;
-    border-radius: 30px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    transition: all 0.3s;
-    width: 100%;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-}
-
-.join-channel-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
-}
-
-.join-channel-btn:active:not(:disabled) {
-    transform: translateY(0);
-}
-
-.join-channel-btn.active {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
-}
-
-.join-channel-btn.active:hover:not(:disabled) {
-    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
-}
-
-.join-channel-btn.full {
-    background: #6c757d;
-    cursor: not-allowed;
-    opacity: 0.8;
-    box-shadow: none;
-}
-
-.join-channel-btn.full:hover {
-    transform: none;
-    box-shadow: none;
-}
-
-/* Start New Channel Button */
-.start-new-channel {
-    margin-top: 25px;
-    text-align: center;
-    padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.start-new-channel-btn {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: 2px dashed rgba(255, 255, 255, 0.5);
-    padding: 15px 30px;
-    border-radius: 30px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 15px;
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    transition: all 0.3s;
-    width: 100%;
-    justify-content: center;
-    backdrop-filter: blur(5px);
-    letter-spacing: 0.5px;
-}
-
-.start-new-channel-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
-}
-
-.start-new-channel-btn:active {
-    transform: translateY(0);
-}
-
-/* No Voice Channels State */
-.no-voice-channels {
-    text-align: center;
-    padding: 40px 20px;
-    color: white;
-    position: relative;
-    z-index: 2;
-}
-
-.no-voice-channels i {
-    font-size: 60px;
-    margin-bottom: 20px;
-    opacity: 0.8;
-    display: block;
-}
-
-.no-voice-channels p {
-    margin-bottom: 25px;
-    font-size: 16px;
-    opacity: 0.9;
-    line-height: 1.5;
-}
-
-.start-voice-channel-btn {
-    background: rgba(255, 255, 255, 0.95);
-    color: #667eea;
-    border: none;
-    padding: 15px 35px;
-    border-radius: 30px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 15px;
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    transition: all 0.3s;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
-.start-voice-channel-btn:hover {
-    background: white;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
-}
-
-/* Loading State */
-.loading-channels {
-    text-align: center;
-    padding: 40px 20px;
-    color: white;
-    position: relative;
-    z-index: 2;
-}
-
-.loading-channels i {
-    font-size: 32px;
-    margin-bottom: 15px;
-    display: block;
-    animation: spin 1.5s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.loading-channels p {
-    font-size: 15px;
-    opacity: 0.9;
-}
-
-/* ==========================================================================
-   MINI CALL PLAYER STYLES (For persistent player)
-   ========================================================================== */
-
-.mini-call-player {
-    position: fixed;
-    bottom: 25px;
-    right: 25px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 18px;
-    padding: 20px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    z-index: 9999;
-    width: 320px;
-    color: white;
-    display: none;
-    animation: slideUp 0.4s ease;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-@keyframes slideUp {
-    from {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideDown {
-    from {
-        transform: translateY(0);
-        opacity: 1;
-    }
-    to {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-}
-
-/* Mini Player Header */
-.mini-player-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 18px;
-}
-
-.mini-player-title {
-    font-size: 15px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    letter-spacing: 0.5px;
-}
-
-.mini-player-title i {
-    color: #ffdd59;
-}
-
-.mini-player-close {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.3s;
-    font-size: 14px;
-}
-
-.mini-player-close:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-/* Mini Player Content */
-.mini-player-content {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.mini-player-icon {
-    width: 50px;
-    height: 50px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    flex-shrink: 0;
-}
-
-.mini-player-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.mini-player-channel {
-    font-size: 14px;
-    font-weight: 700;
-    margin-bottom: 5px;
-    line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.mini-player-participants {
-    font-size: 12px;
-    opacity: 0.9;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.mini-player-participants i {
-    font-size: 11px;
-}
-
-/* Mini Player Controls */
-.mini-player-controls {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.mini-player-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s;
-    font-size: 16px;
-    flex: 1;
-    max-width: 42px;
-}
-
-.mini-player-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
-}
-
-.mini-player-btn.active {
-    background: rgba(255, 255, 255, 0.4);
-    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
-}
-
-.mini-player-btn.mute {
-    color: #ff6b6b;
-}
-
-.mini-player-btn.mute.active {
-    background: rgba(255, 107, 107, 0.2);
-}
-
-.mini-player-btn.open {
-    background: rgba(76, 175, 80, 0.8);
-    flex: 2;
-    max-width: none;
-    border-radius: 25px;
-    font-size: 14px;
-    font-weight: 600;
-    gap: 8px;
-}
-
-.mini-player-btn.open:hover {
-    background: rgba(76, 175, 80, 0.9);
-}
-
-/* ==========================================================================
-   PERSISTENT MINI PLAYER STYLES (Always visible when in voice)
-   ========================================================================== */
-
-.persistent-mini-player {
-    position: fixed;
-    bottom: 25px;
-    right: 25px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 50px;
-    padding: 12px 25px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    z-index: 9998;
-    color: white;
-    display: none;
-    align-items: center;
-    gap: 15px;
-    cursor: pointer;
-    transition: all 0.3s;
-    max-width: 320px;
-    animation: slideUp 0.4s ease;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.persistent-mini-player:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
-    padding-right: 30px;
-}
-
-.persistent-player-icon {
-    width: 36px;
-    height: 36px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    flex-shrink: 0;
-}
-
-.persistent-player-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.persistent-player-channel {
-    font-size: 13px;
-    font-weight: 700;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.3;
-    margin-bottom: 2px;
-}
-
-.persistent-player-participants {
-    font-size: 11px;
-    opacity: 0.9;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.persistent-player-participants i {
-    font-size: 10px;
-}
-
-.persistent-player-close {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    flex-shrink: 0;
-    transition: background 0.3s;
-    margin-left: 5px;
-}
-
-.persistent-player-close:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-/* ==========================================================================
-   RESPONSIVE STYLES
-   ========================================================================== */
-
-/* Tablet and smaller screens */
-@media (max-width: 768px) {
-    .voice-channels-section {
-        margin: 10px;
-        padding: 15px;
-        border-radius: 12px;
-    }
+    <!-- Feather Icons (Modern Line Icons) -->
+    <script src="https://unpkg.com/feather-icons"></script>
     
-    .voice-channels-header h3 {
-        font-size: 16px;
-    }
-    
-    .voice-channel-card {
-        padding: 15px;
-    }
-    
-    .channel-icon {
-        width: 44px;
-        height: 44px;
-        font-size: 18px;
-    }
-    
-    .channel-name {
-        font-size: 15px;
-    }
-    
-    .channel-meta {
-        font-size: 12px;
-        gap: 10px;
-    }
-    
-    .join-channel-btn {
-        padding: 10px 20px;
-        font-size: 14px;
-    }
-    
-    .mini-call-player {
-        width: 280px;
-        padding: 15px;
-        bottom: 20px;
-        right: 20px;
-    }
-    
-    .persistent-mini-player {
-        max-width: 280px;
-        padding: 10px 20px;
-        bottom: 20px;
-        right: 20px;
-    }
-    
-    .persistent-player-icon {
-        width: 32px;
-        height: 32px;
-        font-size: 14px;
-    }
-    
-    .persistent-player-channel {
-        font-size: 12px;
-    }
-}
-
-/* Mobile screens */
-@media (max-width: 480px) {
-    .voice-channels-section {
-        margin: 8px;
-        padding: 12px;
-        border-radius: 10px;
-    }
-    
-    .voice-channels-header {
-        margin-bottom: 15px;
-    }
-    
-    .voice-channels-header h3 {
-        font-size: 15px;
-        gap: 8px;
-    }
-    
-    .voice-channels-header h3 i {
-        font-size: 16px;
-    }
-    
-    .toggle-channels-btn {
-        width: 32px;
-        height: 32px;
-        font-size: 14px;
-    }
-    
-    .channel-header {
-        gap: 12px;
-        margin-bottom: 12px;
-        padding-bottom: 12px;
-    }
-    
-    .channel-icon {
-        width: 40px;
-        height: 40px;
-        font-size: 16px;
-    }
-    
-    .channel-name {
-        font-size: 14px;
-        margin-bottom: 4px;
-    }
-    
-    .channel-meta {
-        font-size: 11px;
-        gap: 8px;
-    }
-    
-    .channel-participants {
-        margin-bottom: 15px;
-        padding: 10px 0;
-    }
-    
-    .participants-count {
-        font-size: 13px;
-        gap: 6px;
-    }
-    
-    .participant-dot {
-        width: 24px;
-        height: 24px;
-        font-size: 10px;
-    }
-    
-    .start-new-channel-btn {
-        padding: 12px 20px;
-        font-size: 14px;
-        gap: 8px;
-    }
-    
-    .mini-call-player {
-        width: 260px;
-        padding: 12px;
-        bottom: 15px;
-        right: 15px;
-    }
-    
-    .mini-player-header {
-        margin-bottom: 15px;
-    }
-    
-    .mini-player-title {
-        font-size: 14px;
-        gap: 8px;
-    }
-    
-    .mini-player-icon {
-        width: 44px;
-        height: 44px;
-        font-size: 20px;
-    }
-    
-    .mini-player-channel {
-        font-size: 13px;
-    }
-    
-    .mini-player-participants {
-        font-size: 11px;
-    }
-    
-    .mini-player-btn {
-        width: 38px;
-        height: 38px;
-        font-size: 15px;
-    }
-    
-    .mini-player-btn.open {
-        font-size: 13px;
-    }
-    
-    .persistent-mini-player {
-        max-width: 260px;
-        padding: 8px 16px;
-        bottom: 15px;
-        right: 15px;
-    }
-    
-    .persistent-player-icon {
-        width: 28px;
-        height: 28px;
-        font-size: 13px;
-    }
-    
-    .persistent-player-channel {
-        font-size: 11px;
-    }
-    
-    .persistent-player-participants {
-        font-size: 10px;
-    }
-    
-    .persistent-player-close {
-        width: 24px;
-        height: 24px;
-        font-size: 11px;
-    }
-}
-
-/* Very small screens */
-@media (max-width: 360px) {
-    .mini-call-player {
-        width: 240px;
-        padding: 10px;
-    }
-    
-    .persistent-mini-player {
-        max-width: 240px;
-        padding: 8px 14px;
-    }
-    
-    .persistent-player-icon {
-        width: 26px;
-        height: 26px;
-        font-size: 12px;
-    }
-    
-    .persistent-player-channel {
-        font-size: 10px;
-    }
-}
-
-/* ==========================================================================
-   ANIMATIONS AND EFFECTS
-   ========================================================================== */
-
-/* Pulse animation for active voice channels */
-@keyframes pulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4);
-    }
-    70% {
-        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
-    }
-}
-
-.voice-channel-card.active-channel {
-    animation: pulse 2s infinite;
-    border: 2px solid #4CAF50;
-}
-
-/* Floating animation for voice icon */
-@keyframes float {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(-5px);
-    }
-}
-
-.channel-icon i {
-    animation: float 3s ease-in-out infinite;
-}
-
-/* Fade in animation for new channels */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.voice-channel-card {
-    animation: fadeIn 0.5s ease;
-}
-
-/* ==========================================================================
-   DARK MODE SUPPORT (if applicable)
-   ========================================================================== */
-
-@media (prefers-color-scheme: dark) {
-    .voice-channel-card {
-        background: rgba(30, 30, 40, 0.95);
-        color: #e0e0e0;
-    }
-    
-    .channel-name {
-        color: #ffffff;
-    }
-    
-    .channel-meta {
-        color: #aaaaaa;
-    }
-    
-    .channel-participants {
-        border-color: rgba(255, 255, 255, 0.1);
-    }
-    
-    .start-voice-channel-btn {
-        background: rgba(255, 255, 255, 0.1);
-        color: #ffffff;
-    }
-    
-    .start-voice-channel-btn:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
-}
-
-/* ==========================================================================
-   ACCESSIBILITY
-   ========================================================================== */
-
-/* Focus styles for keyboard navigation */
-.voice-channel-card:focus,
-.join-channel-btn:focus,
-.toggle-channels-btn:focus,
-.start-new-channel-btn:focus,
-.mini-player-btn:focus,
-.persistent-mini-player:focus,
-.persistent-player-close:focus {
-    outline: 2px solid #4CAF50;
-    outline-offset: 2px;
-}
-
-/* Screen reader only text */
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-}
-
-/* ==========================================================================
-   UTILITY CLASSES
-   ========================================================================== */
-
-/* Text truncation */
-.text-truncate {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Flex utilities */
-.flex-center {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.flex-between {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.flex-start {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-}
-
-/* Spacing utilities */
-.mt-1 { margin-top: 4px; }
-.mt-2 { margin-top: 8px; }
-.mt-3 { margin-top: 12px; }
-.mt-4 { margin-top: 16px; }
-.mt-5 { margin-top: 20px; }
-
-.mb-1 { margin-bottom: 4px; }
-.mb-2 { margin-bottom: 8px; }
-.mb-3 { margin-bottom: 12px; }
-.mb-4 { margin-bottom: 16px; }
-.mb-5 { margin-bottom: 20px; }
-
-/* Hide/show utilities */
-.hidden {
-    display: none !important;
-}
-
-.visible {
-    display: block !important;
-}
-
-/* Loading overlay */
-.loading-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    border-radius: inherit;
-}
-
-/* Error state */
-.error-state {
-    color: #ff6b6b;
-    text-align: center;
-    padding: 20px;
-}
-
-.error-state i {
-    font-size: 48px;
-    margin-bottom: 15px;
-    opacity: 0.7;
-}
-
-/* Success state */
-.success-state {
-    color: #4CAF50;
-    text-align: center;
-    padding: 20px;
-}
-
-.success-state i {
-    font-size: 48px;
-    margin-bottom: 15px;
-    opacity: 0.7;
-}
-</style>
     <style>
+        /* ==========================================================================
+           VOICE CHANNELS SECTION STYLES
+           ========================================================================== */
+
+        /* Icon Styling */
+        .feather {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
+        /* Voice Channels Main Section */
+        .voice-channels-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            margin: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Header Styles */
+        .voice-channels-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            color: white;
+            position: relative;
+            z-index: 2;
+        }
+
+        .voice-channels-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .voice-channels-header h3 .feather {
+            width: 22px;
+            height: 22px;
+            stroke: #ffdd59;
+            stroke-width: 2.5;
+        }
+
+        .toggle-channels-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .toggle-channels-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(180deg);
+        }
+
+        .toggle-channels-btn .feather {
+            width: 20px;
+            height: 20px;
+            stroke: white;
+        }
+
+        /* Voice Channels Container */
+        .voice-channels-container {
+            display: block;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Voice Channel Card */
+        .voice-channel-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .voice-channel-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+            background: white;
+        }
+
+        /* Channel Header */
+        .channel-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .channel-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .channel-icon .feather {
+            width: 24px;
+            height: 24px;
+            stroke: white;
+            stroke-width: 2.5;
+        }
+
+        .channel-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .channel-name {
+            margin: 0 0 6px 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            line-height: 1.3;
+        }
+
+        .channel-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .channel-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .channel-meta .feather {
+            width: 14px;
+            height: 14px;
+            opacity: 0.8;
+        }
+
+        /* Channel Participants */
+        .channel-participants {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            padding: 12px 0;
+            border-top: 1px solid #f0f0f0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .participants-count {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .participants-count .feather {
+            width: 16px;
+            height: 16px;
+            stroke: #667eea;
+        }
+
+        .participants-list {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .participant-dot {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(102, 126, 234, 0.3);
+        }
+
+        .participant-dot::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 10px;
+            height: 10px;
+            background: #4CAF50;
+            border: 2px solid white;
+            border-radius: 50%;
+            display: none;
+        }
+
+        .participant-dot.active::after {
+            display: block;
+        }
+
+        .more-participants {
+            font-size: 12px;
+            color: #888;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        /* Channel Actions */
+        .channel-actions {
+            display: flex;
+            justify-content: center;
+        }
+
+        .join-channel-btn {
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s;
+            width: 100%;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .join-channel-btn .feather {
+            width: 18px;
+            height: 18px;
+            stroke: white;
+            stroke-width: 2.5;
+        }
+
+        .join-channel-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .join-channel-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .join-channel-btn.active {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+
+        .join-channel-btn.active:hover:not(:disabled) {
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+        }
+
+        .join-channel-btn.full {
+            background: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.8;
+            box-shadow: none;
+        }
+
+        .join-channel-btn.full:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Start New Channel Button */
+        .start-new-channel {
+            margin-top: 25px;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .start-new-channel-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            padding: 15px 30px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s;
+            width: 100%;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+            letter-spacing: 0.5px;
+        }
+
+        .start-new-channel-btn .feather {
+            width: 18px;
+            height: 18px;
+            stroke: white;
+        }
+
+        .start-new-channel-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
+        }
+
+        .start-new-channel-btn:active {
+            transform: translateY(0);
+        }
+
+        /* No Voice Channels State */
+        .no-voice-channels {
+            text-align: center;
+            padding: 40px 20px;
+            color: white;
+            position: relative;
+            z-index: 2;
+        }
+
+        .no-voice-channels .feather {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            opacity: 0.8;
+            stroke: white;
+            stroke-width: 1.5;
+        }
+
+        .no-voice-channels p {
+            margin-bottom: 25px;
+            font-size: 16px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .start-voice-channel-btn {
+            background: rgba(255, 255, 255, 0.95);
+            color: #667eea;
+            border: none;
+            padding: 15px 35px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .start-voice-channel-btn .feather {
+            width: 18px;
+            height: 18px;
+            stroke: #667eea;
+        }
+
+        .start-voice-channel-btn:hover {
+            background: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Loading State */
+        .loading-channels {
+            text-align: center;
+            padding: 40px 20px;
+            color: white;
+            position: relative;
+            z-index: 2;
+        }
+
+        .loading-channels .feather {
+            width: 32px;
+            height: 32px;
+            margin: 0 auto 15px;
+            display: block;
+            animation: spin 1.5s linear infinite;
+            stroke: white;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-channels p {
+            font-size: 15px;
+            opacity: 0.9;
+        }
+
+        /* ==========================================================================
+           MINI CALL PLAYER STYLES (For persistent player)
+           ========================================================================== */
+
+        .mini-call-player {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            z-index: 9999;
+            width: 320px;
+            color: white;
+            display: none;
+            animation: slideUp 0.4s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Mini Player Header */
+        .mini-player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .mini-player-title {
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .mini-player-title .feather {
+            width: 18px;
+            height: 18px;
+            stroke: #ffdd59;
+            stroke-width: 2.5;
+        }
+
+        .mini-player-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+
+        .mini-player-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .mini-player-close .feather {
+            width: 16px;
+            height: 16px;
+            stroke: white;
+        }
+
+        /* Mini Player Content */
+        .mini-player-content {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .mini-player-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .mini-player-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .mini-player-channel {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .mini-player-participants {
+            font-size: 12px;
+            opacity: 0.9;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mini-player-participants .feather {
+            width: 12px;
+            height: 12px;
+            stroke: white;
+        }
+
+        /* Mini Player Controls */
+        .mini-player-controls {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .mini-player-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            font-size: 16px;
+            flex: 1;
+            max-width: 42px;
+        }
+
+        .mini-player-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .mini-player-btn.active {
+            background: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+        }
+
+        .mini-player-btn.mute {
+            color: #ff6b6b;
+        }
+
+        .mini-player-btn.mute.active {
+            background: rgba(255, 107, 107, 0.2);
+        }
+
+        .mini-player-btn.open {
+            background: rgba(76, 175, 80, 0.8);
+            flex: 2;
+            max-width: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            gap: 8px;
+        }
+
+        .mini-player-btn.open:hover {
+            background: rgba(76, 175, 80, 0.9);
+        }
+
+        .mini-player-btn .feather {
+            width: 20px;
+            height: 20px;
+            stroke: white;
+        }
+
+        /* ==========================================================================
+           PERSISTENT MINI PLAYER STYLES (Always visible when in voice)
+           ========================================================================== */
+
+        .persistent-mini-player {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50px;
+            padding: 12px 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            z-index: 9998;
+            color: white;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            max-width: 320px;
+            animation: slideUp 0.4s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .persistent-mini-player:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
+            padding-right: 30px;
+        }
+
+        .persistent-player-icon {
+            width: 36px;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .persistent-player-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .persistent-player-channel {
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.3;
+            margin-bottom: 2px;
+        }
+
+        .persistent-player-participants {
+            font-size: 11px;
+            opacity: 0.9;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .persistent-player-participants .feather {
+            width: 10px;
+            height: 10px;
+            stroke: white;
+        }
+
+        .persistent-player-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+            transition: background 0.3s;
+            margin-left: 5px;
+        }
+
+        .persistent-player-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .persistent-player-close .feather {
+            width: 16px;
+            height: 16px;
+            stroke: white;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .voice-channels-section {
+                margin: 10px;
+                padding: 15px;
+                border-radius: 12px;
+            }
+            
+            .voice-channels-header h3 {
+                font-size: 16px;
+            }
+            
+            .voice-channel-card {
+                padding: 15px;
+            }
+            
+            .channel-icon {
+                width: 44px;
+                height: 44px;
+            }
+            
+            .channel-name {
+                font-size: 15px;
+            }
+            
+            .channel-meta {
+                font-size: 12px;
+                gap: 10px;
+            }
+            
+            .join-channel-btn {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            
+            .mini-call-player {
+                width: 280px;
+                padding: 15px;
+                bottom: 20px;
+                right: 20px;
+            }
+            
+            .persistent-mini-player {
+                max-width: 280px;
+                padding: 10px 20px;
+                bottom: 20px;
+                right: 20px;
+            }
+            
+            .persistent-player-icon {
+                width: 32px;
+                height: 32px;
+                font-size: 14px;
+            }
+            
+            .persistent-player-channel {
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .voice-channels-section {
+                margin: 8px;
+                padding: 12px;
+                border-radius: 10px;
+            }
+            
+            .voice-channels-header {
+                margin-bottom: 15px;
+            }
+            
+            .voice-channels-header h3 {
+                font-size: 15px;
+                gap: 8px;
+            }
+            
+            .voice-channels-header h3 .feather {
+                width: 18px;
+                height: 18px;
+            }
+            
+            .toggle-channels-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 14px;
+            }
+            
+            .channel-header {
+                gap: 12px;
+                margin-bottom: 12px;
+                padding-bottom: 12px;
+            }
+            
+            .channel-icon {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .channel-name {
+                font-size: 14px;
+                margin-bottom: 4px;
+            }
+            
+            .channel-meta {
+                font-size: 11px;
+                gap: 8px;
+            }
+            
+            .channel-participants {
+                margin-bottom: 15px;
+                padding: 10px 0;
+            }
+            
+            .participants-count {
+                font-size: 13px;
+                gap: 6px;
+            }
+            
+            .participant-dot {
+                width: 24px;
+                height: 24px;
+                font-size: 10px;
+            }
+            
+            .start-new-channel-btn {
+                padding: 12px 20px;
+                font-size: 14px;
+                gap: 8px;
+            }
+            
+            .mini-call-player {
+                width: 260px;
+                padding: 12px;
+                bottom: 15px;
+                right: 15px;
+            }
+            
+            .mini-player-header {
+                margin-bottom: 15px;
+            }
+            
+            .mini-player-title {
+                font-size: 14px;
+                gap: 8px;
+            }
+            
+            .mini-player-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 20px;
+            }
+            
+            .mini-player-channel {
+                font-size: 13px;
+            }
+            
+            .mini-player-participants {
+                font-size: 11px;
+            }
+            
+            .mini-player-btn {
+                width: 38px;
+                height: 38px;
+                font-size: 15px;
+            }
+            
+            .mini-player-btn.open {
+                font-size: 13px;
+            }
+            
+            .persistent-mini-player {
+                max-width: 260px;
+                padding: 8px 16px;
+                bottom: 15px;
+                right: 15px;
+            }
+            
+            .persistent-player-icon {
+                width: 28px;
+                height: 28px;
+                font-size: 13px;
+            }
+            
+            .persistent-player-channel {
+                font-size: 11px;
+            }
+            
+            .persistent-player-participants {
+                font-size: 10px;
+            }
+            
+            .persistent-player-close {
+                width: 24px;
+                height: 24px;
+                font-size: 11px;
+            }
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+            }
+        }
+
+        .voice-channel-card.active-channel {
+            animation: pulse 2s infinite;
+            border: 2px solid #4CAF50;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-5px);
+            }
+        }
+
+        .channel-icon .feather {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .voice-channel-card {
+            animation: fadeIn 0.5s ease;
+        }
+
         :root {
             --primary: #b3004b;
             --primary-dark: #7a0034;
@@ -1172,6 +1045,12 @@
 
         .back-btn:hover {
             color: var(--primary-light);
+        }
+
+        .back-btn .feather {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
         }
 
         .group-header-info {
@@ -1247,8 +1126,11 @@
             background: linear-gradient(135deg, #1E88E5 0%, #0A3A7A 100%);
         }
 
-        .call-btn i {
-            font-size: 1rem;
+        .call-btn .feather {
+            width: 18px;
+            height: 18px;
+            stroke: white;
+            stroke-width: 2.5;
         }
 
         /* Sidebar content */
@@ -1323,10 +1205,13 @@
             color: var(--text-secondary);
         }
 
-        .rule-item i {
-            color: var(--primary-light);
-            font-size: 0.8rem;
+        .rule-item .feather {
+            width: 16px;
+            height: 16px;
+            stroke: var(--primary-light);
+            stroke-width: 2.5;
             margin-top: 2px;
+            flex-shrink: 0;
         }
 
         /* Main Chat Area */
@@ -1367,15 +1252,23 @@
             border: none;
             color: var(--text-secondary);
             cursor: pointer;
-            font-size: 1.1rem;
             padding: 8px;
             border-radius: 6px;
             transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .header-btn:hover {
             background: rgba(255, 255, 255, 0.05);
             color: var(--primary-light);
+        }
+
+        .header-btn .feather {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
         }
 
         /* Messages Container */
@@ -1394,7 +1287,7 @@
             display: none;
         }
 
-        /* Skeleton Loading Styles - LIKE POST.HTML */
+        /* Skeleton Loading Styles */
         .messages-loading {
             padding: 20px;
             margin-bottom: 20px;
@@ -1441,11 +1334,6 @@
 
         .loading-line.long {
             width: 80%;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
 
         /* Message Styles (Discord-like) */
@@ -1615,8 +1503,10 @@
             background: rgba(114, 137, 218, 0.1);
         }
 
-        .cancel-reply i {
-            font-size: 14px;
+        .cancel-reply .feather {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
         }
 
         /* Image messages */
@@ -1673,18 +1563,18 @@
             background: #f8f9fa;
         }
 
-        .menu-item i {
-            width: 20px;
-            color: #666;
-            font-size: 14px;
+        .menu-item .feather {
+            width: 18px;
+            height: 18px;
+            stroke: #666;
         }
 
         #deleteMenuItem {
             color: #ff4757;
         }
 
-        #deleteMenuItem i {
-            color: #ff4757;
+        #deleteMenuItem .feather {
+            stroke: #ff4757;
         }
 
         /* Delete Modal Styles */
@@ -1897,15 +1787,23 @@
             border: none;
             color: var(--text-secondary);
             cursor: pointer;
-            font-size: 1.2rem;
             padding: 8px;
             border-radius: 6px;
             transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .action-btn:hover {
             background: rgba(255, 255, 255, 0.05);
             color: var(--primary-light);
+        }
+
+        .action-btn .feather {
+            width: 22px;
+            height: 22px;
+            stroke: currentColor;
         }
 
         .send-btn {
@@ -1917,6 +1815,9 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .send-btn:hover {
@@ -1926,6 +1827,38 @@
         .send-btn:disabled {
             background: var(--border);
             cursor: not-allowed;
+        }
+
+        .send-btn .feather {
+            width: 20px;
+            height: 20px;
+            stroke: white;
+            stroke-width: 2.5;
+        }
+
+        /* File Input Button */
+        .file-input-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-input-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--primary-light);
+        }
+
+        .file-input-btn .feather {
+            width: 22px;
+            height: 22px;
+            stroke: currentColor;
         }
 
         /* Lazy Loading More Indicator */
@@ -1958,6 +1891,12 @@
             background: var(--primary);
             color: white;
             border-color: var(--primary);
+        }
+
+        .load-more-btn .feather {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
         }
 
         /* Scrollbar Styling */
@@ -2025,8 +1964,9 @@
                 padding: 3px 6px;
             }
             
-            .cancel-reply i {
-                font-size: 12px;
+            .cancel-reply .feather {
+                width: 12px;
+                height: 12px;
             }
 
             /* Mobile call buttons adjustments */
@@ -2086,8 +2026,11 @@
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <button  onclick="location.href='group.html'" class="back-btn" id="backBtn">
-                    <i class="fas fa-arrow-left"></i>
+                <button onclick="location.href='group.html'" class="back-btn" id="backBtn">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
                     Back to Groups
                 </button>
                 <div class="group-header-info">
@@ -2098,7 +2041,9 @@
                     <!-- CALL BUTTONS IN SIDEBAR - ADDED -->
                     <div class="call-buttons">
                         <button id="groupVoiceCallBtn" class="call-btn group-call">
-                            <i class="fas fa-phone-alt"></i>
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                            </svg>
                             Start Group Call
                         </button>
                     </div>
@@ -2130,14 +2075,24 @@
                 <div class="chat-header-actions">
                     <!-- CALL BUTTON IN HEADER - ADDED -->
                     <button id="groupVoiceCallBtnMobile" class="call-btn group-call" style="padding: 8px 15px; font-size: 0.9rem;">
-                        <i class="fas fa-phone-alt"></i>
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
                         Group Call
                     </button>
                     <button class="header-btn" id="sidebarToggle">
-                        <i class="fas fa-bars"></i>
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
                     </button>
                     <button class="header-btn" id="infoBtn">
-                        <i class="fas fa-info-circle"></i>
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -2175,7 +2130,10 @@
                 <!-- Load more button -->
                 <div class="load-more-container" id="loadMoreContainer">
                     <button class="load-more-btn" id="loadMoreBtn">
-                        <i class="fas fa-chevron-up"></i> Load Older Messages
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <polyline points="18 15 12 9 6 15"></polyline>
+                        </svg>
+                        Load Older Messages
                     </button>
                 </div>
                 
@@ -2196,15 +2154,27 @@
                         placeholder="Type your message here..."
                         rows="1"></textarea>
                     <div class="input-actions">
-                        <button class="action-btn" id="emojiBtn">
-                            <i class="far fa-smile"></i>
+                        <!-- Image/File attachment button -->
+                        <button class="file-input-btn" id="attachmentBtn">
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                            </svg>
                         </button>
-                        <button class="action-btn" id="attachmentBtn">
-                            <i class="fas fa-paperclip"></i>
+                        <!-- Emoji button -->
+                        <button class="action-btn" id="emojiBtn">
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                                <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                                <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                            </svg>
                         </button>
                     </div>
                     <button class="send-btn" id="sendBtn" disabled>
-                        <i class="fas fa-upload"></i>
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -2364,6 +2334,54 @@
             if (groupVoiceCallBtnMobile) {
                 groupVoiceCallBtnMobile.addEventListener('click', handleGroupVoiceCall);
             }
+            
+            // Initialize Feather Icons
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+            
+            // Sidebar toggle functionality
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            
+            if (sidebar && sidebarToggle) {
+                sidebarToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('active');
+                });
+            }
+            
+            // Info button functionality
+            const infoBtn = document.getElementById('infoBtn');
+            if (infoBtn) {
+                infoBtn.addEventListener('click', function() {
+                    if (sidebar) {
+                        sidebar.classList.toggle('active');
+                    }
+                });
+            }
+            
+            // Handle file attachment
+            const attachmentBtn = document.getElementById('attachmentBtn');
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.txt';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+            
+            if (attachmentBtn) {
+                attachmentBtn.addEventListener('click', function() {
+                    fileInput.click();
+                });
+            }
+            
+            fileInput.addEventListener('change', function(e) {
+                const files = e.target.files;
+                if (files.length > 0) {
+                    // Handle file upload here
+                    console.log('File selected:', files[0]);
+                    // You can implement your file upload logic here
+                }
+            });
         });
     </script>
     

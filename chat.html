@@ -9,7 +9,20 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="chat.css">
     
+    <!-- Feather Icons (Modern Line Icons) -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    
     <style>
+    /* Icon Styling */
+    .feather {
+        width: 20px;
+        height: 20px;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+    }
+
     body {
         font-family: 'Inter', sans-serif;
         background-color: var(--bg-primary);
@@ -150,8 +163,10 @@
         color: white;
     }
 
-    .call-btn i {
-        font-size: 16px;
+    .call-btn .feather {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
     }
 
     /* Voice call button specific */
@@ -185,8 +200,9 @@
             height: 32px;
         }
         
-        .call-btn i {
-            font-size: 13px;
+        .call-btn .feather {
+            width: 16px;
+            height: 16px;
         }
         
         .chat-partner-info {
@@ -404,10 +420,6 @@
         gap: 4px;
     }
     
-    .reply-indicator i {
-        font-size: 10px;
-    }
-    
     .reply-message-preview {
         background: rgba(255, 255, 255, 0.05);
         border-left: 2px solid var(--primary);
@@ -466,17 +478,18 @@
     }
 
     /* Message status indicators */
-    .message-status .fa-check {
-        color: var(--text-secondary);
-    }
-
-    .message-status .fa-check-double {
-        color: var(--primary-light);
+    .message-status .feather {
+        width: 14px;
+        height: 14px;
+        stroke: var(--text-secondary);
     }
 
     /* Online status indicator */
-    .online-status .fa-circle {
-        color: var(--primary-light);
+    .online-status .feather {
+        width: 8px;
+        height: 8px;
+        stroke: var(--primary-light);
+        stroke-width: 3;
     }
 
     /* Back button styling */
@@ -487,6 +500,12 @@
     .back-btn:hover {
         color: var(--primary-light);
         background: rgba(255, 255, 255, 0.05);
+    }
+
+    .back-btn .feather {
+        width: 20px;
+        height: 20px;
+        stroke: currentColor;
     }
 
     /* Game button styling */
@@ -509,28 +528,145 @@
         color: white;
         transform: scale(1.1);
     }
+
+    /* Chat input buttons */
+    .attachment-btn .feather,
+    .voice-note-btn-main .feather,
+    .send-btn .feather {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+    }
+
+    .attachment-btn:hover .feather,
+    .voice-note-btn-main:hover .feather,
+    .send-btn:hover .feather {
+        stroke: white;
+    }
+
+    /* Voice note indicator buttons */
+    .voice-note-btn .feather {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+    }
+
+    .voice-note-btn:hover .feather {
+        stroke: white;
+    }
+
+    /* Chat header specific styles */
+    .chat-header {
+        background: var(--bg-card);
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        position: relative;
+    }
+
+    .chat-partner-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1;
+    }
+
+    #chatPartnerImage {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--primary);
+    }
+
+    .chat-partner-info > div {
+        flex: 1;
+    }
+
+    #chatPartnerName {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 3px;
+    }
+
+    .online-status {
+        font-size: 0.85rem;
+        color: var(--text-light);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .call-controls {
+        display: flex;
+        gap: 10px;
+        margin-left: auto;
+    }
+
+    .call-btn .feather {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+    }
+
+    #voiceCallBtn:hover .feather,
+    #videoCallBtn:hover .feather {
+        stroke: white;
+    }
+
+    @media (max-width: 480px) {
+        .call-controls {
+            gap: 6px;
+        }
+        
+        .call-btn {
+            width: 32px;
+            height: 32px;
+        }
+        
+        .call-btn .feather {
+            width: 16px;
+            height: 16px;
+        }
+    }
     </style>
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <button class="back-btn" id="backToMessages"><i class="fas fa-arrow-left"></i></button>
+            <button class="back-btn" id="backToMessages">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </button>
             <div class="chat-partner-info">
                 <img src="images-default-profile.jpg" alt="Profile" id="chatPartnerImage">
                 <div>
                     <h3 id="chatPartnerName">Loading..</h3>
-                    <p class="online-status" id="chatPartnerStatus"><i class="fas fa-circle"></i> Online</p>
+                    <p class="online-status" id="chatPartnerStatus">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                        </svg>
+                        Online
+                    </p>
                 </div>
                 <!-- Call Controls -->
                 <div id="callControls" class="call-controls">
                     <button id="voiceCallBtn" class="call-btn">
-                        <i class="fas fa-phone"></i> 
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
                     </button>
                     <button id="videoCallBtn" class="call-btn">
-                        <i class="fas fa-video"></i> 
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -554,7 +690,12 @@
                     <div class="reply-preview-name"></div>
                     <div class="reply-preview-text"></div>
                 </div>
-                <button id="cancelReply" class="reply-preview-cancel">✕</button>
+                <button id="cancelReply" class="reply-preview-cancel">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
             </div>
             
             <!-- Voice note recording indicator -->
@@ -562,26 +703,46 @@
                 <div class="voice-note-timer" id="voiceNoteTimer">0:00</div>
                 <div class="voice-note-controls">
                     <button class="voice-note-btn" id="cancelVoiceNoteBtn">
-                        <i class="fas fa-times"></i>
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
                     </button>
                     <button class="voice-note-btn" id="sendVoiceNoteBtn">
-                        <i class="fas fa-paper-plane"></i>
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
                     </button>
                 </div>
             </div>
             
             <div class="chat-input">
-                <button class="attachment-btn" id="attachmentBtn"><i class="fas fa-paperclip"></i></button>
+                <button class="attachment-btn" id="attachmentBtn">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                    </svg>
+                </button>
                 <input type="file" id="imageUpload" accept="image/*" style="display: none;">
                 <button class="voice-note-btn-main" id="voiceNoteBtn">
-                    <i class="fas fa-microphone"></i>
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
                 </button>
                 <!-- Game Invite Button -->
                 <button id="gameInviteBtn" class="game-icon-btn" title="Play Games" onclick="openGameSelection()">
                      👾 
                 </button>
                 <input type="text" id="messageInput" placeholder="Type a message...">
-                <button class="send-btn" id="sendMessageBtn"><i class="fas fa-paper-plane"></i></button>
+                <button class="send-btn" id="sendMessageBtn">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
             </div>
         </div>
     </div>
@@ -602,6 +763,11 @@
     <script>
     // This simple script just adds click-to-close functionality
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Feather Icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+        
         // Add chat-page class to body so our CSS only applies here
         document.body.classList.add('chat-page');
         
