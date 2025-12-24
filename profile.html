@@ -10,9 +10,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    <!-- Add this AFTER Feather Icons but BEFORE your stream.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             /*  – Dark, Leather,
@@ -51,6 +52,16 @@
             color: var(--text-primary);
             line-height: 1.5;
             overflow-x: hidden;
+        }
+
+        /* Icon Styling - Consistent with mingle.html */
+        .feather {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
         }
 
         /* Modern Navigation */
@@ -115,8 +126,10 @@
             background-color: rgba(255, 255, 255, 0.02);
         }
 
-        .nav-links i {
-            font-size: 1.25rem;
+        .nav-links .feather {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
         }
 
         .notification-badge {
@@ -260,8 +273,11 @@
             font-weight: 500;
         }
 
-        .online-status i {
-            font-size: 0.7rem;
+        .online-status .feather {
+            width: 8px;
+            height: 8px;
+            stroke: currentColor;
+            fill: currentColor;
         }
 
         /* Gamer Profile Badge */
@@ -277,6 +293,12 @@
             border: 1px solid rgba(179, 0, 75, 0.3);
             margin-left: 1rem;
             animation: pulse 2s infinite;
+        }
+
+        .gamer-profile-badge .feather {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
         }
 
         @keyframes pulse {
@@ -312,8 +334,10 @@
             gap: 0.75rem;
         }
 
-        .gamer-profile-section h3 i {
+        .gamer-profile-section h3 .feather {
             color: var(--primary-light);
+            width: 18px;
+            height: 18px;
         }
 
         .gamer-basic-info {
@@ -333,10 +357,11 @@
             font-size: 0.95rem;
         }
 
-        .gamer-info-row i {
-            width: 20px;
-            text-align: center;
-            color: var(--primary-light);
+        .gamer-info-row .feather {
+            width: 16px;
+            height: 16px;
+            stroke: var(--primary-light);
+            flex-shrink: 0;
         }
 
         .gamer-stats-grid {
@@ -388,6 +413,12 @@
             gap: 0.5rem;
         }
 
+        .gamer-screenshot-container .feather {
+            width: 16px;
+            height: 16px;
+            stroke: var(--primary-light);
+        }
+
         .gamer-screenshot {
             width: 100%;
             max-width: 400px;
@@ -425,6 +456,12 @@
             background: linear-gradient(135deg, var(--primary-light), var(--primary));
         }
 
+        .view-gamer-profile-btn .feather {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+        }
+
         /* Social Links */
         .social-links-section {
             margin: 2rem 0;
@@ -442,8 +479,10 @@
             margin-bottom: 1rem;
         }
 
-        .social-links-title i {
-            color: var(--primary);
+        .social-links-title .feather {
+            width: 16px;
+            height: 16px;
+            stroke: var(--primary);
         }
 
         .profile-social-links {
@@ -465,6 +504,12 @@
             background: rgba(255, 255, 255, 0.05);
             border: 2px solid transparent;
             color: var(--text-secondary);
+        }
+
+        .social-profile-icon .feather {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
         }
 
         .social-profile-icon:hover {
@@ -501,11 +546,13 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        .stat-item i {
-            font-size: 1.5rem;
+        .stat-item .feather {
+            width: 24px;
+            height: 24px;
+            stroke: var(--primary-light);
             margin-bottom: 0.5rem;
             display: block;
-            color: var(--primary-light);
+            margin: 0 auto 0.5rem;
         }
 
         .stat-item .stat-number {
@@ -574,8 +621,10 @@
             gap: 0.75rem;
         }
 
-        .user-videos-section h2 i {
-            color: var(--primary-light);
+        .user-videos-section h2 .feather {
+            width: 20px;
+            height: 20px;
+            stroke: var(--primary-light);
         }
 
         .user-videos-grid {
@@ -659,8 +708,10 @@
             backdrop-filter: blur(4px);
         }
 
-        .video-stat i {
-            font-size: 0.75rem;
+        .video-stat .feather {
+            width: 12px;
+            height: 12px;
+            stroke: white;
         }
 
         .profile-video-play {
@@ -669,16 +720,13 @@
             align-items: center;
         }
 
-        .profile-video-play i {
-            font-size: 2.5rem;
-            color: white;
+        .profile-video-play .feather {
+            width: 40px;
+            height: 40px;
+            stroke: white;
             background: rgba(179, 0, 75, 0.8);
-            width: 60px;
-            height: 60px;
+            padding: 8px;
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             border: 3px solid white;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         }
@@ -709,14 +757,17 @@
             font-size: 1rem;
         }
 
-        .videos-loading i, .videos-error i, .no-videos i {
-            font-size: 2rem;
+        .videos-loading .feather, .videos-error .feather, .no-videos .feather {
+            width: 32px;
+            height: 32px;
             margin-bottom: 1rem;
             color: var(--primary-light);
+            display: block;
+            margin: 0 auto 1rem;
         }
 
-        .videos-error i {
-            color: var(--secondary);
+        .videos-error .feather {
+            stroke: var(--secondary);
         }
 
         /* Profile Actions */
@@ -776,6 +827,12 @@
             box-shadow: var(--shadow);
         }
 
+        .btn-secondary .feather, .btn-primary .feather, .btn-like .feather {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+        }
+
         /* Profile Posts */
         .profile-posts-section {
             margin-top: 3rem;
@@ -791,6 +848,12 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
+        }
+
+        .profile-posts-section h2 .feather {
+            width: 20px;
+            height: 20px;
+            stroke: var(--primary-light);
         }
 
         .profile-posts-container {
@@ -884,6 +947,12 @@
             color: var(--primary-light);
         }
 
+        .post-action .feather {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+        }
+
         /* Comments Section */
         .comments-section {
             margin-top: 1.5rem;
@@ -922,10 +991,19 @@
             cursor: pointer;
             font-weight: 600;
             transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .send-comment-btn:hover {
             background: var(--primary-dark);
+        }
+
+        .send-comment-btn .feather {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
         }
 
         .comment-item {
@@ -1107,10 +1185,10 @@
                 font-size: 0.75rem;
             }
 
-            .profile-video-play i {
-                width: 50px;
-                height: 50px;
-                font-size: 2rem;
+            .profile-video-play .feather {
+                width: 32px;
+                height: 32px;
+                padding: 6px;
             }
         }
     </style>
@@ -1127,44 +1205,68 @@
             <ul class="nav-menu">
                 <li class="nav-item">
                     <a href="mingle.html" class="nav-links">
-                        <i class="fas fa-users"></i>
+                        <svg class="feather" data-feather="users">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
                         <span>Connect</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="messages.html" class="nav-links">
-                        <i class="fas fa-comments"></i>
+                        <svg class="feather" data-feather="message-circle">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                        </svg>
                         <span>Chat</span>
                         <span class="message-count">0</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="posts.html" class="nav-links">
-                        <i class="fas fa-graduation-cap"></i>
+                        <svg class="feather" data-feather="book-open">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                        </svg>
                         <span>Resources</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="stream.html" class="nav-links active">
-                        <i class="fas fa-play-circle"></i>
-                        <span class="nav-text" style="font-family: 'Great Vibes', cursive; font-size: 1.1rem;">Stream</span>
+                        <svg class="feather" data-feather="play-circle">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                        </svg>
+                        <span class="nav-text" style="font-family: 'Inter', sans-serif; font-size: 0.75rem;">Stream</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="account.html" class="nav-links active">
-                        <i class="fas fa-user-shield"></i>
+                        <svg class="feather" data-feather="user">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
                         <span>My Profile</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="notification.html" class="nav-links">
-                        <i class="fas fa-bell"></i>
+                        <svg class="feather" data-feather="bell">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
                         <span class="notification-badge">0</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="groups.html" class="nav-links">
-                        <i class="fas fa-users"></i>
+                        <svg class="feather" data-feather="users">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
                         <span>Groups</span>
                     </a>
                 </li>
@@ -1188,20 +1290,51 @@
                 <div class="profile-main-info">
                     <h1 id="viewProfileName">Loading...
                         <span class="gamer-profile-badge" id="gamerBadge" style="display: none;">
-                            <i class="fas fa-gamepad"></i> Gamer
+                            <svg class="feather" data-feather="cpu">
+                                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                                <rect x="9" y="9" width="6" height="6"></rect>
+                                <line x1="9" y1="1" x2="9" y2="4"></line>
+                                <line x1="15" y1="1" x2="15" y2="4"></line>
+                                <line x1="9" y1="20" x2="9" y2="23"></line>
+                                <line x1="15" y1="20" x2="15" y2="23"></line>
+                                <line x1="20" y1="9" x2="23" y2="9"></line>
+                                <line x1="20" y1="14" x2="23" y2="14"></line>
+                                <line x1="1" y1="9" x2="4" y2="9"></line>
+                                <line x1="1" y1="14" x2="4" y2="14"></line>
+                            </svg>
+                            Gamer
                         </span>
                     </h1>
                     <div class="profile-meta">
                         <span id="viewProfileAge">Sexual Health Educator</span>,
                         <span id="viewProfileLocation">New York</span>
-                        <span class="online-status" id="onlineStatus"><i class="fas fa-circle"></i> Available for Questions</span>
+                        <span class="online-status" id="onlineStatus">
+                            <svg class="feather" data-feather="circle">
+                                <circle cx="12" cy="12" r="10"></circle>
+                            </svg>
+                            Available for Questions
+                        </span>
                     </div>
                 </div>
             </div>
             
             <!-- Gamer Profile Section -->
             <div class="gamer-profile-section" id="gamerProfileSection" style="display: none;">
-                <h3><i class="fas fa-gamepad"></i> Gamer Profile</h3>
+                <h3>
+                    <svg class="feather" data-feather="cpu">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                        <rect x="9" y="9" width="6" height="6"></rect>
+                        <line x1="9" y1="1" x2="9" y2="4"></line>
+                        <line x1="15" y1="1" x2="15" y2="4"></line>
+                        <line x1="9" y1="20" x2="9" y2="23"></line>
+                        <line x1="15" y1="20" x2="15" y2="23"></line>
+                        <line x1="20" y1="9" x2="23" y2="9"></line>
+                        <line x1="20" y1="14" x2="23" y2="14"></line>
+                        <line x1="1" y1="9" x2="4" y2="9"></line>
+                        <line x1="1" y1="14" x2="4" y2="14"></line>
+                    </svg>
+                    Gamer Profile
+                </h3>
                 <div class="gamer-basic-info" id="gamerBasicInfo">
                     <!-- Will be populated by JavaScript -->
                 </div>
@@ -1209,18 +1342,36 @@
                     <!-- Will be populated by JavaScript -->
                 </div>
                 <div class="gamer-screenshot-container" id="gamerScreenshotContainer">
-                    <h4><i class="fas fa-camera"></i> Game Screenshot</h4>
+                    <h4>
+                        <svg class="feather" data-feather="camera">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        Game Screenshot
+                    </h4>
                     <img id="gamerScreenshot" class="gamer-screenshot" alt="Game Screenshot">
                 </div>
                 <a href="#" id="viewGamerProfileBtn" class="view-gamer-profile-btn">
-                    <i class="fas fa-external-link-alt"></i> View Full Gamer Profile
+                    <svg class="feather" data-feather="external-link">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                    View Full Gamer Profile
                 </a>
             </div>
 
             <!-- Social Media Links Section -->
             <div class="social-links-section" id="socialLinksSection">
                 <div class="social-links-title">
-                    <i class="fas fa-share-alt"></i> Connect on Social Media
+                    <svg class="feather" data-feather="share-2">
+                        <circle cx="18" cy="5" r="3"></circle>
+                        <circle cx="6" cy="12" r="3"></circle>
+                        <circle cx="18" cy="19" r="3"></circle>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
+                    Connect on Social Media
                 </div>
                 <div class="profile-social-links" id="profileSocialLinks">
                     <!-- Social media icons will be dynamically added here -->
@@ -1230,17 +1381,30 @@
             <!-- Profile Stats -->
             <div class="profile-stats">
                 <div class="stat-item">
-                    <i class="fas fa-handshake"></i>
+                    <svg class="feather" data-feather="handshake">
+                        <path d="M11 17h2a2 2 0 1 0 0-4h-3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2"></path>
+                        <path d="M5.937 11H5a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h1"></path>
+                        <path d="M14 4h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1"></path>
+                        <path d="M10 11V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5"></path>
+                        <path d="M15 11h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1"></path>
+                        <path d="M10 20v-5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5"></path>
+                    </svg>
                     <span class="stat-number" id="viewLikeCount">0</span>
                     <span class="stat-label">Connections</span>
                 </div>
                 <div class="stat-item">
-                    <i class="fas fa-graduation-cap"></i>
+                    <svg class="feather" data-feather="book-open">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    </svg>
                     <span class="stat-number" id="viewWorkshopCount">12</span>
                     <span class="stat-label">Workshops</span>
                 </div>
                 <div class="stat-item">
-                    <i class="fas fa-certificate"></i>
+                    <svg class="feather" data-feather="award">
+                        <circle cx="12" cy="8" r="7"></circle>
+                        <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
+                    </svg>
                     <span class="stat-number" id="viewCertCount">3</span>
                     <span class="stat-label">Certifications</span>
                 </div>
@@ -1267,19 +1431,40 @@
             <!-- Profile Actions -->
             <div class="profile-actions">
                 <button class="btn-secondary" id="backToMingle">
-                    <i class="fas fa-arrow-left"></i> Back to Community
+                    <svg class="feather" data-feather="arrow-left">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Community
                 </button>
                 <button class="btn-primary" id="messageProfileBtn">
-                    <i class="fas fa-comment"></i> Ask Question
+                    <svg class="feather" data-feather="message-circle">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                    </svg>
+                    Ask Question
                 </button>
                 <button class="btn-like" id="likeProfileBtn">
-                    <i class="fas fa-handshake"></i> Connect
+                    <svg class="feather" data-feather="handshake">
+                        <path d="M11 17h2a2 2 0 1 0 0-4h-3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2"></path>
+                        <path d="M5.937 11H5a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h1"></path>
+                        <path d="M14 4h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1"></path>
+                        <path d="M10 11V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5"></path>
+                        <path d="M15 11h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1"></path>
+                        <path d="M10 20v-5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5"></path>
+                    </svg>
+                    Connect
                 </button>
             </div>
 
             <!-- NEW: User Videos Section - TikTok Style Grid -->
             <div class="user-videos-section" id="userVideosSection">
-                <h2><i class="fas fa-video"></i> My Videos</h2>
+                <h2>
+                    <svg class="feather" data-feather="video">
+                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                    </svg>
+                    My Videos
+                </h2>
                 <div class="user-videos-grid" id="userVideosGrid">
                     <!-- Videos will be dynamically loaded here by stream.js -->
                 </div>
@@ -1287,7 +1472,13 @@
 
             <!-- ALL USER POSTS SECTION AT BOTTOM -->
             <div class="profile-posts-section">
-                <h2><i class="fas fa-graduation-cap"></i> Educational Resources</h2>
+                <h2>
+                    <svg class="feather" data-feather="book-open">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    </svg>
+                    Educational Resources
+                </h2>
                 <div class="profile-posts-container" id="profilePostsContainer">
                     <div class="loading">Loading resources...</div>
                 </div>
@@ -1306,5 +1497,14 @@
     <script type="module" src="games.js"></script>
     <!-- NEW: Add stream.js for video functionality -->
     <script type="module" src="stream.js"></script>
+    
+    <!-- Initialize Feather Icons -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+        });
+    </script>
 </body>
 </html>
