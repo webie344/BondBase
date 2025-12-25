@@ -16,6 +16,760 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* ==========================================================================
+           GAMING FEATURES STYLES
+           ========================================================================== */
+
+        /* Live Activity Strip */
+        .activity-strip {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(90deg, 
+                rgba(102, 126, 234, 0.9) 0%, 
+                rgba(118, 75, 162, 0.9) 100%);
+            backdrop-filter: blur(10px);
+            padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            overflow-x: auto;
+            z-index: 9997;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .activity-item:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .activity-avatar {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .activity-status {
+            font-size: 10px;
+            opacity: 0.9;
+        }
+
+        .activity-status.typing {
+            color: #4CAF50;
+        }
+
+        .activity-status.joining {
+            color: #FFB74D;
+        }
+
+        .activity-status.spectating {
+            color: #64B5F6;
+        }
+
+        /* Voice Bubbles */
+        .voice-bubble-container {
+            position: relative;
+            margin: 10px 0;
+        }
+
+        .voice-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 15px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            max-width: 280px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            animation: bubbleFloat 2s ease-in-out infinite;
+            position: relative;
+        }
+
+        @keyframes bubbleFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .voice-bubble::before {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 20px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #667eea;
+        }
+
+        .voice-play-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .voice-play-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .voice-duration {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-left: auto;
+        }
+
+        .voice-expiry {
+            position: absolute;
+            bottom: -5px;
+            right: 10px;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        /* Tap-to-Talk Button */
+        .tap-to-talk-btn {
+            position: fixed;
+            bottom: 100px;
+            right: 25px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            z-index: 9996;
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+            transition: all 0.3s;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .tap-to-talk-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 35px rgba(76, 175, 80, 0.6);
+        }
+
+        .tap-to-talk-btn.recording {
+            animation: pulseRecording 1.5s infinite;
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        }
+
+        @keyframes pulseRecording {
+            0%, 100% { 
+                box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 0 0 20px rgba(244, 67, 54, 0);
+                transform: scale(1.05);
+            }
+        }
+
+        /* Mini Games Overlay */
+        .mini-game-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            z-index: 10000;
+            display: none;
+            max-width: 500px;
+            width: 90%;
+            border: 2px solid #667eea;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        .mini-game-overlay.active {
+            display: block;
+            animation: gameAppear 0.4s ease-out;
+        }
+
+        @keyframes gameAppear {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .game-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .game-subtitle {
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .game-content {
+            margin-bottom: 30px;
+        }
+
+        .game-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .game-btn {
+            padding: 12px 25px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 15px;
+        }
+
+        .game-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .game-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .game-btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .game-btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Reaction Challenge */
+        .reaction-challenge {
+            position: fixed;
+            bottom: 180px;
+            right: 25px;
+            background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+            padding: 15px;
+            border-radius: 15px;
+            color: white;
+            z-index: 9995;
+            display: none;
+            box-shadow: 0 10px 30px rgba(255, 152, 0, 0.4);
+            animation: challengePulse 2s infinite;
+        }
+
+        @keyframes challengePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .reaction-challenge.active {
+            display: block;
+        }
+
+        .challenge-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .challenge-timer {
+            font-size: 32px;
+            font-weight: 700;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 15px;
+        }
+
+        .challenge-button {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 10px;
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .challenge-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Profile Rings */
+        .profile-ring {
+            position: relative;
+        }
+
+        .profile-ring::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            background: linear-gradient(135deg, #667eea, #764ba2, #4CAF50) border-box;
+            -webkit-mask: 
+                linear-gradient(#fff 0 0) padding-box, 
+                linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            animation: ringSpin 3s linear infinite;
+        }
+
+        @keyframes ringSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .profile-ring.active::after {
+            display: block;
+        }
+
+        /* Glowing Usernames */
+        .username-glow {
+            position: relative;
+            display: inline-block;
+        }
+
+        .username-glow::before {
+            content: attr(data-name);
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: transparent;
+            background: linear-gradient(90deg, 
+                #ff0000, #ff9900, #ffff00, #00ff00, 
+                #00ffff, #0000ff, #9900ff);
+            background-size: 400% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: glowMove 3s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes glowMove {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 400% 50%; }
+        }
+
+        /* Badge System */
+        .badge-container {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .badge {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #333;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+        }
+
+        .badge.new {
+            animation: badgePop 0.5s ease-out;
+        }
+
+        @keyframes badgePop {
+            0% { transform: scale(0); }
+            70% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        /* Achievement Notification */
+        .achievement-notification {
+            position: fixed;
+            top: 100px;
+            right: 25px;
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            border-radius: 15px;
+            padding: 20px;
+            color: white;
+            z-index: 10001;
+            display: none;
+            max-width: 300px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            animation: slideInRight 0.5s ease-out;
+            transform-origin: right;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .achievement-notification.active {
+            display: block;
+        }
+
+        .achievement-icon {
+            font-size: 36px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .achievement-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .achievement-desc {
+            font-size: 14px;
+            opacity: 0.9;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        /* Chat Mode Indicators */
+        .chat-mode-indicator {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 12px 30px;
+            border-radius: 25px;
+            color: white;
+            z-index: 9998;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 2px solid #667eea;
+        }
+
+        .chat-mode-indicator.active {
+            display: block;
+            animation: modePulse 2s infinite;
+        }
+
+        @keyframes modePulse {
+            0%, 100% { 
+                border-color: #667eea;
+                box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            }
+            50% { 
+                border-color: #764ba2;
+                box-shadow: 0 10px 30px rgba(118, 75, 162, 0.3);
+            }
+        }
+
+        .mode-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .mode-timer {
+            font-size: 12px;
+            opacity: 0.8;
+            text-align: center;
+        }
+
+        /* Session Timer */
+        .session-timer {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 8px 15px;
+            border-radius: 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 9997;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Courier New', monospace;
+        }
+
+        .session-timer.active {
+            display: block;
+        }
+
+        /* Group Streak */
+        .group-streak {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 8px 15px;
+            border-radius: 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 9997;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .group-streak.active {
+            display: block;
+        }
+
+        .streak-fire {
+            color: #FF9800;
+            margin-right: 5px;
+        }
+
+        /* Lurker Display */
+        .lurker-display {
+            position: fixed;
+            bottom: 180px;
+            left: 25px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 15px;
+            color: white;
+            z-index: 9995;
+            display: none;
+            max-width: 200px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .lurker-display.active {
+            display: block;
+        }
+
+        .lurker-title {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .lurker-count {
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            color: #64B5F6;
+        }
+
+        /* Reputation Display */
+        .reputation-display {
+            position: fixed;
+            bottom: 260px;
+            left: 25px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 15px;
+            color: white;
+            z-index: 9995;
+            display: none;
+            max-width: 200px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .reputation-display.active {
+            display: block;
+        }
+
+        .reputation-title {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .reputation-value {
+            font-size: 20px;
+            font-weight: 700;
+            text-align: center;
+            color: #FFD700;
+        }
+
+        /* Decaying Reactions */
+        .decaying-reaction {
+            position: absolute;
+            font-size: 24px;
+            animation: decayFloat 3s ease-out forwards;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        @keyframes decayFloat {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            70% {
+                opacity: 0.7;
+                transform: translateY(-30px) scale(1.2);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.5);
+            }
+        }
+
+        /* Message Effects for Chaos Mode */
+        .message-text.chaos-mode {
+            animation: chaosFloat 20s linear infinite;
+        }
+
+        @keyframes chaosFloat {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+            25% {
+                transform: translate(10px, -10px) rotate(5deg);
+            }
+            50% {
+                transform: translate(-10px, 10px) rotate(-5deg);
+            }
+            75% {
+                transform: translate(5px, -5px) rotate(3deg);
+            }
+            100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+        }
+
+        /* Night Raid Mode */
+        body.night-raid-mode {
+            background: linear-gradient(135deg, #0a1929 0%, #152238 100%) !important;
+            color: #c8d1d9 !important;
+        }
+
+        .night-raid-mode .message-text {
+            background: rgba(23, 43, 77, 0.8) !important;
+            border: 1px solid rgba(100, 149, 237, 0.3) !important;
+            color: #c8d1d9 !important;
+        }
+
+        .night-raid-mode .chat-header {
+            background: rgba(10, 25, 41, 0.9) !important;
+            border-bottom: 1px solid rgba(100, 149, 237, 0.3) !important;
+        }
+
+        /* Stealth Mode */
+        .stealth-mode .message-sender {
+            color: #888 !important;
+            filter: blur(1px);
+        }
+
+        .stealth-mode .message-avatar {
+            filter: grayscale(100%) blur(2px);
+        }
+
+        /* Gaming UI Elements Container */
+        .gaming-ui-container {
+            position: fixed;
+            bottom: 100px;
+            left: 25px;
+            z-index: 9995;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Quick Game Actions */
+        .quick-game-actions {
+            display: flex;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .quick-game-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            font-size: 20px;
+        }
+
+        .quick-game-btn:hover {
+            transform: scale(1.1) rotate(15deg);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        /* ==========================================================================
            VOICE CHANNELS SECTION STYLES
            ========================================================================== */
 
@@ -737,6 +1491,49 @@
 
         /* Responsive Styles */
         @media (max-width: 768px) {
+            .activity-strip {
+                padding: 6px 15px;
+                font-size: 11px;
+            }
+            
+            .activity-item {
+                padding: 3px 10px;
+            }
+            
+            .tap-to-talk-btn {
+                bottom: 80px;
+                right: 20px;
+                width: 50px;
+                height: 50px;
+            }
+            
+            .quick-game-actions {
+                padding: 10px;
+                gap: 8px;
+            }
+            
+            .quick-game-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+            
+            .reaction-challenge {
+                bottom: 150px;
+                right: 20px;
+                padding: 12px;
+            }
+            
+            .session-timer, .group-streak {
+                font-size: 11px;
+                padding: 6px 12px;
+            }
+            
+            .gaming-ui-container {
+                bottom: 80px;
+                left: 20px;
+            }
+            
             .voice-channels-section {
                 margin: 10px;
                 padding: 15px;
@@ -796,6 +1593,48 @@
         }
 
         @media (max-width: 480px) {
+            .activity-strip {
+                padding: 5px 10px;
+                font-size: 10px;
+            }
+            
+            .activity-item {
+                padding: 2px 8px;
+            }
+            
+            .activity-avatar {
+                width: 16px;
+                height: 16px;
+            }
+            
+            .tap-to-talk-btn {
+                bottom: 60px;
+                right: 15px;
+                width: 45px;
+                height: 45px;
+            }
+            
+            .reaction-challenge {
+                bottom: 120px;
+                right: 15px;
+                padding: 10px;
+            }
+            
+            .challenge-timer {
+                font-size: 24px;
+            }
+            
+            .quick-game-actions {
+                padding: 8px;
+                gap: 6px;
+            }
+            
+            .quick-game-btn {
+                width: 35px;
+                height: 35px;
+                font-size: 14px;
+            }
+            
             .voice-channels-section {
                 margin: 8px;
                 padding: 12px;
@@ -2023,6 +2862,97 @@
     </style>
 </head>
 <body>
+    <!-- Live Activity Strip -->
+    <div class="activity-strip" id="activityStrip">
+        <!-- Activity items will be loaded here -->
+    </div>
+
+    <!-- Gaming UI Elements Container -->
+    <div class="gaming-ui-container">
+        <!-- Quick Game Actions -->
+        <div class="quick-game-actions" id="quickGameActions">
+            <button class="quick-game-btn" id="triviaGameBtn" title="Start Trivia Game">
+                🎲
+            </button>
+            <button class="quick-game-btn" id="reactionGameBtn" title="Reaction Challenge">
+                ⚡
+            </button>
+            <button class="quick-game-btn" id="wordGameBtn" title="Word Scramble">
+                🔤
+            </button>
+            <button class="quick-game-btn" id="chatModeBtn" title="Vote Chat Mode">
+                🎭
+            </button>
+        </div>
+
+        <!-- Live Event Notifications -->
+        <div class="reputation-display" id="reputationDisplay">
+            <div class="reputation-title">Your Reputation</div>
+            <div class="reputation-value" id="reputationValue">0</div>
+        </div>
+
+        <div class="lurker-display" id="lurkerDisplay">
+            <div class="lurker-title">👁️ Watching</div>
+            <div class="lurker-count" id="lurkerCount">0</div>
+        </div>
+    </div>
+
+    <!-- Tap-to-Talk Button -->
+    <div class="tap-to-talk-btn" id="tapToTalkBtn" title="Hold to record voice note">
+        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+    </div>
+
+    <!-- Reaction Challenge Display -->
+    <div class="reaction-challenge" id="reactionChallenge">
+        <div class="challenge-title">⚡ REACTION CHALLENGE</div>
+        <div class="challenge-timer" id="challengeTimer">3.00</div>
+        <button class="challenge-button" id="challengeButton">TAP NOW!</button>
+    </div>
+
+    <!-- Mini Game Overlay -->
+    <div class="mini-game-overlay" id="miniGameOverlay">
+        <div class="game-header">
+            <h2 class="game-title" id="gameTitle">Trivia Challenge</h2>
+            <p class="game-subtitle" id="gameSubtitle">Answer correctly to earn reputation!</p>
+        </div>
+        <div class="game-content" id="gameContent">
+            <!-- Game content will be loaded here -->
+        </div>
+        <div class="game-actions">
+            <button class="game-btn primary" id="gameSubmitBtn">Submit Answer</button>
+            <button class="game-btn secondary" id="gameCloseBtn">Close</button>
+        </div>
+    </div>
+
+    <!-- Achievement Notification -->
+    <div class="achievement-notification" id="achievementNotification">
+        <div class="achievement-icon" id="achievementIcon">🏆</div>
+        <div class="achievement-title" id="achievementTitle">Achievement Unlocked!</div>
+        <div class="achievement-desc" id="achievementDesc">You've earned a new achievement</div>
+    </div>
+
+    <!-- Chat Mode Indicator -->
+    <div class="chat-mode-indicator" id="chatModeIndicator">
+        <div class="mode-title" id="modeTitle">Chaos Mode Active</div>
+        <div class="mode-timer" id="modeTimer">Ends in 29:30</div>
+    </div>
+
+    <!-- Session Timer -->
+    <div class="session-timer" id="sessionTimer">
+        <span id="sessionTime">00:00:00</span>
+    </div>
+
+    <!-- Group Streak Display -->
+    <div class="group-streak" id="groupStreak">
+        <span class="streak-fire">🔥</span>
+        Streak: <span id="streakCount">0</span> days
+    </div>
+
     <div class="chat-container">
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
@@ -2052,7 +2982,7 @@
             </div>
             <div class="sidebar-content">
                 <div class="members-list">
-                    <h4 class="section-title">Members</h4>
+                    <h4 class="section-title">Members <span id="onlineCount">(0 online)</span></h4>
                     <div id="membersList">
                         <!-- Members will be loaded here -->
                     </div>
@@ -2303,7 +3233,637 @@
                 loadingGroups.forEach(group => group.remove());
             };
             
+            // =============================================
+            // GAMING FEATURES INTEGRATION
+            // =============================================
+            
+            // Initialize Gaming System
+            let gamingSystem = null;
+            
+            // Wait for gaming.js to load
+            function initializeGamingSystem() {
+                if (window.gamingSystem) {
+                    gamingSystem = window.gamingSystem;
+                    setupGamingFeatures();
+                } else {
+                    setTimeout(initializeGamingSystem, 100);
+                }
+            }
+            
+            function setupGamingFeatures() {
+                if (!gamingSystem) return;
+                
+                // Get group ID from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const groupId = urlParams.get('id');
+                
+                if (!groupId) return;
+                
+                // Start gaming system for this group
+                gamingSystem.currentGroupId = groupId;
+                
+                // Setup activity strip
+                setupActivityStrip(groupId);
+                
+                // Setup tap-to-talk button
+                setupTapToTalk(groupId);
+                
+                // Setup quick game buttons
+                setupQuickGameButtons(groupId);
+                
+                // Setup UI updates
+                setupGamingUIUpdates();
+                
+                // Start live events
+                gamingSystem.startLiveEventScheduler(groupId);
+                
+                // Update group streak display
+                updateGroupStreak(groupId);
+                
+                // Update reputation display
+                updateReputationDisplay();
+            }
+            
+            function setupActivityStrip(groupId) {
+                // Listen to group activity
+                gamingSystem.listenToGroupActivity(groupId, (activities) => {
+                    const activityStrip = document.getElementById('activityStrip');
+                    activityStrip.innerHTML = '';
+                    
+                    activities.forEach(activity => {
+                        const activityItem = document.createElement('div');
+                        activityItem.className = 'activity-item';
+                        activityItem.innerHTML = `
+                            <img src="${activity.userAvatar}" alt="${activity.userName}" class="activity-avatar">
+                            <span>${activity.userName}</span>
+                            <span class="activity-status ${activity.status}">${activity.status}</span>
+                        `;
+                        activityStrip.appendChild(activityItem);
+                    });
+                    
+                    // Update online count in sidebar
+                    const onlineCount = activities.filter(a => a.status === 'online').length;
+                    const onlineCountElement = document.getElementById('onlineCount');
+                    if (onlineCountElement) {
+                        onlineCountElement.textContent = `(${onlineCount} online)`;
+                    }
+                });
+            }
+            
+            function setupTapToTalk(groupId) {
+                const tapToTalkBtn = document.getElementById('tapToTalkBtn');
+                if (!tapToTalkBtn) return;
+                
+                let mediaRecorder = null;
+                let audioChunks = [];
+                let recordingTimer = null;
+                let recordingStartTime = 0;
+                
+                tapToTalkBtn.addEventListener('mousedown', startRecording);
+                tapToTalkBtn.addEventListener('touchstart', startRecording);
+                
+                tapToTalkBtn.addEventListener('mouseup', stopRecording);
+                tapToTalkBtn.addEventListener('touchend', stopRecording);
+                
+                tapToTalkBtn.addEventListener('mouseleave', cancelRecording);
+                tapToTalkBtn.addEventListener('touchcancel', cancelRecording);
+                
+                async function startRecording(e) {
+                    e.preventDefault();
+                    
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        mediaRecorder = new MediaRecorder(stream);
+                        audioChunks = [];
+                        
+                        mediaRecorder.ondataavailable = (event) => {
+                            if (event.data.size > 0) {
+                                audioChunks.push(event.data);
+                            }
+                        };
+                        
+                        mediaRecorder.onstop = async () => {
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                            const duration = Date.now() - recordingStartTime;
+                            
+                            if (duration > 1000) { // Only send if recording > 1 second
+                                try {
+                                    await gamingSystem.sendVoiceMessage(groupId, audioBlob, duration);
+                                    showVoiceSentNotification();
+                                } catch (error) {
+                                    console.error('Error sending voice message:', error);
+                                    showErrorNotification('Failed to send voice message');
+                                }
+                            }
+                            
+                            // Stop all tracks
+                            stream.getTracks().forEach(track => track.stop());
+                        };
+                        
+                        mediaRecorder.start();
+                        recordingStartTime = Date.now();
+                        
+                        // Start visual feedback
+                        tapToTalkBtn.classList.add('recording');
+                        
+                        // Start timer to stop recording after max duration
+                        recordingTimer = setTimeout(() => {
+                            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                                stopRecording();
+                            }
+                        }, gamingSystem.GAMING_FEATURES.VOICE_BUBBLES.MAX_DURATION);
+                        
+                    } catch (error) {
+                        console.error('Error accessing microphone:', error);
+                        showErrorNotification('Microphone access denied');
+                    }
+                }
+                
+                function stopRecording() {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        clearTimeout(recordingTimer);
+                        tapToTalkBtn.classList.remove('recording');
+                    }
+                }
+                
+                function cancelRecording() {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        clearTimeout(recordingTimer);
+                        tapToTalkBtn.classList.remove('recording');
+                        
+                        // Stop all tracks
+                        if (mediaRecorder.stream) {
+                            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                        }
+                    }
+                }
+                
+                function showVoiceSentNotification() {
+                    const notification = document.createElement('div');
+                    notification.style.cssText = `
+                        position: fixed;
+                        bottom: 180px;
+                        right: 25px;
+                        background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+                        color: white;
+                        padding: 10px 20px;
+                        border-radius: 20px;
+                        z-index: 9996;
+                        animation: slideUp 0.3s ease;
+                    `;
+                    notification.textContent = 'Voice message sent!';
+                    document.body.appendChild(notification);
+                    
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 2000);
+                }
+                
+                function showErrorNotification(message) {
+                    const notification = document.createElement('div');
+                    notification.style.cssText = `
+                        position: fixed;
+                        bottom: 180px;
+                        right: 25px;
+                        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+                        color: white;
+                        padding: 10px 20px;
+                        border-radius: 20px;
+                        z-index: 9996;
+                        animation: slideUp 0.3s ease;
+                    `;
+                    notification.textContent = message;
+                    document.body.appendChild(notification);
+                    
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 2000);
+                }
+            }
+            
+            function setupQuickGameButtons(groupId) {
+                const triviaBtn = document.getElementById('triviaGameBtn');
+                const reactionBtn = document.getElementById('reactionGameBtn');
+                const wordBtn = document.getElementById('wordGameBtn');
+                const chatModeBtn = document.getElementById('chatModeBtn');
+                
+                if (triviaBtn) {
+                    triviaBtn.addEventListener('click', async () => {
+                        try {
+                            await gamingSystem.startMiniGame(groupId, 'trivia');
+                            showMiniGameOverlay('trivia');
+                        } catch (error) {
+                            console.error('Error starting trivia:', error);
+                        }
+                    });
+                }
+                
+                if (reactionBtn) {
+                    reactionBtn.addEventListener('click', async () => {
+                        try {
+                            await gamingSystem.startReactionChallenge(groupId, 'tap_speed');
+                            showReactionChallenge();
+                        } catch (error) {
+                            console.error('Error starting reaction challenge:', error);
+                        }
+                    });
+                }
+                
+                if (wordBtn) {
+                    wordBtn.addEventListener('click', async () => {
+                        try {
+                            await gamingSystem.startMiniGame(groupId, 'word_scramble');
+                            showMiniGameOverlay('word_scramble');
+                        } catch (error) {
+                            console.error('Error starting word scramble:', error);
+                        }
+                    });
+                }
+                
+                if (chatModeBtn) {
+                    chatModeBtn.addEventListener('click', async () => {
+                        try {
+                            await gamingSystem.startChatModeVote(groupId);
+                            showChatModeVote();
+                        } catch (error) {
+                            console.error('Error starting chat mode vote:', error);
+                        }
+                    });
+                }
+            }
+            
+            function showMiniGameOverlay(gameType) {
+                const overlay = document.getElementById('miniGameOverlay');
+                const gameTitle = document.getElementById('gameTitle');
+                const gameContent = document.getElementById('gameContent');
+                
+                if (!overlay) return;
+                
+                switch (gameType) {
+                    case 'trivia':
+                        gameTitle.textContent = 'Trivia Challenge';
+                        gameContent.innerHTML = `
+                            <div style="text-align: center; margin-bottom: 20px;">
+                                <div style="font-size: 24px; margin-bottom: 10px;">🎯</div>
+                                <h3 style="margin-bottom: 10px;">Quick Trivia</h3>
+                                <p>Answer 3 questions correctly to win!</p>
+                            </div>
+                            <div id="triviaQuestions">
+                                <!-- Questions will be loaded by gaming system -->
+                            </div>
+                        `;
+                        break;
+                        
+                    case 'word_scramble':
+                        gameTitle.textContent = 'Word Scramble';
+                        gameContent.innerHTML = `
+                            <div style="text-align: center; margin-bottom: 20px;">
+                                <div style="font-size: 24px; margin-bottom: 10px;">🔤</div>
+                                <h3 style="margin-bottom: 10px;">Unscramble the Word!</h3>
+                                <div style="font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0;" id="scrambledWord">
+                                    L O A D I N G
+                                </div>
+                                <input type="text" id="wordGuess" placeholder="Type your guess..." style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid #667eea; font-size: 16px;">
+                            </div>
+                        `;
+                        break;
+                }
+                
+                overlay.classList.add('active');
+                
+                // Close button
+                const closeBtn = document.getElementById('gameCloseBtn');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', () => {
+                        overlay.classList.remove('active');
+                    });
+                }
+                
+                // Overlay click to close
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) {
+                        overlay.classList.remove('active');
+                    }
+                });
+            }
+            
+            function showReactionChallenge() {
+                const challenge = document.getElementById('reactionChallenge');
+                if (!challenge) return;
+                
+                challenge.classList.add('active');
+                
+                let startTime = Date.now() + 3000; // Start in 3 seconds
+                let countdownInterval = null;
+                
+                // Update countdown
+                function updateCountdown() {
+                    const now = Date.now();
+                    const remaining = Math.max(0, startTime - now);
+                    
+                    if (remaining <= 0) {
+                        clearInterval(countdownInterval);
+                        document.getElementById('challengeTimer').textContent = 'GO!';
+                        return;
+                    }
+                    
+                    const seconds = (remaining / 1000).toFixed(2);
+                    document.getElementById('challengeTimer').textContent = seconds;
+                }
+                
+                countdownInterval = setInterval(updateCountdown, 10);
+                
+                // Challenge button
+                const challengeButton = document.getElementById('challengeButton');
+                if (challengeButton) {
+                    challengeButton.addEventListener('click', () => {
+                        const reactionTime = Date.now() - startTime;
+                        
+                        // Send reaction time
+                        gamingSystem.submitReaction(gamingSystem.currentGroupId, 'active_challenge_id', reactionTime);
+                        
+                        // Show result
+                        challengeButton.textContent = `${reactionTime}ms`;
+                        challengeButton.disabled = true;
+                        
+                        // Hide after 3 seconds
+                        setTimeout(() => {
+                            challenge.classList.remove('active');
+                            challengeButton.textContent = 'TAP NOW!';
+                            challengeButton.disabled = false;
+                            clearInterval(countdownInterval);
+                        }, 3000);
+                    });
+                }
+                
+                // Auto-hide after 20 seconds
+                setTimeout(() => {
+                    challenge.classList.remove('active');
+                    clearInterval(countdownInterval);
+                }, 20000);
+            }
+            
+            function showChatModeVote() {
+                const modes = ['normal', 'chaos', 'stealth', 'night_raid', 'slow'];
+                
+                // Create voting UI
+                const voteOverlay = document.createElement('div');
+                voteOverlay.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0, 0, 0, 0.95);
+                    backdrop-filter: blur(10px);
+                    border-radius: 20px;
+                    padding: 30px;
+                    z-index: 10001;
+                    max-width: 400px;
+                    width: 90%;
+                    border: 2px solid #667eea;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+                `;
+                
+                voteOverlay.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 25px;">
+                        <h2 style="color: white; margin-bottom: 10px;">Vote for Chat Mode</h2>
+                        <p style="color: #aaa;">Choose a mode for the next 30 minutes</p>
+                    </div>
+                    <div id="modeOptions" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px;">
+                        ${modes.map(mode => `
+                            <button class="mode-option" data-mode="${mode}" style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border: 2px solid rgba(255, 255, 255, 0.2);
+                                color: white;
+                                padding: 15px;
+                                border-radius: 10px;
+                                cursor: pointer;
+                                transition: all 0.3s;
+                                text-align: center;
+                                font-weight: 600;
+                            ">
+                                ${getModeDisplayName(mode)}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div style="text-align: center;">
+                        <button id="closeVoteBtn" style="
+                            background: rgba(255, 255, 255, 0.2);
+                            color: white;
+                            border: none;
+                            padding: 10px 25px;
+                            border-radius: 20px;
+                            cursor: pointer;
+                        ">
+                            Close
+                        </button>
+                    </div>
+                `;
+                
+                document.body.appendChild(voteOverlay);
+                
+                // Mode option click handlers
+                voteOverlay.querySelectorAll('.mode-option').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const mode = btn.dataset.mode;
+                        
+                        // Vote for this mode
+                        gamingSystem.voteForChatMode(gamingSystem.currentGroupId, 'active_vote_id', mode);
+                        
+                        // Visual feedback
+                        btn.style.background = 'rgba(102, 126, 234, 0.8)';
+                        btn.style.borderColor = '#667eea';
+                        
+                        // Close after delay
+                        setTimeout(() => {
+                            voteOverlay.remove();
+                        }, 1000);
+                    });
+                });
+                
+                // Close button
+                voteOverlay.querySelector('#closeVoteBtn').addEventListener('click', () => {
+                    voteOverlay.remove();
+                });
+                
+                // Click outside to close
+                voteOverlay.addEventListener('click', (e) => {
+                    if (e.target === voteOverlay) {
+                        voteOverlay.remove();
+                    }
+                });
+                
+                function getModeDisplayName(mode) {
+                    const names = {
+                        'normal': 'Normal Mode',
+                        'chaos': 'Chaos Mode',
+                        'stealth': 'Stealth Mode',
+                        'night_raid': 'Night Raid',
+                        'slow': 'Slow Mode'
+                    };
+                    return names[mode] || mode;
+                }
+            }
+            
+            function setupGamingUIUpdates() {
+                // Update session timer
+                document.addEventListener('sessionTimerUpdate', (e) => {
+                    const sessionTimer = document.getElementById('sessionTimer');
+                    const sessionTime = document.getElementById('sessionTime');
+                    
+                    if (sessionTimer && sessionTime) {
+                        sessionTimer.classList.add('active');
+                        sessionTime.textContent = e.detail.display;
+                    }
+                });
+                
+                // Update group streak
+                document.addEventListener('groupStreakUpdate', (e) => {
+                    const groupStreak = document.getElementById('groupStreak');
+                    const streakCount = document.getElementById('streakCount');
+                    
+                    if (groupStreak && streakCount) {
+                        groupStreak.classList.add('active');
+                        streakCount.textContent = e.detail.streak;
+                    }
+                });
+                
+                // Show achievement notification
+                document.addEventListener('achievementUnlocked', (e) => {
+                    showAchievementNotification(e.detail.achievementId);
+                });
+                
+                // Update chat mode
+                document.addEventListener('chatModeChange', (e) => {
+                    showChatModeIndicator(e.detail.mode);
+                });
+            }
+            
+            function updateGroupStreak(groupId) {
+                // Update streak display
+                gamingSystem.updateGroupStreak(groupId);
+                
+                // Update every minute
+                setInterval(() => {
+                    gamingSystem.updateGroupStreak(groupId);
+                }, 60000);
+            }
+            
+            function updateReputationDisplay() {
+                // Get current user's reputation
+                const reputationDisplay = document.getElementById('reputationDisplay');
+                const reputationValue = document.getElementById('reputationValue');
+                
+                if (reputationDisplay && reputationValue) {
+                    reputationDisplay.classList.add('active');
+                    
+                    // Update reputation every 30 seconds
+                    setInterval(async () => {
+                        if (gamingSystem.firebaseUser) {
+                            const reputation = await gamingSystem.getUserReputation(gamingSystem.firebaseUser.uid);
+                            reputationValue.textContent = reputation;
+                        }
+                    }, 30000);
+                    
+                    // Initial update
+                    if (gamingSystem.firebaseUser) {
+                        gamingSystem.getUserReputation(gamingSystem.firebaseUser.uid).then(rep => {
+                            reputationValue.textContent = rep;
+                        });
+                    }
+                }
+            }
+            
+            function showAchievementNotification(achievementId) {
+                const notification = document.getElementById('achievementNotification');
+                const achievementIcon = document.getElementById('achievementIcon');
+                const achievementTitle = document.getElementById('achievementTitle');
+                const achievementDesc = document.getElementById('achievementDesc');
+                
+                if (!notification) return;
+                
+                // Set achievement details based on ID
+                const achievements = {
+                    'first_game': { icon: '🎮', title: 'First Game!', desc: 'Played your first mini game' },
+                    'chat_master': { icon: '💬', title: 'Chat Master!', desc: 'Sent 100 messages' },
+                    'reaction_king': { icon: '⚡', title: 'Reaction King!', desc: 'Won 5 reaction challenges' },
+                    'lucky_streak': { icon: '🍀', title: 'Lucky Streak!', desc: 'Won 3 games in a row' }
+                };
+                
+                const achievement = achievements[achievementId] || { 
+                    icon: '🏆', 
+                    title: 'Achievement Unlocked!', 
+                    desc: 'You earned a new achievement' 
+                };
+                
+                achievementIcon.textContent = achievement.icon;
+                achievementTitle.textContent = achievement.title;
+                achievementDesc.textContent = achievement.desc;
+                
+                notification.classList.add('active');
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    notification.classList.remove('active');
+                }, 5000);
+            }
+            
+            function showChatModeIndicator(mode) {
+                const indicator = document.getElementById('chatModeIndicator');
+                const modeTitle = document.getElementById('modeTitle');
+                const modeTimer = document.getElementById('modeTimer');
+                
+                if (!indicator) return;
+                
+                const modeNames = {
+                    'normal': 'Normal Mode',
+                    'chaos': 'Chaos Mode',
+                    'stealth': 'Stealth Mode',
+                    'night_raid': 'Night Raid Mode',
+                    'slow': 'Slow Mode'
+                };
+                
+                modeTitle.textContent = modeNames[mode] || `${mode} Mode`;
+                
+                // Start countdown timer (30 minutes)
+                let remaining = 30 * 60; // 30 minutes in seconds
+                
+                indicator.classList.add('active');
+                
+                // Update body class for mode-specific styling
+                document.body.classList.remove('night-raid-mode', 'chaos-mode', 'stealth-mode');
+                document.body.classList.add(`${mode.toLowerCase().replace('_', '-')}-mode`);
+                
+                const timerInterval = setInterval(() => {
+                    remaining--;
+                    
+                    if (remaining <= 0) {
+                        clearInterval(timerInterval);
+                        indicator.classList.remove('active');
+                        document.body.classList.remove(`${mode.toLowerCase().replace('_', '-')}-mode`);
+                        return;
+                    }
+                    
+                    const minutes = Math.floor(remaining / 60);
+                    const seconds = remaining % 60;
+                    modeTimer.textContent = `Ends in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }, 1000);
+                
+                // Auto-hide indicator after 10 seconds (but keep mode active)
+                setTimeout(() => {
+                    indicator.classList.remove('active');
+                }, 10000);
+            }
+            
+            // Initialize gaming system when DOM is ready
+            setTimeout(initializeGamingSystem, 1000);
+            
+            // =============================================
             // CALL BUTTONS FUNCTIONALITY
+            // =============================================
+            
             const groupVoiceCallBtn = document.getElementById('groupVoiceCallBtn');
             const groupVoiceCallBtnMobile = document.getElementById('groupVoiceCallBtnMobile');
             
@@ -2386,7 +3946,8 @@
         });
     </script>
     
-    <!-- Import the calls module for voice calls -->
+    <!-- Import the gaming system first, then calls module -->
+    <script type="module" src="gaming.js"></script>
     <script type="module" src="calls.js"></script>
     <script type="module" src="group.js"></script>
 </body>
