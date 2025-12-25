@@ -1,5 +1,5 @@
 // group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
-// UPGRADED VERSION: Fixed private message reactions, user blocking, improved caching, duplicate message prevention, and optimized UI refresh
+// UPDATED: Replaced Font Awesome icons with Feather icons, fixed message sending status display
 
 import { 
     getFirestore, 
@@ -2199,10 +2199,6 @@ class GroupChat {
                 opacity: 1;
             }
             
-            .swipe-reply-indicator i {
-                font-size: 16px;
-            }
-            
             .replying-to {
                 background: rgba(102, 126, 234, 0.1);
                 border-left: 3px solid #667eea;
@@ -2515,7 +2511,10 @@ class GroupChat {
                     swipeIndicator = document.createElement('div');
                     swipeIndicator.className = 'swipe-reply-indicator';
                     swipeIndicator.innerHTML = `
-                        <i class="fas fa-reply"></i>
+                        <svg class="feather" data-feather="corner-up-left" style="width: 16px; height: 16px; margin-right: 8px;">
+                            <polyline points="9 10 4 15 9 20"></polyline>
+                            <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+                        </svg>
                         <span>Swipe right to reply</span>
                     `;
                     document.body.appendChild(swipeIndicator);
@@ -2663,7 +2662,10 @@ class GroupChat {
                 <span class="reply-message">${truncatedMessage}</span>
             </div>
             <button class="cancel-reply" id="cancelReply">
-                <i class="fas fa-times"></i>
+                <svg class="feather" data-feather="x" style="width: 16px; height: 16px;">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
             </button>
         `;
         
@@ -2979,11 +2981,16 @@ function initCreateGroupPage() {
                        data-index="${index}">
                 ${index === 0 ? `
                     <button type="button" class="add-rule-btn add-topic-btn">
-                        <i class="fas fa-plus"></i>
+                        <svg class="feather" data-feather="plus">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
                     </button>
                 ` : `
                     <button type="button" class="remove-rule-btn remove-topic-btn">
-                        <i class="fas fa-minus"></i>
+                        <svg class="feather" data-feather="minus">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
                     </button>
                 `}
             `;
@@ -3032,11 +3039,16 @@ function initCreateGroupPage() {
                        data-index="${index}">
                 ${index === 0 ? `
                     <button type="button" class="add-rule-btn add-rule-btn">
-                        <i class="fas fa-plus"></i>
+                        <svg class="feather" data-feather="plus">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
                     </button>
                 ` : `
                     <button type="button" class="remove-rule-btn remove-rule-btn">
-                        <i class="fas fa-minus"></i>
+                        <svg class="feather" data-feather="minus">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
                     </button>
                 `}
             `;
@@ -3102,7 +3114,12 @@ function initCreateGroupPage() {
         }
         
         createBtn.disabled = true;
-        createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+        createBtn.innerHTML = `
+            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite;">
+                <circle cx="12" cy="12" r="10" />
+            </svg>
+            Creating...
+        `;
         
         try {
             const result = await groupChat.createGroup(groupData, groupPhotoFile);
@@ -3180,7 +3197,12 @@ function initGroupsPage() {
         if (groups.length === 0) {
             groupsGrid.innerHTML = `
                 <div class="no-groups">
-                    <i class="fas fa-users-slash"></i>
+                    <svg class="feather" data-feather="users" style="width: 48px; height: 48px; margin-bottom: 16px;">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
                     <p>No groups found. Be the first to create one!</p>
                 </div>
             `;
@@ -3204,11 +3226,21 @@ function initGroupsPage() {
                     <p class="group-description">${group.description}</p>
                     <div class="group-meta">
                         <span class="group-members">
-                            <i class="fas fa-users"></i>
+                            <svg class="feather" data-feather="users" style="width: 14px; height: 14px; margin-right: 4px;">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
                             ${group.memberCount || 0} / ${group.maxMembers || 1000}
                         </span>
                         <span class="group-privacy">
-                            <i class="fas ${group.privacy === 'private' ? 'fa-lock' : 'fa-globe'}"></i>
+                            <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
+                                ${group.privacy === 'private' ? 
+                                    '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
+                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
+                                }
+                            </svg>
                             ${group.privacy === 'private' ? 'Private' : 'Public'}
                         </span>
                     </div>
@@ -3230,13 +3262,20 @@ function initGroupsPage() {
                         <ul class="rules-list">
                             ${(group.rules || []).slice(0, 2).map(rule => 
                                 `<li class="rule-item">
-                                    <i class="fas fa-check-circle"></i>
+                                    <svg class="feather" data-feather="check-circle" style="width: 14px; height: 14px; margin-right: 8px;">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    </svg>
                                     <span>${rule}</span>
                                 </li>`
                             ).join('')}
                             ${(group.rules || []).length > 2 ? 
                                 `<li class="rule-item">
-                                    <i class="fas fa-ellipsis-h"></i>
+                                    <svg class="feather" data-feather="more-horizontal" style="width: 14px; height: 14px; margin-right: 8px;">
+                                        <circle cx="12" cy="12" r="1"></circle>
+                                        <circle cx="19" cy="12" r="1"></circle>
+                                        <circle cx="5" cy="12" r="1"></circle>
+                                    </svg>
                                     <span>${(group.rules || []).length - 2} more rules</span>
                                 </li>` : ''
                             }
@@ -3404,7 +3443,12 @@ function initSetPage() {
         };
         
         joinBtn.disabled = true;
-        joinBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        joinBtn.innerHTML = `
+            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; margin-right: 8px;">
+                <circle cx="12" cy="12" r="10" />
+            </svg>
+            Saving...
+        `;
         
         try {
             await groupChat.updateUserProfile(userData);
@@ -3603,7 +3647,7 @@ function initGroupPage() {
             if (file) {
                 try {
                     const originalHTML = attachmentBtn.innerHTML;
-                    attachmentBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    attachmentBtn.innerHTML = '<svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite;"><circle cx="12" cy="12" r="10" /></svg>';
                     attachmentBtn.disabled = true;
                     
                     await groupChat.sendMediaMessage(groupId, file, groupChat.replyingToMessage?.id);
@@ -3615,7 +3659,7 @@ function initGroupPage() {
                     console.error('Error sending media:', error);
                     alert(error.message || 'Failed to send media. Please try again.');
                     
-                    attachmentBtn.innerHTML = '<i class="fas fa-paperclip"></i>';
+                    attachmentBtn.innerHTML = '<svg class="feather" data-feather="paperclip"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>';
                     attachmentBtn.disabled = false;
                 }
             }
@@ -3670,7 +3714,7 @@ function initGroupPage() {
                 (groupData.rules || []).forEach(rule => {
                     const li = document.createElement('li');
                     li.className = 'rule-item';
-                    li.innerHTML = `<i class="fas fa-check-circle"></i><span>${rule}</span>`;
+                    li.innerHTML = `<svg class="feather" data-feather="check-circle" style="width: 14px; height: 14px; margin-right: 8px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg><span>${rule}</span>`;
                     rulesList.appendChild(li);
                 });
             }
@@ -3731,7 +3775,7 @@ function initGroupPage() {
             const copyBtn = document.createElement('button');
             copyBtn.id = 'copyInviteBtn';
             copyBtn.className = 'copy-invite-btn';
-            copyBtn.innerHTML = '<i class="fas fa-link"></i> Copy Invite Link';
+            copyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
             
             const statusDiv = document.createElement('div');
             statusDiv.id = 'inviteLinkStatus';
@@ -3800,7 +3844,7 @@ function initGroupPage() {
                         color: white;
                     }
                     
-                    .copy-invite-btn.copied i {
+                    .copy-invite-btn.copied svg {
                         animation: bounce 0.5s ease;
                     }
                     
@@ -3823,6 +3867,11 @@ function initGroupPage() {
                         0%, 100% { transform: translateY(0); }
                         50% { transform: translateY(-5px); }
                     }
+                    
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
                 `;
                 document.head.appendChild(styles);
             }
@@ -3834,7 +3883,7 @@ function initGroupPage() {
                 
                 isCopying = true;
                 copyBtn.disabled = true;
-                copyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting link...';
+                copyBtn.innerHTML = '<svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; margin-right: 8px;"><circle cx="12" cy="12" r="10" /></svg> Getting link...';
                 statusDiv.textContent = '';
                 statusDiv.className = 'invite-link-status';
                 
@@ -3843,7 +3892,7 @@ function initGroupPage() {
                     
                     await navigator.clipboard.writeText(inviteLink);
                     
-                    copyBtn.innerHTML = '<i class="fas fa-check"></i> Link Copied!';
+                    copyBtn.innerHTML = '<svg class="feather" data-feather="check" style="margin-right: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Link Copied!';
                     copyBtn.classList.add('copied');
                     
                     statusDiv.textContent = 'Invite link copied to clipboard!';
@@ -3852,7 +3901,7 @@ function initGroupPage() {
                     copyBtn.title = `Link: ${inviteLink}`;
                     
                     setTimeout(() => {
-                        copyBtn.innerHTML = '<i class="fas fa-link"></i> Copy Invite Link';
+                        copyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
                         copyBtn.classList.remove('copied');
                         copyBtn.disabled = false;
                         statusDiv.textContent = 'Share this link to invite others';
@@ -3863,14 +3912,14 @@ function initGroupPage() {
                 } catch (error) {
                     console.error('Error copying invite link:', error);
                     
-                    copyBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+                    copyBtn.innerHTML = '<svg class="feather" data-feather="alert-triangle" style="margin-right: 8px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Error';
                     copyBtn.disabled = false;
                     
                     statusDiv.textContent = 'Failed to copy link. Please try again.';
                     statusDiv.classList.add('error');
                     
                     setTimeout(() => {
-                        copyBtn.innerHTML = '<i class="fas fa-link"></i> Copy Invite Link';
+                        copyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
                         statusDiv.textContent = '';
                         statusDiv.className = 'invite-link-status';
                         isCopying = false;
@@ -4135,7 +4184,10 @@ function initGroupPage() {
                                         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                                                background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
                                                font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                                <circle cx="12" cy="12" r="10" />
+                                            </svg>
+                                            Uploading...
                                         </div>
                                     ` : ''}
                                 </div>
@@ -4153,7 +4205,10 @@ function initGroupPage() {
                                         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                                                background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
                                                font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                                <circle cx="12" cy="12" r="10" />
+                                            </svg>
+                                            Uploading...
                                         </div>
                                     ` : ''}
                                 </div>
@@ -4171,6 +4226,11 @@ function initGroupPage() {
                         const messageDivId = `message-${msg.id}`;
                         
                         const cachedReactions = reactionsCache.get(msg.id) || [];
+                        
+                        // Add sending indicator
+                        const sendingIndicator = isTemp ? 
+                            `<div class="sending-indicator" id="sending-${msg.id}" style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>` : 
+                            '';
                         
                         return `
                             <div class="${messageDivClass}" data-message-id="${msg.id}" id="${messageDivId}">
@@ -4190,7 +4250,7 @@ function initGroupPage() {
                                         +
                                     </div>
                                 </div>
-                                ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                                ${sendingIndicator}
                             </div>
                         `;
                     }).join('')}
@@ -4198,6 +4258,14 @@ function initGroupPage() {
             `;
             
             messagesContainer.appendChild(groupDiv);
+        });
+        
+        // Remove sending indicators for messages that are no longer temp
+        document.querySelectorAll('.sending-indicator').forEach(indicator => {
+            const messageId = indicator.id.replace('sending-', '');
+            if (!tempMessages.has(messageId)) {
+                indicator.remove();
+            }
         });
         
         document.querySelectorAll('.message-avatar').forEach(avatar => {
@@ -4318,7 +4386,11 @@ function initGroupPage() {
         if (!text) return;
         
         sendBtn.disabled = true;
-        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        sendBtn.innerHTML = `
+            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 18px; height: 18px;">
+                <circle cx="12" cy="12" r="10" />
+            </svg>
+        `;
         
         try {
             await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
@@ -4327,12 +4399,20 @@ function initGroupPage() {
             messageInput.style.height = 'auto';
             messageInput.dispatchEvent(new Event('input'));
             
+            // Clear the reply indicator after sending
+            groupChat.clearReply();
+            
         } catch (error) {
             console.error('Error sending message:', error);
             alert(error.message || 'Failed to send message. Please try again.');
         } finally {
             sendBtn.disabled = false;
-            sendBtn.innerHTML = 'Send';
+            sendBtn.innerHTML = `
+                <svg class="feather" data-feather="send">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            `;
         }
     }
     
@@ -4445,11 +4525,20 @@ function initAdminGroupsPage() {
                 if (groupsList) {
                     groupsList.innerHTML = `
                         <div class="empty-state">
-                            <i class="fas fa-users-slash"></i>
+                            <svg class="feather" data-feather="users" style="width: 48px; height: 48px; margin-bottom: 16px;">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
                             <h3>No Groups Created Yet</h3>
                             <p>You haven't created any groups yet. Create your first group to get started!</p>
                             <button id="createFirstGroupBtn" class="primary-btn">
-                                <i class="fas fa-plus"></i> Create Your First Group
+                                <svg class="feather" data-feather="plus" style="width: 16px; height: 16px; margin-right: 8px;">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Create Your First Group
                             </button>
                         </div>
                     `;
@@ -4473,11 +4562,20 @@ function initAdminGroupsPage() {
             if (groupsList) {
                 groupsList.innerHTML = `
                     <div class="error-state">
-                        <i class="fas fa-exclamation-triangle"></i>
+                        <svg class="feather" data-feather="alert-triangle" style="width: 48px; height: 48px; margin-bottom: 16px; color: #ff6b6b;">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
                         <h3>Error Loading Groups</h3>
                         <p>${error.message || 'Failed to load groups. Please try again.'}</p>
                         <button onclick="location.reload()" class="primary-btn">
-                            <i class="fas fa-redo"></i> Retry
+                            <svg class="feather" data-feather="refresh-cw" style="width: 16px; height: 16px; margin-right: 8px;">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            Retry
                         </button>
                     </div>
                 `;
@@ -4521,15 +4619,30 @@ function initAdminGroupsPage() {
                             <p class="group-description">${group.description || 'No description'}</p>
                             <div class="group-meta">
                                 <span class="group-members">
-                                    <i class="fas fa-users"></i>
+                                    <svg class="feather" data-feather="users" style="width: 14px; height: 14px; margin-right: 4px;">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
                                     ${group.memberCount || 0} members
                                 </span>
                                 <span class="group-date">
-                                    <i class="fas fa-calendar"></i>
+                                    <svg class="feather" data-feather="calendar" style="width: 14px; height: 14px; margin-right: 4px;">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
                                     Created ${createdAt}
                                 </span>
                                 <span class="group-privacy">
-                                    <i class="fas ${group.privacy === 'private' ? 'fa-lock' : 'fa-globe'}"></i>
+                                    <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
+                                        ${group.privacy === 'private' ? 
+                                            '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
+                                            '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
+                                        }
+                                    </svg>
                                     ${group.privacy === 'private' ? 'Private' : 'Public'}
                                 </span>
                             </div>
@@ -4537,16 +4650,35 @@ function initAdminGroupsPage() {
                     </div>
                     <div class="group-actions">
                         <button class="view-group-btn" onclick="window.location.href='group.html?id=${group.id}'">
-                            <i class="fas fa-comments"></i> View Chat
+                            <svg class="feather" data-feather="message-circle" style="width: 14px; height: 14px; margin-right: 6px;">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                            </svg>
+                            View Chat
                         </button>
                         <button class="invite-link-admin-btn" onclick="copyGroupInviteLink('${group.id}')">
-                            <i class="fas fa-link"></i> Copy Invite
+                            <svg class="feather" data-feather="link" style="width: 14px; height: 14px; margin-right: 6px;">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                            </svg>
+                            Copy Invite
                         </button>
                         <button class="manage-members-btn" onclick="viewGroupMembers('${group.id}', '${group.name.replace(/'/g, "\\'")}')">
-                            <i class="fas fa-users"></i> Manage Members
+                            <svg class="feather" data-feather="users" style="width: 14px; height: 14px; margin-right: 6px;">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Manage Members
                         </button>
                         <button class="delete-group-btn" onclick="confirmDeleteGroup('${group.id}', '${group.name.replace(/'/g, "\\'")}')">
-                            <i class="fas fa-trash"></i> Delete
+                            <svg class="feather" data-feather="trash-2" style="width: 14px; height: 14px; margin-right: 6px;">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                            Delete
                         </button>
                     </div>
                 </div>
@@ -4584,7 +4716,7 @@ function initAdminGroupsPage() {
         try {
             const originalText = event?.target?.innerHTML || 'Copy Invite';
             if (event?.target) {
-                event.target.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                event.target.innerHTML = '<svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;"><circle cx="12" cy="12" r="10" /></svg>';
                 event.target.disabled = true;
             }
             
@@ -4666,7 +4798,12 @@ function initAdminGroupsPage() {
                                 ${!isAdmin && !isCurrentUser ? `
                                     <button class="remove-member-btn" 
                                             onclick="confirmRemoveMember('${groupId}', '${member.id}', '${member.name.replace(/'/g, "\\'")}')">
-                                        <i class="fas fa-user-minus"></i> Remove
+                                        <svg class="feather" data-feather="user-minus" style="width: 14px; height: 14px; margin-right: 6px;">
+                                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                            <circle cx="8.5" cy="7" r="4"></circle>
+                                            <line x1="23" y1="11" x2="17" y2="11"></line>
+                                        </svg>
+                                        Remove
                                     </button>
                                 ` : ''}
                             </div>
@@ -4717,7 +4854,7 @@ function initAdminGroupsPage() {
             
             const originalText = event?.target?.innerHTML || 'Delete';
             if (event?.target) {
-                event.target.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+                event.target.innerHTML = '<svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px; margin-right: 6px;"><circle cx="12" cy="12" r="10" /></svg> Deleting...';
                 event.target.disabled = true;
             }
             
@@ -4748,7 +4885,7 @@ function initAdminGroupsPage() {
         try {
             const originalText = event?.target?.innerHTML || 'Remove';
             if (event?.target) {
-                event.target.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removing...';
+                event.target.innerHTML = '<svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px; margin-right: 6px;"><circle cx="12" cy="12" r="10" /></svg> Removing...';
                 event.target.disabled = true;
             }
             
@@ -4838,7 +4975,12 @@ function initJoinPage() {
                                     <div class="group-meta">
                                         <span class="group-category">${group.category || 'General'}</span>
                                         <span class="group-privacy-badge ${group.privacy === 'private' ? 'private' : 'public'}">
-                                            <i class="fas ${group.privacy === 'private' ? 'fa-lock' : 'fa-globe'}"></i>
+                                            <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
+                                                ${group.privacy === 'private' ? 
+                                                    '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
+                                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
+                                                }
+                                            </svg>
                                             ${group.privacy === 'private' ? 'Private Group' : 'Public Group'}
                                         </span>
                                     </div>
@@ -4851,7 +4993,12 @@ function initJoinPage() {
                             
                             <div class="group-stats">
                                 <div class="stat-item">
-                                    <i class="fas fa-users"></i>
+                                    <svg class="feather" data-feather="users" style="width: 24px; height: 24px; margin-right: 12px;">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
                                     <div class="stat-content">
                                         <span class="stat-value">${memberCount}/${maxMembers}</span>
                                         <span class="stat-label">Members</span>
@@ -4862,14 +5009,22 @@ function initJoinPage() {
                                     </div>
                                 </div>
                                 <div class="stat-item">
-                                    <i class="fas fa-user-circle"></i>
+                                    <svg class="feather" data-feather="user" style="width: 24px; height: 24px; margin-right: 12px;">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
                                     <div class="stat-content">
                                         <span class="stat-value">${group.creatorName || 'Unknown'}</span>
                                         <span class="stat-label">Created by</span>
                                     </div>
                                 </div>
                                 <div class="stat-item">
-                                    <i class="fas fa-calendar"></i>
+                                    <svg class="feather" data-feather="calendar" style="width: 24px; height: 24px; margin-right: 12px;">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
                                     <div class="stat-content">
                                         <span class="stat-value">${group.createdAt ? new Date(group.createdAt).toLocaleDateString() : 'Unknown'}</span>
                                         <span class="stat-label">Created on</span>
@@ -4880,7 +5035,12 @@ function initJoinPage() {
                         
                         ${group.topics && group.topics.length > 0 ? `
                             <div class="group-section">
-                                <h3><i class="fas fa-comments"></i> Discussion Topics</h3>
+                                <h3>
+                                    <svg class="feather" data-feather="message-square" style="width: 18px; height: 18px; margin-right: 8px;">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                    </svg>
+                                    Discussion Topics
+                                </h3>
                                 <div class="topics-grid">
                                     ${group.topics.map(topic => 
                                         `<span class="topic-chip">${topic}</span>`
@@ -4891,10 +5051,21 @@ function initJoinPage() {
                         
                         ${group.rules && group.rules.length > 0 ? `
                             <div class="group-section">
-                                <h3><i class="fas fa-gavel"></i> Group Rules</h3>
+                                <h3>
+                                    <svg class="feather" data-feather="shield" style="width: 18px; height: 18px; margin-right: 8px;">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                    </svg>
+                                    Group Rules
+                                </h3>
                                 <ul class="rules-list">
                                     ${group.rules.map(rule => 
-                                        `<li><i class="fas fa-check-circle"></i> ${rule}</li>`
+                                        `<li>
+                                            <svg class="feather" data-feather="check-circle" style="width: 16px; height: 16px; margin-right: 8px;">
+                                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                            </svg>
+                                            ${rule}
+                                        </li>`
                                     ).join('')}
                                 </ul>
                             </div>
@@ -4907,13 +5078,25 @@ function initJoinPage() {
                 if (groupChat.firebaseUser) {
                     groupChat.isMember(group.id).then(isMember => {
                         if (isMember) {
-                            joinBtn.innerHTML = '<i class="fas fa-comments"></i> Enter Group Chat';
+                            joinBtn.innerHTML = `
+                                <svg class="feather" data-feather="message-circle" style="width: 16px; height: 16px; margin-right: 8px;">
+                                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                                </svg>
+                                Enter Group Chat
+                            `;
                             joinBtn.className = 'join-btn success';
                             joinBtn.onclick = () => {
                                 window.location.href = `group.html?id=${group.id}`;
                             };
                         } else {
-                            joinBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Join Group';
+                            joinBtn.innerHTML = `
+                                <svg class="feather" data-feather="log-in" style="width: 16px; height: 16px; margin-right: 8px;">
+                                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                                    <polyline points="10 17 15 12 10 7"></polyline>
+                                    <line x1="15" y1="12" x2="3" y2="12"></line>
+                                </svg>
+                                Join Group
+                            `;
                             joinBtn.className = 'join-btn primary';
                             joinBtn.onclick = async () => {
                                 await joinGroup(group.id);
@@ -4921,14 +5104,28 @@ function initJoinPage() {
                         }
                     }).catch(error => {
                         console.error('Error checking membership:', error);
-                        joinBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Join Group';
+                        joinBtn.innerHTML = `
+                            <svg class="feather" data-feather="log-in" style="width: 16px; height: 16px; margin-right: 8px;">
+                                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                                <polyline points="10 17 15 12 10 7"></polyline>
+                                <line x1="15" y1="12" x2="3" y2="12"></line>
+                            </svg>
+                            Join Group
+                        `;
                         joinBtn.className = 'join-btn primary';
                         joinBtn.onclick = async () => {
                             await joinGroup(group.id);
                         };
                     });
                 } else {
-                    joinBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login to Join';
+                    joinBtn.innerHTML = `
+                        <svg class="feather" data-feather="log-in" style="width: 16px; height: 16px; margin-right: 8px;">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                            <polyline points="10 17 15 12 10 7"></polyline>
+                            <line x1="15" y1="12" x2="3" y2="12"></line>
+                        </svg>
+                        Login to Join
+                    `;
                     joinBtn.className = 'join-btn secondary';
                     joinBtn.onclick = () => {
                         sessionStorage.setItem('pendingInviteCode', inviteCode);
@@ -4961,7 +5158,12 @@ function initJoinPage() {
             
             if (joinBtn) {
                 joinBtn.disabled = true;
-                joinBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Joining...';
+                joinBtn.innerHTML = `
+                    <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 16px; height: 16px; margin-right: 8px;">
+                        <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    Joining...
+                `;
             }
             
             await groupChat.joinGroup(groupId);
@@ -4976,7 +5178,14 @@ function initJoinPage() {
             
             if (joinBtn) {
                 joinBtn.disabled = false;
-                joinBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Join Group';
+                joinBtn.innerHTML = `
+                    <svg class="feather" data-feather="log-in" style="width: 16px; height: 16px; margin-right: 8px;">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                        <polyline points="10 17 15 12 10 7"></polyline>
+                        <line x1="15" y1="12" x2="3" y2="12"></line>
+                    </svg>
+                    Join Group
+                `;
             }
         }
     }
@@ -4988,7 +5197,11 @@ function initJoinPage() {
             notification.className = 'error-notification';
             notification.innerHTML = `
                 <div class="error-header">
-                    <i class="fas fa-exclamation-triangle"></i>
+                    <svg class="feather" data-feather="alert-triangle" style="width: 24px; height: 24px; margin-right: 12px; color: #ff6b6b;">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
                     <h3>Error</h3>
                 </div>
                 <p class="error-message">${message}</p>
@@ -4996,10 +5209,19 @@ function initJoinPage() {
                     <div class="error-details">${error.stack || error.toString()}</div>
                     <div class="error-actions">
                         <button class="error-btn retry-btn" onclick="location.reload()">
-                            <i class="fas fa-redo"></i> Retry
+                            <svg class="feather" data-feather="refresh-cw" style="width: 14px; height: 14px; margin-right: 6px;">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            Retry
                         </button>
                         <button class="error-btn details-btn" onclick="this.parentElement.parentElement.classList.toggle('show-details')">
-                            <i class="fas fa-code"></i> Show Details
+                            <svg class="feather" data-feather="code" style="width: 14px; height: 14px; margin-right: 6px;">
+                                <polyline points="16 18 22 12 16 6"></polyline>
+                                <polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                            Show Details
                         </button>
                     </div>
                 ` : ''}
@@ -5015,7 +5237,11 @@ function initJoinPage() {
         } else {
             errorNotification.innerHTML = `
                 <div class="error-header">
-                    <i class="fas fa-exclamation-triangle"></i>
+                    <svg class="feather" data-feather="alert-triangle" style="width: 24px; height: 24px; margin-right: 12px; color: #ff6b6b;">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
                     <h3>Error</h3>
                 </div>
                 <p class="error-message">${message}</p>
@@ -5023,10 +5249,19 @@ function initJoinPage() {
                     <div class="error-details">${error.stack || error.toString()}</div>
                     <div class="error-actions">
                         <button class="error-btn retry-btn" onclick="location.reload()">
-                            <i class="fas fa-redo"></i> Retry
+                            <svg class="feather" data-feather="refresh-cw" style="width: 14px; height: 14px; margin-right: 6px;">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            Retry
                         </button>
                         <button class="error-btn details-btn" onclick="this.parentElement.parentElement.classList.toggle('show-details')">
-                            <i class="fas fa-code"></i> Show Details
+                            <svg class="feather" data-feather="code" style="width: 14px; height: 14px; margin-right: 6px;">
+                                <polyline points="16 18 22 12 16 6"></polyline>
+                                <polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                            Show Details
                         </button>
                     </div>
                 ` : ''}
@@ -5037,7 +5272,11 @@ function initJoinPage() {
         if (groupInfo) {
             groupInfo.innerHTML = `
                 <div class="error-placeholder">
-                    <i class="fas fa-exclamation-circle"></i>
+                    <svg class="feather" data-feather="alert-circle" style="width: 48px; height: 48px; margin-bottom: 16px; color: #ff6b6b;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
                     <p>Unable to load group information. Please try again.</p>
                 </div>
             `;
@@ -5279,7 +5518,7 @@ function initChatPage() {
             if (file) {
                 try {
                     const originalHTML = attachmentBtn.innerHTML;
-                    attachmentBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    attachmentBtn.innerHTML = '<svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite;"><circle cx="12" cy="12" r="10" /></svg>';
                     attachmentBtn.disabled = true;
                     
                     await groupChat.sendPrivateMediaMessage(partnerId, file, groupChat.replyingToMessage?.id);
@@ -5291,7 +5530,7 @@ function initChatPage() {
                     console.error('Error sending media:', error);
                     alert(error.message || 'Failed to send media. Please try again.');
                     
-                    attachmentBtn.innerHTML = '<i class="fas fa-paperclip"></i>';
+                    attachmentBtn.innerHTML = '<svg class="feather" data-feather="paperclip"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>';
                     attachmentBtn.disabled = false;
                 }
             }
@@ -5499,7 +5738,10 @@ function initChatPage() {
                                         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                                                background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
                                                font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                                <circle cx="12" cy="12" r="10" />
+                                            </svg>
+                                            Uploading...
                                         </div>
                                     ` : ''}
                                 </div>
@@ -5517,7 +5759,10 @@ function initChatPage() {
                                         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                                                background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
                                                font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <i class="fas fa-spinner fa-spin"></i> Uploading...
+                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                                <circle cx="12" cy="12" r="10" />
+                                            </svg>
+                                            Uploading...
                                         </div>
                                     ` : ''}
                                 </div>
@@ -5529,6 +5774,11 @@ function initChatPage() {
                         const messageDivId = `message-${msg.id}`;
                         
                         const cachedReactions = reactionsCache.get(msg.id) || [];
+                        
+                        // Add sending indicator
+                        const sendingIndicator = isTemp ? 
+                            `<div class="sending-indicator" id="sending-${msg.id}" style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>` : 
+                            '';
                         
                         return `
                             <div class="${messageDivClass}" data-message-id="${msg.id}" id="${messageDivId}">
@@ -5548,7 +5798,7 @@ function initChatPage() {
                                         +
                                     </div>
                                 </div>
-                                ${isTemp ? '<div style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>' : ''}
+                                ${sendingIndicator}
                             </div>
                         `;
                     }).join('')}
@@ -5556,6 +5806,14 @@ function initChatPage() {
             `;
             
             messagesContainer.appendChild(groupDiv);
+        });
+        
+        // Remove sending indicators for messages that are no longer temp
+        document.querySelectorAll('.sending-indicator').forEach(indicator => {
+            const messageId = indicator.id.replace('sending-', '');
+            if (!groupChat.tempPrivateMessages.has(messageId)) {
+                indicator.remove();
+            }
         });
         
         document.querySelectorAll('.message-avatar').forEach(avatar => {
@@ -5678,7 +5936,11 @@ function initChatPage() {
         if (!text) return;
         
         sendBtn.disabled = true;
-        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        sendBtn.innerHTML = `
+            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 18px; height: 18px;">
+                <circle cx="12" cy="12" r="10" />
+            </svg>
+        `;
         
         try {
             await groupChat.sendPrivateMessage(
@@ -5700,7 +5962,12 @@ function initChatPage() {
             alert('Failed to send message');
         } finally {
             sendBtn.disabled = false;
-            sendBtn.innerHTML = 'Send';
+            sendBtn.innerHTML = `
+                <svg class="feather" data-feather="send">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            `;
         }
     }
     
@@ -5889,7 +6156,11 @@ function initMessagesPage() {
             if (messagesList) {
                 messagesList.innerHTML = `
                     <div class="no-messages">
-                        <i class="fas fa-exclamation-circle"></i>
+                        <svg class="feather" data-feather="alert-circle" style="width: 48px; height: 48px; margin-bottom: 16px; color: #ff6b6b;">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
                         <p>Error loading messages. Please try again.</p>
                     </div>
                 `;
@@ -5903,7 +6174,9 @@ function initMessagesPage() {
         if (privateChats.length === 0) {
             messagesList.innerHTML = `
                 <div class="no-messages">
-                    <i class="fas fa-comment-slash"></i>
+                    <svg class="feather" data-feather="message-circle" style="width: 48px; height: 48px; margin-bottom: 16px; color: #666;">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                    </svg>
                     <p>No private messages yet</p>
                     <p style="font-size: 0.9rem; margin-top: 10px;">Start a chat by clicking on a user's avatar in a group</p>
                 </div>
@@ -5949,7 +6222,12 @@ function initMessagesPage() {
         if (groupChats.length === 0) {
             messagesList.innerHTML = `
                 <div class="no-messages">
-                    <i class="fas fa-users-slash"></i>
+                    <svg class="feather" data-feather="users" style="width: 48px; height: 48px; margin-bottom: 16px; color: #666;">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
                     <p>No group messages yet</p>
                     <p style="font-size: 0.9rem; margin-top: 10px;">Join a group to start chatting</p>
                 </div>
