@@ -1,4 +1,5 @@
 // group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
+// UPDATED: Added typing indicators, glowing messages, fire ring avatars, and reward tags
 // UPDATED: Replaced Font Awesome icons with Feather icons, fixed message sending status display
 
 import { 
@@ -82,6 +83,20 @@ const REACTION_EMOJIS = [
     '🎇', '🧨', '✨', '🎈', '🎉', '🎊', '🎋', '🎍', '🎎', '🎏'
 ];
 
+// New constants for typing indicators and reward system
+const TYPING_TIMEOUT = 5000; // 5 seconds
+const CONSECUTIVE_MESSAGES_THRESHOLD = 5; // Messages needed for glowing effect
+const REWARD_TIME_THRESHOLDS = {
+    THREE_MINUTES: 3 * 60 * 1000, // 3 minutes in milliseconds
+    TEN_MINUTES: 10 * 60 * 1000, // 10 minutes
+    TWENTY_MINUTES: 20 * 60 * 1000 // 20 minutes
+};
+const REWARD_TAGS = {
+    THREE_MINUTES: '🏆 Active Chatter',
+    TEN_MINUTES: '🔥 Chat Master',
+    TWENTY_MINUTES: '🌟 Ultimate Conversationalist'
+};
+
 class GroupChat {
     constructor() {
         this.currentUser = null;
@@ -139,6 +154,14 @@ class GroupChat {
         
         this.blockedUsers = new Map();
         
+        // NEW: Typing indicators and reward tracking
+        this.typingUsers = new Map(); // groupId -> Map(userId -> typingTimeout)
+        this.lastMessageTimes = new Map(); // userId -> last message timestamp
+        this.userMessageStreaks = new Map(); // userId -> consecutive message count
+        this.userStreakTimers = new Map(); // userId -> streak timer
+        this.userRewards = new Map(); // userId -> current reward tag
+        this.userActiveDurations = new Map(); // userId -> active duration in ms
+        
         this.setupAuthListener();
         this.createReactionModal();
         this.checkRestrictedUsers();
@@ -184,6 +207,14 @@ class GroupChat {
         };
         this.lastDisplayedMessages.clear();
         this.messageRenderQueue = [];
+        
+        // NEW: Clear typing and reward data
+        this.typingUsers.clear();
+        this.lastMessageTimes.clear();
+        this.userMessageStreaks.clear();
+        this.userStreakTimers.clear();
+        this.userRewards.clear();
+        this.userActiveDurations.clear();
     }
 
     async loadBlockedUsers() {
@@ -437,7 +468,11 @@ class GroupChat {
                     createdAt: userData.createdAt ? 
                         (userData.createdAt.toDate ? userData.createdAt.toDate() : userData.createdAt) : 
                         new Date(),
-                    profileComplete: userData.displayName && userData.avatar ? true : false
+                    profileComplete: userData.displayName && userData.avatar ? true : false,
+                    // NEW: Add reward tracking
+                    rewardTag: userData.rewardTag || '',
+                    glowEffect: userData.glowEffect || false,
+                    fireRing: userData.fireRing || false
                 };
                 
                 if (!this.cache.userProfiles) {
@@ -507,6 +542,169 @@ class GroupChat {
     getPrivateChatId(userId1, userId2) {
         const ids = [userId1, userId2].sort();
         return `private_${ids[0]}_${ids[1]}`;
+    }
+
+    // NEW: Update user reward in database
+    async updateUserReward(userId, rewardData) {
+        try {
+            const userRef = doc(db, 'group_users', userId);
+            await updateDoc(userRef, {
+                rewardTag: rewardData.tag,
+                glowEffect: rewardData.glowEffect,
+                fireRing: rewardData.fireRing,
+                updatedAt: serverTimestamp()
+            });
+            
+            // Update cache
+            if (this.cache.userProfiles) {
+                const cacheKey = `user_${userId}`;
+                const cached = this.cache.userProfiles.get(cacheKey);
+                if (cached) {
+                    cached.rewardTag = rewardData.tag;
+                    cached.glowEffect = rewardData.glowEffect;
+                    cached.fireRing = rewardData.fireRing;
+                }
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error updating user reward:', error);
+            return false;
+        }
+    }
+
+    // NEW: Send system message for reward upgrade
+    async sendRewardSystemMessage(groupId, userId, userName, rewardTag) {
+        try {
+            const messagesRef = collection(db, 'groups', groupId, 'messages');
+            
+            await addDoc(messagesRef, {
+                type: 'system',
+                text: `🎉 Congratulations! ${userName} has been upgraded to "${rewardTag}"! 🎉`,
+                timestamp: serverTimestamp(),
+                senderId: 'system',
+                senderName: 'System',
+                senderAvatar: '',
+                rewardUpgrade: true,
+                rewardedUserId: userId,
+                rewardedUserName: userName,
+                rewardTag: rewardTag
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('Error sending reward system message:', error);
+            return false;
+        }
+    }
+
+    // NEW: Check and award user for activity
+    async checkAndAwardUser(groupId, userId, userName) {
+        try {
+            const now = Date.now();
+            const lastMessageTime = this.lastMessageTimes.get(userId) || 0;
+            const timeSinceLastMessage = now - lastMessageTime;
+            
+            // Update active duration
+            if (!this.userActiveDurations.has(userId)) {
+                this.userActiveDurations.set(userId, 0);
+            }
+            
+            // Add time since last message to active duration
+            if (lastMessageTime > 0) {
+                const currentDuration = this.userActiveDurations.get(userId);
+                this.userActiveDurations.set(userId, currentDuration + timeSinceLastMessage);
+            }
+            
+            // Check reward thresholds
+            const activeDuration = this.userActiveDurations.get(userId);
+            let rewardTag = '';
+            
+            if (activeDuration >= REWARD_TIME_THRESHOLDS.TWENTY_MINUTES && 
+                (!this.userRewards.has(userId) || this.userRewards.get(userId) !== REWARD_TAGS.TWENTY_MINUTES)) {
+                rewardTag = REWARD_TAGS.TWENTY_MINUTES;
+            } else if (activeDuration >= REWARD_TIME_THRESHOLDS.TEN_MINUTES && 
+                      activeDuration < REWARD_TIME_THRESHOLDS.TWENTY_MINUTES &&
+                      (!this.userRewards.has(userId) || this.userRewards.get(userId) !== REWARD_TAGS.TEN_MINUTES)) {
+                rewardTag = REWARD_TAGS.TEN_MINUTES;
+            } else if (activeDuration >= REWARD_TIME_THRESHOLDS.THREE_MINUTES && 
+                      activeDuration < REWARD_TIME_THRESHOLDS.TEN_MINUTES &&
+                      (!this.userRewards.has(userId) || this.userRewards.get(userId) !== REWARD_TAGS.THREE_MINUTES)) {
+                rewardTag = REWARD_TAGS.THREE_MINUTES;
+            }
+            
+            // Award the reward if earned
+            if (rewardTag) {
+                this.userRewards.set(userId, rewardTag);
+                
+                // Update user profile in database
+                const rewardData = {
+                    tag: rewardTag,
+                    glowEffect: activeDuration >= REWARD_TIME_THRESHOLDS.TEN_MINUTES,
+                    fireRing: activeDuration >= REWARD_TIME_THRESHOLDS.TWENTY_MINUTES
+                };
+                
+                await this.updateUserReward(userId, rewardData);
+                
+                // Send system message about the reward
+                await this.sendRewardSystemMessage(groupId, userId, userName, rewardTag);
+                
+                console.log(`User ${userName} awarded: ${rewardTag}`);
+                
+                // Reset active duration for next tier
+                if (rewardTag === REWARD_TAGS.TWENTY_MINUTES) {
+                    this.userActiveDurations.set(userId, 0);
+                }
+            }
+            
+            // Update last message time
+            this.lastMessageTimes.set(userId, now);
+            
+        } catch (error) {
+            console.error('Error checking and awarding user:', error);
+        }
+    }
+
+    // NEW: Update user message streak
+    updateMessageStreak(userId) {
+        const now = Date.now();
+        const lastStreakTime = this.lastMessageTimes.get(userId) || 0;
+        const timeSinceLastMessage = now - lastStreakTime;
+        
+        // Reset streak if more than 30 seconds between messages
+        if (timeSinceLastMessage > 30000) {
+            this.userMessageStreaks.set(userId, 1);
+        } else {
+            const currentStreak = this.userMessageStreaks.get(userId) || 0;
+            this.userMessageStreaks.set(userId, currentStreak + 1);
+        }
+        
+        // Clear previous streak timer
+        if (this.userStreakTimers.has(userId)) {
+            clearTimeout(this.userStreakTimers.get(userId));
+        }
+        
+        // Set timer to reset streak after 30 seconds of inactivity
+        const streakTimer = setTimeout(() => {
+            this.userMessageStreaks.delete(userId);
+        }, 30000);
+        
+        this.userStreakTimers.set(userId, streakTimer);
+        this.lastMessageTimes.set(userId, now);
+        
+        return this.userMessageStreaks.get(userId) || 0;
+    }
+
+    // NEW: Check if user should have glowing messages
+    shouldGlowMessage(userId) {
+        const streak = this.userMessageStreaks.get(userId) || 0;
+        return streak >= CONSECUTIVE_MESSAGES_THRESHOLD;
+    }
+
+    // NEW: Check if user should have fire ring avatar
+    shouldHaveFireRing(userId) {
+        const streak = this.userMessageStreaks.get(userId) || 0;
+        return streak >= CONSECUTIVE_MESSAGES_THRESHOLD * 2; // After 10 consecutive messages
     }
 
     async sendPrivateMessage(toUserId, text = null, imageUrl = null, videoUrl = null, replyTo = null) {
@@ -1709,6 +1907,104 @@ class GroupChat {
         }
     }
 
+    // NEW: Start typing indicator
+    async startTyping(groupId) {
+        try {
+            if (!this.firebaseUser || !this.currentUser || !groupId) return;
+            
+            const typingRef = doc(db, 'groups', groupId, 'typing', this.firebaseUser.uid);
+            
+            await setDoc(typingRef, {
+                userId: this.firebaseUser.uid,
+                userName: this.currentUser.name,
+                timestamp: serverTimestamp(),
+                isTyping: true
+            }, { merge: true });
+            
+            // Set timeout to automatically stop typing after 5 seconds
+            if (this.typingUsers.has(groupId)) {
+                const userTyping = this.typingUsers.get(groupId);
+                if (userTyping.has(this.firebaseUser.uid)) {
+                    clearTimeout(userTyping.get(this.firebaseUser.uid));
+                }
+            } else {
+                this.typingUsers.set(groupId, new Map());
+            }
+            
+            const typingTimeout = setTimeout(() => {
+                this.stopTyping(groupId);
+            }, TYPING_TIMEOUT);
+            
+            this.typingUsers.get(groupId).set(this.firebaseUser.uid, typingTimeout);
+            
+        } catch (error) {
+            console.error('Error starting typing indicator:', error);
+        }
+    }
+
+    // NEW: Stop typing indicator
+    async stopTyping(groupId) {
+        try {
+            if (!this.firebaseUser || !groupId) return;
+            
+            const typingRef = doc(db, 'groups', groupId, 'typing', this.firebaseUser.uid);
+            
+            await setDoc(typingRef, {
+                userId: this.firebaseUser.uid,
+                userName: this.currentUser.name,
+                timestamp: serverTimestamp(),
+                isTyping: false
+            }, { merge: true });
+            
+            // Clear timeout
+            if (this.typingUsers.has(groupId)) {
+                const userTyping = this.typingUsers.get(groupId);
+                if (userTyping.has(this.firebaseUser.uid)) {
+                    clearTimeout(userTyping.get(this.firebaseUser.uid));
+                    userTyping.delete(this.firebaseUser.uid);
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error stopping typing indicator:', error);
+        }
+    }
+
+    // NEW: Listen to typing indicators
+    listenToTyping(groupId, callback) {
+        try {
+            const typingRef = collection(db, 'groups', groupId, 'typing');
+            
+            return onSnapshot(typingRef, (snapshot) => {
+                const typingUsers = [];
+                const now = Date.now();
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.isTyping) {
+                        const timestamp = data.timestamp ? 
+                            (data.timestamp.toDate ? data.timestamp.toDate().getTime() : new Date(data.timestamp).getTime()) : 
+                            0;
+                        
+                        // Only show users who typed in the last 5 seconds
+                        if (now - timestamp < TYPING_TIMEOUT) {
+                            typingUsers.push({
+                                userId: data.userId,
+                                userName: data.userName,
+                                timestamp: timestamp
+                            });
+                        }
+                    }
+                });
+                
+                callback(typingUsers);
+            });
+        } catch (error) {
+            console.error('Error listening to typing indicators:', error);
+            return () => {};
+        }
+    }
+
     async sendMessage(groupId, text = null, imageUrl = null, videoUrl = null, replyTo = null) {
         try {
             if (!this.firebaseUser || !this.currentUser) {
@@ -1732,6 +2028,11 @@ class GroupChat {
                 }
             }
             
+            // NEW: Update message streak
+            const streak = this.updateMessageStreak(this.firebaseUser.uid);
+            const shouldGlow = this.shouldGlowMessage(this.firebaseUser.uid);
+            const shouldHaveFireRing = this.shouldHaveFireRing(this.firebaseUser.uid);
+            
             const messageId = `${groupId}_${this.firebaseUser.uid}_${Date.now()}`;
             
             if (this.sentMessageIds.has(messageId) || this.pendingMessages.has(messageId)) {
@@ -1749,6 +2050,15 @@ class GroupChat {
                 senderAvatar: this.currentUser.avatar,
                 timestamp: serverTimestamp()
             };
+            
+            // NEW: Add glow effect and fire ring data
+            if (shouldGlow) {
+                messageData.glowEffect = true;
+            }
+            
+            if (shouldHaveFireRing) {
+                messageData.fireRing = true;
+            }
             
             if (replyTo) {
                 messageData.replyTo = replyTo;
@@ -1780,6 +2090,12 @@ class GroupChat {
                     timestamp: serverTimestamp()
                 }
             });
+            
+            // NEW: Check and award user for activity
+            await this.checkAndAwardUser(groupId, this.firebaseUser.uid, this.currentUser.name);
+            
+            // NEW: Stop typing indicator
+            await this.stopTyping(groupId);
             
             await this.updateLastActive(groupId);
             
@@ -1839,6 +2155,11 @@ class GroupChat {
                 type: isVideo ? 'video' : 'image',
                 status: 'uploading'
             };
+            
+            // NEW: Add glow effect for temp messages if user has streak
+            if (this.shouldGlowMessage(this.firebaseUser.uid)) {
+                tempMessage.glowEffect = true;
+            }
             
             const event = new CustomEvent('tempMediaMessage', { detail: tempMessage });
             document.dispatchEvent(event);
@@ -2233,6 +2554,134 @@ class GroupChat {
                 white-space: nowrap;
                 flex: 1;
                 min-width: 0;
+            }
+            
+            /* NEW: Typing indicator styles */
+            .typing-indicator {
+                position: fixed;
+                bottom: 70px;
+                left: 0;
+                right: 0;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 8px 15px;
+                font-size: 13px;
+                text-align: center;
+                z-index: 1000;
+                backdrop-filter: blur(10px);
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                transition: transform 0.3s ease;
+                transform: translateY(100%);
+            }
+            
+            .typing-indicator.show {
+                transform: translateY(0);
+            }
+            
+            .typing-dots {
+                display: inline-block;
+                margin-left: 5px;
+            }
+            
+            .typing-dots span {
+                display: inline-block;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background-color: white;
+                margin: 0 2px;
+                opacity: 0.6;
+                animation: typing-dots 1.5s infinite ease-in-out;
+            }
+            
+            .typing-dots span:nth-child(1) { animation-delay: 0s; }
+            .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+            .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+            
+            @keyframes typing-dots {
+                0%, 100% { opacity: 0.6; transform: scale(1); }
+                50% { opacity: 1; transform: scale(1.2); }
+            }
+            
+            /* NEW: Glowing message styles */
+            .glowing-message {
+                animation: glow 2s ease-in-out infinite alternate;
+                position: relative;
+            }
+            
+            @keyframes glow {
+                from {
+                    box-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #007bff, 0 0 20px #007bff, 0 0 25px #007bff, 0 0 30px #007bff, 0 0 35px #007bff;
+                }
+                to {
+                    box-shadow: 0 0 10px #fff, 0 0 15px #4dabf7, 0 0 20px #4dabf7, 0 0 25px #4dabf7, 0 0 30px #4dabf7, 0 0 35px #4dabf7, 0 0 40px #4dabf7;
+                }
+            }
+            
+            /* NEW: Fire ring avatar styles */
+            .avatar-with-fire-ring {
+                position: relative;
+            }
+            
+            .fire-ring {
+                position: absolute;
+                top: -5px;
+                left: -5px;
+                right: -5px;
+                bottom: -5px;
+                border-radius: 50%;
+                background: linear-gradient(45deg, #ff6b00, #ff9500, #ffcc00);
+                animation: fire-ring 1.5s ease-in-out infinite alternate;
+                z-index: -1;
+            }
+            
+            @keyframes fire-ring {
+                from {
+                    box-shadow: 0 0 10px #ff6b00, 0 0 20px #ff9500, 0 0 30px #ffcc00;
+                    transform: scale(1);
+                }
+                to {
+                    box-shadow: 0 0 15px #ff6b00, 0 0 25px #ff9500, 0 0 35px #ffcc00;
+                    transform: scale(1.05);
+                }
+            }
+            
+            /* NEW: Reward tag styles */
+            .reward-tag {
+                display: inline-block;
+                background: linear-gradient(45deg, #ffd700, #ff9500);
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 10px;
+                font-weight: bold;
+                margin-left: 6px;
+                animation: reward-tag-pulse 2s infinite;
+                text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
+            }
+            
+            @keyframes reward-tag-pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+            
+            .system-message.reward-upgrade {
+                background: linear-gradient(45deg, rgba(255, 215, 0, 0.1), rgba(255, 149, 0, 0.1));
+                border-left: 3px solid #ff9500;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 8px;
+                text-align: center;
+                font-weight: bold;
+                animation: reward-message 3s ease-in-out;
+            }
+            
+            @keyframes reward-message {
+                0% { opacity: 0; transform: translateY(-10px); }
+                20% { opacity: 1; transform: translateY(0); }
+                80% { opacity: 1; transform: translateY(0); }
+                100% { opacity: 0; transform: translateY(-10px); }
             }
         `;
         
@@ -2825,6 +3274,20 @@ class GroupChat {
         this.areListenersSetup = false;
         this.sentMessageIds.clear();
         this.pendingMessages.clear();
+        
+        // NEW: Clear typing timeouts
+        this.typingUsers.forEach((userTyping, groupId) => {
+            userTyping.forEach((timeout, userId) => {
+                clearTimeout(timeout);
+            });
+        });
+        this.typingUsers.clear();
+        
+        // Clear streak timers
+        this.userStreakTimers.forEach(timer => {
+            clearTimeout(timer);
+        });
+        this.userStreakTimers.clear();
     }
 }
 
@@ -3500,6 +3963,63 @@ function initSetPage() {
     }
 }
 
+// NEW: Create typing indicator element
+function createTypingIndicator() {
+    const typingIndicator = document.createElement('div');
+    typingIndicator.id = 'typingIndicator';
+    typingIndicator.className = 'typing-indicator';
+    typingIndicator.style.display = 'none';
+    typingIndicator.innerHTML = `
+        <span id="typingText">No one is typing</span>
+        <span class="typing-dots" id="typingDots">
+            <span></span>
+            <span></span>
+            <span></span>
+        </span>
+    `;
+    document.body.appendChild(typingIndicator);
+    return typingIndicator;
+}
+
+// NEW: Update typing indicator
+function updateTypingIndicator(typingUsers) {
+    const typingIndicator = document.getElementById('typingIndicator');
+    const typingText = document.getElementById('typingText');
+    const typingDots = document.getElementById('typingDots');
+    
+    if (!typingIndicator || !typingText) return;
+    
+    if (typingUsers.length === 0) {
+        typingIndicator.style.display = 'none';
+        typingIndicator.classList.remove('show');
+        return;
+    }
+    
+    let typingMessage = '';
+    if (typingUsers.length === 1) {
+        typingMessage = `${typingUsers[0].userName} is typing`;
+    } else if (typingUsers.length === 2) {
+        typingMessage = `${typingUsers[0].userName} and ${typingUsers[1].userName} are typing`;
+    } else if (typingUsers.length === 3) {
+        typingMessage = `${typingUsers[0].userName}, ${typingUsers[1].userName} and 1 other are typing`;
+    } else {
+        typingMessage = `${typingUsers[0].userName}, ${typingUsers[1].userName} and ${typingUsers.length - 2} others are typing`;
+    }
+    
+    typingText.textContent = typingMessage;
+    typingIndicator.style.display = 'block';
+    
+    // Trigger reflow to enable animation
+    void typingIndicator.offsetWidth;
+    
+    typingIndicator.classList.add('show');
+    
+    // Show/hide dots based on typing
+    if (typingDots) {
+        typingDots.style.display = 'inline-block';
+    }
+}
+
 function initGroupPage() {
     const sidebar = document.getElementById('sidebar');
     const backBtn = document.getElementById('backBtn');
@@ -3532,6 +4052,12 @@ function initGroupPage() {
     let isRendering = false;
     let renderQueue = [];
     
+    // NEW: Typing indicator variables
+    let typingIndicator = null;
+    let typingUnsubscribe = null;
+    let typingTimeout = null;
+    let lastTypingInputTime = 0;
+    
     if (!groupId) {
         window.location.href = 'groups.html';
         return;
@@ -3544,6 +4070,9 @@ function initGroupPage() {
     
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
+    
+    // NEW: Create typing indicator
+    typingIndicator = createTypingIndicator();
     
     (async () => {
         const needsSetup = await groupChat.needsProfileSetup();
@@ -3566,6 +4095,15 @@ function initGroupPage() {
         groupChat.cleanup();
         reactionUnsubscribers.forEach(unsub => unsub());
         reactionUnsubscribers.clear();
+        
+        // NEW: Clean up typing indicator
+        if (typingUnsubscribe) {
+            typingUnsubscribe();
+        }
+        if (typingTimeout) {
+            clearTimeout(typingTimeout);
+        }
+        
         removeSidebarOverlay();
         window.location.href = 'groups.html';
     });
@@ -3611,11 +4149,37 @@ function initGroupPage() {
         });
     }
     
+    // NEW: Typing indicator for message input
     messageInput.addEventListener('input', () => {
         sendBtn.disabled = !messageInput.value.trim();
         
         messageInput.style.height = 'auto';
         messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+        
+        // NEW: Start typing indicator when user types
+        const now = Date.now();
+        if (now - lastTypingInputTime > 1000) { // Throttle to 1 second
+            groupChat.startTyping(groupId);
+            lastTypingInputTime = now;
+        }
+        
+        // Reset typing timeout
+        if (typingTimeout) {
+            clearTimeout(typingTimeout);
+        }
+        
+        // Stop typing after 3 seconds of inactivity
+        typingTimeout = setTimeout(() => {
+            groupChat.stopTyping(groupId);
+        }, 3000);
+    });
+    
+    // NEW: Stop typing when input loses focus
+    messageInput.addEventListener('blur', () => {
+        groupChat.stopTyping(groupId);
+        if (typingTimeout) {
+            clearTimeout(typingTimeout);
+        }
     });
     
     sendBtn.addEventListener('click', () => sendMessage());
@@ -3980,6 +4544,11 @@ function initGroupPage() {
             reactionUnsubscribers.clear();
         }
         
+        // NEW: Clear typing listener
+        if (typingUnsubscribe) {
+            typingUnsubscribe();
+        }
+        
         // Set up new listeners
         groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Received messages:', newMessages.length);
@@ -4019,6 +4588,11 @@ function initGroupPage() {
             }
         });
         
+        // NEW: Set up typing indicator listener
+        typingUnsubscribe = groupChat.listenToTyping(groupId, (typingUsers) => {
+            updateTypingIndicator(typingUsers);
+        });
+        
         const activeInterval = setInterval(() => {
             groupChat.updateLastActive(groupId);
         }, 60000);
@@ -4031,6 +4605,15 @@ function initGroupPage() {
             clearInterval(activeInterval);
             reactionUnsubscribers.forEach(unsub => unsub());
             reactionUnsubscribers.clear();
+            
+            // NEW: Clean up typing
+            if (typingUnsubscribe) {
+                typingUnsubscribe();
+            }
+            if (typingTimeout) {
+                clearTimeout(typingTimeout);
+            }
+            
             removeSidebarOverlay();
         });
         
@@ -4056,13 +4639,24 @@ function initGroupPage() {
             
             const div = document.createElement('div');
             div.className = 'member-item';
+            
+            // NEW: Get user profile for reward tag
+            const userProfile = groupChat.cache.userProfiles ? 
+                groupChat.cache.userProfiles.get(`user_${member.id}`)?.data : null;
+            
+            const rewardTag = userProfile?.rewardTag || '';
+            
             div.innerHTML = `
-                <img src="${member.avatar}" alt="${member.name}" class="member-avatar" data-user-id="${member.id}">
+                <div class="member-avatar-container" style="position: relative;">
+                    ${userProfile?.fireRing ? '<div class="fire-ring"></div>' : ''}
+                    <img src="${member.avatar}" alt="${member.name}" class="member-avatar ${userProfile?.fireRing ? 'avatar-with-fire-ring' : ''}" data-user-id="${member.id}">
+                </div>
                 <div class="member-info">
                     <div class="member-name">
                         ${member.name}
                         ${isAdmin ? '<span style="margin-left: 6px; background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">Admin</span>' : ''}
                         ${isCurrentUser ? '<span style="margin-left: 6px; background: #666; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">You</span>' : ''}
+                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
                     </div>
                     ${member.bio ? `<div class="member-bio">${member.bio}</div>` : ''}
                 </div>
@@ -4130,13 +4724,26 @@ function initGroupPage() {
             const firstMessage = group.messages[0];
             const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
             
+            // NEW: Get user profile for reward tag
+            const userProfile = groupChat.cache.userProfiles ? 
+                groupChat.cache.userProfiles.get(`user_${group.senderId}`)?.data : null;
+            
+            const rewardTag = userProfile?.rewardTag || '';
+            const hasFireRing = userProfile?.fireRing || false;
+            
             groupDiv.innerHTML = `
                 <div class="message-header">
-                    <img src="${group.senderAvatar}" 
-                         alt="${group.senderName}" 
-                         class="message-avatar"
-                         data-user-id="${group.senderId}">
-                    <span class="message-sender">${group.senderName}</span>
+                    <div class="message-avatar-container" style="position: relative; display: inline-block;">
+                        ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
+                        <img src="${group.senderAvatar}" 
+                             alt="${group.senderName}" 
+                             class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
+                             data-user-id="${group.senderId}">
+                    </div>
+                    <div class="message-sender-info">
+                        <span class="message-sender">${group.senderName}</span>
+                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
+                    </div>
                     <span class="message-time">${formatTime(firstMessageTime)}</span>
                 </div>
                 <div class="message-content">
@@ -4167,6 +4774,14 @@ function initGroupPage() {
                         const isUploading = msg.status === 'uploading';
                         
                         const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
+                        
+                        // NEW: Add glowing effect class if message has glowEffect
+                        const hasGlowEffect = msg.glowEffect || false;
+                        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
+                        
+                        // NEW: Check if this is a reward upgrade message
+                        const isRewardUpgrade = msg.rewardUpgrade || false;
+                        const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
                         
                         let messageContent = '';
                         
@@ -4233,7 +4848,7 @@ function initGroupPage() {
                             '';
                         
                         return `
-                            <div class="${messageDivClass}" data-message-id="${msg.id}" id="${messageDivId}">
+                            <div class="${messageDivClass}${extraClasses}${rewardUpgradeClass}" data-message-id="${msg.id}" id="${messageDivId}">
                                 ${replyHtml}
                                 ${messageContent}
                                 <div class="message-reactions" id="reactions-${msg.id}">
@@ -4385,6 +5000,11 @@ function initGroupPage() {
         
         if (!text) return;
         
+        // NEW: Clear typing timeout before sending
+        if (typingTimeout) {
+            clearTimeout(typingTimeout);
+        }
+        
         sendBtn.disabled = true;
         sendBtn.innerHTML = `
             <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 18px; height: 18px;">
@@ -4442,6 +5062,15 @@ function initGroupPage() {
         groupChat.cleanup();
         reactionUnsubscribers.forEach(unsub => unsub());
         reactionUnsubscribers.clear();
+        
+        // NEW: Clean up typing
+        if (typingUnsubscribe) {
+            typingUnsubscribe();
+        }
+        if (typingTimeout) {
+            clearTimeout(typingTimeout);
+        }
+        
         removeSidebarOverlay();
     });
     
@@ -4772,16 +5401,26 @@ function initAdminGroupsPage() {
                         const isCurrentUser = member.id === groupChat.firebaseUser.uid;
                         const isAdmin = member.isAdmin;
                         
+                        // Get user profile for reward tag
+                        const userProfile = groupChat.cache.userProfiles ? 
+                            groupChat.cache.userProfiles.get(`user_${member.id}`)?.data : null;
+                        
+                        const rewardTag = userProfile?.rewardTag || '';
+                        
                         memberItem.innerHTML = `
                             <div class="member-info">
-                                <img src="${member.avatar || AVATAR_OPTIONS[0]}" 
-                                     alt="${member.name}" 
-                                     class="member-avatar">
+                                <div class="member-avatar-container" style="position: relative; display: inline-block;">
+                                    ${userProfile?.fireRing ? '<div class="fire-ring"></div>' : ''}
+                                    <img src="${member.avatar || AVATAR_OPTIONS[0]}" 
+                                         alt="${member.name}" 
+                                         class="member-avatar ${userProfile?.fireRing ? 'avatar-with-fire-ring' : ''}">
+                                </div>
                                 <div class="member-details">
                                     <h4>
                                         ${member.name}
                                         ${isAdmin ? '<span class="admin-badge">Admin</span>' : ''}
                                         ${isCurrentUser ? '<span class="you-badge">You</span>' : ''}
+                                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
                                     </h4>
                                     <p class="member-email">${member.email || 'No email'}</p>
                                     <small class="member-joined">
@@ -5347,8 +5986,25 @@ function initUserPage() {
                 return;
             }
             
-            if (userAvatar) userAvatar.src = userProfile.avatar;
-            if (userName) userName.textContent = userProfile.name;
+            // NEW: Check for fire ring
+            const hasFireRing = userProfile.fireRing || false;
+            const rewardTag = userProfile.rewardTag || '';
+            
+            if (userAvatar) {
+                if (hasFireRing) {
+                    userAvatar.className = 'avatar-with-fire-ring';
+                    userAvatar.style.position = 'relative';
+                }
+                userAvatar.src = userProfile.avatar;
+            }
+            
+            if (userName) {
+                userName.textContent = userProfile.name;
+                if (rewardTag) {
+                    userName.innerHTML += ` <span class="reward-tag">${rewardTag}</span>`;
+                }
+            }
+            
             if (userBio) userBio.textContent = userProfile.bio;
             if (userEmail) userEmail.textContent = userProfile.email || 'Email not available';
             
@@ -5590,8 +6246,25 @@ function initChatPage() {
                 return;
             }
             
-            if (partnerAvatar) partnerAvatar.src = partnerProfile.avatar;
-            if (partnerName) partnerName.textContent = partnerProfile.name;
+            // NEW: Check for fire ring and reward tag
+            const hasFireRing = partnerProfile.fireRing || false;
+            const rewardTag = partnerProfile.rewardTag || '';
+            
+            if (partnerAvatar) {
+                if (hasFireRing) {
+                    partnerAvatar.className = 'avatar-with-fire-ring';
+                    partnerAvatar.style.position = 'relative';
+                }
+                partnerAvatar.src = partnerProfile.avatar;
+            }
+            
+            if (partnerName) {
+                partnerName.textContent = partnerProfile.name;
+                if (rewardTag) {
+                    partnerName.innerHTML += ` <span class="reward-tag">${rewardTag}</span>`;
+                }
+            }
+            
             if (partnerEmail) partnerEmail.textContent = partnerProfile.email || 'Email not available';
             if (userBio) userBio.textContent = partnerProfile.bio;
             if (chatTitle) chatTitle.textContent = partnerProfile.name;
@@ -5684,13 +6357,30 @@ function initChatPage() {
             const firstMessage = group.messages[0];
             const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
             
+            // NEW: Get user profile for reward tag and fire ring
+            let userProfile = null;
+            if (group.senderId === groupChat.firebaseUser.uid) {
+                userProfile = groupChat.currentUser;
+            } else {
+                userProfile = partnerProfile;
+            }
+            
+            const hasFireRing = userProfile?.fireRing || false;
+            const rewardTag = userProfile?.rewardTag || '';
+            
             groupDiv.innerHTML = `
                 <div class="message-header">
-                    <img src="${group.senderAvatar}" 
-                         alt="${group.senderName}" 
-                         class="message-avatar"
-                         data-user-id="${group.senderId}">
-                    <span class="message-sender">${group.senderName}</span>
+                    <div class="message-avatar-container" style="position: relative; display: inline-block;">
+                        ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
+                        <img src="${group.senderAvatar}" 
+                             alt="${group.senderName}" 
+                             class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
+                             data-user-id="${group.senderId}">
+                    </div>
+                    <div class="message-sender-info">
+                        <span class="message-sender">${group.senderName}</span>
+                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
+                    </div>
                     <span class="message-time">${formatTime(firstMessageTime)}</span>
                 </div>
                 <div class="message-content">
@@ -5721,6 +6411,10 @@ function initChatPage() {
                         const isUploading = msg.status === 'uploading';
                         
                         const messageDivClass = 'message-text';
+                        
+                        // NEW: Add glowing effect for private messages too
+                        const hasGlowEffect = msg.glowEffect || false;
+                        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
                         
                         let messageContent = '';
                         
@@ -5781,7 +6475,7 @@ function initChatPage() {
                             '';
                         
                         return `
-                            <div class="${messageDivClass}" data-message-id="${msg.id}" id="${messageDivId}">
+                            <div class="${messageDivClass}${extraClasses}" data-message-id="${msg.id}" id="${messageDivId}">
                                 ${replyHtml}
                                 ${messageContent}
                                 <div class="message-reactions" id="reactions-${msg.id}">
@@ -6189,11 +6883,18 @@ function initMessagesPage() {
         privateChats.forEach(chat => {
             const messageItem = document.createElement('div');
             messageItem.className = `message-item ${chat.unreadCount > 0 ? 'unread' : ''}`;
+            
+            // Get user profile for reward tag
+            const userProfile = groupChat.cache.userProfiles ? 
+                groupChat.cache.userProfiles.get(`user_${chat.userId}`)?.data : null;
+            
+            const rewardTag = userProfile?.rewardTag || '';
+            
             messageItem.innerHTML = `
                 <img src="${chat.userAvatar}" alt="${chat.userName}" class="user-avatar">
                 <div class="message-content">
                     <div class="message-header">
-                        <div class="message-user">${chat.userName}</div>
+                        <div class="message-user">${chat.userName} ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}</div>
                         <div class="message-time">${formatTime(chat.updatedAt)}</div>
                     </div>
                     <div class="message-preview">
