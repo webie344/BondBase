@@ -1,6 +1,8 @@
-// group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
+//now this my group.js when I send messages the whole messages on the oag is rerendered each time so look at how I fixed it in my app.js and apply the fix to my group.js so that the message cannot just be applied without the whole message being rerendered also I was formerly using discord style message but help me restyle it to use line telegram bubble message just like the screenshot :// group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
 // UPDATED: Added typing indicators, glowing messages, fire ring avatars, and reward tags
 // UPDATED: Replaced Font Awesome icons with Feather icons, fixed message sending status display
+// UPDATED: Fixed issues - soft glow, page refresh, send button loader, group name truncation, SVG icons
+// FIXED: Message disappearing/reappearing issue and typing indicators not working
 
 import { 
     getFirestore, 
@@ -117,7 +119,16 @@ class GroupChat {
             groupMembers: new Map(),
             profileSetupChecked: false,
             blockedUsers: new Map(),
-            messageReactions: new Map()
+            messageReactions: new Map(),
+            userProfiles: new Map(),
+            mutualGroups: new Map(),
+            privateChats: new Map(),
+            unreadCounts: new Map(),
+            groupChats: new Map(),
+            groupInvites: new Map(),
+            adminGroups: new Map(),
+            allGroups: new Map(),
+            messages: new Map()
         };
         
         this.replyingToMessage = null;
@@ -203,7 +214,16 @@ class GroupChat {
             groupMembers: new Map(),
             profileSetupChecked: false,
             blockedUsers: new Map(),
-            messageReactions: new Map()
+            messageReactions: new Map(),
+            userProfiles: new Map(),
+            mutualGroups: new Map(),
+            privateChats: new Map(),
+            unreadCounts: new Map(),
+            groupChats: new Map(),
+            groupInvites: new Map(),
+            adminGroups: new Map(),
+            allGroups: new Map(),
+            messages: new Map()
         };
         this.lastDisplayedMessages.clear();
         this.messageRenderQueue = [];
@@ -445,7 +465,7 @@ class GroupChat {
             const cacheKey = `user_${userId}`;
             
             if (!forceRefresh) {
-                const cached = this.getCachedItem(cacheKey, this.cache.userProfiles || new Map());
+                const cached = this.getCachedItem(cacheKey, this.cache.userProfiles);
                 if (cached) {
                     return cached;
                 }
@@ -475,9 +495,6 @@ class GroupChat {
                     fireRing: userData.fireRing || false
                 };
                 
-                if (!this.cache.userProfiles) {
-                    this.cache.userProfiles = new Map();
-                }
                 this.setCachedItem(cacheKey, profile, this.cache.userProfiles, CACHE_DURATION.USER_PROFILE);
                 
                 return profile;
@@ -492,7 +509,7 @@ class GroupChat {
     async getMutualGroups(userId1, userId2) {
         try {
             const cacheKey = `mutual_${userId1}_${userId2}`;
-            const cached = this.getCachedItem(cacheKey, this.cache.mutualGroups || new Map());
+            const cached = this.getCachedItem(cacheKey, this.cache.mutualGroups);
             if (cached) return cached;
 
             const groupsRef = collection(db, 'groups');
@@ -527,9 +544,6 @@ class GroupChat {
                 }
             }
             
-            if (!this.cache.mutualGroups) {
-                this.cache.mutualGroups = new Map();
-            }
             this.setCachedItem(cacheKey, mutualGroups, this.cache.mutualGroups, CACHE_DURATION.GROUP_DATA);
             
             return mutualGroups;
@@ -556,14 +570,12 @@ class GroupChat {
             });
             
             // Update cache
-            if (this.cache.userProfiles) {
-                const cacheKey = `user_${userId}`;
-                const cached = this.cache.userProfiles.get(cacheKey);
-                if (cached) {
-                    cached.rewardTag = rewardData.tag;
-                    cached.glowEffect = rewardData.glowEffect;
-                    cached.fireRing = rewardData.fireRing;
-                }
+            const cacheKey = `user_${userId}`;
+            const cached = this.cache.userProfiles.get(cacheKey);
+            if (cached) {
+                cached.rewardTag = rewardData.tag;
+                cached.glowEffect = rewardData.glowEffect;
+                cached.fireRing = rewardData.fireRing;
             }
             
             return true;
@@ -926,7 +938,7 @@ class GroupChat {
             if (!this.firebaseUser) return [];
             
             const cacheKey = `private_chats_${this.firebaseUser.uid}`;
-            const cached = this.getCachedItem(cacheKey, this.cache.privateChats || new Map());
+            const cached = this.getCachedItem(cacheKey, this.cache.privateChats);
             if (cached) return cached;
 
             const privateChatsRef = collection(db, 'private_chats');
@@ -963,9 +975,6 @@ class GroupChat {
             
             chats.sort((a, b) => b.updatedAt - a.updatedAt);
             
-            if (!this.cache.privateChats) {
-                this.cache.privateChats = new Map();
-            }
             this.setCachedItem(cacheKey, chats, this.cache.privateChats, CACHE_DURATION.GROUP_DATA);
             
             return chats;
@@ -978,7 +987,7 @@ class GroupChat {
     async getUnreadMessageCount(chatId, otherUserId) {
         try {
             const cacheKey = `unread_${chatId}_${otherUserId}`;
-            const cached = this.getCachedItem(cacheKey, this.cache.unreadCounts || new Map());
+            const cached = this.getCachedItem(cacheKey, this.cache.unreadCounts);
             if (cached !== null) return cached;
 
             const messagesRef = collection(db, 'private_chats', chatId, 'messages');
@@ -993,9 +1002,6 @@ class GroupChat {
                 }
             });
             
-            if (!this.cache.unreadCounts) {
-                this.cache.unreadCounts = new Map();
-            }
             this.setCachedItem(cacheKey, unreadCount, this.cache.unreadCounts, CACHE_DURATION.USER_PROFILE);
             
             return unreadCount;
@@ -1024,9 +1030,7 @@ class GroupChat {
             if (hasUpdates) {
                 await batch.commit();
                 
-                if (this.cache.unreadCounts) {
-                    this.cache.unreadCounts.delete(`unread_${chatId}_${senderId}`);
-                }
+                this.cache.unreadCounts.delete(`unread_${chatId}_${senderId}`);
             }
             
             return true;
@@ -1041,7 +1045,7 @@ class GroupChat {
             if (!this.firebaseUser) return [];
             
             const cacheKey = `group_chats_${this.firebaseUser.uid}`;
-            const cached = this.getCachedItem(cacheKey, this.cache.groupChats || new Map());
+            const cached = this.getCachedItem(cacheKey, this.cache.groupChats);
             if (cached) return cached;
 
             const groupsRef = collection(db, 'groups');
@@ -1089,9 +1093,6 @@ class GroupChat {
                 return timeB - timeA;
             });
             
-            if (!this.cache.groupChats) {
-                this.cache.groupChats = new Map();
-            }
             this.setCachedItem(cacheKey, groupChats, this.cache.groupChats, CACHE_DURATION.GROUP_DATA);
             
             return groupChats;
@@ -1113,7 +1114,7 @@ class GroupChat {
     async getGroupByInviteCode(inviteCode) {
         try {
             const cacheKey = `group_invite_${inviteCode}`;
-            const cached = this.getCachedItem(cacheKey, this.cache.groupInvites || new Map());
+            const cached = this.getCachedItem(cacheKey, this.cache.groupInvites);
             if (cached) return cached;
 
             const groupsRef = collection(db, 'groups');
@@ -1130,9 +1131,6 @@ class GroupChat {
                     updatedAt: data.updatedAt ? (data.updatedAt.toDate ? data.updatedAt.toDate() : data.updatedAt) : new Date()
                 };
                 
-                if (!this.cache.groupInvites) {
-                    this.cache.groupInvites = new Map();
-                }
                 this.setCachedItem(cacheKey, group, this.cache.groupInvites, CACHE_DURATION.GROUP_DATA);
                 
                 return group;
@@ -1173,9 +1171,7 @@ class GroupChat {
 
             this.clearGroupCache(groupId);
             
-            if (this.cache.groupInvites) {
-                this.cache.groupInvites.delete(`group_invite_${groupData.inviteCode}`);
-            }
+            this.cache.groupInvites.delete(`group_invite_${groupData.inviteCode}`);
 
             return newInviteLink;
         } catch (error) {
@@ -1233,7 +1229,7 @@ class GroupChat {
             }
 
             const cacheKey = `admin_groups_${this.firebaseUser.uid}`;
-            const cached = this.getCachedItem(cacheKey, this.cache.adminGroups || new Map());
+            const cached = this.getCachedItem(cacheKey, this.cache.adminGroups);
             if (cached) return cached;
 
             const groupsRef = collection(db, 'groups');
@@ -1254,9 +1250,6 @@ class GroupChat {
                 }
             });
             
-            if (!this.cache.adminGroups) {
-                this.cache.adminGroups = new Map();
-            }
             this.setCachedItem(cacheKey, groups, this.cache.adminGroups, CACHE_DURATION.GROUP_DATA);
             
             return groups;
@@ -1551,9 +1544,7 @@ class GroupChat {
             this.cache.userProfileExpiry = Date.now() + CACHE_DURATION.USER_PROFILE;
             this.cache.profileSetupChecked = true;
             
-            if (this.cache.userProfiles) {
-                this.cache.userProfiles.delete(`user_${this.firebaseUser.uid}`);
-            }
+            this.cache.userProfiles.delete(`user_${this.firebaseUser.uid}`);
             
             return true;
         } catch (error) {
@@ -1707,7 +1698,7 @@ class GroupChat {
     async getAllGroups() {
         try {
             const cacheKey = 'all_groups';
-            const cached = this.getCachedItem(cacheKey, this.cache.allGroups || new Map());
+            const cached = this.getCachedItem(cacheKey, this.cache.allGroups);
             if (cached) return cached;
 
             const groupsRef = collection(db, 'groups');
@@ -1729,9 +1720,6 @@ class GroupChat {
                 this.setCachedItem(doc.id, group, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
             });
             
-            if (!this.cache.allGroups) {
-                this.cache.allGroups = new Map();
-            }
             this.setCachedItem(cacheKey, groups, this.cache.allGroups, CACHE_DURATION.GROUP_DATA);
             
             return groups;
@@ -1981,7 +1969,7 @@ class GroupChat {
                 
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    if (data.isTyping) {
+                    if (data.isTyping && data.userId !== this.firebaseUser?.uid) {
                         const timestamp = data.timestamp ? 
                             (data.timestamp.toDate ? data.timestamp.toDate().getTime() : new Date(data.timestamp).getTime()) : 
                             0;
@@ -2174,7 +2162,7 @@ class GroupChat {
     async getMessages(groupId, limitCount = 50) {
         try {
             const cacheKey = `messages_${groupId}_${limitCount}`;
-            const cached = this.getCachedItem(cacheKey, this.cache.messages || new Map());
+            const cached = this.getCachedItem(cacheKey, this.cache.messages);
             if (cached) return cached;
 
             const messagesRef = collection(db, 'groups', groupId, 'messages');
@@ -2193,9 +2181,6 @@ class GroupChat {
             
             const result = messages.reverse();
             
-            if (!this.cache.messages) {
-                this.cache.messages = new Map();
-            }
             this.setCachedItem(cacheKey, result, this.cache.messages, 30000);
             
             return result;
@@ -2231,10 +2216,8 @@ class GroupChat {
                     });
                 });
                 
-                if (this.cache.messages) {
-                    const cacheKey = `messages_${groupId}_${messages.length}`;
-                    this.setCachedItem(cacheKey, messages, this.cache.messages, 30000);
-                }
+                const cacheKey = `messages_${groupId}_${messages.length}`;
+                this.setCachedItem(cacheKey, messages, this.cache.messages, 30000);
                 
                 callback(messages);
             }, (error) => {
@@ -2556,22 +2539,23 @@ class GroupChat {
                 min-width: 0;
             }
             
-            /* NEW: Typing indicator styles */
+            /* UPDATED: Typing indicator styles - Moved to top */
             .typing-indicator {
                 position: fixed;
-                bottom: 70px;
+                top: 0;
                 left: 0;
                 right: 0;
-                background: rgba(0, 0, 0, 0.8);
+                background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
                 color: white;
                 padding: 8px 15px;
                 font-size: 13px;
                 text-align: center;
                 z-index: 1000;
                 backdrop-filter: blur(10px);
-                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 transition: transform 0.3s ease;
-                transform: translateY(100%);
+                transform: translateY(-100%);
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             }
             
             .typing-indicator.show {
@@ -2603,22 +2587,33 @@ class GroupChat {
                 50% { opacity: 1; transform: scale(1.2); }
             }
             
-            /* NEW: Glowing message styles */
+            /* UPDATED: Soft glass glowing message styles */
             .glowing-message {
-                animation: glow 2s ease-in-out infinite alternate;
+                animation: soft-glow 3s ease-in-out infinite alternate;
                 position: relative;
+                backdrop-filter: blur(5px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                padding: 8px 12px;
+                margin: 2px 0;
             }
             
-            @keyframes glow {
-                from {
-                    box-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #007bff, 0 0 20px #007bff, 0 0 25px #007bff, 0 0 30px #007bff, 0 0 35px #007bff;
+            @keyframes soft-glow {
+                0% {
+                    box-shadow: 0 0 5px rgba(255, 255, 255, 0.3),
+                                0 0 10px rgba(77, 171, 247, 0.2),
+                                0 0 15px rgba(77, 171, 247, 0.1);
+                    background: rgba(255, 255, 255, 0.05);
                 }
-                to {
-                    box-shadow: 0 0 10px #fff, 0 0 15px #4dabf7, 0 0 20px #4dabf7, 0 0 25px #4dabf7, 0 0 30px #4dabf7, 0 0 35px #4dabf7, 0 0 40px #4dabf7;
+                100% {
+                    box-shadow: 0 0 10px rgba(255, 255, 255, 0.4),
+                                0 0 20px rgba(77, 171, 247, 0.3),
+                                0 0 30px rgba(77, 171, 247, 0.2);
+                    background: rgba(255, 255, 255, 0.08);
                 }
             }
             
-            /* NEW: Fire ring avatar styles */
+            /* Fire ring avatar styles */
             .avatar-with-fire-ring {
                 position: relative;
             }
@@ -2646,7 +2641,7 @@ class GroupChat {
                 }
             }
             
-            /* NEW: Reward tag styles */
+            /* Reward tag styles */
             .reward-tag {
                 display: inline-block;
                 background: linear-gradient(45deg, #ffd700, #ff9500);
@@ -2682,6 +2677,27 @@ class GroupChat {
                 20% { opacity: 1; transform: translateY(0); }
                 80% { opacity: 1; transform: translateY(0); }
                 100% { opacity: 0; transform: translateY(-10px); }
+            }
+            
+            /* Sending indicator for messages */
+            .sending-indicator {
+                font-size: 11px;
+                color: #666;
+                margin-top: 4px;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+            
+            /* Ensure SVG icons display properly */
+            .feather {
+                display: inline-block;
+                vertical-align: middle;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                fill: none;
             }
         `;
         
@@ -3076,8 +3092,9 @@ class GroupChat {
 
     truncateName(name) {
         if (!name) return '';
-        if (name.length <= 6) return name;
-        return name.substring(0, 6) + '...';
+        const words = name.split(' ');
+        if (words.length <= 6) return name;
+        return words.slice(0, 6).join(' ') + '...';
     }
 
     truncateMessage(text) {
@@ -3963,7 +3980,7 @@ function initSetPage() {
     }
 }
 
-// NEW: Create typing indicator element
+// UPDATED: Create typing indicator element at top
 function createTypingIndicator() {
     const typingIndicator = document.createElement('div');
     typingIndicator.id = 'typingIndicator';
@@ -3981,11 +3998,10 @@ function createTypingIndicator() {
     return typingIndicator;
 }
 
-// NEW: Update typing indicator
+// UPDATED: Update typing indicator
 function updateTypingIndicator(typingUsers) {
     const typingIndicator = document.getElementById('typingIndicator');
     const typingText = document.getElementById('typingText');
-    const typingDots = document.getElementById('typingDots');
     
     if (!typingIndicator || !typingText) return;
     
@@ -4013,11 +4029,6 @@ function updateTypingIndicator(typingUsers) {
     void typingIndicator.offsetWidth;
     
     typingIndicator.classList.add('show');
-    
-    // Show/hide dots based on typing
-    if (typingDots) {
-        typingDots.style.display = 'inline-block';
-    }
 }
 
 function initGroupPage() {
@@ -4052,7 +4063,7 @@ function initGroupPage() {
     let isRendering = false;
     let renderQueue = [];
     
-    // NEW: Typing indicator variables
+    // UPDATED: Typing indicator variables
     let typingIndicator = null;
     let typingUnsubscribe = null;
     let typingTimeout = null;
@@ -4071,7 +4082,7 @@ function initGroupPage() {
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
     
-    // NEW: Create typing indicator
+    // UPDATED: Create typing indicator at top
     typingIndicator = createTypingIndicator();
     
     (async () => {
@@ -4096,7 +4107,7 @@ function initGroupPage() {
         reactionUnsubscribers.forEach(unsub => unsub());
         reactionUnsubscribers.clear();
         
-        // NEW: Clean up typing indicator
+        // UPDATED: Clean up typing indicator
         if (typingUnsubscribe) {
             typingUnsubscribe();
         }
@@ -4149,14 +4160,14 @@ function initGroupPage() {
         });
     }
     
-    // NEW: Typing indicator for message input
+    // UPDATED: Typing indicator for message input
     messageInput.addEventListener('input', () => {
         sendBtn.disabled = !messageInput.value.trim();
         
         messageInput.style.height = 'auto';
         messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
         
-        // NEW: Start typing indicator when user types
+        // UPDATED: Start typing indicator when user types
         const now = Date.now();
         if (now - lastTypingInputTime > 1000) { // Throttle to 1 second
             groupChat.startTyping(groupId);
@@ -4174,7 +4185,7 @@ function initGroupPage() {
         }, 3000);
     });
     
-    // NEW: Stop typing when input loses focus
+    // UPDATED: Stop typing when input loses focus
     messageInput.addEventListener('blur', () => {
         groupChat.stopTyping(groupId);
         if (typingTimeout) {
@@ -4182,7 +4193,11 @@ function initGroupPage() {
         }
     });
     
-    sendBtn.addEventListener('click', () => sendMessage());
+    // FIXED: Send button always shows airplane icon, no loader - prevent form submission
+    sendBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        sendMessage();
+    });
     
     messageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -4270,7 +4285,10 @@ function initGroupPage() {
             if (groupAvatar) groupAvatar.src = groupAvatarUrl;
             if (groupNameSidebar) groupNameSidebar.textContent = groupData.name;
             if (groupMembersCount) groupMembersCount.textContent = `${groupData.memberCount || 0} members`;
-            if (chatTitle) chatTitle.textContent = groupData.name;
+            
+            // FIXED: Truncate group name to 6 words in chat header
+            const truncatedGroupName = groupChat.truncateName(groupData.name);
+            if (chatTitle) chatTitle.textContent = truncatedGroupName;
             if (chatSubtitle) chatSubtitle.textContent = groupData.description;
             
             if (rulesList) {
@@ -4544,7 +4562,7 @@ function initGroupPage() {
             reactionUnsubscribers.clear();
         }
         
-        // NEW: Clear typing listener
+        // UPDATED: Clear typing listener
         if (typingUnsubscribe) {
             typingUnsubscribe();
         }
@@ -4588,7 +4606,7 @@ function initGroupPage() {
             }
         });
         
-        // NEW: Set up typing indicator listener
+        // UPDATED: Set up typing indicator listener
         typingUnsubscribe = groupChat.listenToTyping(groupId, (typingUsers) => {
             updateTypingIndicator(typingUsers);
         });
@@ -4606,7 +4624,7 @@ function initGroupPage() {
             reactionUnsubscribers.forEach(unsub => unsub());
             reactionUnsubscribers.clear();
             
-            // NEW: Clean up typing
+            // UPDATED: Clean up typing
             if (typingUnsubscribe) {
                 typingUnsubscribe();
             }
@@ -4640,7 +4658,7 @@ function initGroupPage() {
             const div = document.createElement('div');
             div.className = 'member-item';
             
-            // NEW: Get user profile for reward tag
+            // Get user profile for reward tag
             const userProfile = groupChat.cache.userProfiles ? 
                 groupChat.cache.userProfiles.get(`user_${member.id}`)?.data : null;
             
@@ -4689,6 +4707,10 @@ function initGroupPage() {
         
         window.currentMessages = messages;
         
+        // Use DocumentFragment for efficient DOM updates
+        const fragment = document.createDocumentFragment();
+        const messageIds = new Set();
+        
         const groupedMessages = [];
         let currentGroup = null;
         
@@ -4714,6 +4736,7 @@ function initGroupPage() {
             }
         });
         
+        // Clear container only once
         messagesContainer.innerHTML = '';
         
         groupedMessages.forEach(group => {
@@ -4724,7 +4747,7 @@ function initGroupPage() {
             const firstMessage = group.messages[0];
             const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
             
-            // NEW: Get user profile for reward tag
+            // Get user profile for reward tag
             const userProfile = groupChat.cache.userProfiles ? 
                 groupChat.cache.userProfiles.get(`user_${group.senderId}`)?.data : null;
             
@@ -4775,11 +4798,11 @@ function initGroupPage() {
                         
                         const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
                         
-                        // NEW: Add glowing effect class if message has glowEffect
+                        // UPDATED: Add soft glowing effect class if message has glowEffect
                         const hasGlowEffect = msg.glowEffect || false;
                         const extraClasses = hasGlowEffect ? ' glowing-message' : '';
                         
-                        // NEW: Check if this is a reward upgrade message
+                        // Check if this is a reward upgrade message
                         const isRewardUpgrade = msg.rewardUpgrade || false;
                         const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
                         
@@ -4842,9 +4865,14 @@ function initGroupPage() {
                         
                         const cachedReactions = reactionsCache.get(msg.id) || [];
                         
-                        // Add sending indicator
+                        // UPDATED: Add sending indicator on message (not on button)
                         const sendingIndicator = isTemp ? 
-                            `<div class="sending-indicator" id="sending-${msg.id}" style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>` : 
+                            `<div class="sending-indicator" id="sending-${msg.id}">
+                                <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
+                                    <circle cx="12" cy="12" r="10" />
+                                </svg>
+                                <span>Sending...</span>
+                            </div>` : 
                             '';
                         
                         return `
@@ -4872,8 +4900,10 @@ function initGroupPage() {
                 </div>
             `;
             
-            messagesContainer.appendChild(groupDiv);
+            fragment.appendChild(groupDiv);
         });
+        
+        messagesContainer.appendChild(fragment);
         
         // Remove sending indicators for messages that are no longer temp
         document.querySelectorAll('.sending-indicator').forEach(indicator => {
@@ -4941,9 +4971,10 @@ function initGroupPage() {
         
         setupReactionListeners();
         
+        // Scroll to bottom after rendering
         setTimeout(() => {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 100);
+        }, 50);
     }
     
     function setupReactionListeners() {
@@ -5000,17 +5031,19 @@ function initGroupPage() {
         
         if (!text) return;
         
-        // NEW: Clear typing timeout before sending
+        // UPDATED: Clear typing timeout before sending
         if (typingTimeout) {
             clearTimeout(typingTimeout);
         }
         
+        // Stop typing indicator
+        await groupChat.stopTyping(groupId);
+        
+        // FIXED: Send button always shows airplane icon, no loader
+        // We only disable it temporarily to prevent double sends
+        const originalHTML = sendBtn.innerHTML;
+        const originalDisabled = sendBtn.disabled;
         sendBtn.disabled = true;
-        sendBtn.innerHTML = `
-            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 18px; height: 18px;">
-                <circle cx="12" cy="12" r="10" />
-            </svg>
-        `;
         
         try {
             await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
@@ -5026,13 +5059,9 @@ function initGroupPage() {
             console.error('Error sending message:', error);
             alert(error.message || 'Failed to send message. Please try again.');
         } finally {
-            sendBtn.disabled = false;
-            sendBtn.innerHTML = `
-                <svg class="feather" data-feather="send">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
-            `;
+            // FIXED: Always restore airplane icon immediately
+            sendBtn.disabled = originalDisabled;
+            sendBtn.innerHTML = originalHTML;
         }
     }
     
@@ -5063,7 +5092,7 @@ function initGroupPage() {
         reactionUnsubscribers.forEach(unsub => unsub());
         reactionUnsubscribers.clear();
         
-        // NEW: Clean up typing
+        // UPDATED: Clean up typing
         if (typingUnsubscribe) {
             typingUnsubscribe();
         }
@@ -5986,7 +6015,7 @@ function initUserPage() {
                 return;
             }
             
-            // NEW: Check for fire ring
+            // Check for fire ring and reward tag
             const hasFireRing = userProfile.fireRing || false;
             const rewardTag = userProfile.rewardTag || '';
             
@@ -6145,7 +6174,11 @@ function initChatPage() {
         messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
     });
     
-    sendBtn.addEventListener('click', () => sendMessage());
+    // FIXED: Send button always shows airplane icon, no loader - prevent form submission
+    sendBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        sendMessage();
+    });
     
     messageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -6246,7 +6279,7 @@ function initChatPage() {
                 return;
             }
             
-            // NEW: Check for fire ring and reward tag
+            // Check for fire ring and reward tag
             const hasFireRing = partnerProfile.fireRing || false;
             const rewardTag = partnerProfile.rewardTag || '';
             
@@ -6267,7 +6300,10 @@ function initChatPage() {
             
             if (partnerEmail) partnerEmail.textContent = partnerProfile.email || 'Email not available';
             if (userBio) userBio.textContent = partnerProfile.bio;
-            if (chatTitle) chatTitle.textContent = partnerProfile.name;
+            
+            // FIXED: Truncate partner name to 6 words in chat header
+            const truncatedPartnerName = groupChat.truncateName(partnerProfile.name);
+            if (chatTitle) chatTitle.textContent = truncatedPartnerName;
             if (chatSubtitle) chatSubtitle.textContent = 'Private Chat';
             
             messages = await groupChat.getPrivateMessages(partnerId);
@@ -6320,6 +6356,10 @@ function initChatPage() {
         
         window.currentMessages = messages;
         
+        // Use DocumentFragment for efficient DOM updates
+        const fragment = document.createDocumentFragment();
+        const messageIds = new Set();
+        
         const groupedMessages = [];
         let currentGroup = null;
         
@@ -6347,6 +6387,7 @@ function initChatPage() {
             }
         });
         
+        // Clear container only once
         messagesContainer.innerHTML = '';
         
         groupedMessages.forEach(group => {
@@ -6357,7 +6398,7 @@ function initChatPage() {
             const firstMessage = group.messages[0];
             const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
             
-            // NEW: Get user profile for reward tag and fire ring
+            // Get user profile for reward tag and fire ring
             let userProfile = null;
             if (group.senderId === groupChat.firebaseUser.uid) {
                 userProfile = groupChat.currentUser;
@@ -6412,7 +6453,7 @@ function initChatPage() {
                         
                         const messageDivClass = 'message-text';
                         
-                        // NEW: Add glowing effect for private messages too
+                        // UPDATED: Add soft glowing effect for private messages too
                         const hasGlowEffect = msg.glowEffect || false;
                         const extraClasses = hasGlowEffect ? ' glowing-message' : '';
                         
@@ -6469,9 +6510,14 @@ function initChatPage() {
                         
                         const cachedReactions = reactionsCache.get(msg.id) || [];
                         
-                        // Add sending indicator
+                        // UPDATED: Add sending indicator on message
                         const sendingIndicator = isTemp ? 
-                            `<div class="sending-indicator" id="sending-${msg.id}" style="font-size: 11px; color: #999; margin-top: 4px;">Sending...</div>` : 
+                            `<div class="sending-indicator" id="sending-${msg.id}">
+                                <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
+                                    <circle cx="12" cy="12" r="10" />
+                                </svg>
+                                <span>Sending...</span>
+                            </div>` : 
                             '';
                         
                         return `
@@ -6499,8 +6545,10 @@ function initChatPage() {
                 </div>
             `;
             
-            messagesContainer.appendChild(groupDiv);
+            fragment.appendChild(groupDiv);
         });
+        
+        messagesContainer.appendChild(fragment);
         
         // Remove sending indicators for messages that are no longer temp
         document.querySelectorAll('.sending-indicator').forEach(indicator => {
@@ -6568,9 +6616,10 @@ function initChatPage() {
         
         setupPrivateReactionListeners();
         
+        // Scroll to bottom after rendering
         setTimeout(() => {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 100);
+        }, 50);
     }
     
     function setupPrivateReactionListeners() {
@@ -6629,12 +6678,11 @@ function initChatPage() {
         
         if (!text) return;
         
+        // FIXED: Send button always shows airplane icon, no loader
+        // We only disable it temporarily to prevent double sends
+        const originalHTML = sendBtn.innerHTML;
+        const originalDisabled = sendBtn.disabled;
         sendBtn.disabled = true;
-        sendBtn.innerHTML = `
-            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 18px; height: 18px;">
-                <circle cx="12" cy="12" r="10" />
-            </svg>
-        `;
         
         try {
             await groupChat.sendPrivateMessage(
@@ -6655,13 +6703,9 @@ function initChatPage() {
             console.error('Error sending message:', error);
             alert('Failed to send message');
         } finally {
-            sendBtn.disabled = false;
-            sendBtn.innerHTML = `
-                <svg class="feather" data-feather="send">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
-            `;
+            // FIXED: Always restore airplane icon immediately
+            sendBtn.disabled = originalDisabled;
+            sendBtn.innerHTML = originalHTML;
         }
     }
     
