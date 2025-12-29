@@ -1,4 +1,4 @@
-//now this my group.js when I send messages the whole messages on the oag is rerendered each time so look at how I fixed it in my app.js and apply the fix to my group.js so that the message cannot just be applied without the whole message being rerendered also I was formerly using discord style message but help me restyle it to use line telegram bubble message just like the screenshot :// group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
+// group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
 // UPDATED: Added typing indicators, glowing messages, fire ring avatars, and reward tags
 // UPDATED: Replaced Font Awesome icons with Feather icons, fixed message sending status display
 // UPDATED: Fixed issues - soft glow, page refresh, send button loader, group name truncation, SVG icons
@@ -1049,7 +1049,7 @@ class GroupChat {
             if (cached) return cached;
 
             const groupsRef = collection(db, 'groups');
-            const querySnapshot = await getDocs(groupsRef);
+            const querySnapshot = await getDocs(q);
             
             const groupChats = [];
             
@@ -4068,6 +4068,7 @@ function initGroupPage() {
     let typingUnsubscribe = null;
     let typingTimeout = null;
     let lastTypingInputTime = 0;
+    let lastMessageIds = '';
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -4707,9 +4708,15 @@ function initGroupPage() {
         
         window.currentMessages = messages;
         
+        // Only update if messages have actually changed
+        const messageIdsString = messages.map(m => m.id).sort().join(',');
+        if (lastMessageIds === messageIdsString) {
+            return; // Messages haven't changed, skip re-render
+        }
+        lastMessageIds = messageIdsString;
+        
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
-        const messageIds = new Set();
         
         const groupedMessages = [];
         let currentGroup = null;
@@ -5646,7 +5653,7 @@ function initJoinPage() {
                                             <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
                                                 ${group.privacy === 'private' ? 
                                                     '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
-                                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
+                                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>'
                                                 }
                                             </svg>
                                             ${group.privacy === 'private' ? 'Private Group' : 'Public Group'}
@@ -6110,6 +6117,7 @@ function initChatPage() {
     let reactionsCache = new Map();
     let isRendering = false;
     let renderQueue = [];
+    let lastMessageIds = '';
     
     if (!partnerId) {
         alert('No chat partner specified');
@@ -6356,9 +6364,15 @@ function initChatPage() {
         
         window.currentMessages = messages;
         
+        // Only update if messages have actually changed
+        const messageIdsString = messages.map(m => m.id).sort().join(',');
+        if (lastMessageIds === messageIdsString) {
+            return; // Messages haven't changed, skip re-render
+        }
+        lastMessageIds = messageIdsString;
+        
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
-        const messageIds = new Set();
         
         const groupedMessages = [];
         let currentGroup = null;

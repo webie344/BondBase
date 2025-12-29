@@ -1288,55 +1288,6 @@
             display: none;
         }
 
-        /* Skeleton Loading Styles */
-        .messages-loading {
-            padding: 20px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .messages-loading.active {
-            display: block;
-        }
-
-        .message-group.loading {
-            margin-bottom: 20px;
-            animation: pulse 1.5s infinite;
-        }
-
-        .loading-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--bg-card);
-            float: left;
-            margin-right: 12px;
-        }
-
-        .loading-content {
-            margin-left: 52px;
-        }
-
-        .loading-line {
-            height: 12px;
-            background: var(--bg-card);
-            border-radius: 4px;
-            margin-bottom: 8px;
-            animation: pulse 1.5s infinite;
-        }
-
-        .loading-line.short {
-            width: 40%;
-        }
-
-        .loading-line.medium {
-            width: 60%;
-        }
-
-        .loading-line.long {
-            width: 80%;
-        }
-
         /* Message Styles (Discord-like) */
         .message-group {
             margin-bottom: 20px;
@@ -2027,7 +1978,7 @@
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <button onclick="location.href='group.html'" class="back-btn" id="backBtn">
+                <button  class="back-btn" id="backBtn">
                     <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <line x1="19" y1="12" x2="5" y2="12"></line>
                         <polyline points="12 19 5 12 12 5"></polyline>
@@ -2100,34 +2051,6 @@
 
             <!-- Messages Container -->
             <div class="messages-container" id="messagesContainer">
-                <!-- Initial skeleton loading -->
-                <div id="initialLoading">
-                    <div class="message-group loading">
-                        <div class="loading-avatar"></div>
-                        <div class="loading-content">
-                            <div class="loading-line long"></div>
-                            <div class="loading-line medium"></div>
-                            <div class="loading-line short"></div>
-                        </div>
-                    </div>
-                    <div class="message-group loading">
-                        <div class="loading-avatar"></div>
-                        <div class="loading-content">
-                            <div class="loading-line long"></div>
-                            <div class="loading-line medium"></div>
-                            <div class="loading-line short"></div>
-                        </div>
-                    </div>
-                    <div class="message-group loading">
-                        <div class="loading-avatar"></div>
-                        <div class="loading-content">
-                            <div class="loading-line long"></div>
-                            <div class="loading-line medium"></div>
-                            <div class="loading-line short"></div>
-                        </div>
-                    </div>
-                </div>
-                
                 <!-- Load more button -->
                 <div class="load-more-container" id="loadMoreContainer">
                     <button class="load-more-btn" id="loadMoreBtn" type="button">
@@ -2184,140 +2107,8 @@
 <!-- Import the calls module for voice calls -->
     <script type="module" src="calls.js"></script>
     <script type="module" src="group.js"></script>
-    <script type="module" src="app.js"></script>
-    <script type="module" src="additional-group.js"></script>
-    <script>
-    // Prevent page refresh when sending messages
-    document.addEventListener('DOMContentLoaded', function() {
-        // Get the elements
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        
-        if (messageInput && sendBtn) {
-            // Prevent form submission on Enter key
-            messageInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    // Don't send empty messages
-                    if (!messageInput.value.trim()) return;
-                    
-                    // Use the groupChat instance from group.js
-                    if (typeof groupChat !== 'undefined') {
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const groupId = urlParams.get('id');
-                        
-                        const text = messageInput.value.trim();
-                        if (text && groupId) {
-                            // Call the sendMessage function from groupChat
-                            groupChat.sendMessage(groupId, text).catch(err => {
-                                console.error('Error sending message:', err);
-                                alert('Error sending message: ' + err.message);
-                            });
-                            
-                            // Clear input
-                            messageInput.value = '';
-                            messageInput.style.height = 'auto';
-                            
-                            // Trigger input event to update button state
-                            messageInput.dispatchEvent(new Event('input'));
-                        }
-                    }
-                }
-            });
-            
-            // Prevent form submission on button click
-            sendBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // Don't send empty messages
-                if (!messageInput.value.trim()) return;
-                
-                // Use the groupChat instance from group.js
-                if (typeof groupChat !== 'undefined') {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const groupId = urlParams.get('id');
-                    
-                    const text = messageInput.value.trim();
-                    if (text && groupId) {
-                        // Call the sendMessage function from groupChat
-                        groupChat.sendMessage(groupId, text).catch(err => {
-                            console.error('Error sending message:', err);
-                            alert('Error sending message: ' + err.message);
-                        });
-                        
-                        // Clear input
-                        messageInput.value = '';
-                        messageInput.style.height = 'auto';
-                        
-                        // Trigger input event to update button state
-                        messageInput.dispatchEvent(new Event('input'));
-                    }
-                }
-            });
-            
-            // Also add form submit prevention if there's a form wrapper
-            const form = messageInput.closest('form');
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return false;
-                });
-            }
-        }
-        
-        // Enable/disable send button based on input
-        if (messageInput) {
-            messageInput.addEventListener('input', function() {
-                if (sendBtn) {
-                    sendBtn.disabled = !messageInput.value.trim();
-                    
-                    // Auto-resize textarea
-                    messageInput.style.height = 'auto';
-                    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
-                }
-            });
-        }
-    });
-
-    // Also add global form submit prevention
-    document.addEventListener('submit', function(e) {
-        // Prevent any form submission in the chat area
-        if (e.target.closest('.input-container')) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        }
-    });
-            
-    // Function to show skeleton loading
-    window.showSkeletonLoading = function() {
-        const skeletonHTML = window.createSkeletonLoader();
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'messages-loading active';
-        loadingDiv.innerHTML = skeletonHTML;
-        
-        // Insert at the top of messages
-        const firstMessage = messagesContainer.querySelector('.message-group:not(.loading)');
-        if (firstMessage) {
-            messagesContainer.insertBefore(loadingDiv, firstMessage);
-        } else {
-            messagesContainer.appendChild(loadingDiv);
-        }
-        
-        return loadingDiv;
-    };
-    
-    // Function to remove skeleton loading
-    window.removeSkeletonLoading = function(loadingElement) {
-        if (loadingElement && loadingElement.parentNode) {
-            loadingElement.remove();
-        }
-    };
-    </script>
+    <script type="module" src="ap.js"></script>
+    <script type="module" src="additional-grop.js"></script>
     
     
 </body>
