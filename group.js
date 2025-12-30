@@ -4070,6 +4070,7 @@ function initGroupPage() {
     let typingTimeout = null;
     let lastTypingInputTime = 0;
     let lastMessageIds = '';
+    let renderedMessageIds = new Set(); // Track which messages have been rendered
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -4311,6 +4312,8 @@ function initGroupPage() {
             if (isInitialLoad) {
                 messages = await groupChat.getMessages(groupId);
                 await loadInitialReactions();
+                // Clear rendered message IDs on initial load
+                renderedMessageIds.clear();
                 queueRender();
                 isInitialLoad = false;
             }
@@ -4702,6 +4705,7 @@ function initGroupPage() {
         if (messages.length === 0) {
             if (noMessages) noMessages.style.display = 'block';
             messagesContainer.innerHTML = '';
+            renderedMessageIds.clear();
             return;
         }
         
@@ -4709,22 +4713,26 @@ function initGroupPage() {
         
         window.currentMessages = messages;
         
-        // Only update if messages have actually changed
-        const messageIdsString = messages.map(m => m.id).sort().join(',');
-        if (lastMessageIds === messageIdsString) {
-            return; // Messages haven't changed, skip re-render
+        // Only update if there are new messages that haven't been rendered
+        const newMessages = messages.filter(msg => !renderedMessageIds.has(msg.id));
+        
+        if (newMessages.length === 0) {
+            return; // No new messages to render
         }
-        lastMessageIds = messageIdsString;
+        
+        // Track which messages we've rendered
+        newMessages.forEach(msg => renderedMessageIds.add(msg.id));
         
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
         
+        // Group new messages by sender and time
         const groupedMessages = [];
         let currentGroup = null;
         
-        messages.forEach((message, index) => {
+        newMessages.forEach((message, index) => {
             const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-            const prevMessage = messages[index - 1];
+            const prevMessage = index > 0 ? newMessages[index - 1] : null;
             const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
             
             const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
@@ -4743,9 +4751,6 @@ function initGroupPage() {
                 currentGroup.messages.push(message);
             }
         });
-        
-        // Clear container only once
-        messagesContainer.innerHTML = '';
         
         groupedMessages.forEach(group => {
             const groupDiv = document.createElement('div');
@@ -4911,6 +4916,7 @@ function initGroupPage() {
             fragment.appendChild(groupDiv);
         });
         
+        // Append new messages to the container (don't clear existing ones)
         messagesContainer.appendChild(fragment);
         
         // Remove sending indicators for messages that are no longer temp
@@ -5306,7 +5312,7 @@ function initAdminGroupsPage() {
                                     <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
                                         ${group.privacy === 'private' ? 
                                             '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
-                                            '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
+                                            '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>'
                                         }
                                     </svg>
                                     ${group.privacy === 'private' ? 'Private' : 'Public'}
@@ -6119,6 +6125,7 @@ function initChatPage() {
     let isRendering = false;
     let renderQueue = [];
     let lastMessageIds = '';
+    let renderedMessageIds = new Set(); // Track which messages have been rendered
     
     if (!partnerId) {
         alert('No chat partner specified');
@@ -6317,6 +6324,8 @@ function initChatPage() {
             
             messages = await groupChat.getPrivateMessages(partnerId);
             await loadInitialPrivateReactions();
+            // Clear rendered message IDs on initial load
+            renderedMessageIds.clear();
             queueRender();
             
             if (messagesContainer) {
@@ -6358,6 +6367,7 @@ function initChatPage() {
         if (messages.length === 0) {
             if (noMessages) noMessages.style.display = 'block';
             messagesContainer.innerHTML = '';
+            renderedMessageIds.clear();
             return;
         }
         
@@ -6365,22 +6375,26 @@ function initChatPage() {
         
         window.currentMessages = messages;
         
-        // Only update if messages have actually changed
-        const messageIdsString = messages.map(m => m.id).sort().join(',');
-        if (lastMessageIds === messageIdsString) {
-            return; // Messages haven't changed, skip re-render
+        // Only update if there are new messages that haven't been rendered
+        const newMessages = messages.filter(msg => !renderedMessageIds.has(msg.id));
+        
+        if (newMessages.length === 0) {
+            return; // No new messages to render
         }
-        lastMessageIds = messageIdsString;
+        
+        // Track which messages we've rendered
+        newMessages.forEach(msg => renderedMessageIds.add(msg.id));
         
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
         
+        // Group new messages by sender and time
         const groupedMessages = [];
         let currentGroup = null;
         
-        messages.forEach((message, index) => {
+        newMessages.forEach((message, index) => {
             const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-            const prevMessage = messages[index - 1];
+            const prevMessage = index > 0 ? newMessages[index - 1] : null;
             const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
             
             const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
@@ -6401,9 +6415,6 @@ function initChatPage() {
                 currentGroup.messages.push(message);
             }
         });
-        
-        // Clear container only once
-        messagesContainer.innerHTML = '';
         
         groupedMessages.forEach(group => {
             const groupDiv = document.createElement('div');
@@ -6563,6 +6574,7 @@ function initChatPage() {
             fragment.appendChild(groupDiv);
         });
         
+        // Append new messages to the container (don't clear existing ones)
         messagesContainer.appendChild(fragment);
         
         // Remove sending indicators for messages that are no longer temp
