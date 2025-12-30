@@ -4,8 +4,6 @@
 // UPDATED: Fixed issues - soft glow, page refresh, send button loader, group name truncation, SVG icons
 // FIXED: Message disappearing/reappearing issue and typing indicators not working
 // FIXED: Entire page rerender on message send and q is not defined error
-// FIXED: Message re-rendering issues - optimized render cycle
-// FIXED: Group chat now uses same temporary message system as private chat to prevent flickering
 
 import { 
     getFirestore, 
@@ -147,7 +145,6 @@ class GroupChat {
         this.isLoadingMessages = false;
         
         this.tempPrivateMessages = new Map();
-        this.tempGroupMessages = new Map(); // NEW: Temp messages for group chat
         this.privateChatImageInput = null;
         
         this.sentMessageIds = new Set();
@@ -176,11 +173,6 @@ class GroupChat {
         this.userStreakTimers = new Map(); // userId -> streak timer
         this.userRewards = new Map(); // userId -> current reward tag
         this.userActiveDurations = new Map(); // userId -> active duration in ms
-        
-        // FIXED: Add message rendering optimization
-        this.lastRenderedMessages = new Map(); // groupId -> array of message IDs
-        this.messageRenderCache = new Map(); // messageId -> HTML string
-        this.renderThrottle = false;
         
         this.setupAuthListener();
         this.createReactionModal();
@@ -212,13 +204,6 @@ class GroupChat {
         this.cache.groupMembers.delete(groupId);
         this.cache.joinedGroups.delete(groupId);
         this.cache.messageReactions.delete(groupId);
-        this.lastRenderedMessages.delete(groupId);
-        // Clear message render cache for this group
-        for (const [key, value] of this.messageRenderCache.entries()) {
-            if (key.startsWith(`group_${groupId}_`)) {
-                this.messageRenderCache.delete(key);
-            }
-        }
     }
 
     clearAllCache() {
@@ -243,8 +228,6 @@ class GroupChat {
         };
         this.lastDisplayedMessages.clear();
         this.messageRenderQueue = [];
-        this.lastRenderedMessages.clear();
-        this.messageRenderCache.clear();
         
         // NEW: Clear typing and reward data
         this.typingUsers.clear();
@@ -870,72 +853,6 @@ class GroupChat {
         document.dispatchEvent(event);
     }
 
-    // NEW: Temporary message system for group chat (same as private chat)
-    showTempGroupMessage(groupId, text, tempId) {
-        if (this.currentGroupId === groupId) {
-            const tempMessage = {
-                id: tempId,
-                senderId: this.firebaseUser.uid,
-                senderName: this.currentUser.name,
-                senderAvatar: this.currentUser.avatar,
-                text: text.trim(),
-                timestamp: new Date().toISOString(),
-                type: 'text',
-                status: 'sending',
-                isTemp: true
-            };
-            
-            // NEW: Add glow effect for temp messages if user has streak
-            if (this.shouldGlowMessage(this.firebaseUser.uid)) {
-                tempMessage.glowEffect = true;
-            }
-            
-            this.tempGroupMessages.set(tempId, tempMessage);
-            
-            const event = new CustomEvent('tempGroupMessage', { 
-                detail: { 
-                    tempId,
-                    message: tempMessage,
-                    groupId: groupId 
-                } 
-            });
-            document.dispatchEvent(event);
-        }
-    }
-
-    removeTempGroupMessage(tempId) {
-        this.tempGroupMessages.delete(tempId);
-        const event = new CustomEvent('removeTempGroupMessage', { detail: { tempId } });
-        document.dispatchEvent(event);
-    }
-
-    showTempGroupMediaMessage(groupId, file, tempId, isVideo = false) {
-        if (window.currentGroupId === groupId) {
-            const tempMediaUrl = URL.createObjectURL(file);
-            const tempMessage = {
-                id: tempId,
-                senderId: this.firebaseUser.uid,
-                senderName: this.currentUser.name,
-                senderAvatar: this.currentUser.avatar,
-                [isVideo ? 'videoUrl' : 'imageUrl']: tempMediaUrl,
-                timestamp: new Date().toISOString(),
-                type: isVideo ? 'video' : 'image',
-                status: 'uploading',
-                isTemp: true
-            };
-            
-            // NEW: Add glow effect for temp messages if user has streak
-            if (this.shouldGlowMessage(this.firebaseUser.uid)) {
-                tempMessage.glowEffect = true;
-            }
-            
-            this.tempGroupMessages.set(tempId, tempMessage);
-            
-            const event = new CustomEvent('tempGroupMediaMessage', { detail: tempMessage });
-            document.dispatchEvent(event);
-        }
-    }
-
     async getPrivateMessages(otherUserId, limitCount = 50) {
         try {
             const chatId = this.getPrivateChatId(this.firebaseUser.uid, otherUserId);
@@ -1133,7 +1050,7 @@ class GroupChat {
             if (cached) return cached;
 
             const groupsRef = collection(db, 'groups');
-            const querySnapshot = await getDocs(groupsRef);
+            const querySnapshot = await getDocs(groupsRef); // FIXED: Changed from getDocs(q) to getDocs(groupsRef)
             
             const groupChats = [];
             
@@ -2184,117 +2101,6 @@ class GroupChat {
         }
     }
 
-    // NEW: Optimized send message with temporary message
-    async sendGroupMessage(groupId, text = null, imageUrl = null, videoUrl = null, replyTo = null) {
-        try {
-            if (!this.firebaseUser || !this.currentUser) {
-                throw new Error('You must be logged in to send messages');
-            }
-            
-            const isRestricted = await this.isUserRestricted(groupId, this.firebaseUser.uid);
-            if (isRestricted) {
-                throw new Error('You are restricted from sending messages in this group for 2 hours due to using restricted words.');
-            }
-            
-            if (!text && !imageUrl && !videoUrl) {
-                throw new Error('Message cannot be empty');
-            }
-            
-            if (text) {
-                const restrictedWord = await this.checkMessageForRestrictedWords(groupId, text);
-                if (restrictedWord) {
-                    await this.restrictUser(groupId, this.firebaseUser.uid, 2);
-                    throw new Error(`Your message contains a restricted word (${restrictedWord}). You have been restricted from chatting for 2 hours.`);
-                }
-            }
-            
-            // NEW: Update message streak
-            const streak = this.updateMessageStreak(this.firebaseUser.uid);
-            const shouldGlow = this.shouldGlowMessage(this.firebaseUser.uid);
-            const shouldHaveFireRing = this.shouldHaveFireRing(this.firebaseUser.uid);
-            
-            const tempId = 'temp_group_' + Date.now();
-            
-            // Show temporary message
-            if (text) {
-                this.showTempGroupMessage(groupId, text, tempId);
-            }
-            
-            const messagesRef = collection(db, 'groups', groupId, 'messages');
-            const messageData = {
-                senderId: this.firebaseUser.uid,
-                senderName: this.currentUser.name,
-                senderAvatar: this.currentUser.avatar,
-                timestamp: serverTimestamp()
-            };
-            
-            // NEW: Add glow effect and fire ring data
-            if (shouldGlow) {
-                messageData.glowEffect = true;
-            }
-            
-            if (shouldHaveFireRing) {
-                messageData.fireRing = true;
-            }
-            
-            if (replyTo) {
-                messageData.replyTo = replyTo;
-            }
-            
-            if (text) {
-                messageData.text = text.trim();
-            }
-            
-            if (imageUrl) {
-                messageData.imageUrl = imageUrl;
-                messageData.type = 'image';
-            }
-            
-            if (videoUrl) {
-                messageData.videoUrl = videoUrl;
-                messageData.type = 'video';
-            }
-            
-            await addDoc(messagesRef, messageData);
-            
-            const groupRef = doc(db, 'groups', groupId);
-            await updateDoc(groupRef, {
-                updatedAt: serverTimestamp(),
-                lastActivity: serverTimestamp(),
-                lastMessage: {
-                    text: text ? text.trim() : (imageUrl ? '📷 Image' : videoUrl ? '🎬 Video' : ''),
-                    sender: this.currentUser.name,
-                    timestamp: serverTimestamp()
-                }
-            });
-            
-            // NEW: Check and award user for activity
-            await this.checkAndAwardUser(groupId, this.firebaseUser.uid, this.currentUser.name);
-            
-            // NEW: Stop typing indicator
-            await this.stopTyping(groupId);
-            
-            await this.updateLastActive(groupId);
-            
-            this.clearReply();
-            
-            // Remove temporary message
-            if (text) {
-                this.removeTempGroupMessage(tempId);
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('Error sending message:', error);
-            
-            // Remove temporary message on error
-            const tempId = 'temp_group_' + Date.now();
-            this.removeTempGroupMessage(tempId);
-            
-            throw error;
-        }
-    }
-
     async sendMediaMessage(groupId, file, replyTo = null) {
         try {
             const isVideo = file.type.startsWith('video/');
@@ -2305,35 +2111,58 @@ class GroupChat {
                 this.validateImageFile(file);
             }
             
-            const tempMessageId = 'temp_group_media_' + Date.now();
-            this.showTempGroupMediaMessage(groupId, file, tempMessageId, isVideo);
+            const tempMessageId = 'temp_media_' + Date.now();
+            this.showTempMediaMessage(groupId, file, tempMessageId, isVideo);
             
             const mediaUrl = await this.uploadMediaToCloudinary(file);
             
             if (isVideo) {
-                await this.sendGroupMessage(groupId, null, null, mediaUrl, replyTo);
+                await this.sendMessage(groupId, null, null, mediaUrl, replyTo);
             } else {
-                await this.sendGroupMessage(groupId, null, mediaUrl, null, replyTo);
+                await this.sendMessage(groupId, null, mediaUrl, null, replyTo);
             }
             
-            this.removeTempGroupMessage(tempMessageId);
+            this.removeTempMessage(tempMessageId);
             
             return true;
         } catch (error) {
             console.error('Error sending media message:', error);
-            
-            // Remove temporary message on error
-            const tempMessageId = 'temp_group_media_' + Date.now();
-            this.removeTempGroupMessage(tempMessageId);
-            
             throw error;
         }
     }
 
-    // FIXED: Use same approach as private chat for getting messages
-    async getGroupMessages(groupId, limitCount = 50) {
+    showTempMediaMessage(groupId, file, tempId, isVideo = false) {
+        if (window.currentGroupId === groupId) {
+            const tempMediaUrl = URL.createObjectURL(file);
+            const tempMessage = {
+                id: tempId,
+                senderId: this.firebaseUser.uid,
+                senderName: this.currentUser.name,
+                senderAvatar: this.currentUser.avatar,
+                [isVideo ? 'videoUrl' : 'imageUrl']: tempMediaUrl,
+                timestamp: new Date().toISOString(),
+                type: isVideo ? 'video' : 'image',
+                status: 'uploading'
+            };
+            
+            // NEW: Add glow effect for temp messages if user has streak
+            if (this.shouldGlowMessage(this.firebaseUser.uid)) {
+                tempMessage.glowEffect = true;
+            }
+            
+            const event = new CustomEvent('tempMediaMessage', { detail: tempMessage });
+            document.dispatchEvent(event);
+        }
+    }
+
+    removeTempMessage(tempId) {
+        const event = new CustomEvent('removeTempMessage', { detail: { tempId } });
+        document.dispatchEvent(event);
+    }
+
+    async getMessages(groupId, limitCount = 50) {
         try {
-            const cacheKey = `group_messages_${groupId}_${limitCount}`;
+            const cacheKey = `messages_${groupId}_${limitCount}`;
             const cached = this.getCachedItem(cacheKey, this.cache.messages);
             if (cached) return cached;
 
@@ -2351,26 +2180,18 @@ class GroupChat {
                 });
             });
             
-            // Add temporary messages
-            this.tempGroupMessages.forEach((tempMsg, tempId) => {
-                if (!messages.some(m => m.id === tempId)) {
-                    messages.push({...tempMsg});
-                }
-            });
-            
             const result = messages.reverse();
             
             this.setCachedItem(cacheKey, result, this.cache.messages, 30000);
             
             return result;
         } catch (error) {
-            console.error('Error getting group messages:', error);
-            return [];
+            console.error('Error getting messages:', error);
+            throw error;
         }
     }
 
-    // FIXED: Use same approach as private chat for listening to messages
-    listenToGroupMessages(groupId, callback) {
+    listenToMessages(groupId, callback) {
         try {
             // First, unsubscribe from any existing listener
             if (this.unsubscribeMessages) {
@@ -2396,14 +2217,7 @@ class GroupChat {
                     });
                 });
                 
-                // Add temporary messages
-                this.tempGroupMessages.forEach((tempMsg, tempId) => {
-                    if (!messages.some(m => m.id === tempId)) {
-                        messages.push({...tempMsg});
-                    }
-                });
-                
-                const cacheKey = `group_messages_${groupId}_${messages.length}`;
+                const cacheKey = `messages_${groupId}_${messages.length}`;
                 this.setCachedItem(cacheKey, messages, this.cache.messages, 30000);
                 
                 callback(messages);
@@ -2488,47 +2302,6 @@ class GroupChat {
         } catch (error) {
             console.error('Error updating last active:', error);
         }
-    }
-
-    // FIXED: Add message rendering optimization methods
-    shouldRenderMessages(groupId, messages) {
-        const lastIds = this.lastRenderedMessages.get(groupId) || [];
-        const currentIds = messages.map(m => m.id);
-        
-        // If counts differ, we need to render
-        if (lastIds.length !== currentIds.length) {
-            this.lastRenderedMessages.set(groupId, currentIds);
-            return true;
-        }
-        
-        // Check if any message IDs are different
-        for (let i = 0; i < currentIds.length; i++) {
-            if (lastIds[i] !== currentIds[i]) {
-                this.lastRenderedMessages.set(groupId, currentIds);
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
-    // FIXED: Cache rendered message HTML
-    cacheMessageHtml(messageId, html) {
-        this.messageRenderCache.set(messageId, html);
-    }
-
-    getCachedMessageHtml(messageId) {
-        return this.messageRenderCache.get(messageId);
-    }
-
-    // FIXED: Clear message cache for a specific group
-    clearMessageCacheForGroup(groupId) {
-        for (const [key, value] of this.messageRenderCache.entries()) {
-            if (key.startsWith(`group_${groupId}_`)) {
-                this.messageRenderCache.delete(key);
-            }
-        }
-        this.lastRenderedMessages.delete(groupId);
     }
 
     createReactionModal() {
@@ -3519,7 +3292,6 @@ class GroupChat {
         this.areListenersSetup = false;
         this.sentMessageIds.clear();
         this.pendingMessages.clear();
-        this.tempGroupMessages.clear();
         
         // NEW: Clear typing timeouts
         this.typingUsers.forEach((userTyping, groupId) => {
@@ -3534,9 +3306,6 @@ class GroupChat {
             clearTimeout(timer);
         });
         this.userStreakTimers.clear();
-        
-        // FIXED: Clear render cache
-        this.renderThrottle = false;
     }
 }
 
@@ -4480,39 +4249,24 @@ function initGroupPage() {
         fileInput.click();
     });
     
-    // FIXED: Use new temporary message events for group chat
-    document.addEventListener('tempGroupMessage', (e) => {
-        const { tempId, message, groupId: eventGroupId } = e.detail;
-        
-        if (eventGroupId === groupId) {
-            tempMessages.set(tempId, message);
-            
-            const tempMsgIndex = messages.findIndex(m => m.id === tempId);
-            if (tempMsgIndex === -1) {
-                messages.push(message);
-                queueRender();
-            }
-        }
-    });
-    
-    document.addEventListener('removeTempGroupMessage', (e) => {
-        const tempId = e.detail.tempId;
-        tempMessages.delete(tempId);
-        
-        const tempMsgIndex = messages.findIndex(m => m.id === tempId);
-        if (tempMsgIndex !== -1) {
-            messages.splice(tempMsgIndex, 1);
-            queueRender();
-        }
-    });
-    
-    document.addEventListener('tempGroupMediaMessage', (e) => {
+    document.addEventListener('tempMediaMessage', (e) => {
         const tempMessage = e.detail;
         tempMessages.set(tempMessage.id, tempMessage);
         
         const tempMsgIndex = messages.findIndex(m => m.id === tempMessage.id);
         if (tempMsgIndex === -1) {
             messages.push(tempMessage);
+            queueRender();
+        }
+    });
+    
+    document.addEventListener('removeTempMessage', (e) => {
+        const tempId = e.detail.tempId;
+        tempMessages.delete(tempId);
+        
+        const tempMsgIndex = messages.findIndex(m => m.id === tempId);
+        if (tempMsgIndex !== -1) {
+            messages.splice(tempMsgIndex, 1);
             queueRender();
         }
     });
@@ -4555,8 +4309,7 @@ function initGroupPage() {
             updateMembersList();
             
             if (isInitialLoad) {
-                // FIXED: Use getGroupMessages instead of getMessages
-                messages = await groupChat.getGroupMessages(groupId);
+                messages = await groupChat.getMessages(groupId);
                 await loadInitialReactions();
                 queueRender();
                 isInitialLoad = false;
@@ -4570,9 +4323,6 @@ function initGroupPage() {
     
     async function loadInitialReactions() {
         for (const message of messages) {
-            // Skip temp messages
-            if (message.isTemp) continue;
-            
             const reactions = await groupChat.getMessageReactions(groupId, message.id);
             reactionsCache.set(message.id, reactions);
         }
@@ -4819,9 +4569,9 @@ function initGroupPage() {
             typingUnsubscribe();
         }
         
-        // FIXED: Use listenToGroupMessages instead of listenToMessages
-        groupChat.listenToGroupMessages(groupId, (newMessages) => {
-            console.log('Received group messages:', newMessages.length);
+        // Set up new listeners
+        groupChat.listenToMessages(groupId, (newMessages) => {
+            console.log('Received messages:', newMessages.length);
             
             const uniqueMessages = [];
             const seenIds = new Set();
@@ -4833,7 +4583,6 @@ function initGroupPage() {
                 }
             });
             
-            // Add temp messages
             tempMessages.forEach((tempMsg, tempId) => {
                 if (!uniqueMessages.some(m => m.id === tempId)) {
                     uniqueMessages.push(tempMsg);
@@ -5052,8 +4801,8 @@ function initGroupPage() {
                             }
                         }
                         
-                        const isTemp = msg.isTemp || false;
-                        const isUploading = msg.status === 'uploading' || msg.status === 'sending';
+                        const isTemp = tempMessages.has(msg.id);
+                        const isUploading = msg.status === 'uploading';
                         
                         const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
                         
@@ -5138,22 +4887,20 @@ function initGroupPage() {
                             <div class="${messageDivClass}${extraClasses}${rewardUpgradeClass}" data-message-id="${msg.id}" id="${messageDivId}">
                                 ${replyHtml}
                                 ${messageContent}
-                                ${!isTemp ? `
-                                    <div class="message-reactions" id="reactions-${msg.id}">
-                                        ${cachedReactions.map(reaction => {
-                                            const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
-                                            return `
-                                                <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
-                                                    <span class="reaction-emoji">${reaction.emoji}</span>
-                                                    <span class="reaction-count">${reaction.count}</span>
-                                                </div>
-                                            `;
-                                        }).join('')}
-                                        <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
-                                            +
-                                        </div>
+                                <div class="message-reactions" id="reactions-${msg.id}">
+                                    ${cachedReactions.map(reaction => {
+                                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+                                        return `
+                                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
+                                                <span class="reaction-emoji">${reaction.emoji}</span>
+                                                <span class="reaction-count">${reaction.count}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
+                                        +
                                     </div>
-                                ` : ''}
+                                </div>
                                 ${sendingIndicator}
                             </div>
                         `;
@@ -5169,7 +4916,7 @@ function initGroupPage() {
         // Remove sending indicators for messages that are no longer temp
         document.querySelectorAll('.sending-indicator').forEach(indicator => {
             const messageId = indicator.id.replace('sending-', '');
-            if (!tempMessages.has(messageId) && !groupChat.tempGroupMessages.has(messageId)) {
+            if (!tempMessages.has(messageId)) {
                 indicator.remove();
             }
         });
@@ -5240,9 +4987,6 @@ function initGroupPage() {
     
     function setupReactionListeners() {
         messages.forEach(message => {
-            // Skip temp messages
-            if (message.isTemp) return;
-            
             if (reactionUnsubscribers.has(message.id)) {
                 return;
             }
@@ -5260,8 +5004,6 @@ function initGroupPage() {
     }
     
     function updateReactionsDisplay(container, reactions, messageId) {
-        if (!container) return;
-        
         container.innerHTML = '';
         
         reactions.forEach(reaction => {
@@ -5312,8 +5054,7 @@ function initGroupPage() {
         sendBtn.disabled = true;
         
         try {
-            // FIXED: Use sendGroupMessage instead of sendMessage
-            await groupChat.sendGroupMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
+            await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
             
             messageInput.value = '';
             messageInput.style.height = 'auto';
@@ -5565,7 +5306,7 @@ function initAdminGroupsPage() {
                                     <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
                                         ${group.privacy === 'private' ? 
                                             '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
-                                            '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>'
+                                            '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
                                         }
                                     </svg>
                                     ${group.privacy === 'private' ? 'Private' : 'Public'}
