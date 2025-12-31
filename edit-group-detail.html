@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Group Details - BondBase</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #b3004b;
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --border-light: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --text-muted: #6b7280;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .edit-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--bg-primary);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .edit-header {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(20, 20, 20, 0.95);
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--primary-light);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            margin-right: 12px;
+        }
+
+        .back-btn:hover {
+            background: rgba(179, 0, 75, 0.1);
+        }
+
+        .edit-header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        /* Edit Content */
+        .edit-content {
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .edit-section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title i {
+            color: var(--primary-light);
+        }
+
+        /* Group Photo Section */
+        .photo-edit-container {
+            text-align: center;
+        }
+
+        .group-photo-preview {
+            width: 150px;
+            height: 150px;
+            border-radius: 12px;
+            object-fit: cover;
+            margin: 0 auto 20px;
+            border: 3px solid var(--primary-light);
+            display: block;
+        }
+
+        .upload-photo-btn {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .upload-photo-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .photo-hint {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        /* Form Inputs */
+        .input-group {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 2px rgba(179, 0, 75, 0.1);
+        }
+
+        .form-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            resize: vertical;
+            min-height: 100px;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.5;
+        }
+
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 2px rgba(179, 0, 75, 0.1);
+        }
+
+        .input-count {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            background: var(--bg-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .input-hint {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        /* Dropdown Select */
+        .select-wrapper {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            appearance: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 2px rgba(179, 0, 75, 0.1);
+        }
+
+        .select-arrow {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+            pointer-events: none;
+        }
+
+        /* Rules and Restricted Words */
+        .rules-container {
+            margin-top: 16px;
+        }
+
+        .rule-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .rule-input {
+            flex: 1;
+        }
+
+        .remove-rule-btn {
+            background: var(--bg-secondary);
+            color: var(--text-light);
+            border: 1px solid var(--border);
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .remove-rule-btn:hover {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+        }
+
+        .add-rule-btn {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .add-rule-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        /* Action Buttons */
+        .edit-actions {
+            display: flex;
+            gap: 12px;
+            padding: 20px 0;
+            margin-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .primary-btn {
+            flex: 1;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .primary-btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .primary-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .secondary-btn {
+            flex: 1;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .secondary-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        /* Danger Zone */
+        .danger-zone {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .danger-zone .section-title {
+            color: var(--danger);
+        }
+
+        .danger-zone .section-title i {
+            color: var(--danger);
+        }
+
+        .danger-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+            width: 100%;
+        }
+
+        .danger-btn:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .danger-hint {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(11, 11, 11, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(179, 0, 75, 0.1);
+            border-top-color: var(--primary-light);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        .loading-overlay p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Status Notification */
+        .status-notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--success);
+            color: white;
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 90%;
+            width: max-content;
+        }
+
+        .status-notification.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .status-notification.error {
+            background: var(--danger);
+        }
+
+        .status-notification.warning {
+            background: var(--warning);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .edit-content {
+                padding: 16px;
+            }
+            
+            .edit-section {
+                padding: 16px;
+            }
+            
+            .group-photo-preview {
+                width: 120px;
+                height: 120px;
+            }
+            
+            .edit-actions {
+                flex-direction: column-reverse;
+            }
+            
+            .primary-btn,
+            .secondary-btn {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .edit-header {
+                padding: 14px 16px;
+            }
+            
+            .edit-header h1 {
+                font-size: 1.1rem;
+            }
+            
+            .group-photo-preview {
+                width: 100px;
+                height: 100px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="edit-container">
+        <!-- Header -->
+        <div class="edit-header">
+            <button class="back-btn" id="backBtn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1 id="pageTitle">Edit Group</h1>
+        </div>
+
+        <!-- Edit Content -->
+        <main class="edit-content">
+            <form id="editGroupForm">
+                <!-- Group Photo Section -->
+                <div class="edit-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-camera"></i>
+                        Group Photo
+                    </h2>
+                    <div class="photo-edit-container">
+                        <img id="groupPhotoPreview" src="" alt="Group Photo" class="group-photo-preview">
+                        <button type="button" id="uploadPhotoBtn" class="upload-photo-btn">
+                            <i class="fas fa-upload"></i>
+                            Upload New Photo
+                        </button>
+                        <input type="file" id="groupPhotoUpload" accept="image/*" style="display: none;">
+                        <p class="photo-hint">Recommended size: 500x500 pixels. Max 5MB.</p>
+                    </div>
+                </div>
+
+                <!-- Group Name -->
+                <div class="edit-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-users"></i>
+                        Group Information
+                    </h2>
+                    
+                    <div class="input-group">
+                        <input type="text" 
+                               id="groupName" 
+                               class="form-input" 
+                               placeholder="Group Name"
+                               maxlength="50" 
+                               required>
+                        <div class="input-count">
+                            <span id="nameCount">0</span>/50
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <textarea 
+                            id="groupDescription" 
+                            class="form-textarea" 
+                            placeholder="Group Description..."
+                            rows="3"
+                            maxlength="500"
+                            required></textarea>
+                        <div class="input-count">
+                            <span id="descCount">0</span>/500
+                        </div>
+                    </div>
+                    
+                    <div class="select-wrapper">
+                        <select id="groupCategory" class="form-select" required>
+                            <option value="">Select Category</option>
+                            <option value="social">Social</option>
+                            <option value="dating">Dating</option>
+                            <option value="friendship">Friendship</option>
+                            <option value="hobbies">Hobbies</option>
+                            <option value="education">Education</option>
+                            <option value="business">Business</option>
+                            <option value="support">Support</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <i class="fas fa-chevron-down select-arrow"></i>
+                    </div>
+                    
+                    <div class="select-wrapper">
+                        <select id="groupPrivacy" class="form-select">
+                            <option value="public">Public Group</option>
+                            <option value="private">Private Group</option>
+                        </select>
+                        <i class="fas fa-chevron-down select-arrow"></i>
+                    </div>
+                    
+                    <div class="input-group">
+                        <input type="number" 
+                               id="maxMembers" 
+                               class="form-input" 
+                               placeholder="Maximum Members"
+                               min="10"
+                               max="1000"
+                               value="100">
+                        <p class="input-hint">Maximum number of members allowed in the group (10-1000)</p>
+                    </div>
+                </div>
+
+                <!-- Group Rules -->
+                <div class="edit-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-gavel"></i>
+                        Group Rules
+                    </h2>
+                    <div id="rulesContainer" class="rules-container">
+                        <!-- Rules will be dynamically added here -->
+                    </div>
+                    <button type="button" id="addRuleBtn" class="add-rule-btn">
+                        <i class="fas fa-plus"></i>
+                        Add Rule
+                    </button>
+                </div>
+
+                <!-- Restricted Words -->
+                <div class="edit-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-ban"></i>
+                        Restricted Words
+                    </h2>
+                    <div class="input-group">
+                        <textarea 
+                            id="restrictedWords" 
+                            class="form-textarea" 
+                            placeholder="Enter restricted words separated by commas..."
+                            rows="3"
+                            maxlength="1000"></textarea>
+                        <div class="input-count">
+                            <span id="wordsCount">0</span>/1000
+                        </div>
+                    </div>
+                    <p class="input-hint">Users will be restricted for 2 hours if they use these words. Separate with commas (e.g., spam, hate, offensive)</p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="edit-actions">
+                    <button type="button" id="cancelBtn" class="secondary-btn">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </button>
+                    <button type="submit" id="saveBtn" class="primary-btn">
+                        <i class="fas fa-save"></i>
+                        Save Changes
+                    </button>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="edit-section danger-zone">
+                    <h2 class="section-title">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Danger Zone
+                    </h2>
+                    <p class="danger-hint">These actions are permanent and cannot be undone.</p>
+                    
+                    <button type="button" id="regenerateInviteBtn" class="danger-btn">
+                        <i class="fas fa-key"></i>
+                        Regenerate Invite Link
+                    </button>
+                    <p class="danger-hint">Creates a new invite link and invalidates the old one.</p>
+                    
+                    <button type="button" id="deleteGroupBtn" class="danger-btn">
+                        <i class="fas fa-trash"></i>
+                        Delete Group
+                    </button>
+                    <p class="danger-hint">Permanently deletes this group and all its messages.</p>
+                </div>
+            </form>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p id="loadingText">Processing...</p>
+        </div>
+
+        <!-- Status Notification -->
+        <div id="statusNotification" class="status-notification"></div>
+    </div>
+
+    <script>
+        // Initialize UI functions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Back button functionality
+            const backBtn = document.getElementById('backBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            
+            if (backBtn) {
+                backBtn.addEventListener('click', function() {
+                    window.history.back();
+                });
+            }
+            
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', function() {
+                    window.history.back();
+                });
+            }
+            
+            // Character counters
+            const groupName = document.getElementById('groupName');
+            const nameCount = document.getElementById('nameCount');
+            const groupDescription = document.getElementById('groupDescription');
+            const descCount = document.getElementById('descCount');
+            const restrictedWords = document.getElementById('restrictedWords');
+            const wordsCount = document.getElementById('wordsCount');
+            
+            if (groupName && nameCount) {
+                groupName.addEventListener('input', function() {
+                    nameCount.textContent = this.value.length;
+                });
+            }
+            
+            if (groupDescription && descCount) {
+                groupDescription.addEventListener('input', function() {
+                    descCount.textContent = this.value.length;
+                });
+            }
+            
+            if (restrictedWords && wordsCount) {
+                restrictedWords.addEventListener('input', function() {
+                    wordsCount.textContent = this.value.length;
+                });
+            }
+            
+            // Show loading overlay function
+            window.showLoadingOverlay = function(show, text = 'Processing...') {
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                const loadingText = document.getElementById('loadingText');
+                if (loadingOverlay) {
+                    loadingOverlay.classList.toggle('active', show);
+                    if (loadingText) {
+                        loadingText.textContent = text;
+                    }
+                }
+            };
+            
+            // Show status notification function
+            window.showStatusNotification = function(message, type = 'success', duration = 3000) {
+                const notification = document.getElementById('statusNotification');
+                if (notification) {
+                    notification.textContent = message;
+                    notification.className = 'status-notification ' + type;
+                    notification.classList.add('show');
+                    
+                    // Add appropriate icon
+                    const icon = type === 'success' ? 'check-circle' : 
+                                 type === 'error' ? 'exclamation-circle' : 
+                                 type === 'warning' ? 'exclamation-triangle' : 'info-circle';
+                    notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
+                    
+                    setTimeout(() => {
+                        notification.classList.remove('show');
+                    }, duration);
+                }
+            };
+            
+            // Set page title function
+            window.setPageTitle = function(title) {
+                const pageTitle = document.getElementById('pageTitle');
+                if (pageTitle) {
+                    pageTitle.textContent = title;
+                }
+            };
+        });
+    </script>
+    
+    <script type="module" src="edit.js"></script>
+</body>
+</html>

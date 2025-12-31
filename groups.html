@@ -463,8 +463,10 @@
         .page-header {
             max-width: 1200px;
             margin: 0 auto 30px;
-            display: flex;
+            display: grid;
+            grid-template:column;
             justify-content: space-between;
+            grid-template-columns:1fr;
             align-items: center;
             flex-wrap: wrap;
             gap: 20px;
@@ -485,6 +487,7 @@
             font-weight: 600;
             cursor: pointer;
             display: flex;
+            grid-column:row;
             align-items: center;
             gap: 8px;
             transition: all 0.3s ease;
@@ -862,6 +865,7 @@
     <div class="main-content">
         <div class="page-header">
             <h1 class="page-title">Join Groups</h1>
+            <div>
             <button class="create-group-btn" id="createGroupBtn">
                 <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -869,6 +873,8 @@
                 </svg>
                 Create Group
             </button>
+                </div>
+            <div>
             <button class="create-group-btn">
                 <a href="admin-groups.html">
                     <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -877,8 +883,18 @@
                     Edit Group
                 </a>
             </button>
-        </div>
-
+                </div>
+            <div>
+            <button class="create-group-btn" style="float:righ;margin-top:none;">
+                <a href="edit-profile.html">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                    </svg>
+                    Edit Groups profile
+                </a>
+            </button>
+               </div>
+             </div>
         <div class="search-container">
             <input type="text" class="search-box" id="groupSearch" placeholder="Search groups by name, topic, or category...">
         </div>

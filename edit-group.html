@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Group - BondBase</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #b3004b;
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --border-light: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --text-muted: #6b7280;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--bg-primary);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(20, 20, 20, 0.95);
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--primary-light);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            margin-right: 12px;
+        }
+
+        .back-btn:hover {
+            background: rgba(179, 0, 75, 0.1);
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        /* Groups List */
+        .groups-list {
+            padding: 20px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title i {
+            color: var(--primary-light);
+        }
+
+        /* Group Cards */
+        .group-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .group-card:hover {
+            background: var(--bg-secondary);
+            border-color: var(--primary-light);
+            transform: translateY(-2px);
+        }
+
+        .group-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            object-fit: cover;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            flex-shrink: 0;
+        }
+
+        .group-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .group-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .group-description {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .group-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .group-members, .group-date {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .edit-icon {
+            color: var(--primary-light);
+            font-size: 1.2rem;
+            margin-left: auto;
+            padding: 8px;
+            border-radius: 6px;
+            background: rgba(179, 0, 75, 0.1);
+            flex-shrink: 0;
+        }
+
+        /* Empty State */
+        .empty-state {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            color: var(--border);
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-light);
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+            max-width: 300px;
+            margin: 0 auto 20px;
+            line-height: 1.5;
+        }
+
+        .create-group-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .create-group-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        /* Loading States */
+        .loading-state {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(179, 0, 75, 0.1);
+            border-top-color: var(--primary-light);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .skeleton-group {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .skeleton-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            background: var(--bg-secondary);
+            animation: pulse 1.5s infinite;
+            flex-shrink: 0;
+        }
+
+        .skeleton-content {
+            flex: 1;
+        }
+
+        .skeleton-line {
+            height: 12px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .skeleton-line.short {
+            width: 40%;
+        }
+
+        .skeleton-line.medium {
+            width: 60%;
+        }
+
+        .skeleton-line.long {
+            width: 80%;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(11, 11, 11, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-overlay .loading-spinner {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+        }
+
+        .loading-overlay p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .groups-list {
+                padding: 16px;
+            }
+            
+            .group-card {
+                padding: 14px;
+            }
+            
+            .group-avatar {
+                width: 50px;
+                height: 50px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 14px 16px;
+            }
+            
+            .header-title {
+                font-size: 1.1rem;
+            }
+            
+            .group-meta {
+                flex-direction: column;
+                gap: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <button class="back-btn" id="backBtn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1 class="header-title">Edit Group</h1>
+        </div>
+
+        <!-- Groups List -->
+        <main class="groups-list">
+            <h2 class="section-title">
+                <i class="fas fa-users"></i>
+                Select a Group to Edit
+            </h2>
+            
+            <div id="groupsContainer">
+                <!-- Skeleton loading -->
+                <div id="skeletonLoading">
+                    <div class="skeleton-group">
+                        <div class="skeleton-avatar"></div>
+                        <div class="skeleton-content">
+                            <div class="skeleton-line long"></div>
+                            <div class="skeleton-line medium"></div>
+                            <div class="skeleton-line short"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-group">
+                        <div class="skeleton-avatar"></div>
+                        <div class="skeleton-content">
+                            <div class="skeleton-line long"></div>
+                            <div class="skeleton-line medium"></div>
+                            <div class="skeleton-line short"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-group">
+                        <div class="skeleton-avatar"></div>
+                        <div class="skeleton-content">
+                            <div class="skeleton-line long"></div>
+                            <div class="skeleton-line medium"></div>
+                            <div class="skeleton-line short"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Groups will be loaded here -->
+                <div id="groupsList"></div>
+                
+                <!-- Empty state -->
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <i class="fas fa-users"></i>
+                    <h3>No Groups to Edit</h3>
+                    <p>You need to be an admin of a group to edit it.</p>
+                    <button class="create-group-btn" id="createGroupBtn">
+                        <i class="fas fa-plus"></i>
+                        Create Your First Group
+                    </button>
+                </div>
+                
+                <!-- Loading state -->
+                <div id="loadingState" class="loading-state" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p>Loading groups...</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p id="loadingText">Processing...</p>
+        </div>
+    </div>
+
+    <script>
+        // Initialize UI functions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Back button functionality
+            const backBtn = document.getElementById('backBtn');
+            if (backBtn) {
+                backBtn.addEventListener('click', function() {
+                    window.history.back();
+                });
+            }
+            
+            // Create group button
+            const createGroupBtn = document.getElementById('createGroupBtn');
+            if (createGroupBtn) {
+                createGroupBtn.addEventListener('click', function() {
+                    window.location.href = 'create-group.html';
+                });
+            }
+            
+            // Show loading overlay function
+            window.showLoadingOverlay = function(show, text = 'Processing...') {
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                const loadingText = document.getElementById('loadingText');
+                
+                if (loadingOverlay) {
+                    if (show) {
+                        loadingOverlay.classList.add('active');
+                    } else {
+                        loadingOverlay.classList.remove('active');
+                    }
+                    
+                    if (loadingText) {
+                        loadingText.textContent = text;
+                    }
+                }
+            };
+            
+            // Show groups function
+            window.showGroupsList = function(groups) {
+                const skeletonLoading = document.getElementById('skeletonLoading');
+                const groupsList = document.getElementById('groupsList');
+                const emptyState = document.getElementById('emptyState');
+                const loadingState = document.getElementById('loadingState');
+                
+                // Hide skeleton and loading
+                if (skeletonLoading) skeletonLoading.style.display = 'none';
+                if (loadingState) loadingState.style.display = 'none';
+                
+                if (!groups || groups.length === 0) {
+                    if (emptyState) emptyState.style.display = 'block';
+                    if (groupsList) groupsList.innerHTML = '';
+                    return;
+                }
+                
+                if (emptyState) emptyState.style.display = 'none';
+                
+                // Display groups
+                let groupsHTML = '';
+                groups.forEach(group => {
+                    const avatarUrl = group.photoUrl || 
+                        `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.name)}&backgroundColor=00897b&backgroundType=gradientLinear`;
+                    
+                    const createdAt = group.createdAt ? 
+                        new Date(group.createdAt).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        }) : 'Unknown';
+                    
+                    groupsHTML += `
+                        <div class="group-card" data-group-id="${group.id}">
+                            <img src="${avatarUrl}" alt="${group.name}" class="group-avatar">
+                            <div class="group-info">
+                                <div class="group-name">${group.name}</div>
+                                <div class="group-description">${group.description || 'No description'}</div>
+                                <div class="group-meta">
+                                    <span class="group-members">
+                                        <i class="fas fa-users"></i>
+                                        ${group.memberCount || 0} members
+                                    </span>
+                                    <span class="group-date">
+                                        <i class="fas fa-calendar"></i>
+                                        ${createdAt}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="edit-icon">
+                                <i class="fas fa-edit"></i>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                if (groupsList) {
+                    groupsList.innerHTML = groupsHTML;
+                    
+                    // Add click event listeners
+                    document.querySelectorAll('.group-card').forEach(card => {
+                        card.addEventListener('click', function() {
+                            const groupId = this.dataset.groupId;
+                            window.location.href = `edit-group-detail.html?id=${groupId}`;
+                        });
+                    });
+                }
+            };
+            
+            // Show loading state function
+            window.showLoadingState = function() {
+                const skeletonLoading = document.getElementById('skeletonLoading');
+                const groupsList = document.getElementById('groupsList');
+                const emptyState = document.getElementById('emptyState');
+                const loadingState = document.getElementById('loadingState');
+                
+                if (skeletonLoading) skeletonLoading.style.display = 'none';
+                if (groupsList) groupsList.innerHTML = '';
+                if (emptyState) emptyState.style.display = 'none';
+                if (loadingState) loadingState.style.display = 'block';
+            };
+            
+            // Show empty state function
+            window.showEmptyState = function() {
+                const skeletonLoading = document.getElementById('skeletonLoading');
+                const groupsList = document.getElementById('groupsList');
+                const emptyState = document.getElementById('emptyState');
+                const loadingState = document.getElementById('loadingState');
+                
+                if (skeletonLoading) skeletonLoading.style.display = 'none';
+                if (groupsList) groupsList.innerHTML = '';
+                if (loadingState) loadingState.style.display = 'none';
+                if (emptyState) emptyState.style.display = 'block';
+            };
+        });
+    </script>
+    
+    <script type="module" src="edit.js"></script>
+</body>
+</html>

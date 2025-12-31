@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Profile - BondBase</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #b3004b;
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --border-light: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --text-muted: #6b7280;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .edit-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--bg-primary);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .edit-header {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(20, 20, 20, 0.95);
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--primary-light);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            margin-right: 12px;
+        }
+
+        .back-btn:hover {
+            background: rgba(179, 0, 75, 0.1);
+        }
+
+        .edit-header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        /* Edit Content */
+        .edit-content {
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .edit-section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title i {
+            color: var(--primary-light);
+        }
+
+        /* Avatar Edit Section */
+        .avatar-edit-container {
+            text-align: center;
+        }
+
+        .avatar-preview-large {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 0 auto 20px;
+            border: 3px solid var(--primary-light);
+            display: block;
+        }
+
+        .upload-avatar-btn {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .upload-avatar-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .avatar-options {
+            margin-top: 20px;
+        }
+
+        .option-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .avatar-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        @media (min-width: 640px) {
+            .avatar-grid {
+                grid-template-columns: repeat(6, 1fr);
+            }
+        }
+
+        .avatar-option {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            object-fit: cover;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .avatar-option:hover {
+            transform: scale(1.05);
+            border-color: var(--text-light);
+        }
+
+        .avatar-option.selected {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 2px rgba(179, 0, 75, 0.3);
+        }
+
+        /* Form Inputs */
+        .input-group {
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 2px rgba(179, 0, 75, 0.1);
+        }
+
+        .form-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            resize: vertical;
+            min-height: 100px;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.5;
+        }
+
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 2px rgba(179, 0, 75, 0.1);
+        }
+
+        .input-count {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            background: var(--bg-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .input-hint {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+
+        /* Action Buttons */
+        .edit-actions {
+            display: flex;
+            gap: 12px;
+            padding: 20px 0;
+            margin-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .primary-btn {
+            flex: 1;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .primary-btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .primary-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .secondary-btn {
+            flex: 1;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .secondary-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(11, 11, 11, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(179, 0, 75, 0.1);
+            border-top-color: var(--primary-light);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        .loading-overlay p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Status Notification */
+        .status-notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--success);
+            color: white;
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 90%;
+            width: max-content;
+        }
+
+        .status-notification.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .status-notification.error {
+            background: var(--danger);
+        }
+
+        .status-notification.warning {
+            background: var(--warning);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .edit-content {
+                padding: 16px;
+            }
+            
+            .edit-section {
+                padding: 16px;
+            }
+            
+            .avatar-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            
+            .edit-actions {
+                flex-direction: column-reverse;
+            }
+            
+            .primary-btn,
+            .secondary-btn {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .edit-header {
+                padding: 14px 16px;
+            }
+            
+            .edit-header h1 {
+                font-size: 1.1rem;
+            }
+            
+            .avatar-preview-large {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .avatar-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="edit-container">
+        <!-- Header -->
+        <div class="edit-header">
+            <button class="back-btn" id="backBtn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1>Edit Profile</h1>
+        </div>
+
+        <!-- Edit Content -->
+        <main class="edit-content">
+            <form id="editProfileForm">
+                <!-- Avatar Section -->
+                <div class="edit-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-user-circle"></i>
+                        Profile Picture
+                    </h2>
+                    <div class="avatar-edit-container">
+                        <img id="avatarPreview" src="" alt="Current Avatar" class="avatar-preview-large">
+                        <button type="button" id="uploadAvatarBtn" class="upload-avatar-btn">
+                            <i class="fas fa-upload"></i>
+                            Upload New Photo
+                        </button>
+                        <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+                        
+                        <div class="avatar-options">
+                            <p class="option-label">Or choose from default avatars:</p>
+                            <div id="avatarOptions" class="avatar-grid"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Display Name Section -->
+                <div class="edit-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-id-card"></i>
+                        Display Name
+                    </h2>
+                    <div class="input-group">
+                        <input type="text" 
+                               id="displayName" 
+                               class="form-input" 
+                               placeholder="Enter your display name"
+                               maxlength="30">
+                        <div class="input-count">
+                            <span id="nameCount">0</span>/30
+                        </div>
+                    </div>
+                    <p class="input-hint">This name will be visible to other users in groups and chats.</p>
+                </div>
+
+                <!-- Bio Section -->
+                <div class="edit-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-align-left"></i>
+                        Bio
+                    </h2>
+                    <div class="input-group">
+                        <textarea 
+                            id="userBio" 
+                            class="form-textarea" 
+                            placeholder="Tell others about yourself..."
+                            rows="4"
+                            maxlength="200"></textarea>
+                        <div class="input-count">
+                            <span id="bioCount">0</span>/200
+                        </div>
+                    </div>
+                    <p class="input-hint">Share your interests, hobbies, or a brief introduction.</p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="edit-actions">
+                    <button type="button" id="cancelBtn" class="secondary-btn">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </button>
+                    <button type="submit" id="saveBtn" class="primary-btn">
+                        <i class="fas fa-save"></i>
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>Saving changes...</p>
+        </div>
+
+        <!-- Status Notification -->
+        <div id="statusNotification" class="status-notification"></div>
+    </div>
+
+    <script>
+        // Initialize form functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Back button functionality
+            const backBtn = document.getElementById('backBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            
+            function goBack() {
+                const referrer = document.referrer;
+                if (referrer && (referrer.includes('group.html') || referrer.includes('chats.html') || referrer.includes('message.html'))) {
+                    window.history.back();
+                } else {
+                    window.location.href = 'groups.html';
+                }
+            }
+            
+            if (backBtn) backBtn.addEventListener('click', goBack);
+            if (cancelBtn) cancelBtn.addEventListener('click', goBack);
+            
+            // Character counters
+            const displayName = document.getElementById('displayName');
+            const nameCount = document.getElementById('nameCount');
+            const userBio = document.getElementById('userBio');
+            const bioCount = document.getElementById('bioCount');
+            
+            if (displayName && nameCount) {
+                displayName.addEventListener('input', function() {
+                    nameCount.textContent = this.value.length;
+                });
+            }
+            
+            if (userBio && bioCount) {
+                userBio.addEventListener('input', function() {
+                    bioCount.textContent = this.value.length;
+                });
+            }
+            
+            // Show loading overlay function
+            window.showLoadingOverlay = function(show) {
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.classList.toggle('active', show);
+                }
+            };
+            
+            // Show status notification function
+            window.showStatusNotification = function(message, type = 'success', duration = 3000) {
+                const notification = document.getElementById('statusNotification');
+                if (notification) {
+                    notification.textContent = message;
+                    notification.className = 'status-notification ' + type;
+                    notification.classList.add('show');
+                    
+                    // Add appropriate icon
+                    const icon = type === 'success' ? 'check-circle' : 
+                                 type === 'error' ? 'exclamation-circle' : 
+                                 type === 'warning' ? 'exclamation-triangle' : 'info-circle';
+                    notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
+                    
+                    setTimeout(() => {
+                        notification.classList.remove('show');
+                    }, duration);
+                }
+            };
+        });
+    </script>
+    
+    <script type="module" src="group.js"></script>
+    <script type="module" src="edit.js"></script>
+</body>
+</html>
