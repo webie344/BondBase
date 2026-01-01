@@ -1,10 +1,10 @@
-//this my group.js when I send a new messages before it appears on the page the messages on the page disappears for maybe 1 or 2 seconds before it appears with the new messages I don't want it to disappears at all it should just remain on the page and the new messages just join on the pagegroup.js -//
 // Complete Group Chat System with Cloudinary Media Support & Invite Links
 // UPDATED: Added typing indicators, glowing messages, fire ring avatars, and reward tags
 // UPDATED: Replaced Font Awesome icons with Feather icons, fixed message sending status display
 // UPDATED: Fixed issues - soft glow, page refresh, send button loader, group name truncation, SVG icons
 // FIXED: Message disappearing/reappearing issue and typing indicators not working
 // FIXED: Entire page rerender on message send and q is not defined error
+// FIXED: Messages no longer disappear when sending new messages - optimized rendering
 
 import { 
     getFirestore, 
@@ -4072,6 +4072,10 @@ function initGroupPage() {
     let lastTypingInputTime = 0;
     let lastMessageIds = '';
     
+    // NEW: Tracking variables for optimized rendering
+    let renderedMessageIds = new Set();
+    let messageGroupsCache = new Map();
+    
     if (!groupId) {
         window.location.href = 'groups.html';
         return;
@@ -4344,6 +4348,407 @@ function initGroupPage() {
         } else {
             renderQueue.push(true);
         }
+    }
+    
+    function displayMessages() {
+        if (!messagesContainer) return;
+        
+        if (messages.length === 0) {
+            if (noMessages) noMessages.style.display = 'block';
+            messagesContainer.innerHTML = '';
+            renderedMessageIds.clear();
+            messageGroupsCache.clear();
+            return;
+        }
+        
+        if (noMessages) noMessages.style.display = 'none';
+        
+        window.currentMessages = messages;
+        
+        // Calculate which messages are new
+        const newMessages = messages.filter(msg => !renderedMessageIds.has(msg.id));
+        const allMessageIds = messages.map(m => m.id);
+        
+        // If no new messages, just update reactions on existing ones
+        if (newMessages.length === 0) {
+            updateReactionsOnExistingMessages();
+            return;
+        }
+        
+        // Add new message IDs to our tracking set
+        newMessages.forEach(msg => renderedMessageIds.add(msg.id));
+        
+        // If this is the first render or we have few messages, render everything
+        if (renderedMessageIds.size === newMessages.length || messages.length <= 10) {
+            renderAllMessages();
+            return;
+        }
+        
+        // Otherwise, append only new messages
+        appendNewMessages(newMessages);
+    }
+    
+    function renderAllMessages() {
+        // Clear the container
+        messagesContainer.innerHTML = '';
+        messageGroupsCache.clear();
+        
+        // Render all messages
+        const groupedMessages = groupMessages(messages);
+        const fragment = createMessageGroupsFragment(groupedMessages);
+        
+        messagesContainer.appendChild(fragment);
+        scrollToBottom();
+        setupMessageEventListeners();
+    }
+    
+    function appendNewMessages(newMessages) {
+        // Get existing groups
+        const existingGroups = Array.from(messagesContainer.querySelectorAll('.message-group'));
+        const lastGroup = existingGroups[existingGroups.length - 1];
+        
+        // If there's a last group and new messages belong to the same sender as last group
+        if (lastGroup && newMessages.length > 0) {
+            const lastGroupSenderId = lastGroup.dataset.senderId;
+            const firstNewMessage = newMessages[0];
+            
+            // Check if new messages should be added to the last group
+            const lastMessageTime = getLastMessageTimeInGroup(lastGroup);
+            const firstNewMessageTime = firstNewMessage.timestamp ? new Date(firstNewMessage.timestamp) : new Date();
+            
+            const timeDiff = lastMessageTime ? Math.abs(firstNewMessageTime - lastMessageTime) / (1000 * 60) : 6;
+            
+            if (firstNewMessage.senderId === lastGroupSenderId && timeDiff <= 5) {
+                // Add to existing group
+                appendToExistingGroup(lastGroup, [firstNewMessage]);
+                newMessages.shift(); // Remove first message since we added it
+            }
+        }
+        
+        // Group remaining new messages
+        if (newMessages.length > 0) {
+            const groupedNewMessages = groupMessages(newMessages);
+            const fragment = createMessageGroupsFragment(groupedNewMessages);
+            
+            messagesContainer.appendChild(fragment);
+        }
+        
+        scrollToBottom();
+        setupMessageEventListeners();
+    }
+    
+    function getLastMessageTimeInGroup(groupElement) {
+        const messageElements = groupElement.querySelectorAll('.message-text, .system-message');
+        if (messageElements.length === 0) return null;
+        
+        const lastMessageElement = messageElements[messageElements.length - 1];
+        const messageId = lastMessageElement.dataset.messageId;
+        const message = messages.find(m => m.id === messageId);
+        
+        if (!message || !message.timestamp) return null;
+        
+        return new Date(message.timestamp);
+    }
+    
+    function appendToExistingGroup(groupElement, messagesToAdd) {
+        const messageContentDiv = groupElement.querySelector('.message-content');
+        
+        if (!messageContentDiv) return;
+        
+        messagesToAdd.forEach(msg => {
+            const messageElement = createSingleMessageElement(msg);
+            messageContentDiv.appendChild(messageElement);
+        });
+    }
+    
+    function groupMessages(messagesArray) {
+        const groupedMessages = [];
+        let currentGroup = null;
+        
+        messagesArray.forEach((message, index) => {
+            const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
+            const prevMessage = messagesArray[index - 1];
+            const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
+            
+            const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
+            
+            if (!prevMessage || 
+                prevMessage.senderId !== message.senderId || 
+                timeDiff > 5) {
+                currentGroup = {
+                    senderId: message.senderId,
+                    senderName: message.senderName,
+                    senderAvatar: message.senderAvatar,
+                    messages: [message]
+                };
+                groupedMessages.push(currentGroup);
+            } else {
+                currentGroup.messages.push(message);
+            }
+        });
+        
+        return groupedMessages;
+    }
+    
+    function createMessageGroupsFragment(groupedMessages) {
+        const fragment = document.createDocumentFragment();
+        
+        groupedMessages.forEach(group => {
+            const groupDiv = createMessageGroupElement(group);
+            fragment.appendChild(groupDiv);
+        });
+        
+        return fragment;
+    }
+    
+    function createMessageGroupElement(group) {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'message-group';
+        groupDiv.dataset.senderId = group.senderId;
+        groupDiv.dataset.groupId = `group_${group.senderId}_${Date.now()}`;
+        
+        const firstMessage = group.messages[0];
+        const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
+        
+        // Get user profile for reward tag
+        const userProfile = groupChat.cache.userProfiles ? 
+            groupChat.cache.userProfiles.get(`user_${group.senderId}`)?.data : null;
+        
+        const rewardTag = userProfile?.rewardTag || '';
+        const hasFireRing = userProfile?.fireRing || false;
+        
+        groupDiv.innerHTML = `
+            <div class="message-header">
+                <div class="message-avatar-container" style="position: relative; display: inline-block;">
+                    ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
+                    <img src="${group.senderAvatar}" 
+                         alt="${group.senderName}" 
+                         class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
+                         data-user-id="${group.senderId}">
+                </div>
+                <div class="message-sender-info">
+                    <span class="message-sender">${group.senderName}</span>
+                    ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
+                </div>
+                <span class="message-time">${formatTime(firstMessageTime)}</span>
+            </div>
+            <div class="message-content">
+                ${group.messages.map(msg => createSingleMessageHtml(msg)).join('')}
+            </div>
+        `;
+        
+        return groupDiv;
+    }
+    
+    function createSingleMessageElement(msg) {
+        const template = document.createElement('template');
+        template.innerHTML = createSingleMessageHtml(msg);
+        return template.content.firstElementChild;
+    }
+    
+    function createSingleMessageHtml(msg) {
+        const messageTime = msg.timestamp ? new Date(msg.timestamp) : new Date();
+        
+        let replyHtml = '';
+        if (msg.replyTo) {
+            const repliedMessage = messages.find(m => m.id === msg.replyTo);
+            if (repliedMessage) {
+                const truncatedName = groupChat.truncateName(repliedMessage.senderName);
+                const truncatedMessage = repliedMessage.text ? 
+                    groupChat.truncateMessage(repliedMessage.text) : 
+                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : '');
+                
+                replyHtml = `
+                    <div class="replying-to">
+                        <span class="reply-label">Replying to</span> 
+                        <span class="reply-sender">${truncatedName}</span>
+                        <span class="reply-separator">:</span> 
+                        <span class="reply-message">${truncatedMessage}</span>
+                    </div>
+                `;
+            }
+        }
+        
+        const isTemp = tempMessages.has(msg.id);
+        const isUploading = msg.status === 'uploading';
+        
+        const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
+        
+        // Add soft glowing effect class if message has glowEffect
+        const hasGlowEffect = msg.glowEffect || false;
+        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
+        
+        // Check if this is a reward upgrade message
+        const isRewardUpgrade = msg.rewardUpgrade || false;
+        const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
+        
+        let messageContent = '';
+        
+        if (msg.imageUrl) {
+            messageContent = `
+                <div class="message-image-container" style="position: relative;">
+                    <img src="${msg.imageUrl}" 
+                         alt="Shared image" 
+                         class="message-image"
+                         style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
+                         onload="this.style.opacity='1';"
+                         onerror="this.style.display='none';"
+                         onclick="openImageModal('${msg.imageUrl}')">
+                    ${isUploading ? `
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                <circle cx="12" cy="12" r="10" />
+                            </svg>
+                            Uploading...
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else if (msg.videoUrl) {
+            messageContent = `
+                <div class="message-video-container" style="position: relative;">
+                    <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
+                           onload="this.style.opacity='1';"
+                           onerror="this.style.display='none';">
+                        <source src="${msg.videoUrl}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    ${isUploading ? `
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                <circle cx="12" cy="12" r="10" />
+                            </svg>
+                            Uploading...
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else if (msg.type === 'system') {
+            messageContent = `
+                <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
+                    ${msg.text}
+                </div>
+            `;
+        } else {
+            messageContent = msg.text || '';
+        }
+        
+        const messageDivId = `message-${msg.id}`;
+        
+        const cachedReactions = reactionsCache.get(msg.id) || [];
+        
+        // Add sending indicator on message
+        const sendingIndicator = isTemp ? 
+            `<div class="sending-indicator" id="sending-${msg.id}">
+                <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
+                    <circle cx="12" cy="12" r="10" />
+                </svg>
+                <span>Sending...</span>
+            </div>` : 
+            '';
+        
+        return `
+            <div class="${messageDivClass}${extraClasses}${rewardUpgradeClass}" data-message-id="${msg.id}" id="${messageDivId}">
+                ${replyHtml}
+                ${messageContent}
+                <div class="message-reactions" id="reactions-${msg.id}">
+                    ${cachedReactions.map(reaction => {
+                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+                        return `
+                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
+                                <span class="reaction-emoji">${reaction.emoji}</span>
+                                <span class="reaction-count">${reaction.count}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
+                        +
+                    </div>
+                </div>
+                ${sendingIndicator}
+            </div>
+        `;
+    }
+    
+    function updateReactionsOnExistingMessages() {
+        // Update reactions on existing messages without re-rendering
+        messages.forEach(msg => {
+            const reactionsContainer = document.getElementById(`reactions-${msg.id}`);
+            if (reactionsContainer) {
+                const cachedReactions = reactionsCache.get(msg.id) || [];
+                updateReactionsDisplay(reactionsContainer, cachedReactions, msg.id);
+            }
+            
+            // Remove sending indicators for messages that are no longer temp
+            const sendingIndicator = document.getElementById(`sending-${msg.id}`);
+            if (sendingIndicator && !tempMessages.has(msg.id)) {
+                sendingIndicator.remove();
+            }
+        });
+    }
+    
+    function setupMessageEventListeners() {
+        document.querySelectorAll('.message-avatar').forEach(avatar => {
+            avatar.addEventListener('click', (e) => {
+                const userId = e.target.dataset.userId;
+                if (userId && userId !== groupChat.firebaseUser?.uid) {
+                    window.open(`user.html?id=${userId}`, '_blank');
+                }
+            });
+        });
+        
+        document.querySelectorAll('.reaction-bubble').forEach(bubble => {
+            bubble.addEventListener('click', (e) => {
+                if (e.currentTarget.classList.contains('add-reaction')) {
+                    return;
+                }
+                const messageElement = e.target.closest('.message-text, .system-message');
+                if (messageElement) {
+                    const messageId = messageElement.dataset.messageId;
+                    const message = messages.find(m => m.id === messageId);
+                    if (message) {
+                        const emoji = e.currentTarget.dataset.emoji;
+                        groupChat.currentMessageForReaction = message;
+                        groupChat.addReactionToMessage(emoji);
+                    }
+                }
+            });
+        });
+        
+        document.querySelectorAll('.message-text, .system-message').forEach(messageElement => {
+            let longPressTimer;
+            const messageId = messageElement.dataset.messageId;
+            const message = messages.find(m => m.id === messageId);
+            
+            if (message) {
+                messageElement.addEventListener('touchstart', (e) => {
+                    longPressTimer = setTimeout(() => {
+                        groupChat.showReactionModal(message);
+                    }, 500);
+                });
+                
+                messageElement.addEventListener('touchend', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                messageElement.addEventListener('touchmove', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                messageElement.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    groupChat.showReactionModal(message);
+                });
+            }
+        });
+        
+        groupChat.setupSwipeToReply(messagesContainer);
+        
+        setupReactionListeners();
     }
     
     function addInviteLinkButton() {
@@ -4697,295 +5102,6 @@ function initGroupPage() {
         });
     }
     
-    function displayMessages() {
-        if (!messagesContainer) return;
-        
-        if (messages.length === 0) {
-            if (noMessages) noMessages.style.display = 'block';
-            messagesContainer.innerHTML = '';
-            return;
-        }
-        
-        if (noMessages) noMessages.style.display = 'none';
-        
-        window.currentMessages = messages;
-        
-        // Only update if messages have actually changed
-        const messageIdsString = messages.map(m => m.id).sort().join(',');
-        if (lastMessageIds === messageIdsString) {
-            return; // Messages haven't changed, skip re-render
-        }
-        lastMessageIds = messageIdsString;
-        
-        // Use DocumentFragment for efficient DOM updates
-        const fragment = document.createDocumentFragment();
-        
-        const groupedMessages = [];
-        let currentGroup = null;
-        
-        messages.forEach((message, index) => {
-            const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-            const prevMessage = messages[index - 1];
-            const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
-            
-            const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
-            
-            if (!prevMessage || 
-                prevMessage.senderId !== message.senderId || 
-                timeDiff > 5) {
-                currentGroup = {
-                    senderId: message.senderId,
-                    senderName: message.senderName,
-                    senderAvatar: message.senderAvatar,
-                    messages: [message]
-                };
-                groupedMessages.push(currentGroup);
-            } else {
-                currentGroup.messages.push(message);
-            }
-        });
-        
-        // Clear container only once
-        messagesContainer.innerHTML = '';
-        
-        groupedMessages.forEach(group => {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'message-group';
-            groupDiv.dataset.senderId = group.senderId;
-            
-            const firstMessage = group.messages[0];
-            const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
-            
-            // Get user profile for reward tag
-            const userProfile = groupChat.cache.userProfiles ? 
-                groupChat.cache.userProfiles.get(`user_${group.senderId}`)?.data : null;
-            
-            const rewardTag = userProfile?.rewardTag || '';
-            const hasFireRing = userProfile?.fireRing || false;
-            
-            groupDiv.innerHTML = `
-                <div class="message-header">
-                    <div class="message-avatar-container" style="position: relative; display: inline-block;">
-                        ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
-                        <img src="${group.senderAvatar}" 
-                             alt="${group.senderName}" 
-                             class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
-                             data-user-id="${group.senderId}">
-                    </div>
-                    <div class="message-sender-info">
-                        <span class="message-sender">${group.senderName}</span>
-                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
-                    </div>
-                    <span class="message-time">${formatTime(firstMessageTime)}</span>
-                </div>
-                <div class="message-content">
-                    ${group.messages.map(msg => {
-                        const messageTime = msg.timestamp ? new Date(msg.timestamp) : new Date();
-                        
-                        let replyHtml = '';
-                        if (msg.replyTo) {
-                            const repliedMessage = messages.find(m => m.id === msg.replyTo);
-                            if (repliedMessage) {
-                                const truncatedName = groupChat.truncateName(repliedMessage.senderName);
-                                const truncatedMessage = repliedMessage.text ? 
-                                    groupChat.truncateMessage(repliedMessage.text) : 
-                                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : '');
-                                
-                                replyHtml = `
-                                    <div class="replying-to">
-                                        <span class="reply-label">Replying to</span> 
-                                        <span class="reply-sender">${truncatedName}</span>
-                                        <span class="reply-separator">:</span> 
-                                        <span class="reply-message">${truncatedMessage}</span>
-                                    </div>
-                                `;
-                            }
-                        }
-                        
-                        const isTemp = tempMessages.has(msg.id);
-                        const isUploading = msg.status === 'uploading';
-                        
-                        const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
-                        
-                        // UPDATED: Add soft glowing effect class if message has glowEffect
-                        const hasGlowEffect = msg.glowEffect || false;
-                        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
-                        
-                        // Check if this is a reward upgrade message
-                        const isRewardUpgrade = msg.rewardUpgrade || false;
-                        const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
-                        
-                        let messageContent = '';
-                        
-                        if (msg.imageUrl) {
-                            messageContent = `
-                                <div class="message-image-container" style="position: relative;">
-                                    <img src="${msg.imageUrl}" 
-                                         alt="Shared image" 
-                                         class="message-image"
-                                         style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
-                                         onload="this.style.opacity='1';"
-                                         onerror="this.style.display='none';"
-                                         onclick="openImageModal('${msg.imageUrl}')">
-                                    ${isUploading ? `
-                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
-                                                <circle cx="12" cy="12" r="10" />
-                                            </svg>
-                                            Uploading...
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        } else if (msg.videoUrl) {
-                            messageContent = `
-                                <div class="message-video-container" style="position: relative;">
-                                    <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
-                                           onload="this.style.opacity='1';"
-                                           onerror="this.style.display='none';">
-                                        <source src="${msg.videoUrl}" type="video/mp4">
-                                        Your browser does not support the video tag.
-                                    </video>
-                                    ${isUploading ? `
-                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
-                                                <circle cx="12" cy="12" r="10" />
-                                            </svg>
-                                            Uploading...
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        } else if (msg.type === 'system') {
-                            messageContent = `
-                                <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
-                                    ${msg.text}
-                                </div>
-                            `;
-                        } else {
-                            messageContent = msg.text || '';
-                        }
-                        
-                        const messageDivId = `message-${msg.id}`;
-                        
-                        const cachedReactions = reactionsCache.get(msg.id) || [];
-                        
-                        // UPDATED: Add sending indicator on message (not on button)
-                        const sendingIndicator = isTemp ? 
-                            `<div class="sending-indicator" id="sending-${msg.id}">
-                                <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
-                                    <circle cx="12" cy="12" r="10" />
-                                </svg>
-                                <span>Sending...</span>
-                            </div>` : 
-                            '';
-                        
-                        return `
-                            <div class="${messageDivClass}${extraClasses}${rewardUpgradeClass}" data-message-id="${msg.id}" id="${messageDivId}">
-                                ${replyHtml}
-                                ${messageContent}
-                                <div class="message-reactions" id="reactions-${msg.id}">
-                                    ${cachedReactions.map(reaction => {
-                                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
-                                        return `
-                                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
-                                                <span class="reaction-emoji">${reaction.emoji}</span>
-                                                <span class="reaction-count">${reaction.count}</span>
-                                            </div>
-                                        `;
-                                    }).join('')}
-                                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
-                                        +
-                                    </div>
-                                </div>
-                                ${sendingIndicator}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-            
-            fragment.appendChild(groupDiv);
-        });
-        
-        messagesContainer.appendChild(fragment);
-        
-        // Remove sending indicators for messages that are no longer temp
-        document.querySelectorAll('.sending-indicator').forEach(indicator => {
-            const messageId = indicator.id.replace('sending-', '');
-            if (!tempMessages.has(messageId)) {
-                indicator.remove();
-            }
-        });
-        
-        document.querySelectorAll('.message-avatar').forEach(avatar => {
-            avatar.addEventListener('click', (e) => {
-                const userId = e.target.dataset.userId;
-                if (userId && userId !== groupChat.firebaseUser?.uid) {
-                    window.open(`user.html?id=${userId}`, '_blank');
-                }
-            });
-        });
-        
-        document.querySelectorAll('.reaction-bubble').forEach(bubble => {
-            bubble.addEventListener('click', (e) => {
-                if (e.currentTarget.classList.contains('add-reaction')) {
-                    return;
-                }
-                const messageElement = e.target.closest('.message-text, .system-message');
-                if (messageElement) {
-                    const messageId = messageElement.dataset.messageId;
-                    const message = messages.find(m => m.id === messageId);
-                    if (message) {
-                        const emoji = e.currentTarget.dataset.emoji;
-                        groupChat.currentMessageForReaction = message;
-                        groupChat.addReactionToMessage(emoji);
-                    }
-                }
-            });
-        });
-        
-        document.querySelectorAll('.message-text, .system-message').forEach(messageElement => {
-            let longPressTimer;
-            const messageId = messageElement.dataset.messageId;
-            const message = messages.find(m => m.id === messageId);
-            
-            if (message) {
-                messageElement.addEventListener('touchstart', (e) => {
-                    longPressTimer = setTimeout(() => {
-                        groupChat.showReactionModal(message);
-                    }, 500);
-                });
-                
-                messageElement.addEventListener('touchend', () => {
-                    clearTimeout(longPressTimer);
-                });
-                
-                messageElement.addEventListener('touchmove', () => {
-                    clearTimeout(longPressTimer);
-                });
-                
-                messageElement.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    groupChat.showReactionModal(message);
-                });
-            }
-        });
-        
-        groupChat.setupSwipeToReply(messagesContainer);
-        
-        setupReactionListeners();
-        
-        // Scroll to bottom after rendering
-        setTimeout(() => {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 50);
-    }
-    
     function setupReactionListeners() {
         messages.forEach(message => {
             if (reactionUnsubscribers.has(message.id)) {
@@ -5072,6 +5188,12 @@ function initGroupPage() {
             sendBtn.disabled = originalDisabled;
             sendBtn.innerHTML = originalHTML;
         }
+    }
+    
+    function scrollToBottom() {
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 50);
     }
     
     function formatTime(date) {
@@ -5307,7 +5429,7 @@ function initAdminGroupsPage() {
                                     <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
                                         ${group.privacy === 'private' ? 
                                             '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
-                                            '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
+                                            '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>'
                                         }
                                     </svg>
                                     ${group.privacy === 'private' ? 'Private' : 'Public'}
@@ -6121,6 +6243,10 @@ function initChatPage() {
     let renderQueue = [];
     let lastMessageIds = '';
     
+    // NEW: Tracking variables for optimized rendering
+    let renderedMessageIds = new Set();
+    let messageGroupsCache = new Map();
+    
     if (!partnerId) {
         alert('No chat partner specified');
         window.location.href = 'message.html';
@@ -6359,6 +6485,8 @@ function initChatPage() {
         if (messages.length === 0) {
             if (noMessages) noMessages.style.display = 'block';
             messagesContainer.innerHTML = '';
+            renderedMessageIds.clear();
+            messageGroupsCache.clear();
             return;
         }
         
@@ -6366,22 +6494,109 @@ function initChatPage() {
         
         window.currentMessages = messages;
         
-        // Only update if messages have actually changed
-        const messageIdsString = messages.map(m => m.id).sort().join(',');
-        if (lastMessageIds === messageIdsString) {
-            return; // Messages haven't changed, skip re-render
+        // Calculate which messages are new
+        const newMessages = messages.filter(msg => !renderedMessageIds.has(msg.id));
+        const allMessageIds = messages.map(m => m.id);
+        
+        // If no new messages, just update reactions on existing ones
+        if (newMessages.length === 0) {
+            updateReactionsOnExistingMessages();
+            return;
         }
-        lastMessageIds = messageIdsString;
         
-        // Use DocumentFragment for efficient DOM updates
-        const fragment = document.createDocumentFragment();
+        // Add new message IDs to our tracking set
+        newMessages.forEach(msg => renderedMessageIds.add(msg.id));
         
+        // If this is the first render or we have few messages, render everything
+        if (renderedMessageIds.size === newMessages.length || messages.length <= 10) {
+            renderAllMessages();
+            return;
+        }
+        
+        // Otherwise, append only new messages
+        appendNewMessages(newMessages);
+    }
+    
+    function renderAllMessages() {
+        // Clear the container
+        messagesContainer.innerHTML = '';
+        messageGroupsCache.clear();
+        
+        // Render all messages
+        const groupedMessages = groupPrivateMessages(messages);
+        const fragment = createPrivateMessageGroupsFragment(groupedMessages);
+        
+        messagesContainer.appendChild(fragment);
+        scrollToBottomPrivate();
+        setupPrivateMessageEventListeners();
+    }
+    
+    function appendNewMessages(newMessages) {
+        // Get existing groups
+        const existingGroups = Array.from(messagesContainer.querySelectorAll('.message-group'));
+        const lastGroup = existingGroups[existingGroups.length - 1];
+        
+        // If there's a last group and new messages belong to the same sender as last group
+        if (lastGroup && newMessages.length > 0) {
+            const lastGroupSenderId = lastGroup.dataset.senderId;
+            const firstNewMessage = newMessages[0];
+            
+            // Check if new messages should be added to the last group
+            const lastMessageTime = getLastMessageTimeInGroupPrivate(lastGroup);
+            const firstNewMessageTime = firstNewMessage.timestamp ? new Date(firstNewMessage.timestamp) : new Date();
+            
+            const timeDiff = lastMessageTime ? Math.abs(firstNewMessageTime - lastMessageTime) / (1000 * 60) : 6;
+            
+            if (firstNewMessage.senderId === lastGroupSenderId && timeDiff <= 5) {
+                // Add to existing group
+                appendToExistingGroupPrivate(lastGroup, [firstNewMessage]);
+                newMessages.shift(); // Remove first message since we added it
+            }
+        }
+        
+        // Group remaining new messages
+        if (newMessages.length > 0) {
+            const groupedNewMessages = groupPrivateMessages(newMessages);
+            const fragment = createPrivateMessageGroupsFragment(groupedNewMessages);
+            
+            messagesContainer.appendChild(fragment);
+        }
+        
+        scrollToBottomPrivate();
+        setupPrivateMessageEventListeners();
+    }
+    
+    function getLastMessageTimeInGroupPrivate(groupElement) {
+        const messageElements = groupElement.querySelectorAll('.message-text');
+        if (messageElements.length === 0) return null;
+        
+        const lastMessageElement = messageElements[messageElements.length - 1];
+        const messageId = lastMessageElement.dataset.messageId;
+        const message = messages.find(m => m.id === messageId);
+        
+        if (!message || !message.timestamp) return null;
+        
+        return new Date(message.timestamp);
+    }
+    
+    function appendToExistingGroupPrivate(groupElement, messagesToAdd) {
+        const messageContentDiv = groupElement.querySelector('.message-content');
+        
+        if (!messageContentDiv) return;
+        
+        messagesToAdd.forEach(msg => {
+            const messageElement = createPrivateSingleMessageElement(msg);
+            messageContentDiv.appendChild(messageElement);
+        });
+    }
+    
+    function groupPrivateMessages(messagesArray) {
         const groupedMessages = [];
         let currentGroup = null;
         
-        messages.forEach((message, index) => {
+        messagesArray.forEach((message, index) => {
             const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-            const prevMessage = messages[index - 1];
+            const prevMessage = messagesArray[index - 1];
             const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
             
             const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
@@ -6403,177 +6618,205 @@ function initChatPage() {
             }
         });
         
-        // Clear container only once
-        messagesContainer.innerHTML = '';
+        return groupedMessages;
+    }
+    
+    function createPrivateMessageGroupsFragment(groupedMessages) {
+        const fragment = document.createDocumentFragment();
         
         groupedMessages.forEach(group => {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'message-group';
-            groupDiv.dataset.senderId = group.senderId;
-            
-            const firstMessage = group.messages[0];
-            const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
-            
-            // Get user profile for reward tag and fire ring
-            let userProfile = null;
-            if (group.senderId === groupChat.firebaseUser.uid) {
-                userProfile = groupChat.currentUser;
-            } else {
-                userProfile = partnerProfile;
-            }
-            
-            const hasFireRing = userProfile?.fireRing || false;
-            const rewardTag = userProfile?.rewardTag || '';
-            
-            groupDiv.innerHTML = `
-                <div class="message-header">
-                    <div class="message-avatar-container" style="position: relative; display: inline-block;">
-                        ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
-                        <img src="${group.senderAvatar}" 
-                             alt="${group.senderName}" 
-                             class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
-                             data-user-id="${group.senderId}">
-                    </div>
-                    <div class="message-sender-info">
-                        <span class="message-sender">${group.senderName}</span>
-                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
-                    </div>
-                    <span class="message-time">${formatTime(firstMessageTime)}</span>
-                </div>
-                <div class="message-content">
-                    ${group.messages.map(msg => {
-                        const messageTime = msg.timestamp ? new Date(msg.timestamp) : new Date();
-                        
-                        let replyHtml = '';
-                        if (msg.replyTo) {
-                            const repliedMessage = messages.find(m => m.id === msg.replyTo);
-                            if (repliedMessage) {
-                                const truncatedName = groupChat.truncateName(repliedMessage.senderName);
-                                const truncatedMessage = repliedMessage.text ? 
-                                    groupChat.truncateMessage(repliedMessage.text) : 
-                                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : '');
-                                
-                                replyHtml = `
-                                    <div class="replying-to">
-                                        <span class="reply-label">Replying to</span> 
-                                        <span class="reply-sender">${truncatedName}</span>
-                                        <span class="reply-separator">:</span> 
-                                        <span class="reply-message">${truncatedMessage}</span>
-                                    </div>
-                                `;
-                            }
-                        }
-                        
-                        const isTemp = groupChat.tempPrivateMessages.has(msg.id);
-                        const isUploading = msg.status === 'uploading';
-                        
-                        const messageDivClass = 'message-text';
-                        
-                        // UPDATED: Add soft glowing effect for private messages too
-                        const hasGlowEffect = msg.glowEffect || false;
-                        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
-                        
-                        let messageContent = '';
-                        
-                        if (msg.imageUrl) {
-                            messageContent = `
-                                <div class="message-image-container" style="position: relative;">
-                                    <img src="${msg.imageUrl}" 
-                                         alt="Shared image" 
-                                         class="message-image"
-                                         style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
-                                         onload="this.style.opacity='1';"
-                                         onerror="this.style.display='none';"
-                                         onclick="openImageModal('${msg.imageUrl}')">
-                                    ${isUploading ? `
-                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
-                                                <circle cx="12" cy="12" r="10" />
-                                            </svg>
-                                            Uploading...
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        } else if (msg.videoUrl) {
-                            messageContent = `
-                                <div class="message-video-container" style="position: relative;">
-                                    <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
-                                           onload="this.style.opacity='1';"
-                                           onerror="this.style.display='none';">
-                                        <source src="${msg.videoUrl}" type="video/mp4">
-                                        Your browser does not support the video tag.
-                                    </video>
-                                    ${isUploading ? `
-                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
-                                                <circle cx="12" cy="12" r="10" />
-                                            </svg>
-                                            Uploading...
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        } else {
-                            messageContent = msg.text || '';
-                        }
-                        
-                        const messageDivId = `message-${msg.id}`;
-                        
-                        const cachedReactions = reactionsCache.get(msg.id) || [];
-                        
-                        // UPDATED: Add sending indicator on message
-                        const sendingIndicator = isTemp ? 
-                            `<div class="sending-indicator" id="sending-${msg.id}">
-                                <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
-                                    <circle cx="12" cy="12" r="10" />
-                                </svg>
-                                <span>Sending...</span>
-                            </div>` : 
-                            '';
-                        
-                        return `
-                            <div class="${messageDivClass}${extraClasses}" data-message-id="${msg.id}" id="${messageDivId}">
-                                ${replyHtml}
-                                ${messageContent}
-                                <div class="message-reactions" id="reactions-${msg.id}">
-                                    ${cachedReactions.map(reaction => {
-                                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
-                                        return `
-                                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
-                                                <span class="reaction-emoji">${reaction.emoji}</span>
-                                                <span class="reaction-count">${reaction.count}</span>
-                                            </div>
-                                        `;
-                                    }).join('')}
-                                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
-                                        +
-                                    </div>
-                                </div>
-                                ${sendingIndicator}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-            
+            const groupDiv = createPrivateMessageGroupElement(group);
             fragment.appendChild(groupDiv);
         });
         
-        messagesContainer.appendChild(fragment);
+        return fragment;
+    }
+    
+    function createPrivateMessageGroupElement(group) {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'message-group';
+        groupDiv.dataset.senderId = group.senderId;
+        groupDiv.dataset.groupId = `group_${group.senderId}_${Date.now()}`;
         
-        // Remove sending indicators for messages that are no longer temp
-        document.querySelectorAll('.sending-indicator').forEach(indicator => {
-            const messageId = indicator.id.replace('sending-', '');
-            if (!groupChat.tempPrivateMessages.has(messageId)) {
-                indicator.remove();
+        const firstMessage = group.messages[0];
+        const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
+        
+        // Get user profile for reward tag and fire ring
+        let userProfile = null;
+        if (group.senderId === groupChat.firebaseUser.uid) {
+            userProfile = groupChat.currentUser;
+        } else {
+            userProfile = partnerProfile;
+        }
+        
+        const hasFireRing = userProfile?.fireRing || false;
+        const rewardTag = userProfile?.rewardTag || '';
+        
+        groupDiv.innerHTML = `
+            <div class="message-header">
+                <div class="message-avatar-container" style="position: relative; display: inline-block;">
+                    ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
+                    <img src="${group.senderAvatar}" 
+                         alt="${group.senderName}" 
+                         class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
+                         data-user-id="${group.senderId}">
+                </div>
+                <div class="message-sender-info">
+                    <span class="message-sender">${group.senderName}</span>
+                    ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
+                </div>
+                <span class="message-time">${formatTime(firstMessageTime)}</span>
+            </div>
+            <div class="message-content">
+                ${group.messages.map(msg => createPrivateSingleMessageHtml(msg)).join('')}
+            </div>
+        `;
+        
+        return groupDiv;
+    }
+    
+    function createPrivateSingleMessageElement(msg) {
+        const template = document.createElement('template');
+        template.innerHTML = createPrivateSingleMessageHtml(msg);
+        return template.content.firstElementChild;
+    }
+    
+    function createPrivateSingleMessageHtml(msg) {
+        const messageTime = msg.timestamp ? new Date(msg.timestamp) : new Date();
+        
+        let replyHtml = '';
+        if (msg.replyTo) {
+            const repliedMessage = messages.find(m => m.id === msg.replyTo);
+            if (repliedMessage) {
+                const truncatedName = groupChat.truncateName(repliedMessage.senderName);
+                const truncatedMessage = repliedMessage.text ? 
+                    groupChat.truncateMessage(repliedMessage.text) : 
+                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : '');
+                
+                replyHtml = `
+                    <div class="replying-to">
+                        <span class="reply-label">Replying to</span> 
+                        <span class="reply-sender">${truncatedName}</span>
+                        <span class="reply-separator">:</span> 
+                        <span class="reply-message">${truncatedMessage}</span>
+                    </div>
+                `;
+            }
+        }
+        
+        const isTemp = groupChat.tempPrivateMessages.has(msg.id);
+        const isUploading = msg.status === 'uploading';
+        
+        const messageDivClass = 'message-text';
+        
+        // UPDATED: Add soft glowing effect for private messages too
+        const hasGlowEffect = msg.glowEffect || false;
+        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
+        
+        let messageContent = '';
+        
+        if (msg.imageUrl) {
+            messageContent = `
+                <div class="message-image-container" style="position: relative;">
+                    <img src="${msg.imageUrl}" 
+                         alt="Shared image" 
+                         class="message-image"
+                         style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
+                         onload="this.style.opacity='1';"
+                         onerror="this.style.display='none';"
+                         onclick="openImageModal('${msg.imageUrl}')">
+                    ${isUploading ? `
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                <circle cx="12" cy="12" r="10" />
+                            </svg>
+                            Uploading...
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else if (msg.videoUrl) {
+            messageContent = `
+                <div class="message-video-container" style="position: relative;">
+                    <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
+                           onload="this.style.opacity='1';"
+                           onerror="this.style.display='none';">
+                        <source src="${msg.videoUrl}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    ${isUploading ? `
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                <circle cx="12" cy="12" r="10" />
+                            </svg>
+                            Uploading...
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            messageContent = msg.text || '';
+        }
+        
+        const messageDivId = `message-${msg.id}`;
+        
+        const cachedReactions = reactionsCache.get(msg.id) || [];
+        
+        // UPDATED: Add sending indicator on message
+        const sendingIndicator = isTemp ? 
+            `<div class="sending-indicator" id="sending-${msg.id}">
+                <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
+                    <circle cx="12" cy="12" r="10" />
+                </svg>
+                <span>Sending...</span>
+            </div>` : 
+            '';
+        
+        return `
+            <div class="${messageDivClass}${extraClasses}" data-message-id="${msg.id}" id="${messageDivId}">
+                ${replyHtml}
+                ${messageContent}
+                <div class="message-reactions" id="reactions-${msg.id}">
+                    ${cachedReactions.map(reaction => {
+                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+                        return `
+                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
+                                <span class="reaction-emoji">${reaction.emoji}</span>
+                                <span class="reaction-count">${reaction.count}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
+                        +
+                    </div>
+                </div>
+                ${sendingIndicator}
+            </div>
+        `;
+    }
+    
+    function updateReactionsOnExistingMessages() {
+        // Update reactions on existing messages without re-rendering
+        messages.forEach(msg => {
+            const reactionsContainer = document.getElementById(`reactions-${msg.id}`);
+            if (reactionsContainer) {
+                const cachedReactions = reactionsCache.get(msg.id) || [];
+                updateReactionsDisplay(reactionsContainer, cachedReactions, msg.id);
+            }
+            
+            // Remove sending indicators for messages that are no longer temp
+            const sendingIndicator = document.getElementById(`sending-${msg.id}`);
+            if (sendingIndicator && !groupChat.tempPrivateMessages.has(msg.id)) {
+                sendingIndicator.remove();
             }
         });
-        
+    }
+    
+    function setupPrivateMessageEventListeners() {
         document.querySelectorAll('.message-avatar').forEach(avatar => {
             avatar.addEventListener('click', (e) => {
                 const userId = e.target.dataset.userId;
@@ -6631,11 +6874,6 @@ function initChatPage() {
         groupChat.setupSwipeToReply(messagesContainer);
         
         setupPrivateReactionListeners();
-        
-        // Scroll to bottom after rendering
-        setTimeout(() => {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 50);
     }
     
     function setupPrivateReactionListeners() {
@@ -6723,6 +6961,12 @@ function initChatPage() {
             sendBtn.disabled = originalDisabled;
             sendBtn.innerHTML = originalHTML;
         }
+    }
+    
+    function scrollToBottomPrivate() {
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 50);
     }
     
     function formatTime(date) {
