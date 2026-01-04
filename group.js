@@ -4317,7 +4317,13 @@ function initGroupPage() {
             if (isInitialLoad) {
                 messages = await groupChat.getMessages(groupId);
                 await loadInitialReactions();
-                // Don't clear rendered message IDs on initial load - they persist across page navigation
+                // Clear rendered message IDs for this specific group when first loading
+                // Keep the window.renderedMessageIds but filter out only messages for this group
+                for (const msgId of renderedMessageIds) {
+                    if (msgId.includes(groupId)) {
+                        renderedMessageIds.delete(msgId);
+                    }
+                }
                 queueRender();
                 isInitialLoad = false;
             }
@@ -4664,14 +4670,14 @@ function initGroupPage() {
             const isAdmin = member.role === 'creator';
             const isCurrentUser = member.id === groupChat.firebaseUser?.uid;
             
-            const div = document.createElement('div');
-            div.className = 'member-item';
-            
             // Get user profile for reward tag
             const userProfile = groupChat.cache.userProfiles ? 
                 groupChat.cache.userProfiles.get(`user_${member.id}`)?.data : null;
             
             const rewardTag = userProfile?.rewardTag || '';
+            
+            const div = document.createElement('div');
+            div.className = 'member-item';
             
             div.innerHTML = `
                 <div class="member-avatar-container" style="position: relative;">
@@ -4709,7 +4715,6 @@ function initGroupPage() {
         if (messages.length === 0) {
             if (noMessages) noMessages.style.display = 'block';
             messagesContainer.innerHTML = '';
-            // Don't clear window.renderedMessageIds
             return;
         }
         
@@ -6332,14 +6337,20 @@ function initChatPage() {
             
             messages = await groupChat.getPrivateMessages(partnerId);
             await loadInitialPrivateReactions();
-            // Don't clear rendered message IDs on initial load - they persist across page navigation
+            // Clear rendered message IDs for this specific chat when first loading
+            // Keep the window.renderedMessageIds but filter out only messages for this chat
+            const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
+            for (const msgId of renderedMessageIds) {
+                if (msgId.includes(chatId)) {
+                    renderedMessageIds.delete(msgId);
+                }
+            }
             queueRender();
             
             if (messagesContainer) {
                 groupChat.setupSwipeToReply(messagesContainer);
             }
             
-            const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
             await groupChat.markMessagesAsRead(chatId, partnerId);
             
             if (!isListening) {
@@ -6374,7 +6385,6 @@ function initChatPage() {
         if (messages.length === 0) {
             if (noMessages) noMessages.style.display = 'block';
             messagesContainer.innerHTML = '';
-            // Don't clear window.renderedMessageIds
             return;
         }
         
