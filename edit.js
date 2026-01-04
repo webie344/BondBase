@@ -48,7 +48,7 @@ const cloudinaryConfig = {
 
 // Avatar Options
 const AVATAR_OPTIONS = [
-const avatarOptions = [
+
   // Adventurer Style (Pixel RPG Look)
   'https://api.dicebear.com/7.x/adventurer/svg?seed=user1',
   'https://api.dicebear.com/7.x/adventurer/svg?seed=user2',
