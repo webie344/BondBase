@@ -52,16 +52,86 @@ const cloudinaryConfig = {
 };
 
 const AVATAR_OPTIONS = [
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user2',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user3',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user4',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user5',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user6',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user7',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user8'
+  // Adventurer Style (Pixel RPG Look)
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user1',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user2',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user3',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user4',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user5',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user6',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user7',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user8',
+  
+  // Pixel Art Style
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer1',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer2',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer3',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer4',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer5',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer6',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer7',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer8',
+  
+  // Bottts Style (Robot/AI Theme)
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot1',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot2',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot3',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot4',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot5',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot6',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot7',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot8',
+  
+  // Open Peeps Style (Illustrated Characters)
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player1',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player2',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player3',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player4',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player5',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player6',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player7',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player8',
+  
+  // Lorelei Style (Fantasy Gaming)
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero1',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero2',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero3',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero4',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero5',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero6',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero7',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero8',
+  
+  // RoboHash (Robot/Monster Themes)
+  'https://robohash.org/gamebot1.png?set=set1',
+  'https://robohash.org/gamebot2.png?set=set1',
+  'https://robohash.org/gamebot3.png?set=set2',
+  'https://robohash.org/gamebot4.png?set=set2',
+  'https://robohash.org/gamebot5.png?set=set3',
+  'https://robohash.org/gamebot6.png?set=set3',
+  'https://robohash.org/gamebot7.png?set=set4',
+  'https://robohash.org/gamebot8.png?set=set4',
+  
+  // Funko Pop Style (Popular with gamers)
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop1',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop2',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop3',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop4',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop5',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop6',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop7',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop8',
+  
+  // Micah Style (More detailed, modern)
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar1',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar2',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar3',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar4',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar5',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar6',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar7',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar8'
 ];
-
 const CACHE_DURATION = {
     USER_PROFILE: 5 * 60 * 1000,
     GROUP_DATA: 2 * 60 * 1000,
@@ -1163,7 +1233,7 @@ class GroupChat {
             }
 
             const newInviteCode = this.generateInviteCode();
-            const newInviteLink = `https://bondlydatingweb.vercel.app/join.html?code=${newInviteCode}`;
+            const newInviteLink = `https://bond-base.vercel.app/join.html?code=${newInviteCode}`;
 
             await updateDoc(groupRef, {
                 inviteCode: newInviteCode,
@@ -1205,7 +1275,7 @@ class GroupChat {
             }
             
             const inviteCode = this.generateInviteCode();
-            const inviteLink = `https://bondlydatingweb.vercel.app/join.html?code=${inviteCode}`;
+            const inviteLink = `https://bond-base.vercel.app/join.html?code=${inviteCode}`;
             
             await updateDoc(groupRef, {
                 inviteCode: inviteCode,

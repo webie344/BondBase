@@ -1,6 +1,5 @@
 // edit.js - Independent Edit Manager for Profile and Group Editing
 // Complete with Firebase and Cloudinary initialization and cache synchronization
-// FIXED: Properly synchronizes profile updates with group.js cache and Firestore listeners
 
 import { 
     getFirestore, 
@@ -49,14 +48,86 @@ const cloudinaryConfig = {
 
 // Avatar Options
 const AVATAR_OPTIONS = [
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user2',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user3',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user4',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user5',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user6',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user7',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user8'
+const avatarOptions = [
+  // Adventurer Style (Pixel RPG Look)
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user1',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user2',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user3',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user4',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user5',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user6',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user7',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=user8',
+  
+  // Pixel Art Style
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer1',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer2',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer3',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer4',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer5',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer6',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer7',
+  'https://api.dicebear.com/7.x/pixel-art/svg?seed=gamer8',
+  
+  // Bottts Style (Robot/AI Theme)
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot1',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot2',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot3',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot4',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot5',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot6',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot7',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=bot8',
+  
+  // Open Peeps Style (Illustrated Characters)
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player1',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player2',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player3',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player4',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player5',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player6',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player7',
+  'https://api.dicebear.com/7.x/open-peeps/svg?seed=player8',
+  
+  // Lorelei Style (Fantasy Gaming)
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero1',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero2',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero3',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero4',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero5',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero6',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero7',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=hero8',
+  
+  // RoboHash (Robot/Monster Themes)
+  'https://robohash.org/gamebot1.png?set=set1',
+  'https://robohash.org/gamebot2.png?set=set1',
+  'https://robohash.org/gamebot3.png?set=set2',
+  'https://robohash.org/gamebot4.png?set=set2',
+  'https://robohash.org/gamebot5.png?set=set3',
+  'https://robohash.org/gamebot6.png?set=set3',
+  'https://robohash.org/gamebot7.png?set=set4',
+  'https://robohash.org/gamebot8.png?set=set4',
+  
+  // Funko Pop Style (Popular with gamers)
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop1',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop2',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop3',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop4',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop5',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop6',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop7',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=pop8',
+  
+  // Micah Style (More detailed, modern)
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar1',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar2',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar3',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar4',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar5',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar6',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar7',
+  'https://api.dicebear.com/7.x/micah/svg?seed=avatar8'
 ];
 
 class EditManager {
@@ -271,7 +342,7 @@ class EditManager {
     }
 
     // ============================
-    // FIXED CACHE SYNC FUNCTIONS
+    // CACHE SYNC FUNCTIONS
     // ============================
 
     async clearGroupJsUserCache() {
@@ -284,13 +355,7 @@ class EditManager {
                     window.groupChat.cache.userProfiles.delete(cacheKey);
                     
                     // Also clear the current user profile
-                    if (window.groupChat.currentUser) {
-                        window.groupChat.currentUser.name = this.currentUser.name;
-                        window.groupChat.currentUser.avatar = this.currentUser.avatar;
-                        window.groupChat.currentUser.bio = this.currentUser.bio;
-                    }
-                    
-                    // Force reload user profile next time
+                    window.groupChat.currentUser = null;
                     window.groupChat.cache.userProfile = null;
                     window.groupChat.cache.userProfileExpiry = 0;
                     window.groupChat.cache.profileSetupChecked = false;
@@ -306,8 +371,11 @@ class EditManager {
                     }
                     
                     // Clear private chats cache
-                    const privateCacheKey = `private_chats_${this.firebaseUser.uid}`;
-                    window.groupChat.cache.privateChats.delete(privateCacheKey);
+                    for (const key of window.groupChat.cache.privateChats.keys()) {
+                        if (key.includes(this.firebaseUser.uid)) {
+                            window.groupChat.cache.privateChats.delete(key);
+                        }
+                    }
                     
                     // Clear unread counts cache
                     for (const key of window.groupChat.cache.unreadCounts.keys()) {
@@ -315,20 +383,9 @@ class EditManager {
                             window.groupChat.cache.unreadCounts.delete(key);
                         }
                     }
-                    
-                    // Clear group chats cache
-                    const groupChatsKey = `group_chats_${this.firebaseUser.uid}`;
-                    window.groupChat.cache.groupChats.delete(groupChatsKey);
-                    
-                    // Clear admin groups cache
-                    const adminCacheKey = `admin_groups_${this.firebaseUser.uid}`;
-                    window.groupChat.cache.adminGroups.delete(adminCacheKey);
-                    
-                    // Clear all groups cache
-                    window.groupChat.cache.allGroups.delete('all_groups');
                 }
                 
-                console.log('Cleared group.js user cache and updated current user');
+                console.log('Cleared group.js user cache');
             }
         } catch (error) {
             console.error('Error clearing group.js user cache:', error);
@@ -338,30 +395,35 @@ class EditManager {
     async clearGroupJsGroupCache(groupId) {
         try {
             // If group.js is loaded, clear its cache for this group
-            if (window.groupChat && window.groupChat.cache) {
-                // Clear specific group caches
-                window.groupChat.cache.groupData.delete(groupId);
-                window.groupChat.cache.groupMembers.delete(groupId);
-                window.groupChat.cache.joinedGroups.delete(groupId);
-                window.groupChat.cache.messageReactions.delete(groupId);
-                
-                // Clear messages cache for this group
-                for (const key of window.groupChat.cache.messages.keys()) {
-                    if (key.includes(groupId)) {
-                        window.groupChat.cache.messages.delete(key);
+            if (window.groupChat) {
+                if (window.groupChat.cache) {
+                    // Clear specific group caches
+                    window.groupChat.cache.groupData.delete(groupId);
+                    window.groupChat.cache.groupMembers.delete(groupId);
+                    window.groupChat.cache.joinedGroups.delete(groupId);
+                    window.groupChat.cache.messageReactions.delete(groupId);
+                    
+                    // Clear messages cache for this group
+                    for (const key of window.groupChat.cache.messages.keys()) {
+                        if (key.includes(groupId)) {
+                            window.groupChat.cache.messages.delete(key);
+                        }
+                    }
+                    
+                    // Clear admin groups cache
+                    const adminCacheKey = `admin_groups_${this.firebaseUser.uid}`;
+                    window.groupChat.cache.adminGroups.delete(adminCacheKey);
+                    
+                    // Clear all groups cache
+                    window.groupChat.cache.allGroups.clear();
+                    
+                    // Clear group chats cache
+                    for (const key of window.groupChat.cache.groupChats.keys()) {
+                        if (key.includes(this.firebaseUser.uid)) {
+                            window.groupChat.cache.groupChats.delete(key);
+                        }
                     }
                 }
-                
-                // Clear admin groups cache
-                const adminCacheKey = `admin_groups_${this.firebaseUser.uid}`;
-                window.groupChat.cache.adminGroups.delete(adminCacheKey);
-                
-                // Clear all groups cache
-                window.groupChat.cache.allGroups.delete('all_groups');
-                
-                // Clear group chats cache
-                const groupChatsKey = `group_chats_${this.firebaseUser.uid}`;
-                window.groupChat.cache.groupChats.delete(groupChatsKey);
                 
                 console.log(`Cleared group.js cache for group: ${groupId}`);
             }
@@ -370,98 +432,36 @@ class EditManager {
         }
     }
 
-    async updateGroupMemberInfoInAllGroups() {
+    async updateGroupJsMemberInfo(groupId) {
         try {
-            if (!this.firebaseUser || !this.currentUser) return;
-            
-            // Get all groups the user is a member of
-            const groupsRef = collection(db, 'groups');
-            const querySnapshot = await getDocs(groupsRef);
-            
-            const updatePromises = [];
-            
-            for (const docSnap of querySnapshot.docs) {
-                const memberRef = doc(db, 'groups', docSnap.id, 'members', this.firebaseUser.uid);
+            // Update member information in all groups the user is a member of
+            if (window.groupChat && this.currentUser) {
+                // Get all groups the user is in
+                const groupsRef = collection(db, 'groups');
+                const querySnapshot = await getDocs(groupsRef);
                 
-                // Update member info in this group
-                updatePromises.push(
-                    setDoc(memberRef, {
-                        name: this.currentUser.name,
-                        avatar: this.currentUser.avatar,
-                        bio: this.currentUser.bio,
-                        updatedAt: serverTimestamp()
-                    }, { merge: true }).catch(error => {
-                        console.warn(`Failed to update member info in group ${docSnap.id}:`, error);
-                    })
-                );
+                for (const docSnap of querySnapshot.docs) {
+                    const memberRef = doc(db, 'groups', docSnap.id, 'members', this.firebaseUser.uid);
+                    const memberSnap = await getDoc(memberRef);
+                    
+                    if (memberSnap.exists()) {
+                        // Update member info in this group
+                        await updateDoc(memberRef, {
+                            name: this.currentUser.name,
+                            avatar: this.currentUser.avatar,
+                            bio: this.currentUser.bio,
+                            updatedAt: serverTimestamp()
+                        });
+                        
+                        // Clear cache for this group
+                        this.clearGroupJsGroupCache(docSnap.id);
+                    }
+                }
+                
+                console.log('Updated member info in all groups');
             }
-            
-            // Wait for all updates to complete
-            await Promise.all(updatePromises);
-            
-            console.log('Updated member info in all groups');
-            
         } catch (error) {
             console.error('Error updating member info:', error);
-        }
-    }
-
-    // NEW: Force refresh of group.js message listeners
-    async refreshGroupMessageListeners() {
-        try {
-            if (!window.groupChat) return;
-            
-            // Get current active group if any
-            const activeGroupId = window.groupChat.currentGroupId;
-            if (!activeGroupId) return;
-            
-            console.log('Refreshing message listeners for group:', activeGroupId);
-            
-            // Unsubscribe from current listeners
-            if (window.groupChat.unsubscribeMessages) {
-                try {
-                    window.groupChat.unsubscribeMessages();
-                } catch (err) {
-                    console.log('Error unsubscribing from messages:', err);
-                }
-                window.groupChat.unsubscribeMessages = null;
-            }
-            
-            if (window.groupChat.unsubscribeMembers) {
-                try {
-                    window.groupChat.unsubscribeMembers();
-                } catch (err) {
-                    console.log('Error unsubscribing from members:', err);
-                }
-                window.groupChat.unsubscribeMembers = null;
-            }
-            
-            // Clear message cache for this group
-            for (const key of window.groupChat.cache.messages.keys()) {
-                if (key.includes(activeGroupId)) {
-                    window.groupChat.cache.messages.delete(key);
-                }
-            }
-            
-            // Clear the last displayed messages
-            if (window.groupChat.lastDisplayedMessages) {
-                window.groupChat.lastDisplayedMessages.clear();
-            }
-            
-            // Reset message render queue
-            window.groupChat.messageRenderQueue = [];
-            
-            // If we're on the group page, force a refresh
-            if (window.location.pathname.includes('group.html') && window.currentGroupId === activeGroupId) {
-                // Trigger a page refresh to reinitialize listeners
-                setTimeout(() => {
-                    console.log('Forcing page refresh to reinitialize listeners');
-                    window.location.reload();
-                }, 1000);
-            }
-            
-        } catch (error) {
-            console.error('Error refreshing message listeners:', error);
         }
     }
 
@@ -703,54 +703,37 @@ class EditManager {
             // Update user profile in Firebase
             const userRef = doc(db, 'group_users', this.firebaseUser.uid);
             
-            const updateData = {
+            await setDoc(userRef, {
                 displayName: name,
                 avatar: this.selectedAvatar,
                 bio: bio,
                 email: this.firebaseUser.email,
                 updatedAt: serverTimestamp(),
                 lastSeen: serverTimestamp()
-            };
-            
-            await setDoc(userRef, updateData, { merge: true });
+            }, { merge: true });
             
             // Update local user object
             this.currentUser.name = name;
             this.currentUser.avatar = this.selectedAvatar;
             this.currentUser.bio = bio;
             
-            // 1. Clear cache in group.js
+            // Clear cache in group.js
             await this.clearGroupJsUserCache();
             
-            // 2. Update member info in all groups
-            await this.updateGroupMemberInfoInAllGroups();
+            // Update member info in all groups
+            await this.updateGroupJsMemberInfo();
             
-            // 3. Clear local cache
+            // Clear local cache
             this.userProfileCache = null;
-            
-            // 4. Force refresh of message listeners to prevent duplicate messages
-            await this.refreshGroupMessageListeners();
             
             this.showLoadingOverlay(false);
             this.showNotification('Profile updated successfully!', 'success');
             
-            // Redirect to profile or previous page after successful save
+            // Restore save button
             setTimeout(() => {
-                // Check if we should redirect
-                const urlParams = new URLSearchParams(window.location.search);
-                const returnTo = urlParams.get('returnTo');
-                
-                if (returnTo) {
-                    window.location.href = returnTo;
-                } else {
-                    // Go back to previous page
-                    if (document.referrer && document.referrer.includes(window.location.hostname)) {
-                        window.history.back();
-                    } else {
-                        window.location.href = 'profile.html';
-                    }
-                }
-            }, 1500);
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+            }, 1000);
             
         } catch (error) {
             console.error('Error saving profile:', error);
@@ -1162,16 +1145,14 @@ class EditManager {
             // Clear local cache
             this.groupDataCache.delete(this.currentGroupId);
             
-            // Refresh group message listeners
-            await this.refreshGroupMessageListeners();
-            
             this.showLoadingOverlay(false);
             this.showNotification('Group updated successfully!', 'success');
             
-            // Redirect back to edit group selection page after successful save
+            // Restore save button
             setTimeout(() => {
-                window.location.href = 'edit-group.html';
-            }, 1500);
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+            }, 1000);
             
         } catch (error) {
             console.error('Error saving group:', error);
