@@ -6,6 +6,8 @@
 // FIXED: Entire page rerender on message send and q is not defined error
 // FIXED: Messages displaying twice when returning to page - COMPLETELY FIXED
 // FIXED: Old messages not loading - messages flash then disappear issue
+// FIXED: Info button not working after navigation
+// FIXED: Temporary message avatar/timestamp not removing properly
 
 import { 
     getFirestore, 
@@ -184,6 +186,20 @@ class GroupChat {
         // FIXED: Single source of truth for rendered messages
         this.renderedMessagesPerChat = new Map(); // chatId -> Set(messageIds)
         this.lastActiveChatKey = null; // Track which chat was last active
+        
+        // Store page-specific state to prevent re-initialization issues
+        this.pageState = {
+            groupPage: {
+                initialized: false,
+                eventListeners: new Map(),
+                sidebarToggleHandler: null,
+                infoButtonHandler: null
+            },
+            chatPage: {
+                initialized: false,
+                eventListeners: new Map()
+            }
+        };
         
         this.setupAuthListener();
         this.createReactionModal();
@@ -895,6 +911,17 @@ class GroupChat {
     }
 
     removeTempPrivateMessage(tempId) {
+        const tempMessage = this.tempPrivateMessages.get(tempId);
+        if (tempMessage) {
+            // Clean up the object URL to prevent memory leaks
+            if (tempMessage.imageUrl && tempMessage.imageUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(tempMessage.imageUrl);
+            }
+            if (tempMessage.videoUrl && tempMessage.videoUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(tempMessage.videoUrl);
+            }
+        }
+        
         this.tempPrivateMessages.delete(tempId);
         const event = new CustomEvent('removeTempPrivateMessage', { detail: { tempId } });
         document.dispatchEvent(event);
@@ -2224,6 +2251,17 @@ class GroupChat {
     }
 
     removeTempMessage(tempId) {
+        const tempMessage = window.tempMessagesMap ? window.tempMessagesMap.get(tempId) : null;
+        if (tempMessage) {
+            // Clean up the object URL to prevent memory leaks
+            if (tempMessage.imageUrl && tempMessage.imageUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(tempMessage.imageUrl);
+            }
+            if (tempMessage.videoUrl && tempMessage.videoUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(tempMessage.videoUrl);
+            }
+        }
+        
         const event = new CustomEvent('removeTempMessage', { detail: { tempId } });
         document.dispatchEvent(event);
     }
@@ -4254,6 +4292,11 @@ function initGroupPage() {
     // Create typing indicator at top
     typingIndicator = createTypingIndicator();
     
+    // Clear any existing page state
+    if (groupChat.pageState.groupPage.initialized) {
+        cleanupGroupPage();
+    }
+    
     (async () => {
         const needsSetup = await groupChat.needsProfileSetup();
         if (needsSetup) {
@@ -4272,73 +4315,56 @@ function initGroupPage() {
     })();
     
     backBtn.addEventListener('click', () => {
-        groupChat.cleanup();
-        reactionUnsubscribers.forEach(unsub => {
-            if (unsub && typeof unsub === 'function') {
-                try {
-                    unsub();
-                } catch (err) {
-                    console.log('Error unsubscribing from reaction:', err);
-                }
-            }
-        });
-        reactionUnsubscribers.clear();
-        
-        // Clean up typing indicator
-        if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
-            try {
-                typingUnsubscribe();
-            } catch (err) {
-                console.log('Error unsubscribing from typing:', err);
-            }
-        }
-        if (typingTimeout) {
-            clearTimeout(typingTimeout);
-        }
-        
-        removeSidebarOverlay();
+        cleanupGroupPage();
         window.location.href = 'groups.html';
     });
     
-    if (sidebarToggle) {
-        const newToggle = sidebarToggle.cloneNode(true);
-        sidebarToggle.parentNode.replaceChild(newToggle, sidebarToggle);
+    // FIXED: Proper sidebar toggle setup without cloning
+    function setupSidebarToggle() {
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const infoBtn = document.getElementById('infoBtn');
         
-        const freshToggle = document.getElementById('sidebarToggle');
+        if (sidebarToggle && !groupChat.pageState.groupPage.sidebarToggleHandler) {
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                if (sidebar) {
+                    const isActive = sidebar.classList.contains('active');
+                    if (isActive) {
+                        sidebar.classList.remove('active');
+                        removeSidebarOverlay();
+                    } else {
+                        sidebar.classList.add('active');
+                        createSidebarOverlay();
+                    }
+                }
+            };
+            
+            sidebarToggle.addEventListener('click', handler);
+            groupChat.pageState.groupPage.sidebarToggleHandler = handler;
+        }
         
-        freshToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            
-            if (sidebar) {
-                const isActive = sidebar.classList.contains('active');
-                if (isActive) {
-                    sidebar.classList.remove('active');
-                    removeSidebarOverlay();
-                } else {
-                    sidebar.classList.add('active');
-                    createSidebarOverlay();
+        if (infoBtn && !groupChat.pageState.groupPage.infoButtonHandler) {
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                if (sidebar) {
+                    const isActive = sidebar.classList.contains('active');
+                    if (isActive) {
+                        sidebar.classList.remove('active');
+                        removeSidebarOverlay();
+                    } else {
+                        sidebar.classList.add('active');
+                        createSidebarOverlay();
+                    }
                 }
-            }
-        });
-    }
-    
-    if (infoBtn) {
-        infoBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
+            };
             
-            if (sidebar) {
-                const isActive = sidebar.classList.contains('active');
-                if (isActive) {
-                    sidebar.classList.remove('active');
-                    removeSidebarOverlay();
-                } else {
-                    sidebar.classList.add('active');
-                    createSidebarOverlay();
-                }
-            }
-        });
+            infoBtn.addEventListener('click', handler);
+            groupChat.pageState.groupPage.infoButtonHandler = handler;
+        }
     }
     
     // Typing indicator for message input
@@ -4427,6 +4453,9 @@ function initGroupPage() {
         
         fileInput.click();
     });
+    
+    // Store temp messages globally for cleanup
+    window.tempMessagesMap = tempMessages;
     
     document.addEventListener('tempMediaMessage', (e) => {
         const tempMessage = e.detail;
@@ -5102,12 +5131,12 @@ function initGroupPage() {
                 }
             });
             
-            // FIXED: Only update messages array if it's actually different
-            // Check if messages are the same (initial load duplicate)
-            const isSameMessages = messages.length === uniqueMessages.length && 
+            // FIXED: Check if we're seeing the same messages (prevent duplicates)
+            const isDuplicateInitialLoad = isInitialLoad && messages.length > 0 && 
+                messages.length === uniqueMessages.length &&
                 messages.every((msg, index) => msg.id === uniqueMessages[index]?.id);
             
-            if (!isSameMessages) {
+            if (!isDuplicateInitialLoad) {
                 messages = uniqueMessages;
                 
                 // Only render new messages
@@ -5120,6 +5149,7 @@ function initGroupPage() {
                 setupReactionListenersForNewMessages(newMessagesToRender);
             } else {
                 console.log('Listener returned same messages (initial load duplicate), skipping re-render');
+                isInitialLoad = false;
             }
         });
         
@@ -5148,35 +5178,73 @@ function initGroupPage() {
             groupChat.updateLastActive(groupId);
         });
         
-        window.addEventListener('beforeunload', () => {
-            clearInterval(activeInterval);
-            reactionUnsubscribers.forEach(unsub => {
-                if (unsub && typeof unsub === 'function') {
-                    try {
-                        unsub();
-                    } catch (err) {
-                        console.log('Error unsubscribing from reaction:', err);
-                    }
-                }
-            });
-            reactionUnsubscribers.clear();
-            
-            // Clean up typing
-            if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
-                try {
-                    typingUnsubscribe();
-                } catch (err) {
-                    console.log('Error unsubscribing from typing:', err);
-                }
-            }
-            if (typingTimeout) {
-                clearTimeout(typingTimeout);
-            }
-            
-            removeSidebarOverlay();
-        });
+        // Setup sidebar toggle
+        setupSidebarToggle();
+        
+        // Mark page as initialized
+        groupChat.pageState.groupPage.initialized = true;
         
         groupChat.areListenersSetup = true;
+    }
+    
+    function cleanupGroupPage() {
+        groupChat.cleanup();
+        reactionUnsubscribers.forEach(unsub => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from reaction:', err);
+                }
+            }
+        });
+        reactionUnsubscribers.clear();
+        
+        // Clean up typing
+        if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
+            try {
+                typingUnsubscribe();
+            } catch (err) {
+                console.log('Error unsubscribing from typing:', err);
+            }
+        }
+        if (typingTimeout) {
+            clearTimeout(typingTimeout);
+        }
+        
+        // Clean up temp messages object URLs
+        tempMessages.forEach((tempMsg, tempId) => {
+            if (tempMsg.imageUrl && tempMsg.imageUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(tempMsg.imageUrl);
+            }
+            if (tempMsg.videoUrl && tempMsg.videoUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(tempMsg.videoUrl);
+            }
+        });
+        tempMessages.clear();
+        
+        // Remove sidebar overlay
+        removeSidebarOverlay();
+        
+        // Remove event listeners
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const infoBtn = document.getElementById('infoBtn');
+        
+        if (sidebarToggle && groupChat.pageState.groupPage.sidebarToggleHandler) {
+            sidebarToggle.removeEventListener('click', groupChat.pageState.groupPage.sidebarToggleHandler);
+        }
+        
+        if (infoBtn && groupChat.pageState.groupPage.infoButtonHandler) {
+            infoBtn.removeEventListener('click', groupChat.pageState.groupPage.infoButtonHandler);
+        }
+        
+        // Reset page state
+        groupChat.pageState.groupPage = {
+            initialized: false,
+            eventListeners: new Map(),
+            sidebarToggleHandler: null,
+            infoButtonHandler: null
+        };
     }
     
     function updateMembersList() {
@@ -5327,31 +5395,7 @@ function initGroupPage() {
     }
     
     window.addEventListener('beforeunload', () => {
-        groupChat.cleanup();
-        reactionUnsubscribers.forEach(unsub => {
-            if (unsub && typeof unsub === 'function') {
-                try {
-                    unsub();
-                } catch (err) {
-                    console.log('Error unsubscribing from reaction:', err);
-                }
-            }
-        });
-        reactionUnsubscribers.clear();
-        
-        // Clean up typing
-        if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
-            try {
-                typingUnsubscribe();
-            } catch (err) {
-                console.log('Error unsubscribing from typing:', err);
-            }
-        }
-        if (typingTimeout) {
-            clearTimeout(typingTimeout);
-        }
-        
-        removeSidebarOverlay();
+        cleanupGroupPage();
     });
     
     window.openImageModal = function(imageUrl) {
@@ -6394,42 +6438,34 @@ function initChatPage() {
     const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
     
     backBtn.addEventListener('click', () => {
-        groupChat.cleanup();
-        reactionUnsubscribers.forEach(unsub => {
-            if (unsub && typeof unsub === 'function') {
-                try {
-                    unsub();
-                } catch (err) {
-                    console.log('Error unsubscribing from reaction:', err);
-                }
-            }
-        });
-        reactionUnsubscribers.clear();
-        
+        cleanupChatPage();
         window.location.href = 'message.html';
     });
     
-    if (sidebarToggle) {
-        const newToggle = sidebarToggle.cloneNode(true);
-        sidebarToggle.parentNode.replaceChild(newToggle, sidebarToggle);
+    // FIXED: Proper sidebar toggle setup without cloning
+    function setupSidebarToggle() {
+        const sidebarToggle = document.getElementById('sidebarToggle');
         
-        const freshToggle = document.getElementById('sidebarToggle');
-        
-        freshToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            
-            if (sidebar) {
-                const isActive = sidebar.classList.contains('active');
-                if (isActive) {
-                    sidebar.classList.remove('active');
-                    removeSidebarOverlay();
-                } else {
-                    sidebar.classList.add('active');
-                    createSidebarOverlay();
+        if (sidebarToggle && !groupChat.pageState.chatPage.eventListeners.has('sidebarToggle')) {
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                if (sidebar) {
+                    const isActive = sidebar.classList.contains('active');
+                    if (isActive) {
+                        sidebar.classList.remove('active');
+                        removeSidebarOverlay();
+                    } else {
+                        sidebar.classList.add('active');
+                        createSidebarOverlay();
+                    }
                 }
-            }
-        });
+            };
+            
+            sidebarToggle.addEventListener('click', handler);
+            groupChat.pageState.chatPage.eventListeners.set('sidebarToggle', handler);
+        }
     }
     
     if (viewProfileBtn) {
@@ -7055,7 +7091,7 @@ function initChatPage() {
         }
     }
     
-    window.addEventListener('beforeunload', () => {
+    function cleanupChatPage() {
         groupChat.cleanup();
         reactionUnsubscribers.forEach(unsub => {
             if (unsub && typeof unsub === 'function') {
@@ -7068,7 +7104,23 @@ function initChatPage() {
         });
         reactionUnsubscribers.clear();
         
+        // Remove event listeners
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        if (sidebarToggle && groupChat.pageState.chatPage.eventListeners.has('sidebarToggle')) {
+            sidebarToggle.removeEventListener('click', groupChat.pageState.chatPage.eventListeners.get('sidebarToggle'));
+        }
+        
+        // Reset page state
+        groupChat.pageState.chatPage = {
+            initialized: false,
+            eventListeners: new Map()
+        };
+        
         removeSidebarOverlay();
+    }
+    
+    window.addEventListener('beforeunload', () => {
+        cleanupChatPage();
     });
     
     if (!window.openImageModal) {
