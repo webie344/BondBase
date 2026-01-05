@@ -246,6 +246,9 @@ class GroupChat {
         this.userStreakTimers.clear();
         this.userRewards.clear();
         this.userActiveDurations.clear();
+        
+        // FIXED: Clear rendered messages tracking
+        this.renderedMessagesPerChat.clear();
     }
 
     async loadBlockedUsers() {
@@ -4176,10 +4179,10 @@ function initGroupPage() {
     
     // FIXED: Use per-chat message tracking
     const chatKey = `group_${groupId}`;
-    if (!groupChat.renderedMessagesPerChat.has(chatKey)) {
-        groupChat.renderedMessagesPerChat.set(chatKey, new Set());
-    }
-    const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
+    
+    // ALWAYS create a new Set for this chat session
+    const renderedMessageIds = new Set();
+    groupChat.renderedMessagesPerChat.set(chatKey, renderedMessageIds);
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -4193,6 +4196,9 @@ function initGroupPage() {
     
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
+    
+    // Clear any global message tracking
+    window.globalMessageIds.clear();
     
     // UPDATED: Create typing indicator at top
     typingIndicator = createTypingIndicator();
@@ -4226,6 +4232,9 @@ function initGroupPage() {
             }
         });
         reactionUnsubscribers.clear();
+        
+        // Clear the rendered messages for this chat
+        groupChat.renderedMessagesPerChat.delete(chatKey);
         
         // UPDATED: Clean up typing indicator
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
@@ -5264,6 +5273,9 @@ function initGroupPage() {
         });
         reactionUnsubscribers.clear();
         
+        // Clear the rendered messages for this chat
+        groupChat.renderedMessagesPerChat.delete(chatKey);
+        
         // UPDATED: Clean up typing
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             try {
@@ -6289,10 +6301,10 @@ function initChatPage() {
     // FIXED: Use per-chat message tracking for private chats
     const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
     const chatKey = `private_${chatId}`;
-    if (!groupChat.renderedMessagesPerChat.has(chatKey)) {
-        groupChat.renderedMessagesPerChat.set(chatKey, new Set());
-    }
-    const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
+    
+    // ALWAYS create a new Set for this chat session
+    const renderedMessageIds = new Set();
+    groupChat.renderedMessagesPerChat.set(chatKey, renderedMessageIds);
     
     if (!partnerId) {
         alert('No chat partner specified');
@@ -6325,6 +6337,10 @@ function initChatPage() {
             }
         });
         reactionUnsubscribers.clear();
+        
+        // Clear the rendered messages for this chat
+        groupChat.renderedMessagesPerChat.delete(chatKey);
+        
         window.location.href = 'message.html';
     });
     
@@ -6981,6 +6997,10 @@ function initChatPage() {
             }
         });
         reactionUnsubscribers.clear();
+        
+        // Clear the rendered messages for this chat
+        groupChat.renderedMessagesPerChat.delete(chatKey);
+        
         removeSidebarOverlay();
     });
     
