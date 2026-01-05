@@ -5,6 +5,7 @@
 // FIXED: Message disappearing/reappearing issue and typing indicators not working
 // FIXED: Entire page rerender on message send and q is not defined error
 // FIXED: Messages displaying twice when returning to page - COMPLETELY FIXED
+// FIXED: Old messages not loading - messages flash then disappear issue
 
 import { 
     getFirestore, 
@@ -108,7 +109,7 @@ class GroupChat {
         this.currentGroupId = null;
         this.currentChatPartnerId = null;
         
-        // CHANGED: Store unsubscribe functions per chat instead of globally
+        // Store unsubscribe functions per chat instead of globally
         this.unsubscribeFunctions = {
             groupMessages: new Map(),      // groupId -> unsubscribe function
             groupMembers: new Map(),       // groupId -> unsubscribe function
@@ -172,7 +173,7 @@ class GroupChat {
         
         this.blockedUsers = new Map();
         
-        // NEW: Typing indicators and reward tracking
+        // Typing indicators and reward tracking
         this.typingUsers = new Map(); // groupId -> Map(userId -> typingTimeout)
         this.lastMessageTimes = new Map(); // userId -> last message timestamp
         this.userMessageStreaks = new Map(); // userId -> consecutive message count
@@ -180,9 +181,9 @@ class GroupChat {
         this.userRewards = new Map(); // userId -> current reward tag
         this.userActiveDurations = new Map(); // userId -> active duration in ms
         
-        // FIXED: Add global message tracking
-        window.globalMessageIds = window.globalMessageIds || new Set();
+        // FIXED: Single source of truth for rendered messages
         this.renderedMessagesPerChat = new Map(); // chatId -> Set(messageIds)
+        this.lastActiveChatKey = null; // Track which chat was last active
         
         this.setupAuthListener();
         this.createReactionModal();
@@ -239,7 +240,7 @@ class GroupChat {
         this.lastDisplayedMessages.clear();
         this.messageRenderQueue = [];
         
-        // NEW: Clear typing and reward data
+        // Clear typing and reward data
         this.typingUsers.clear();
         this.lastMessageTimes.clear();
         this.userMessageStreaks.clear();
@@ -247,8 +248,41 @@ class GroupChat {
         this.userRewards.clear();
         this.userActiveDurations.clear();
         
-        // FIXED: Clear rendered messages tracking
-        this.renderedMessagesPerChat.clear();
+        // FIXED: Only clear chat tracking if we're switching users
+        // Don't clear renderedMessagesPerChat here - keep it for page navigation
+    }
+
+    // FIXED: Get chat key for tracking rendered messages
+    getChatKey(chatId = null) {
+        if (this.currentGroupId) {
+            return `group_${this.currentGroupId}`;
+        } else if (this.currentChatPartnerId) {
+            return `private_${this.getPrivateChatId(this.firebaseUser.uid, this.currentChatPartnerId)}`;
+        } else if (chatId) {
+            if (chatId.startsWith('group_')) {
+                return chatId;
+            } else if (chatId.includes('private_')) {
+                return chatId;
+            }
+        }
+        return null;
+    }
+
+    // FIXED: Clear tracking for specific chat only
+    clearChatTracking(chatKey) {
+        if (chatKey) {
+            this.renderedMessagesPerChat.delete(chatKey);
+        }
+    }
+
+    // FIXED: Track when we leave a chat
+    markChatAsInactive() {
+        if (this.lastActiveChatKey) {
+            // Keep the rendered messages tracking for this chat
+            // Don't clear it - this prevents duplicates when returning
+            console.log(`Marking chat ${this.lastActiveChatKey} as inactive (keeping tracking)`);
+        }
+        this.lastActiveChatKey = null;
     }
 
     async loadBlockedUsers() {
@@ -503,7 +537,7 @@ class GroupChat {
                         (userData.createdAt.toDate ? userData.createdAt.toDate() : userData.createdAt) : 
                         new Date(),
                     profileComplete: userData.displayName && userData.avatar ? true : false,
-                    // NEW: Add reward tracking
+                    // Add reward tracking
                     rewardTag: userData.rewardTag || '',
                     glowEffect: userData.glowEffect || false,
                     fireRing: userData.fireRing || false
@@ -572,7 +606,7 @@ class GroupChat {
         return `private_${ids[0]}_${ids[1]}`;
     }
 
-    // NEW: Update user reward in database
+    // Update user reward in database
     async updateUserReward(userId, rewardData) {
         try {
             const userRef = doc(db, 'group_users', userId);
@@ -599,7 +633,7 @@ class GroupChat {
         }
     }
 
-    // NEW: Send system message for reward upgrade
+    // Send system message for reward upgrade
     async sendRewardSystemMessage(groupId, userId, userName, rewardTag) {
         try {
             const messagesRef = collection(db, 'groups', groupId, 'messages');
@@ -624,7 +658,7 @@ class GroupChat {
         }
     }
 
-    // NEW: Check and award user for activity
+    // Check and award user for activity
     async checkAndAwardUser(groupId, userId, userName) {
         try {
             const now = Date.now();
@@ -691,7 +725,7 @@ class GroupChat {
         }
     }
 
-    // NEW: Update user message streak
+    // Update user message streak
     updateMessageStreak(userId) {
         const now = Date.now();
         const lastStreakTime = this.lastMessageTimes.get(userId) || 0;
@@ -721,13 +755,13 @@ class GroupChat {
         return this.userMessageStreaks.get(userId) || 0;
     }
 
-    // NEW: Check if user should have glowing messages
+    // Check if user should have glowing messages
     shouldGlowMessage(userId) {
         const streak = this.userMessageStreaks.get(userId) || 0;
         return streak >= CONSECUTIVE_MESSAGES_THRESHOLD;
     }
 
-    // NEW: Check if user should have fire ring avatar
+    // Check if user should have fire ring avatar
     shouldHaveFireRing(userId) {
         const streak = this.userMessageStreaks.get(userId) || 0;
         return streak >= CONSECUTIVE_MESSAGES_THRESHOLD * 2; // After 10 consecutive messages
@@ -1913,7 +1947,7 @@ class GroupChat {
         }
     }
 
-    // NEW: Start typing indicator
+    // Start typing indicator
     async startTyping(groupId) {
         try {
             if (!this.firebaseUser || !this.currentUser || !groupId) return;
@@ -1948,7 +1982,7 @@ class GroupChat {
         }
     }
 
-    // NEW: Stop typing indicator
+    // Stop typing indicator
     async stopTyping(groupId) {
         try {
             if (!this.firebaseUser || !groupId) return;
@@ -1976,7 +2010,7 @@ class GroupChat {
         }
     }
 
-    // NEW: Listen to typing indicators
+    // Listen to typing indicators
     listenToTyping(groupId, callback) {
         try {
             // Unsubscribe from previous typing listener for this group
@@ -2051,7 +2085,7 @@ class GroupChat {
                 }
             }
             
-            // NEW: Update message streak
+            // Update message streak
             const streak = this.updateMessageStreak(this.firebaseUser.uid);
             const shouldGlow = this.shouldGlowMessage(this.firebaseUser.uid);
             const shouldHaveFireRing = this.shouldHaveFireRing(this.firebaseUser.uid);
@@ -2074,7 +2108,7 @@ class GroupChat {
                 timestamp: serverTimestamp()
             };
             
-            // NEW: Add glow effect and fire ring data
+            // Add glow effect and fire ring data
             if (shouldGlow) {
                 messageData.glowEffect = true;
             }
@@ -2114,10 +2148,10 @@ class GroupChat {
                 }
             });
             
-            // NEW: Check and award user for activity
+            // Check and award user for activity
             await this.checkAndAwardUser(groupId, this.firebaseUser.uid, this.currentUser.name);
             
-            // NEW: Stop typing indicator
+            // Stop typing indicator
             await this.stopTyping(groupId);
             
             await this.updateLastActive(groupId);
@@ -2179,7 +2213,7 @@ class GroupChat {
                 status: 'uploading'
             };
             
-            // NEW: Add glow effect for temp messages if user has streak
+            // Add glow effect for temp messages if user has streak
             if (this.shouldGlowMessage(this.firebaseUser.uid)) {
                 tempMessage.glowEffect = true;
             }
@@ -3305,21 +3339,10 @@ class GroupChat {
         this.removeReplyIndicator();
     }
 
-    async logout() {
-        try {
-            await signOut(auth);
-            this.firebaseUser = null;
-            this.currentUser = null;
-            this.clearAllCache();
-            this.cleanup();
-            
-            window.location.href = 'login.html';
-        } catch (error) {
-            console.error('Error logging out:', error);
-        }
-    }
-
+    // FIXED: Enhanced cleanup that preserves message tracking
     cleanup() {
+        console.log('Cleaning up chat listeners...');
+        
         // Clean up all unsubscribe functions
         this.unsubscribeFunctions.groupMessages.forEach((unsub, groupId) => {
             if (unsub && typeof unsub === 'function') {
@@ -3414,6 +3437,32 @@ class GroupChat {
             clearTimeout(timer);
         });
         this.userStreakTimers.clear();
+        
+        // FIXED: Mark current chat as inactive but don't clear tracking
+        this.markChatAsInactive();
+        
+        // Reset current IDs
+        this.currentGroupId = null;
+        this.currentChatPartnerId = null;
+    }
+
+    async logout() {
+        try {
+            await signOut(auth);
+            this.firebaseUser = null;
+            this.currentUser = null;
+            this.clearAllCache();
+            
+            // FIXED: Clear ALL tracking when logging out
+            this.renderedMessagesPerChat.clear();
+            this.lastActiveChatKey = null;
+            
+            this.cleanup();
+            
+            window.location.href = 'login.html';
+        } catch (error) {
+            console.error('Error logging out:', error);
+        }
     }
 }
 
@@ -4089,7 +4138,7 @@ function initSetPage() {
     }
 }
 
-// UPDATED: Create typing indicator element at top
+// Create typing indicator element at top
 function createTypingIndicator() {
     const typingIndicator = document.createElement('div');
     typingIndicator.id = 'typingIndicator';
@@ -4107,7 +4156,7 @@ function createTypingIndicator() {
     return typingIndicator;
 }
 
-// UPDATED: Update typing indicator
+// Update typing indicator
 function updateTypingIndicator(typingUsers) {
     const typingIndicator = document.getElementById('typingIndicator');
     const typingText = document.getElementById('typingText');
@@ -4140,6 +4189,7 @@ function updateTypingIndicator(typingUsers) {
     typingIndicator.classList.add('show');
 }
 
+// FIXED: initGroupPage with proper message tracking and listener conflict resolution
 function initGroupPage() {
     const sidebar = document.getElementById('sidebar');
     const backBtn = document.getElementById('backBtn');
@@ -4169,20 +4219,15 @@ function initGroupPage() {
     let isInitialLoad = true;
     let reactionUnsubscribers = new Map();
     let reactionsCache = new Map();
-    let isRendering = false;
     
-    // UPDATED: Typing indicator variables
+    // Typing indicator variables
     let typingIndicator = null;
     let typingUnsubscribe = null;
     let typingTimeout = null;
     let lastTypingInputTime = 0;
     
-    // FIXED: Use per-chat message tracking
+    // FIXED: Get or create chat key tracking
     const chatKey = `group_${groupId}`;
-    
-    // ALWAYS create a new Set for this chat session
-    const renderedMessageIds = new Set();
-    groupChat.renderedMessagesPerChat.set(chatKey, renderedMessageIds);
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -4197,10 +4242,16 @@ function initGroupPage() {
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
     
-    // Clear any global message tracking
-    window.globalMessageIds.clear();
+    // FIXED: Mark this as the active chat
+    groupChat.lastActiveChatKey = chatKey;
     
-    // UPDATED: Create typing indicator at top
+    // Get or create rendered messages tracking for this chat
+    if (!groupChat.renderedMessagesPerChat.has(chatKey)) {
+        groupChat.renderedMessagesPerChat.set(chatKey, new Set());
+    }
+    const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
+    
+    // Create typing indicator at top
     typingIndicator = createTypingIndicator();
     
     (async () => {
@@ -4233,10 +4284,7 @@ function initGroupPage() {
         });
         reactionUnsubscribers.clear();
         
-        // Clear the rendered messages for this chat
-        groupChat.renderedMessagesPerChat.delete(chatKey);
-        
-        // UPDATED: Clean up typing indicator
+        // Clean up typing indicator
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             try {
                 typingUnsubscribe();
@@ -4293,14 +4341,14 @@ function initGroupPage() {
         });
     }
     
-    // UPDATED: Typing indicator for message input
+    // Typing indicator for message input
     messageInput.addEventListener('input', () => {
         sendBtn.disabled = !messageInput.value.trim();
         
         messageInput.style.height = 'auto';
         messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
         
-        // UPDATED: Start typing indicator when user types
+        // Start typing indicator when user types
         const now = Date.now();
         if (now - lastTypingInputTime > 1000) { // Throttle to 1 second
             groupChat.startTyping(groupId);
@@ -4318,7 +4366,7 @@ function initGroupPage() {
         }, 3000);
     });
     
-    // UPDATED: Stop typing when input loses focus
+    // Stop typing when input loses focus
     messageInput.addEventListener('blur', () => {
         groupChat.stopTyping(groupId);
         if (typingTimeout) {
@@ -4326,7 +4374,7 @@ function initGroupPage() {
         }
     });
     
-    // FIXED: Send button always shows airplane icon, no loader - prevent form submission
+    // Send button always shows airplane icon, no loader - prevent form submission
     sendBtn.addEventListener('click', (e) => {
         e.preventDefault();
         sendMessage();
@@ -4423,7 +4471,7 @@ function initGroupPage() {
             if (groupNameSidebar) groupNameSidebar.textContent = groupData.name;
             if (groupMembersCount) groupMembersCount.textContent = `${groupData.memberCount || 0} members`;
             
-            // FIXED: Truncate group name to 6 words in chat header
+            // Truncate group name to 6 words in chat header
             const truncatedGroupName = groupChat.truncateName(groupData.name);
             if (chatTitle) chatTitle.textContent = truncatedGroupName;
             if (chatSubtitle) chatSubtitle.textContent = groupData.description;
@@ -4446,8 +4494,6 @@ function initGroupPage() {
             if (isInitialLoad) {
                 messages = await groupChat.getMessages(groupId);
                 await loadInitialReactions();
-                // Clear rendered message IDs for this specific group when first loading
-                renderedMessageIds.clear();
                 displayAllMessages();
                 isInitialLoad = false;
             }
@@ -4471,10 +4517,18 @@ function initGroupPage() {
         // Filter out messages that have already been rendered
         const messagesToRender = newMessages.filter(msg => !renderedMessageIds.has(msg.id));
         
-        if (messagesToRender.length === 0) return;
+        if (messagesToRender.length === 0) {
+            console.log('No new messages to render');
+            return;
+        }
+        
+        console.log(`Rendering ${messagesToRender.length} new messages`);
         
         // Track which messages we've rendered
-        messagesToRender.forEach(msg => renderedMessageIds.add(msg.id));
+        messagesToRender.forEach(msg => {
+            renderedMessageIds.add(msg.id);
+            console.log(`Added message ${msg.id} to rendered set`);
+        });
         
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
@@ -4564,7 +4618,7 @@ function initGroupPage() {
                         
                         const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
                         
-                        // UPDATED: Add soft glowing effect class if message has glowEffect
+                        // Add soft glowing effect class if message has glowEffect
                         const hasGlowEffect = msg.glowEffect || false;
                         const extraClasses = hasGlowEffect ? ' glowing-message' : '';
                         
@@ -4631,7 +4685,7 @@ function initGroupPage() {
                         
                         const cachedReactions = reactionsCache.get(msg.id) || [];
                         
-                        // UPDATED: Add sending indicator on message (not on button)
+                        // Add sending indicator on message (not on button)
                         const sendingIndicator = isTemp ? 
                             `<div class="sending-indicator" id="sending-${msg.id}">
                                 <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
@@ -4690,6 +4744,7 @@ function initGroupPage() {
         }, 50);
     }
     
+    // FIXED: displayAllMessages function - renders ALL initial messages without filtering
     function displayAllMessages() {
         if (!messagesContainer) return;
         
@@ -4706,11 +4761,13 @@ function initGroupPage() {
         // Clear container first
         messagesContainer.innerHTML = '';
         
-        // Render all messages
-        renderNewMessages(messages);
+        // Clear the renderedMessageIds for this chat to start fresh
+        renderedMessageIds.clear();
         
-        // After initial render, mark all messages as rendered
-        messages.forEach(msg => renderedMessageIds.add(msg.id));
+        console.log(`Displaying ${messages.length} initial messages (cleared tracking)`);
+        
+        // Render ALL messages without filtering
+        renderNewMessages(messages);
     }
     
     function attachMessageEventListeners() {
@@ -5016,7 +5073,7 @@ function initGroupPage() {
             reactionUnsubscribers.clear();
         }
         
-        // UPDATED: Clear typing listener
+        // Clear typing listener
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             try {
                 typingUnsubscribe();
@@ -5027,7 +5084,7 @@ function initGroupPage() {
         
         // Set up new listeners
         const messagesUnsub = groupChat.listenToMessages(groupId, (newMessages) => {
-            console.log('Received messages:', newMessages.length);
+            console.log('Received messages from listener:', newMessages.length);
             
             const uniqueMessages = [];
             const seenIds = new Set();
@@ -5045,15 +5102,25 @@ function initGroupPage() {
                 }
             });
             
-            messages = uniqueMessages;
+            // FIXED: Only update messages array if it's actually different
+            // Check if messages are the same (initial load duplicate)
+            const isSameMessages = messages.length === uniqueMessages.length && 
+                messages.every((msg, index) => msg.id === uniqueMessages[index]?.id);
             
-            // Only render new messages
-            const newMessagesToRender = uniqueMessages.filter(msg => !renderedMessageIds.has(msg.id));
-            if (newMessagesToRender.length > 0) {
-                renderNewMessages(newMessagesToRender);
+            if (!isSameMessages) {
+                messages = uniqueMessages;
+                
+                // Only render new messages
+                const newMessagesToRender = uniqueMessages.filter(msg => !renderedMessageIds.has(msg.id));
+                if (newMessagesToRender.length > 0) {
+                    console.log(`Rendering ${newMessagesToRender.length} new messages from listener`);
+                    renderNewMessages(newMessagesToRender);
+                }
+                
+                setupReactionListenersForNewMessages(newMessagesToRender);
+            } else {
+                console.log('Listener returned same messages (initial load duplicate), skipping re-render');
             }
-            
-            setupReactionListenersForNewMessages(newMessagesToRender);
         });
         
         const membersUnsub = groupChat.listenToMembers(groupId, (newMembers) => {
@@ -5068,7 +5135,7 @@ function initGroupPage() {
             }
         });
         
-        // UPDATED: Set up typing indicator listener
+        // Set up typing indicator listener
         typingUnsubscribe = groupChat.listenToTyping(groupId, (typingUsers) => {
             updateTypingIndicator(typingUsers);
         });
@@ -5094,7 +5161,7 @@ function initGroupPage() {
             });
             reactionUnsubscribers.clear();
             
-            // UPDATED: Clean up typing
+            // Clean up typing
             if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
                 try {
                     typingUnsubscribe();
@@ -5204,7 +5271,7 @@ function initGroupPage() {
         
         if (!text) return;
         
-        // UPDATED: Clear typing timeout before sending
+        // Clear typing timeout before sending
         if (typingTimeout) {
             clearTimeout(typingTimeout);
         }
@@ -5212,8 +5279,7 @@ function initGroupPage() {
         // Stop typing indicator
         await groupChat.stopTyping(groupId);
         
-        // FIXED: Send button always shows airplane icon, no loader
-        // We only disable it temporarily to prevent double sends
+        // Send button always shows airplane icon, no loader
         const originalHTML = sendBtn.innerHTML;
         const originalDisabled = sendBtn.disabled;
         sendBtn.disabled = true;
@@ -5232,7 +5298,7 @@ function initGroupPage() {
             console.error('Error sending message:', error);
             alert(error.message || 'Failed to send message. Please try again.');
         } finally {
-            // FIXED: Always restore airplane icon immediately
+            // Always restore airplane icon immediately
             sendBtn.disabled = originalDisabled;
             sendBtn.innerHTML = originalHTML;
         }
@@ -5273,10 +5339,7 @@ function initGroupPage() {
         });
         reactionUnsubscribers.clear();
         
-        // Clear the rendered messages for this chat
-        groupChat.renderedMessagesPerChat.delete(chatKey);
-        
-        // UPDATED: Clean up typing
+        // Clean up typing
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             try {
                 typingUnsubscribe();
@@ -6270,6 +6333,7 @@ function initUserPage() {
     }
 }
 
+// FIXED: initChatPage with proper message tracking
 function initChatPage() {
     const sidebar = document.getElementById('sidebar');
     const backBtn = document.getElementById('backBtn');
@@ -6296,15 +6360,10 @@ function initChatPage() {
     let isListening = false;
     let reactionUnsubscribers = new Map();
     let reactionsCache = new Map();
-    let isRendering = false;
     
-    // FIXED: Use per-chat message tracking for private chats
+    // FIXED: Get or create chat key tracking for private chat
     const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
     const chatKey = `private_${chatId}`;
-    
-    // ALWAYS create a new Set for this chat session
-    const renderedMessageIds = new Set();
-    groupChat.renderedMessagesPerChat.set(chatKey, renderedMessageIds);
     
     if (!partnerId) {
         alert('No chat partner specified');
@@ -6325,6 +6384,15 @@ function initChatPage() {
     
     groupChat.currentChatPartnerId = partnerId;
     
+    // FIXED: Mark this as the active chat
+    groupChat.lastActiveChatKey = chatKey;
+    
+    // Get or create rendered messages tracking for this chat
+    if (!groupChat.renderedMessagesPerChat.has(chatKey)) {
+        groupChat.renderedMessagesPerChat.set(chatKey, new Set());
+    }
+    const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
+    
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
         reactionUnsubscribers.forEach(unsub => {
@@ -6337,9 +6405,6 @@ function initChatPage() {
             }
         });
         reactionUnsubscribers.clear();
-        
-        // Clear the rendered messages for this chat
-        groupChat.renderedMessagesPerChat.delete(chatKey);
         
         window.location.href = 'message.html';
     });
@@ -6381,7 +6446,7 @@ function initChatPage() {
         messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
     });
     
-    // FIXED: Send button always shows airplane icon, no loader - prevent form submission
+    // Send button always shows airplane icon, no loader - prevent form submission
     sendBtn.addEventListener('click', (e) => {
         e.preventDefault();
         sendMessage();
@@ -6495,15 +6560,13 @@ function initChatPage() {
             if (partnerEmail) partnerEmail.textContent = partnerProfile.email || 'Email not available';
             if (userBio) userBio.textContent = partnerProfile.bio;
             
-            // FIXED: Truncate partner name to 6 words in chat header
+            // Truncate partner name to 6 words in chat header
             const truncatedPartnerName = groupChat.truncateName(partnerProfile.name);
             if (chatTitle) chatTitle.textContent = truncatedPartnerName;
             if (chatSubtitle) chatSubtitle.textContent = 'Private Chat';
             
             messages = await groupChat.getPrivateMessages(partnerId);
             await loadInitialPrivateReactions();
-            // Clear rendered message IDs for this specific chat when first loading
-            renderedMessageIds.clear();
             displayAllPrivateMessages();
             
             if (messagesContainer) {
@@ -6550,8 +6613,13 @@ function initChatPage() {
         
         if (messagesToRender.length === 0) return;
         
+        console.log(`Rendering ${messagesToRender.length} new private messages`);
+        
         // Track which messages we've rendered
-        messagesToRender.forEach(msg => renderedMessageIds.add(msg.id));
+        messagesToRender.forEach(msg => {
+            renderedMessageIds.add(msg.id);
+            console.log(`Added private message ${msg.id} to rendered set`);
+        });
         
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
@@ -6647,7 +6715,7 @@ function initChatPage() {
                         
                         const messageDivClass = 'message-text';
                         
-                        // UPDATED: Add soft glowing effect for private messages too
+                        // Add soft glowing effect for private messages too
                         const hasGlowEffect = msg.glowEffect || false;
                         const extraClasses = hasGlowEffect ? ' glowing-message' : '';
                         
@@ -6704,7 +6772,7 @@ function initChatPage() {
                         
                         const cachedReactions = reactionsCache.get(msg.id) || [];
                         
-                        // UPDATED: Add sending indicator on message
+                        // Add sending indicator on message
                         const sendingIndicator = isTemp ? 
                             `<div class="sending-indicator" id="sending-${msg.id}">
                                 <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
@@ -6763,6 +6831,7 @@ function initChatPage() {
         }, 50);
     }
     
+    // FIXED: displayAllPrivateMessages function - renders ALL initial messages without filtering
     function displayAllPrivateMessages() {
         if (!messagesContainer) return;
         
@@ -6779,11 +6848,13 @@ function initChatPage() {
         // Clear container first
         messagesContainer.innerHTML = '';
         
-        // Render all messages
-        renderNewPrivateMessages(messages);
+        // Clear the renderedMessageIds for this chat to start fresh
+        renderedMessageIds.clear();
         
-        // After initial render, mark all messages as rendered
-        messages.forEach(msg => renderedMessageIds.add(msg.id));
+        console.log(`Displaying ${messages.length} initial private messages (cleared tracking)`);
+        
+        // Render ALL messages without filtering
+        renderNewPrivateMessages(messages);
     }
     
     function attachPrivateMessageEventListeners() {
@@ -6898,8 +6969,7 @@ function initChatPage() {
         
         if (!text) return;
         
-        // FIXED: Send button always shows airplane icon, no loader
-        // We only disable it temporarily to prevent double sends
+        // Send button always shows airplane icon, no loader
         const originalHTML = sendBtn.innerHTML;
         const originalDisabled = sendBtn.disabled;
         sendBtn.disabled = true;
@@ -6923,7 +6993,7 @@ function initChatPage() {
             console.error('Error sending message:', error);
             alert('Failed to send message');
         } finally {
-            // FIXED: Always restore airplane icon immediately
+            // Always restore airplane icon immediately
             sendBtn.disabled = originalDisabled;
             sendBtn.innerHTML = originalHTML;
         }
@@ -6997,9 +7067,6 @@ function initChatPage() {
             }
         });
         reactionUnsubscribers.clear();
-        
-        // Clear the rendered messages for this chat
-        groupChat.renderedMessagesPerChat.delete(chatKey);
         
         removeSidebarOverlay();
     });
