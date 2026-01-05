@@ -4,7 +4,7 @@
 // UPDATED: Fixed issues - soft glow, page refresh, send button loader, group name truncation, SVG icons
 // FIXED: Message disappearing/reappearing issue and typing indicators not working
 // FIXED: Entire page rerender on message send and q is not defined error
-// FIXED: Messages displaying twice when returning to page - moved renderedMessageIds to window object
+// FIXED: Messages displaying twice when returning to page - COMPLETELY FIXED
 
 import { 
     getFirestore, 
@@ -107,11 +107,16 @@ class GroupChat {
         this.firebaseUser = null;
         this.currentGroupId = null;
         this.currentChatPartnerId = null;
-        this.unsubscribeMessages = null;
-        this.unsubscribeMembers = null;
-        this.unsubscribePrivateMessages = null;
-        this.unsubscribeAuth = null;
-        this.unsubscribePrivateChats = null;
+        
+        // CHANGED: Store unsubscribe functions per chat instead of globally
+        this.unsubscribeFunctions = {
+            groupMessages: new Map(),      // groupId -> unsubscribe function
+            groupMembers: new Map(),       // groupId -> unsubscribe function
+            privateMessages: new Map(),    // chatId -> unsubscribe function
+            typing: new Map(),             // groupId -> unsubscribe function
+            reactions: new Map(),          // messageId -> unsubscribe function
+            privateReactions: new Map()    // messageId -> unsubscribe function
+        };
         
         this.cache = {
             userProfile: null,
@@ -174,6 +179,10 @@ class GroupChat {
         this.userStreakTimers = new Map(); // userId -> streak timer
         this.userRewards = new Map(); // userId -> current reward tag
         this.userActiveDurations = new Map(); // userId -> active duration in ms
+        
+        // FIXED: Add global message tracking
+        window.globalMessageIds = window.globalMessageIds || new Set();
+        this.renderedMessagesPerChat = new Map(); // chatId -> Set(messageIds)
         
         this.setupAuthListener();
         this.createReactionModal();
@@ -449,7 +458,7 @@ class GroupChat {
     }
 
     validateVideoFile(file) {
-        const maxSize = 50 * 1024 * 1024;
+        const maxSize = 50 * 1024 * 1000;
         if (file.size > maxSize) {
             throw new Error('Video file must be less than 50MB');
         }
@@ -887,17 +896,21 @@ class GroupChat {
 
     listenToPrivateMessages(otherUserId, callback) {
         try {
-            // First, unsubscribe from any existing listener
-            if (this.unsubscribePrivateMessages) {
-                try {
-                    this.unsubscribePrivateMessages();
-                } catch (err) {
-                    console.log('Error unsubscribing from previous private messages:', err);
+            const chatId = this.getPrivateChatId(this.firebaseUser.uid, otherUserId);
+            
+            // Unsubscribe from previous listener for this chat
+            if (this.unsubscribeFunctions.privateMessages.has(chatId)) {
+                const unsub = this.unsubscribeFunctions.privateMessages.get(chatId);
+                if (unsub && typeof unsub === 'function') {
+                    try {
+                        unsub();
+                    } catch (err) {
+                        console.log('Error unsubscribing from previous private messages:', err);
+                    }
                 }
-                this.unsubscribePrivateMessages = null;
+                this.unsubscribeFunctions.privateMessages.delete(chatId);
             }
             
-            const chatId = this.getPrivateChatId(this.firebaseUser.uid, otherUserId);
             const messagesRef = collection(db, 'private_chats', chatId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
             
@@ -925,7 +938,7 @@ class GroupChat {
                 console.error('Error in private messages listener:', error);
             });
             
-            this.unsubscribePrivateMessages = unsubscribe;
+            this.unsubscribeFunctions.privateMessages.set(chatId, unsubscribe);
             
             return unsubscribe;
         } catch (error) {
@@ -1051,7 +1064,7 @@ class GroupChat {
             if (cached) return cached;
 
             const groupsRef = collection(db, 'groups');
-            const querySnapshot = await getDocs(groupsRef); // FIXED: Changed from getDocs(q) to getDocs(groupsRef)
+            const querySnapshot = await getDocs(groupsRef);
             
             const groupChats = [];
             
@@ -1255,7 +1268,7 @@ class GroupChat {
             this.setCachedItem(cacheKey, groups, this.cache.adminGroups, CACHE_DURATION.GROUP_DATA);
             
             return groups;
-        } catch (error) {
+       } catch (error) {
             console.error('Error getting admin groups:', error);
             throw error;
         }
@@ -1963,9 +1976,22 @@ class GroupChat {
     // NEW: Listen to typing indicators
     listenToTyping(groupId, callback) {
         try {
+            // Unsubscribe from previous typing listener for this group
+            if (this.unsubscribeFunctions.typing.has(groupId)) {
+                const unsub = this.unsubscribeFunctions.typing.get(groupId);
+                if (unsub && typeof unsub === 'function') {
+                    try {
+                        unsub();
+                    } catch (err) {
+                        console.log('Error unsubscribing from previous typing listener:', err);
+                    }
+                }
+                this.unsubscribeFunctions.typing.delete(groupId);
+            }
+            
             const typingRef = collection(db, 'groups', groupId, 'typing');
             
-            return onSnapshot(typingRef, (snapshot) => {
+            const unsubscribe = onSnapshot(typingRef, (snapshot) => {
                 const typingUsers = [];
                 const now = Date.now();
                 
@@ -1989,6 +2015,10 @@ class GroupChat {
                 
                 callback(typingUsers);
             });
+            
+            this.unsubscribeFunctions.typing.set(groupId, unsubscribe);
+            
+            return unsubscribe;
         } catch (error) {
             console.error('Error listening to typing indicators:', error);
             return () => {};
@@ -2194,14 +2224,17 @@ class GroupChat {
 
     listenToMessages(groupId, callback) {
         try {
-            // First, unsubscribe from any existing listener
-            if (this.unsubscribeMessages) {
-                try {
-                    this.unsubscribeMessages();
-                } catch (err) {
-                    console.log('Error unsubscribing from previous messages:', err);
+            // Unsubscribe from previous listener for this group
+            if (this.unsubscribeFunctions.groupMessages.has(groupId)) {
+                const unsub = this.unsubscribeFunctions.groupMessages.get(groupId);
+                if (unsub && typeof unsub === 'function') {
+                    try {
+                        unsub();
+                    } catch (err) {
+                        console.log('Error unsubscribing from previous messages:', err);
+                    }
                 }
-                this.unsubscribeMessages = null;
+                this.unsubscribeFunctions.groupMessages.delete(groupId);
             }
             
             const messagesRef = collection(db, 'groups', groupId, 'messages');
@@ -2226,7 +2259,7 @@ class GroupChat {
                 console.error('Error in messages listener:', error);
             });
             
-            this.unsubscribeMessages = unsubscribe;
+            this.unsubscribeFunctions.groupMessages.set(groupId, unsubscribe);
             
             return unsubscribe;
         } catch (error) {
@@ -2238,14 +2271,17 @@ class GroupChat {
 
     listenToMembers(groupId, callback) {
         try {
-            // First, unsubscribe from any existing listener
-            if (this.unsubscribeMembers) {
-                try {
-                    this.unsubscribeMembers();
-                } catch (err) {
-                    console.log('Error unsubscribing from previous members:', err);
+            // Unsubscribe from previous listener for this group
+            if (this.unsubscribeFunctions.groupMembers.has(groupId)) {
+                const unsub = this.unsubscribeFunctions.groupMembers.get(groupId);
+                if (unsub && typeof unsub === 'function') {
+                    try {
+                        unsub();
+                    } catch (err) {
+                        console.log('Error unsubscribing from previous members:', err);
+                    }
                 }
-                this.unsubscribeMembers = null;
+                this.unsubscribeFunctions.groupMembers.delete(groupId);
             }
             
             const membersRef = collection(db, 'groups', groupId, 'members');
@@ -2269,7 +2305,7 @@ class GroupChat {
                 console.error('Error in members listener:', error);
             });
             
-            this.unsubscribeMembers = unsubscribe;
+            this.unsubscribeFunctions.groupMembers.set(groupId, unsubscribe);
             
             return unsubscribe;
         } catch (error) {
@@ -2882,10 +2918,24 @@ class GroupChat {
 
     async listenToMessageReactions(groupId, messageId, callback) {
         try {
+            // Unsubscribe from previous reaction listener for this message
+            const reactionKey = `reaction_${groupId}_${messageId}`;
+            if (this.unsubscribeFunctions.reactions.has(reactionKey)) {
+                const unsub = this.unsubscribeFunctions.reactions.get(reactionKey);
+                if (unsub && typeof unsub === 'function') {
+                    try {
+                        unsub();
+                    } catch (err) {
+                        console.log('Error unsubscribing from previous reactions:', err);
+                    }
+                }
+                this.unsubscribeFunctions.reactions.delete(reactionKey);
+            }
+            
             const reactionsRef = collection(db, 'groups', groupId, 'messages', messageId, 'reactions');
             const q = query(reactionsRef);
             
-            return onSnapshot(q, (snapshot) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
                 const reactions = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -2902,6 +2952,10 @@ class GroupChat {
                 
                 callback(reactions);
             });
+            
+            this.unsubscribeFunctions.reactions.set(reactionKey, unsubscribe);
+            
+            return unsubscribe;
         } catch (error) {
             console.error('Error listening to reactions:', error);
             return () => {};
@@ -2910,10 +2964,24 @@ class GroupChat {
 
     async listenToPrivateMessageReactions(chatId, messageId, callback) {
         try {
+            // Unsubscribe from previous reaction listener for this message
+            const reactionKey = `private_reaction_${chatId}_${messageId}`;
+            if (this.unsubscribeFunctions.privateReactions.has(reactionKey)) {
+                const unsub = this.unsubscribeFunctions.privateReactions.get(reactionKey);
+                if (unsub && typeof unsub === 'function') {
+                    try {
+                        unsub();
+                    } catch (err) {
+                        console.log('Error unsubscribing from previous private reactions:', err);
+                    }
+                }
+                this.unsubscribeFunctions.privateReactions.delete(reactionKey);
+            }
+            
             const reactionsRef = collection(db, 'private_chats', chatId, 'messages', messageId, 'reactions');
             const q = query(reactionsRef);
             
-            return onSnapshot(q, (snapshot) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
                 const reactions = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -2930,6 +2998,10 @@ class GroupChat {
                 
                 callback(reactions);
             });
+            
+            this.unsubscribeFunctions.privateReactions.set(reactionKey, unsubscribe);
+            
+            return unsubscribe;
         } catch (error) {
             console.error('Error listening to private message reactions:', error);
             return () => {};
@@ -3245,43 +3317,75 @@ class GroupChat {
     }
 
     cleanup() {
-        if (this.unsubscribeMessages) {
-            try {
-                this.unsubscribeMessages();
-            } catch (err) {
-                console.log('Error unsubscribing from messages:', err);
+        // Clean up all unsubscribe functions
+        this.unsubscribeFunctions.groupMessages.forEach((unsub, groupId) => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from group messages:', err);
+                }
             }
-            this.unsubscribeMessages = null;
-        }
+        });
+        this.unsubscribeFunctions.groupMessages.clear();
         
-        if (this.unsubscribeMembers) {
-            try {
-                this.unsubscribeMembers();
-            } catch (err) {
-                console.log('Error unsubscribing from members:', err);
+        this.unsubscribeFunctions.groupMembers.forEach((unsub, groupId) => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from group members:', err);
+                }
             }
-            this.unsubscribeMembers = null;
-        }
+        });
+        this.unsubscribeFunctions.groupMembers.clear();
         
-        if (this.unsubscribePrivateMessages) {
-            try {
-                this.unsubscribePrivateMessages();
-            } catch (err) {
-                console.log('Error unsubscribing from private messages:', err);
+        this.unsubscribeFunctions.privateMessages.forEach((unsub, chatId) => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from private messages:', err);
+                }
             }
-            this.unsubscribePrivateMessages = null;
-        }
+        });
+        this.unsubscribeFunctions.privateMessages.clear();
         
-        if (this.unsubscribePrivateChats) {
-            try {
-                this.unsubscribePrivateChats();
-            } catch (err) {
-                console.log('Error unsubscribing from private chats:', err);
+        this.unsubscribeFunctions.typing.forEach((unsub, groupId) => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from typing:', err);
+                }
             }
-            this.unsubscribePrivateChats = null;
-        }
+        });
+        this.unsubscribeFunctions.typing.clear();
         
-        if (this.unsubscribeAuth) {
+        this.unsubscribeFunctions.reactions.forEach((unsub, reactionKey) => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from reactions:', err);
+                }
+            }
+        });
+        this.unsubscribeFunctions.reactions.clear();
+        
+        this.unsubscribeFunctions.privateReactions.forEach((unsub, reactionKey) => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from private reactions:', err);
+                }
+            }
+        });
+        this.unsubscribeFunctions.privateReactions.clear();
+        
+        // Clean up auth listener
+        if (this.unsubscribeAuth && typeof this.unsubscribeAuth === 'function') {
             try {
                 this.unsubscribeAuth();
             } catch (err) {
@@ -3294,7 +3398,7 @@ class GroupChat {
         this.sentMessageIds.clear();
         this.pendingMessages.clear();
         
-        // NEW: Clear typing timeouts
+        // Clear typing timeouts
         this.typingUsers.forEach((userTyping, groupId) => {
             userTyping.forEach((timeout, userId) => {
                 clearTimeout(timeout);
@@ -3720,7 +3824,7 @@ function initGroupsPage() {
                             <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
                                 ${group.privacy === 'private' ? 
                                     '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
-                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>'
+                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1 4-10z"></path>'
                                 }
                             </svg>
                             ${group.privacy === 'private' ? 'Private' : 'Public'}
@@ -4063,19 +4167,19 @@ function initGroupPage() {
     let reactionUnsubscribers = new Map();
     let reactionsCache = new Map();
     let isRendering = false;
-    let renderQueue = [];
     
     // UPDATED: Typing indicator variables
     let typingIndicator = null;
     let typingUnsubscribe = null;
     let typingTimeout = null;
     let lastTypingInputTime = 0;
-    let lastMessageIds = '';
-    // FIXED: Moved renderedMessageIds to window object to persist across page navigation
-    if (!window.renderedMessageIds) {
-        window.renderedMessageIds = new Set();
+    
+    // FIXED: Use per-chat message tracking
+    const chatKey = `group_${groupId}`;
+    if (!groupChat.renderedMessagesPerChat.has(chatKey)) {
+        groupChat.renderedMessagesPerChat.set(chatKey, new Set());
     }
-    let renderedMessageIds = window.renderedMessageIds;
+    const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -4112,12 +4216,24 @@ function initGroupPage() {
     
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
-        reactionUnsubscribers.forEach(unsub => unsub());
+        reactionUnsubscribers.forEach(unsub => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from reaction:', err);
+                }
+            }
+        });
         reactionUnsubscribers.clear();
         
         // UPDATED: Clean up typing indicator
-        if (typingUnsubscribe) {
-            typingUnsubscribe();
+        if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
+            try {
+                typingUnsubscribe();
+            } catch (err) {
+                console.log('Error unsubscribing from typing:', err);
+            }
         }
         if (typingTimeout) {
             clearTimeout(typingTimeout);
@@ -4262,7 +4378,7 @@ function initGroupPage() {
         const tempMsgIndex = messages.findIndex(m => m.id === tempMessage.id);
         if (tempMsgIndex === -1) {
             messages.push(tempMessage);
-            queueRender();
+            renderNewMessages([tempMessage]);
         }
     });
     
@@ -4273,7 +4389,11 @@ function initGroupPage() {
         const tempMsgIndex = messages.findIndex(m => m.id === tempId);
         if (tempMsgIndex !== -1) {
             messages.splice(tempMsgIndex, 1);
-            queueRender();
+            // Remove the temp message from DOM
+            const tempMessageElement = document.getElementById(`message-${tempId}`);
+            if (tempMessageElement) {
+                tempMessageElement.remove();
+            }
         }
     });
     
@@ -4318,13 +4438,8 @@ function initGroupPage() {
                 messages = await groupChat.getMessages(groupId);
                 await loadInitialReactions();
                 // Clear rendered message IDs for this specific group when first loading
-                // Keep the window.renderedMessageIds but filter out only messages for this group
-                for (const msgId of renderedMessageIds) {
-                    if (msgId.includes(groupId)) {
-                        renderedMessageIds.delete(msgId);
-                    }
-                }
-                queueRender();
+                renderedMessageIds.clear();
+                displayAllMessages();
                 isInitialLoad = false;
             }
             
@@ -4341,21 +4456,328 @@ function initGroupPage() {
         }
     }
     
-    function queueRender() {
-        if (!isRendering) {
-            isRendering = true;
-            requestAnimationFrame(() => {
-                displayMessages();
-                isRendering = false;
-                
-                if (renderQueue.length > 0) {
-                    renderQueue = [];
-                    queueRender();
+    function renderNewMessages(newMessages) {
+        if (!messagesContainer || newMessages.length === 0) return;
+        
+        // Filter out messages that have already been rendered
+        const messagesToRender = newMessages.filter(msg => !renderedMessageIds.has(msg.id));
+        
+        if (messagesToRender.length === 0) return;
+        
+        // Track which messages we've rendered
+        messagesToRender.forEach(msg => renderedMessageIds.add(msg.id));
+        
+        // Use DocumentFragment for efficient DOM updates
+        const fragment = document.createDocumentFragment();
+        
+        // Group new messages by sender and time
+        const groupedMessages = [];
+        let currentGroup = null;
+        
+        messagesToRender.forEach((message, index) => {
+            const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
+            const prevMessage = index > 0 ? messagesToRender[index - 1] : null;
+            const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
+            
+            const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
+            
+            if (!prevMessage || 
+                prevMessage.senderId !== message.senderId || 
+                timeDiff > 5) {
+                currentGroup = {
+                    senderId: message.senderId,
+                    senderName: message.senderName,
+                    senderAvatar: message.senderAvatar,
+                    messages: [message]
+                };
+                groupedMessages.push(currentGroup);
+            } else {
+                currentGroup.messages.push(message);
+            }
+        });
+        
+        groupedMessages.forEach(group => {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'message-group';
+            groupDiv.dataset.senderId = group.senderId;
+            
+            const firstMessage = group.messages[0];
+            const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
+            
+            // Get user profile for reward tag
+            const userProfile = groupChat.cache.userProfiles ? 
+                groupChat.cache.userProfiles.get(`user_${group.senderId}`)?.data : null;
+            
+            const rewardTag = userProfile?.rewardTag || '';
+            const hasFireRing = userProfile?.fireRing || false;
+            
+            groupDiv.innerHTML = `
+                <div class="message-header">
+                    <div class="message-avatar-container" style="position: relative; display: inline-block;">
+                        ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
+                        <img src="${group.senderAvatar}" 
+                             alt="${group.senderName}" 
+                             class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
+                             data-user-id="${group.senderId}">
+                    </div>
+                    <div class="message-sender-info">
+                        <span class="message-sender">${group.senderName}</span>
+                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
+                    </div>
+                    <span class="message-time">${formatTime(firstMessageTime)}</span>
+                </div>
+                <div class="message-content">
+                    ${group.messages.map(msg => {
+                        const messageTime = msg.timestamp ? new Date(msg.timestamp) : new Date();
+                        
+                        let replyHtml = '';
+                        if (msg.replyTo) {
+                            const repliedMessage = messages.find(m => m.id === msg.replyTo);
+                            if (repliedMessage) {
+                                const truncatedName = groupChat.truncateName(repliedMessage.senderName);
+                                const truncatedMessage = repliedMessage.text ? 
+                                    groupChat.truncateMessage(repliedMessage.text) : 
+                                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : '');
+                                
+                                replyHtml = `
+                                    <div class="replying-to">
+                                        <span class="reply-label">Replying to</span> 
+                                        <span class="reply-sender">${truncatedName}</span>
+                                        <span class="reply-separator">:</span> 
+                                        <span class="reply-message">${truncatedMessage}</span>
+                                    </div>
+                                `;
+                            }
+                        }
+                        
+                        const isTemp = tempMessages.has(msg.id);
+                        const isUploading = msg.status === 'uploading';
+                        
+                        const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
+                        
+                        // UPDATED: Add soft glowing effect class if message has glowEffect
+                        const hasGlowEffect = msg.glowEffect || false;
+                        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
+                        
+                        // Check if this is a reward upgrade message
+                        const isRewardUpgrade = msg.rewardUpgrade || false;
+                        const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
+                        
+                        let messageContent = '';
+                        
+                        if (msg.imageUrl) {
+                            messageContent = `
+                                <div class="message-image-container" style="position: relative;">
+                                    <img src="${msg.imageUrl}" 
+                                         alt="Shared image" 
+                                         class="message-image"
+                                         style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
+                                         onload="this.style.opacity='1';"
+                                         onerror="this.style.display='none';"
+                                         onclick="openImageModal('${msg.imageUrl}')">
+                                    ${isUploading ? `
+                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                                <circle cx="12" cy="12" r="10" />
+                                            </svg>
+                                            Uploading...
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        } else if (msg.videoUrl) {
+                            messageContent = `
+                                <div class="message-video-container" style="position: relative;">
+                                    <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
+                                           onload="this.style.opacity='1';"
+                                           onerror="this.style.display='none';">
+                                        <source src="${msg.videoUrl}" type="video/mp4">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                    ${isUploading ? `
+                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
+                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
+                                                <circle cx="12" cy="12" r="10" />
+                                            </svg>
+                                            Uploading...
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        } else if (msg.type === 'system') {
+                            messageContent = `
+                                <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
+                                    ${msg.text}
+                                </div>
+                            `;
+                        } else {
+                            messageContent = msg.text || '';
+                        }
+                        
+                        const messageDivId = `message-${msg.id}`;
+                        
+                        const cachedReactions = reactionsCache.get(msg.id) || [];
+                        
+                        // UPDATED: Add sending indicator on message (not on button)
+                        const sendingIndicator = isTemp ? 
+                            `<div class="sending-indicator" id="sending-${msg.id}">
+                                <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
+                                    <circle cx="12" cy="12" r="10" />
+                                </svg>
+                                <span>Sending...</span>
+                            </div>` : 
+                            '';
+                        
+                        return `
+                            <div class="${messageDivClass}${extraClasses}${rewardUpgradeClass}" data-message-id="${msg.id}" id="${messageDivId}">
+                                ${replyHtml}
+                                ${messageContent}
+                                <div class="message-reactions" id="reactions-${msg.id}">
+                                    ${cachedReactions.map(reaction => {
+                                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+                                        return `
+                                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
+                                                <span class="reaction-emoji">${reaction.emoji}</span>
+                                                <span class="reaction-count">${reaction.count}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
+                                        +
+                                    </div>
+                                </div>
+                                ${sendingIndicator}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            
+            fragment.appendChild(groupDiv);
+        });
+        
+        // Append new messages to the container
+        messagesContainer.appendChild(fragment);
+        
+        // Remove sending indicators for messages that are no longer temp
+        document.querySelectorAll('.sending-indicator').forEach(indicator => {
+            const messageId = indicator.id.replace('sending-', '');
+            if (!tempMessages.has(messageId)) {
+                indicator.remove();
+            }
+        });
+        
+        attachMessageEventListeners();
+        
+        setupReactionListenersForNewMessages(messagesToRender);
+        
+        // Scroll to bottom after rendering
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 50);
+    }
+    
+    function displayAllMessages() {
+        if (!messagesContainer) return;
+        
+        if (messages.length === 0) {
+            if (noMessages) noMessages.style.display = 'block';
+            messagesContainer.innerHTML = '';
+            return;
+        }
+        
+        if (noMessages) noMessages.style.display = 'none';
+        
+        window.currentMessages = messages;
+        
+        // Clear container first
+        messagesContainer.innerHTML = '';
+        
+        // Render all messages
+        renderNewMessages(messages);
+        
+        // After initial render, mark all messages as rendered
+        messages.forEach(msg => renderedMessageIds.add(msg.id));
+    }
+    
+    function attachMessageEventListeners() {
+        document.querySelectorAll('.message-avatar').forEach(avatar => {
+            avatar.addEventListener('click', (e) => {
+                const userId = e.target.dataset.userId;
+                if (userId && userId !== groupChat.firebaseUser?.uid) {
+                    window.open(`user.html?id=${userId}`, '_blank');
                 }
             });
-        } else {
-            renderQueue.push(true);
-        }
+        });
+        
+        document.querySelectorAll('.reaction-bubble').forEach(bubble => {
+            bubble.addEventListener('click', (e) => {
+                if (e.currentTarget.classList.contains('add-reaction')) {
+                    return;
+                }
+                const messageElement = e.target.closest('.message-text, .system-message');
+                if (messageElement) {
+                    const messageId = messageElement.dataset.messageId;
+                    const message = messages.find(m => m.id === messageId);
+                    if (message) {
+                        const emoji = e.currentTarget.dataset.emoji;
+                        groupChat.currentMessageForReaction = message;
+                        groupChat.addReactionToMessage(emoji);
+                    }
+                }
+            });
+        });
+        
+        document.querySelectorAll('.message-text, .system-message').forEach(messageElement => {
+            let longPressTimer;
+            const messageId = messageElement.dataset.messageId;
+            const message = messages.find(m => m.id === messageId);
+            
+            if (message) {
+                messageElement.addEventListener('touchstart', (e) => {
+                    longPressTimer = setTimeout(() => {
+                        groupChat.showReactionModal(message);
+                    }, 500);
+                });
+                
+                messageElement.addEventListener('touchend', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                messageElement.addEventListener('touchmove', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                messageElement.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    groupChat.showReactionModal(message);
+                });
+            }
+        });
+        
+        groupChat.setupSwipeToReply(messagesContainer);
+    }
+    
+    function setupReactionListenersForNewMessages(newMessages) {
+        newMessages.forEach(message => {
+            if (reactionUnsubscribers.has(message.id)) {
+                return;
+            }
+            
+            const unsubscribe = groupChat.listenToMessageReactions(groupId, message.id, (reactions) => {
+                reactionsCache.set(message.id, reactions);
+                const reactionsContainer = document.getElementById(`reactions-${message.id}`);
+                if (reactionsContainer) {
+                    updateReactionsDisplay(reactionsContainer, reactions, message.id);
+                }
+            });
+            
+            reactionUnsubscribers.set(message.id, unsubscribe);
+        });
     }
     
     function addInviteLinkButton() {
@@ -4573,17 +4995,29 @@ function initGroupPage() {
         // Clear any existing listeners first
         if (groupChat.areListenersSetup) {
             groupChat.cleanup();
-            reactionUnsubscribers.forEach(unsub => unsub());
+            reactionUnsubscribers.forEach(unsub => {
+                if (unsub && typeof unsub === 'function') {
+                    try {
+                        unsub();
+                    } catch (err) {
+                        console.log('Error unsubscribing from reaction:', err);
+                    }
+                }
+            });
             reactionUnsubscribers.clear();
         }
         
         // UPDATED: Clear typing listener
-        if (typingUnsubscribe) {
-            typingUnsubscribe();
+        if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
+            try {
+                typingUnsubscribe();
+            } catch (err) {
+                console.log('Error unsubscribing from typing:', err);
+            }
         }
         
         // Set up new listeners
-        groupChat.listenToMessages(groupId, (newMessages) => {
+        const messagesUnsub = groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Received messages:', newMessages.length);
             
             const uniqueMessages = [];
@@ -4604,12 +5038,16 @@ function initGroupPage() {
             
             messages = uniqueMessages;
             
-            setupReactionListeners();
+            // Only render new messages
+            const newMessagesToRender = uniqueMessages.filter(msg => !renderedMessageIds.has(msg.id));
+            if (newMessagesToRender.length > 0) {
+                renderNewMessages(newMessagesToRender);
+            }
             
-            queueRender();
+            setupReactionListenersForNewMessages(newMessagesToRender);
         });
         
-        groupChat.listenToMembers(groupId, (newMembers) => {
+        const membersUnsub = groupChat.listenToMembers(groupId, (newMembers) => {
             members = newMembers;
             updateMembersList();
             
@@ -4636,12 +5074,24 @@ function initGroupPage() {
         
         window.addEventListener('beforeunload', () => {
             clearInterval(activeInterval);
-            reactionUnsubscribers.forEach(unsub => unsub());
+            reactionUnsubscribers.forEach(unsub => {
+                if (unsub && typeof unsub === 'function') {
+                    try {
+                        unsub();
+                    } catch (err) {
+                        console.log('Error unsubscribing from reaction:', err);
+                    }
+                }
+            });
             reactionUnsubscribers.clear();
             
             // UPDATED: Clean up typing
-            if (typingUnsubscribe) {
-                typingUnsubscribe();
+            if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
+                try {
+                    typingUnsubscribe();
+                } catch (err) {
+                    console.log('Error unsubscribing from typing:', err);
+                }
             }
             if (typingTimeout) {
                 clearTimeout(typingTimeout);
@@ -4706,315 +5156,6 @@ function initGroupPage() {
                     window.open(`user.html?id=${userId}`, '_blank');
                 }
             });
-        });
-    }
-    
-    function displayMessages() {
-        if (!messagesContainer) return;
-        
-        if (messages.length === 0) {
-            if (noMessages) noMessages.style.display = 'block';
-            messagesContainer.innerHTML = '';
-            return;
-        }
-        
-        if (noMessages) noMessages.style.display = 'none';
-        
-        window.currentMessages = messages;
-        
-        // Only update if there are new messages that haven't been rendered
-        const newMessages = messages.filter(msg => !renderedMessageIds.has(msg.id));
-        
-        if (newMessages.length === 0) {
-            return; // No new messages to render
-        }
-        
-        // Track which messages we've rendered
-        newMessages.forEach(msg => renderedMessageIds.add(msg.id));
-        
-        // Use DocumentFragment for efficient DOM updates
-        const fragment = document.createDocumentFragment();
-        
-        // Group new messages by sender and time
-        const groupedMessages = [];
-        let currentGroup = null;
-        
-        newMessages.forEach((message, index) => {
-            const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-            const prevMessage = index > 0 ? newMessages[index - 1] : null;
-            const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
-            
-            const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
-            
-            if (!prevMessage || 
-                prevMessage.senderId !== message.senderId || 
-                timeDiff > 5) {
-                currentGroup = {
-                    senderId: message.senderId,
-                    senderName: message.senderName,
-                    senderAvatar: message.senderAvatar,
-                    messages: [message]
-                };
-                groupedMessages.push(currentGroup);
-            } else {
-                currentGroup.messages.push(message);
-            }
-        });
-        
-        groupedMessages.forEach(group => {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'message-group';
-            groupDiv.dataset.senderId = group.senderId;
-            
-            const firstMessage = group.messages[0];
-            const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
-            
-            // Get user profile for reward tag
-            const userProfile = groupChat.cache.userProfiles ? 
-                groupChat.cache.userProfiles.get(`user_${group.senderId}`)?.data : null;
-            
-            const rewardTag = userProfile?.rewardTag || '';
-            const hasFireRing = userProfile?.fireRing || false;
-            
-            groupDiv.innerHTML = `
-                <div class="message-header">
-                    <div class="message-avatar-container" style="position: relative; display: inline-block;">
-                        ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
-                        <img src="${group.senderAvatar}" 
-                             alt="${group.senderName}" 
-                             class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
-                             data-user-id="${group.senderId}">
-                    </div>
-                    <div class="message-sender-info">
-                        <span class="message-sender">${group.senderName}</span>
-                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
-                    </div>
-                    <span class="message-time">${formatTime(firstMessageTime)}</span>
-                </div>
-                <div class="message-content">
-                    ${group.messages.map(msg => {
-                        const messageTime = msg.timestamp ? new Date(msg.timestamp) : new Date();
-                        
-                        let replyHtml = '';
-                        if (msg.replyTo) {
-                            const repliedMessage = messages.find(m => m.id === msg.replyTo);
-                            if (repliedMessage) {
-                                const truncatedName = groupChat.truncateName(repliedMessage.senderName);
-                                const truncatedMessage = repliedMessage.text ? 
-                                    groupChat.truncateMessage(repliedMessage.text) : 
-                                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : '');
-                                
-                                replyHtml = `
-                                    <div class="replying-to">
-                                        <span class="reply-label">Replying to</span> 
-                                        <span class="reply-sender">${truncatedName}</span>
-                                        <span class="reply-separator">:</span> 
-                                        <span class="reply-message">${truncatedMessage}</span>
-                                    </div>
-                                `;
-                            }
-                        }
-                        
-                        const isTemp = tempMessages.has(msg.id);
-                        const isUploading = msg.status === 'uploading';
-                        
-                        const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
-                        
-                        // UPDATED: Add soft glowing effect class if message has glowEffect
-                        const hasGlowEffect = msg.glowEffect || false;
-                        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
-                        
-                        // Check if this is a reward upgrade message
-                        const isRewardUpgrade = msg.rewardUpgrade || false;
-                        const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
-                        
-                        let messageContent = '';
-                        
-                        if (msg.imageUrl) {
-                            messageContent = `
-                                <div class="message-image-container" style="position: relative;">
-                                    <img src="${msg.imageUrl}" 
-                                         alt="Shared image" 
-                                         class="message-image"
-                                         style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
-                                         onload="this.style.opacity='1';"
-                                         onerror="this.style.display='none';"
-                                         onclick="openImageModal('${msg.imageUrl}')">
-                                    ${isUploading ? `
-                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
-                                                <circle cx="12" cy="12" r="10" />
-                                            </svg>
-                                            Uploading...
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        } else if (msg.videoUrl) {
-                            messageContent = `
-                                <div class="message-video-container" style="position: relative;">
-                                    <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
-                                           onload="this.style.opacity='1';"
-                                           onerror="this.style.display='none';">
-                                        <source src="${msg.videoUrl}" type="video/mp4">
-                                        Your browser does not support the video tag.
-                                    </video>
-                                    ${isUploading ? `
-                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                               background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 20px;
-                                               font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                            <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 14px; height: 14px;">
-                                                <circle cx="12" cy="12" r="10" />
-                                            </svg>
-                                            Uploading...
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        } else if (msg.type === 'system') {
-                            messageContent = `
-                                <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
-                                    ${msg.text}
-                                </div>
-                            `;
-                        } else {
-                            messageContent = msg.text || '';
-                        }
-                        
-                        const messageDivId = `message-${msg.id}`;
-                        
-                        const cachedReactions = reactionsCache.get(msg.id) || [];
-                        
-                        // UPDATED: Add sending indicator on message (not on button)
-                        const sendingIndicator = isTemp ? 
-                            `<div class="sending-indicator" id="sending-${msg.id}">
-                                <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
-                                    <circle cx="12" cy="12" r="10" />
-                                </svg>
-                                <span>Sending...</span>
-                            </div>` : 
-                            '';
-                        
-                        return `
-                            <div class="${messageDivClass}${extraClasses}${rewardUpgradeClass}" data-message-id="${msg.id}" id="${messageDivId}">
-                                ${replyHtml}
-                                ${messageContent}
-                                <div class="message-reactions" id="reactions-${msg.id}">
-                                    ${cachedReactions.map(reaction => {
-                                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
-                                        return `
-                                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
-                                                <span class="reaction-emoji">${reaction.emoji}</span>
-                                                <span class="reaction-count">${reaction.count}</span>
-                                            </div>
-                                        `;
-                                    }).join('')}
-                                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
-                                        +
-                                    </div>
-                                </div>
-                                ${sendingIndicator}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-            
-            fragment.appendChild(groupDiv);
-        });
-        
-        // Append new messages to the container (don't clear existing ones)
-        messagesContainer.appendChild(fragment);
-        
-        // Remove sending indicators for messages that are no longer temp
-        document.querySelectorAll('.sending-indicator').forEach(indicator => {
-            const messageId = indicator.id.replace('sending-', '');
-            if (!tempMessages.has(messageId)) {
-                indicator.remove();
-            }
-        });
-        
-        document.querySelectorAll('.message-avatar').forEach(avatar => {
-            avatar.addEventListener('click', (e) => {
-                const userId = e.target.dataset.userId;
-                if (userId && userId !== groupChat.firebaseUser?.uid) {
-                    window.open(`user.html?id=${userId}`, '_blank');
-                }
-            });
-        });
-        
-        document.querySelectorAll('.reaction-bubble').forEach(bubble => {
-            bubble.addEventListener('click', (e) => {
-                if (e.currentTarget.classList.contains('add-reaction')) {
-                    return;
-                }
-                const messageElement = e.target.closest('.message-text, .system-message');
-                if (messageElement) {
-                    const messageId = messageElement.dataset.messageId;
-                    const message = messages.find(m => m.id === messageId);
-                    if (message) {
-                        const emoji = e.currentTarget.dataset.emoji;
-                        groupChat.currentMessageForReaction = message;
-                        groupChat.addReactionToMessage(emoji);
-                    }
-                }
-            });
-        });
-        
-        document.querySelectorAll('.message-text, .system-message').forEach(messageElement => {
-            let longPressTimer;
-            const messageId = messageElement.dataset.messageId;
-            const message = messages.find(m => m.id === messageId);
-            
-            if (message) {
-                messageElement.addEventListener('touchstart', (e) => {
-                    longPressTimer = setTimeout(() => {
-                        groupChat.showReactionModal(message);
-                    }, 500);
-                });
-                
-                messageElement.addEventListener('touchend', () => {
-                    clearTimeout(longPressTimer);
-                });
-                
-                messageElement.addEventListener('touchmove', () => {
-                    clearTimeout(longPressTimer);
-                });
-                
-                messageElement.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    groupChat.showReactionModal(message);
-                });
-            }
-        });
-        
-        groupChat.setupSwipeToReply(messagesContainer);
-        
-        setupReactionListeners();
-        
-        // Scroll to bottom after rendering
-        setTimeout(() => {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 50);
-    }
-    
-    function setupReactionListeners() {
-        messages.forEach(message => {
-            if (reactionUnsubscribers.has(message.id)) {
-                return;
-            }
-            
-            const unsubscribe = groupChat.listenToMessageReactions(groupId, message.id, (reactions) => {
-                reactionsCache.set(message.id, reactions);
-                const reactionsContainer = document.getElementById(`reactions-${message.id}`);
-                if (reactionsContainer) {
-                    updateReactionsDisplay(reactionsContainer, reactions, message.id);
-                }
-            });
-            
-            reactionUnsubscribers.set(message.id, unsubscribe);
         });
     }
     
@@ -5112,12 +5253,24 @@ function initGroupPage() {
     
     window.addEventListener('beforeunload', () => {
         groupChat.cleanup();
-        reactionUnsubscribers.forEach(unsub => unsub());
+        reactionUnsubscribers.forEach(unsub => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from reaction:', err);
+                }
+            }
+        });
         reactionUnsubscribers.clear();
         
         // UPDATED: Clean up typing
-        if (typingUnsubscribe) {
-            typingUnsubscribe();
+        if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
+            try {
+                typingUnsubscribe();
+            } catch (err) {
+                console.log('Error unsubscribing from typing:', err);
+            }
         }
         if (typingTimeout) {
             clearTimeout(typingTimeout);
@@ -5321,7 +5474,7 @@ function initAdminGroupsPage() {
                                     <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
                                         ${group.privacy === 'private' ? 
                                             '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
-                                            '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>'
+                                            '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1 4-10z"></path>'
                                         }
                                     </svg>
                                     ${group.privacy === 'private' ? 'Private' : 'Public'}
@@ -5669,7 +5822,7 @@ function initJoinPage() {
                                             <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
                                                 ${group.privacy === 'private' ? 
                                                     '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
-                                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>'
+                                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1 4-10z"></path>'
                                                 }
                                             </svg>
                                             ${group.privacy === 'private' ? 'Private Group' : 'Public Group'}
@@ -6132,13 +6285,14 @@ function initChatPage() {
     let reactionUnsubscribers = new Map();
     let reactionsCache = new Map();
     let isRendering = false;
-    let renderQueue = [];
-    let lastMessageIds = '';
-    // FIXED: Moved renderedMessageIds to window object to persist across page navigation
-    if (!window.renderedMessageIds) {
-        window.renderedMessageIds = new Set();
+    
+    // FIXED: Use per-chat message tracking for private chats
+    const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
+    const chatKey = `private_${chatId}`;
+    if (!groupChat.renderedMessagesPerChat.has(chatKey)) {
+        groupChat.renderedMessagesPerChat.set(chatKey, new Set());
     }
-    let renderedMessageIds = window.renderedMessageIds;
+    const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
     
     if (!partnerId) {
         alert('No chat partner specified');
@@ -6161,7 +6315,15 @@ function initChatPage() {
     
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
-        reactionUnsubscribers.forEach(unsub => unsub());
+        reactionUnsubscribers.forEach(unsub => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from reaction:', err);
+                }
+            }
+        });
         reactionUnsubscribers.clear();
         window.location.href = 'message.html';
     });
@@ -6264,7 +6426,7 @@ function initChatPage() {
             const tempMsgIndex = messages.findIndex(m => m.id === tempId);
             if (tempMsgIndex === -1) {
                 messages.push(message);
-                queueRender();
+                renderNewPrivateMessages([message]);
             }
         }
     });
@@ -6275,28 +6437,15 @@ function initChatPage() {
         const tempMsgIndex = messages.findIndex(m => m.id === tempId);
         if (tempMsgIndex !== -1) {
             messages.splice(tempMsgIndex, 1);
-            queueRender();
+            // Remove the temp message from DOM
+            const tempMessageElement = document.getElementById(`message-${tempId}`);
+            if (tempMessageElement) {
+                tempMessageElement.remove();
+            }
         }
     });
     
     loadChatData();
-    
-    function queueRender() {
-        if (!isRendering) {
-            isRendering = true;
-            requestAnimationFrame(() => {
-                displayMessages();
-                isRendering = false;
-                
-                if (renderQueue.length > 0) {
-                    renderQueue = [];
-                    queueRender();
-                }
-            });
-        } else {
-            renderQueue.push(true);
-        }
-    }
     
     async function loadChatData() {
         try {
@@ -6338,14 +6487,8 @@ function initChatPage() {
             messages = await groupChat.getPrivateMessages(partnerId);
             await loadInitialPrivateReactions();
             // Clear rendered message IDs for this specific chat when first loading
-            // Keep the window.renderedMessageIds but filter out only messages for this chat
-            const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
-            for (const msgId of renderedMessageIds) {
-                if (msgId.includes(chatId)) {
-                    renderedMessageIds.delete(msgId);
-                }
-            }
-            queueRender();
+            renderedMessageIds.clear();
+            displayAllPrivateMessages();
             
             if (messagesContainer) {
                 groupChat.setupSwipeToReply(messagesContainer);
@@ -6356,7 +6499,12 @@ function initChatPage() {
             if (!isListening) {
                 groupChat.listenToPrivateMessages(partnerId, (newMessages) => {
                     messages = newMessages;
-                    queueRender();
+                    
+                    // Only render new messages
+                    const newMessagesToRender = newMessages.filter(msg => !renderedMessageIds.has(msg.id));
+                    if (newMessagesToRender.length > 0) {
+                        renderNewPrivateMessages(newMessagesToRender);
+                    }
                     
                     if (newMessages.length > 0) {
                         groupChat.markMessagesAsRead(chatId, partnerId);
@@ -6372,35 +6520,22 @@ function initChatPage() {
     }
     
     async function loadInitialPrivateReactions() {
-        const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
         for (const message of messages) {
             const reactions = await groupChat.getPrivateMessageReactions(chatId, message.id);
             reactionsCache.set(message.id, reactions);
         }
     }
     
-    function displayMessages() {
-        if (!messagesContainer) return;
+    function renderNewPrivateMessages(newMessages) {
+        if (!messagesContainer || newMessages.length === 0) return;
         
-        if (messages.length === 0) {
-            if (noMessages) noMessages.style.display = 'block';
-            messagesContainer.innerHTML = '';
-            return;
-        }
+        // Filter out messages that have already been rendered
+        const messagesToRender = newMessages.filter(msg => !renderedMessageIds.has(msg.id));
         
-        if (noMessages) noMessages.style.display = 'none';
-        
-        window.currentMessages = messages;
-        
-        // Only update if there are new messages that haven't been rendered
-        const newMessages = messages.filter(msg => !renderedMessageIds.has(msg.id));
-        
-        if (newMessages.length === 0) {
-            return; // No new messages to render
-        }
+        if (messagesToRender.length === 0) return;
         
         // Track which messages we've rendered
-        newMessages.forEach(msg => renderedMessageIds.add(msg.id));
+        messagesToRender.forEach(msg => renderedMessageIds.add(msg.id));
         
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
@@ -6409,9 +6544,9 @@ function initChatPage() {
         const groupedMessages = [];
         let currentGroup = null;
         
-        newMessages.forEach((message, index) => {
+        messagesToRender.forEach((message, index) => {
             const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-            const prevMessage = index > 0 ? newMessages[index - 1] : null;
+            const prevMessage = index > 0 ? messagesToRender[index - 1] : null;
             const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
             
             const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
@@ -6591,7 +6726,7 @@ function initChatPage() {
             fragment.appendChild(groupDiv);
         });
         
-        // Append new messages to the container (don't clear existing ones)
+        // Append new messages to the container
         messagesContainer.appendChild(fragment);
         
         // Remove sending indicators for messages that are no longer temp
@@ -6602,6 +6737,40 @@ function initChatPage() {
             }
         });
         
+        attachPrivateMessageEventListeners();
+        
+        setupPrivateReactionListenersForNewMessages(messagesToRender);
+        
+        // Scroll to bottom after rendering
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 50);
+    }
+    
+    function displayAllPrivateMessages() {
+        if (!messagesContainer) return;
+        
+        if (messages.length === 0) {
+            if (noMessages) noMessages.style.display = 'block';
+            messagesContainer.innerHTML = '';
+            return;
+        }
+        
+        if (noMessages) noMessages.style.display = 'none';
+        
+        window.currentMessages = messages;
+        
+        // Clear container first
+        messagesContainer.innerHTML = '';
+        
+        // Render all messages
+        renderNewPrivateMessages(messages);
+        
+        // After initial render, mark all messages as rendered
+        messages.forEach(msg => renderedMessageIds.add(msg.id));
+    }
+    
+    function attachPrivateMessageEventListeners() {
         document.querySelectorAll('.message-avatar').forEach(avatar => {
             avatar.addEventListener('click', (e) => {
                 const userId = e.target.dataset.userId;
@@ -6657,19 +6826,10 @@ function initChatPage() {
         });
         
         groupChat.setupSwipeToReply(messagesContainer);
-        
-        setupPrivateReactionListeners();
-        
-        // Scroll to bottom after rendering
-        setTimeout(() => {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 50);
     }
     
-    function setupPrivateReactionListeners() {
-        const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
-        
-        messages.forEach(message => {
+    function setupPrivateReactionListenersForNewMessages(newMessages) {
+        newMessages.forEach(message => {
             if (reactionUnsubscribers.has(message.id)) {
                 return;
             }
@@ -6678,7 +6838,7 @@ function initChatPage() {
                 reactionsCache.set(message.id, reactions);
                 const reactionsContainer = document.getElementById(`reactions-${message.id}`);
                 if (reactionsContainer) {
-                    updateReactionsDisplay(reactionsContainer, reactions, message.id);
+                    updatePrivateReactionsDisplay(reactionsContainer, reactions, message.id);
                 }
             });
             
@@ -6686,7 +6846,7 @@ function initChatPage() {
         });
     }
     
-    function updateReactionsDisplay(container, reactions, messageId) {
+    function updatePrivateReactionsDisplay(container, reactions, messageId) {
         container.innerHTML = '';
         
         reactions.forEach(reaction => {
@@ -6811,7 +6971,15 @@ function initChatPage() {
     
     window.addEventListener('beforeunload', () => {
         groupChat.cleanup();
-        reactionUnsubscribers.forEach(unsub => unsub());
+        reactionUnsubscribers.forEach(unsub => {
+            if (unsub && typeof unsub === 'function') {
+                try {
+                    unsub();
+                } catch (err) {
+                    console.log('Error unsubscribing from reaction:', err);
+                }
+            }
+        });
         reactionUnsubscribers.clear();
         removeSidebarOverlay();
     });
