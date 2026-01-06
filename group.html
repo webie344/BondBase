@@ -61,7 +61,31 @@
             gap: 12px;
             letter-spacing: 0.5px;
         }
+         .message-group {
+    animation: fadeIn 0.3s ease-in-out;
+}
 
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Prevent flash of unstyled content */
+.messages-container {
+    will-change: transform;
+    contain: content;
+}
+
+/* Smooth scrolling */
+.messages-container {
+    scroll-behavior: smooth;
+}
         .voice-channels-header h3 .feather {
             width: 22px;
             height: 22px;
@@ -2106,10 +2130,14 @@
         </div>
     </div>
 <!-- Import the calls module for voice calls -->
+    
+    <script  src="clean.js"></script>
+    <script type="module" src="edi.js"></script>
     <script type="module" src="calls.js"></script>
     <script type="module" src="group.js"></script>
+    
     <script type="module" src="ap.js"></script>
-    <script type="module" src="additional-group.js"></script>
+    <script type="module" src="additiona-group.js"></script>
     
     
 </body>
