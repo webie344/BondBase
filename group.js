@@ -7,6 +7,7 @@
 // FIXED: Messages displaying twice when returning to page - COMPLETELY FIXED
 // FIXED: Old messages not loading - messages flash then disappear issue
 // FIXED: Sidebar/info button stops working when duplication starts
+// UPDATED: Added prepare.html integration for stable group entry
 
 import { 
     getFirestore, 
@@ -75,7 +76,6 @@ const CACHE_DURATION = {
     BLOCKED_USERS: 10 * 60 * 1000
 };
 
-// Emojis for reactions (100 emojis like Discord)
 const REACTION_EMOJIS = [
     '😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '❤️', '🔥', '✨',
     '😊', '😍', '🤩', '😜', '😋', '😇', '🥳', '😏', '😒', '🥺',
@@ -89,13 +89,12 @@ const REACTION_EMOJIS = [
     '🎇', '🧨', '✨', '🎈', '🎉', '🎊', '🎋', '🎍', '🎎', '🎏'
 ];
 
-// New constants for typing indicators and reward system
-const TYPING_TIMEOUT = 5000; // 5 seconds
-const CONSECUTIVE_MESSAGES_THRESHOLD = 5; // Messages needed for glowing effect
+const TYPING_TIMEOUT = 5000;
+const CONSECUTIVE_MESSAGES_THRESHOLD = 5;
 const REWARD_TIME_THRESHOLDS = {
-    THREE_MINUTES: 3 * 60 * 1000, // 3 minutes in milliseconds
-    TEN_MINUTES: 10 * 60 * 1000, // 10 minutes
-    TWENTY_MINUTES: 20 * 60 * 1000 // 20 minutes
+    THREE_MINUTES: 3 * 60 * 1000,
+    TEN_MINUTES: 10 * 60 * 1000,
+    TWENTY_MINUTES: 20 * 60 * 1000
 };
 const REWARD_TAGS = {
     THREE_MINUTES: '🏆 Active Chatter',
@@ -110,14 +109,13 @@ class GroupChat {
         this.currentGroupId = null;
         this.currentChatPartnerId = null;
         
-        // Store unsubscribe functions per chat instead of globally
         this.unsubscribeFunctions = {
-            groupMessages: new Map(),      // groupId -> unsubscribe function
-            groupMembers: new Map(),       // groupId -> unsubscribe function
-            privateMessages: new Map(),    // chatId -> unsubscribe function
-            typing: new Map(),             // groupId -> unsubscribe function
-            reactions: new Map(),          // messageId -> unsubscribe function
-            privateReactions: new Map()    // messageId -> unsubscribe function
+            groupMessages: new Map(),
+            groupMembers: new Map(),
+            privateMessages: new Map(),
+            typing: new Map(),
+            reactions: new Map(),
+            privateReactions: new Map()
         };
         
         this.cache = {
@@ -174,59 +172,49 @@ class GroupChat {
         
         this.blockedUsers = new Map();
         
-        // Typing indicators and reward tracking
-        this.typingUsers = new Map(); // groupId -> Map(userId -> typingTimeout)
-        this.lastMessageTimes = new Map(); // userId -> last message timestamp
-        this.userMessageStreaks = new Map(); // userId -> consecutive message count
-        this.userStreakTimers = new Map(); // userId -> streak timer
-        this.userRewards = new Map(); // userId -> current reward tag
-        this.userActiveDurations = new Map(); // userId -> active duration in ms
+        this.typingUsers = new Map();
+        this.lastMessageTimes = new Map();
+        this.userMessageStreaks = new Map();
+        this.userStreakTimers = new Map();
+        this.userRewards = new Map();
+        this.userActiveDurations = new Map();
         
-        // FIXED: Single source of truth for rendered messages
-        this.renderedMessagesPerChat = new Map(); // chatId -> Set(messageIds)
-        this.lastActiveChatKey = null; // Track which chat was last active
+        this.renderedMessagesPerChat = new Map();
+        this.lastActiveChatKey = null;
         
-        // NEW: Track page navigation to prevent listener duplication
         this.currentPage = null;
-        this.pageListeners = new Map(); // page -> { groupId/chatId -> unsubscribe }
+        this.pageListeners = new Map();
         
         this.setupAuthListener();
         this.createReactionModal();
         this.checkRestrictedUsers();
         this.loadBlockedUsers();
         
-        // Set up global page tracking
         this.setupGlobalPageTracking();
     }
 
-    // Set up global page tracking
     setupGlobalPageTracking() {
-        // Store the original pushState and replaceState
         const originalPushState = history.pushState;
         const originalReplaceState = history.replaceState;
         
-        // Override pushState to detect page changes
         history.pushState = function(...args) {
             const result = originalPushState.apply(this, args);
             window.dispatchEvent(new CustomEvent('pagechange', { detail: { type: 'pushstate' } }));
             return result;
         };
         
-        // Override replaceState to detect page changes
         history.replaceState = function(...args) {
             const result = originalReplaceState.apply(this, args);
             window.dispatchEvent(new CustomEvent('pagechange', { detail: { type: 'replacestate' } }));
             return result;
         };
         
-        // Listen to popstate (back/forward navigation)
         window.addEventListener('popstate', () => {
             setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('pagechange', { detail: { type: 'popstate' } }));
             }, 100);
         });
         
-        // Listen for page changes and clean up old page's listeners
         window.addEventListener('pagechange', () => {
             setTimeout(() => {
                 this.cleanupPreviousPageListeners();
@@ -234,19 +222,15 @@ class GroupChat {
         });
     }
     
-    // Clean up previous page's listeners
     cleanupPreviousPageListeners() {
         const currentPath = window.location.pathname.split('/').pop().split('.')[0];
         
-        // If we're navigating away from a group/chat page, clean up
         if (this.currentPage && this.currentPage !== currentPath) {
             console.log(`Cleaning up listeners for previous page: ${this.currentPage} -> ${currentPath}`);
             
-            // Clean up all listeners for the previous page
             if (this.pageListeners.has(this.currentPage)) {
                 const pageData = this.pageListeners.get(this.currentPage);
                 
-                // Clean up group messages listeners
                 if (pageData.groupMessages) {
                     pageData.groupMessages.forEach((unsub, groupId) => {
                         if (unsub && typeof unsub === 'function') {
@@ -259,7 +243,6 @@ class GroupChat {
                     });
                 }
                 
-                // Clean up private messages listeners
                 if (pageData.privateMessages) {
                     pageData.privateMessages.forEach((unsub, chatId) => {
                         if (unsub && typeof unsub === 'function') {
@@ -272,7 +255,6 @@ class GroupChat {
                     });
                 }
                 
-                // Clean up typing listeners
                 if (pageData.typing) {
                     pageData.typing.forEach((unsub, groupId) => {
                         if (unsub && typeof unsub === 'function') {
@@ -285,19 +267,15 @@ class GroupChat {
                     });
                 }
                 
-                // Remove the page from tracking
                 this.pageListeners.delete(this.currentPage);
             }
             
-            // Mark current chat as inactive
             this.markChatAsInactive();
             
-            // Reset current IDs
             this.currentGroupId = null;
             this.currentChatPartnerId = null;
         }
         
-        // Update current page
         this.currentPage = currentPath;
     }
 
@@ -350,19 +328,14 @@ class GroupChat {
         this.lastDisplayedMessages.clear();
         this.messageRenderQueue = [];
         
-        // Clear typing and reward data
         this.typingUsers.clear();
         this.lastMessageTimes.clear();
         this.userMessageStreaks.clear();
         this.userStreakTimers.clear();
         this.userRewards.clear();
         this.userActiveDurations.clear();
-        
-        // FIXED: Only clear chat tracking if we're switching users
-        // Don't clear renderedMessagesPerChat here - keep it for page navigation
     }
 
-    // FIXED: Get chat key for tracking rendered messages
     getChatKey(chatId = null) {
         if (this.currentGroupId) {
             return `group_${this.currentGroupId}`;
@@ -378,18 +351,15 @@ class GroupChat {
         return null;
     }
 
-    // FIXED: Clear tracking for specific chat only
     clearChatTracking(chatKey) {
         if (chatKey) {
             this.renderedMessagesPerChat.delete(chatKey);
         }
     }
 
-    // FIXED: Track when we leave a chat
     markChatAsInactive() {
         if (this.lastActiveChatKey) {
             console.log(`Marking chat ${this.lastActiveChatKey} as inactive`);
-            // Clear the tracking for this specific chat
             this.clearChatTracking(this.lastActiveChatKey);
         }
         this.lastActiveChatKey = null;
@@ -647,7 +617,6 @@ class GroupChat {
                         (userData.createdAt.toDate ? userData.createdAt.toDate() : userData.createdAt) : 
                         new Date(),
                     profileComplete: userData.displayName && userData.avatar ? true : false,
-                    // Add reward tracking
                     rewardTag: userData.rewardTag || '',
                     glowEffect: userData.glowEffect || false,
                     fireRing: userData.fireRing || false
@@ -716,7 +685,6 @@ class GroupChat {
         return `private_${ids[0]}_${ids[1]}`;
     }
 
-    // Update user reward in database
     async updateUserReward(userId, rewardData) {
         try {
             const userRef = doc(db, 'group_users', userId);
@@ -727,7 +695,6 @@ class GroupChat {
                 updatedAt: serverTimestamp()
             });
             
-            // Update cache
             const cacheKey = `user_${userId}`;
             const cached = this.cache.userProfiles.get(cacheKey);
             if (cached) {
@@ -743,7 +710,6 @@ class GroupChat {
         }
     }
 
-    // Send system message for reward upgrade
     async sendRewardSystemMessage(groupId, userId, userName, rewardTag) {
         try {
             const messagesRef = collection(db, 'groups', groupId, 'messages');
@@ -768,25 +734,21 @@ class GroupChat {
         }
     }
 
-    // Check and award user for activity
     async checkAndAwardUser(groupId, userId, userName) {
         try {
             const now = Date.now();
             const lastMessageTime = this.lastMessageTimes.get(userId) || 0;
             const timeSinceLastMessage = now - lastMessageTime;
             
-            // Update active duration
             if (!this.userActiveDurations.has(userId)) {
                 this.userActiveDurations.set(userId, 0);
             }
             
-            // Add time since last message to active duration
             if (lastMessageTime > 0) {
                 const currentDuration = this.userActiveDurations.get(userId);
                 this.userActiveDurations.set(userId, currentDuration + timeSinceLastMessage);
             }
             
-            // Check reward thresholds
             const activeDuration = this.userActiveDurations.get(userId);
             let rewardTag = '';
             
@@ -803,11 +765,9 @@ class GroupChat {
                 rewardTag = REWARD_TAGS.THREE_MINUTES;
             }
             
-            // Award the reward if earned
             if (rewardTag) {
                 this.userRewards.set(userId, rewardTag);
                 
-                // Update user profile in database
                 const rewardData = {
                     tag: rewardTag,
                     glowEffect: activeDuration >= REWARD_TIME_THRESHOLDS.TEN_MINUTES,
@@ -816,18 +776,15 @@ class GroupChat {
                 
                 await this.updateUserReward(userId, rewardData);
                 
-                // Send system message about the reward
                 await this.sendRewardSystemMessage(groupId, userId, userName, rewardTag);
                 
                 console.log(`User ${userName} awarded: ${rewardTag}`);
                 
-                // Reset active duration for next tier
                 if (rewardTag === REWARD_TAGS.TWENTY_MINUTES) {
                     this.userActiveDurations.set(userId, 0);
                 }
             }
             
-            // Update last message time
             this.lastMessageTimes.set(userId, now);
             
         } catch (error) {
@@ -835,13 +792,11 @@ class GroupChat {
         }
     }
 
-    // Update user message streak
     updateMessageStreak(userId) {
         const now = Date.now();
         const lastStreakTime = this.lastMessageTimes.get(userId) || 0;
         const timeSinceLastMessage = now - lastStreakTime;
         
-        // Reset streak if more than 30 seconds between messages
         if (timeSinceLastMessage > 30000) {
             this.userMessageStreaks.set(userId, 1);
         } else {
@@ -849,12 +804,10 @@ class GroupChat {
             this.userMessageStreaks.set(userId, currentStreak + 1);
         }
         
-        // Clear previous streak timer
         if (this.userStreakTimers.has(userId)) {
             clearTimeout(this.userStreakTimers.get(userId));
         }
         
-        // Set timer to reset streak after 30 seconds of inactivity
         const streakTimer = setTimeout(() => {
             this.userMessageStreaks.delete(userId);
         }, 30000);
@@ -865,16 +818,14 @@ class GroupChat {
         return this.userMessageStreaks.get(userId) || 0;
     }
 
-    // Check if user should have glowing messages
     shouldGlowMessage(userId) {
         const streak = this.userMessageStreaks.get(userId) || 0;
         return streak >= CONSECUTIVE_MESSAGES_THRESHOLD;
     }
 
-    // Check if user should have fire ring avatar
     shouldHaveFireRing(userId) {
         const streak = this.userMessageStreaks.get(userId) || 0;
-        return streak >= CONSECUTIVE_MESSAGES_THRESHOLD * 2; // After 10 consecutive messages
+        return streak >= CONSECUTIVE_MESSAGES_THRESHOLD * 2;
     }
 
     async sendPrivateMessage(toUserId, text = null, imageUrl = null, videoUrl = null, replyTo = null) {
@@ -1045,7 +996,6 @@ class GroupChat {
         try {
             const chatId = this.getPrivateChatId(this.firebaseUser.uid, otherUserId);
             
-            // Track this listener for page cleanup
             const currentPage = window.location.pathname.split('/').pop().split('.')[0];
             if (!this.pageListeners.has(currentPage)) {
                 this.pageListeners.set(currentPage, {
@@ -1055,7 +1005,6 @@ class GroupChat {
                 });
             }
             
-            // Unsubscribe from previous listener for this chat
             if (this.unsubscribeFunctions.privateMessages.has(chatId)) {
                 const unsub = this.unsubscribeFunctions.privateMessages.get(chatId);
                 if (unsub && typeof unsub === 'function') {
@@ -1068,7 +1017,6 @@ class GroupChat {
                 this.unsubscribeFunctions.privateMessages.delete(chatId);
             }
             
-            // Also unsub from page tracking
             const pageData = this.pageListeners.get(currentPage);
             if (pageData && pageData.privateMessages && pageData.privateMessages.has(chatId)) {
                 const pageUnsub = pageData.privateMessages.get(chatId);
@@ -1097,7 +1045,6 @@ class GroupChat {
                     });
                 });
                 
-                // Add temp messages
                 this.tempPrivateMessages.forEach((tempMsg, tempId) => {
                     if (!messages.some(m => m.id === tempId)) {
                         messages.push({...tempMsg, chatType: 'private'});
@@ -1111,7 +1058,6 @@ class GroupChat {
             
             this.unsubscribeFunctions.privateMessages.set(chatId, unsubscribe);
             
-            // Also track in page listeners for cleanup
             if (pageData) {
                 pageData.privateMessages.set(chatId, unsubscribe);
             }
@@ -1119,7 +1065,6 @@ class GroupChat {
             return unsubscribe;
         } catch (error) {
             console.error('Error listening to private messages:', error);
-            // Return a dummy unsubscribe function to prevent errors
             return () => {};
         }
     }
@@ -1672,7 +1617,7 @@ class GroupChat {
                 this.clearAllCache();
                 console.log('User logged out');
                 
-                const protectedPages = ['create-group', 'group', 'admin-groups', 'user', 'chat', 'messages', 'chats'];
+                const protectedPages = ['create-group', 'group', 'admin-groups', 'user', 'chat', 'messages', 'chats', 'prepare'];
                 const currentPage = window.location.pathname.split('/').pop().split('.')[0];
                 
                 if (protectedPages.includes(currentPage)) {
@@ -2086,7 +2031,6 @@ class GroupChat {
         }
     }
 
-    // Start typing indicator
     async startTyping(groupId) {
         try {
             if (!this.firebaseUser || !this.currentUser || !groupId) return;
@@ -2100,7 +2044,6 @@ class GroupChat {
                 isTyping: true
             }, { merge: true });
             
-            // Set timeout to automatically stop typing after 5 seconds
             if (this.typingUsers.has(groupId)) {
                 const userTyping = this.typingUsers.get(groupId);
                 if (userTyping.has(this.firebaseUser.uid)) {
@@ -2121,7 +2064,6 @@ class GroupChat {
         }
     }
 
-    // Stop typing indicator
     async stopTyping(groupId) {
         try {
             if (!this.firebaseUser || !groupId) return;
@@ -2135,7 +2077,6 @@ class GroupChat {
                 isTyping: false
             }, { merge: true });
             
-            // Clear timeout
             if (this.typingUsers.has(groupId)) {
                 const userTyping = this.typingUsers.get(groupId);
                 if (userTyping.has(this.firebaseUser.uid)) {
@@ -2149,12 +2090,10 @@ class GroupChat {
         }
     }
 
-    // Listen to typing indicators
     listenToTyping(groupId, callback) {
         try {
             const currentPage = window.location.pathname.split('/').pop().split('.')[0];
             
-            // Unsubscribe from previous typing listener for this group
             if (this.unsubscribeFunctions.typing.has(groupId)) {
                 const unsub = this.unsubscribeFunctions.typing.get(groupId);
                 if (unsub && typeof unsub === 'function') {
@@ -2167,7 +2106,6 @@ class GroupChat {
                 this.unsubscribeFunctions.typing.delete(groupId);
             }
             
-            // Also unsub from page tracking
             const pageData = this.pageListeners.get(currentPage);
             if (pageData && pageData.typing && pageData.typing.has(groupId)) {
                 const pageUnsub = pageData.typing.get(groupId);
@@ -2194,7 +2132,6 @@ class GroupChat {
                             (data.timestamp.toDate ? data.timestamp.toDate().getTime() : new Date(data.timestamp).getTime()) : 
                             0;
                         
-                        // Only show users who typed in the last 5 seconds
                         if (now - timestamp < TYPING_TIMEOUT) {
                             typingUsers.push({
                                 userId: data.userId,
@@ -2210,7 +2147,6 @@ class GroupChat {
             
             this.unsubscribeFunctions.typing.set(groupId, unsubscribe);
             
-            // NEW: Also track in page listeners for cleanup
             if (!pageData) {
                 this.pageListeners.set(currentPage, {
                     privateMessages: new Map(),
@@ -2250,7 +2186,6 @@ class GroupChat {
                 }
             }
             
-            // Update message streak
             const streak = this.updateMessageStreak(this.firebaseUser.uid);
             const shouldGlow = this.shouldGlowMessage(this.firebaseUser.uid);
             const shouldHaveFireRing = this.shouldHaveFireRing(this.firebaseUser.uid);
@@ -2273,7 +2208,6 @@ class GroupChat {
                 timestamp: serverTimestamp()
             };
             
-            // Add glow effect and fire ring data
             if (shouldGlow) {
                 messageData.glowEffect = true;
             }
@@ -2313,10 +2247,8 @@ class GroupChat {
                 }
             });
             
-            // Check and award user for activity
             await this.checkAndAwardUser(groupId, this.firebaseUser.uid, this.currentUser.name);
             
-            // Stop typing indicator
             await this.stopTyping(groupId);
             
             await this.updateLastActive(groupId);
@@ -2378,7 +2310,6 @@ class GroupChat {
                 status: 'uploading'
             };
             
-            // Add glow effect for temp messages if user has streak
             if (this.shouldGlowMessage(this.firebaseUser.uid)) {
                 tempMessage.glowEffect = true;
             }
@@ -2428,7 +2359,6 @@ class GroupChat {
         try {
             const currentPage = window.location.pathname.split('/').pop().split('.')[0];
             
-            // Unsubscribe from previous listener for this group
             if (this.unsubscribeFunctions.groupMessages.has(groupId)) {
                 const unsub = this.unsubscribeFunctions.groupMessages.get(groupId);
                 if (unsub && typeof unsub === 'function') {
@@ -2441,7 +2371,6 @@ class GroupChat {
                 this.unsubscribeFunctions.groupMessages.delete(groupId);
             }
             
-            // Also unsub from page tracking
             const pageData = this.pageListeners.get(currentPage);
             if (pageData && pageData.groupMessages && pageData.groupMessages.has(groupId)) {
                 const pageUnsub = pageData.groupMessages.get(groupId);
@@ -2479,7 +2408,6 @@ class GroupChat {
             
             this.unsubscribeFunctions.groupMessages.set(groupId, unsubscribe);
             
-            // Also track in page listeners for cleanup
             if (!pageData) {
                 this.pageListeners.set(currentPage, {
                     privateMessages: new Map(),
@@ -2492,14 +2420,12 @@ class GroupChat {
             return unsubscribe;
         } catch (error) {
             console.error('Error listening to messages:', error);
-            // Return a dummy unsubscribe function to prevent errors
             return () => {};
         }
     }
 
     listenToMembers(groupId, callback) {
         try {
-            // Unsubscribe from previous listener for this group
             if (this.unsubscribeFunctions.groupMembers.has(groupId)) {
                 const unsub = this.unsubscribeFunctions.groupMembers.get(groupId);
                 if (unsub && typeof unsub === 'function') {
@@ -2538,7 +2464,6 @@ class GroupChat {
             return unsubscribe;
         } catch (error) {
             console.error('Error listening to members:', error);
-            // Return a dummy unsubscribe function to prevent errors
             return () => {};
         }
     }
@@ -2805,7 +2730,6 @@ class GroupChat {
                 min-width: 0;
             }
             
-            /* UPDATED: Typing indicator styles - Moved to top */
             .typing-indicator {
                 position: fixed;
                 top: 0;
@@ -2853,7 +2777,6 @@ class GroupChat {
                 50% { opacity: 1; transform: scale(1.2); }
             }
             
-            /* UPDATED: Soft glass glowing message styles */
             .glowing-message {
                 animation: soft-glow 3s ease-in-out infinite alternate;
                 position: relative;
@@ -2879,7 +2802,6 @@ class GroupChat {
                 }
             }
             
-            /* Fire ring avatar styles */
             .avatar-with-fire-ring {
                 position: relative;
             }
@@ -2907,7 +2829,6 @@ class GroupChat {
                 }
             }
             
-            /* Reward tag styles */
             .reward-tag {
                 display: inline-block;
                 background: linear-gradient(45deg, #ffd700, #ff9500);
@@ -2945,7 +2866,6 @@ class GroupChat {
                 100% { opacity: 0; transform: translateY(-10px); }
             }
             
-            /* Sending indicator for messages */
             .sending-indicator {
                 font-size: 11px;
                 color: #666;
@@ -2955,7 +2875,6 @@ class GroupChat {
                 gap: 4px;
             }
             
-            /* Ensure SVG icons display properly */
             .feather {
                 display: inline-block;
                 vertical-align: middle;
@@ -3146,7 +3065,6 @@ class GroupChat {
 
     async listenToMessageReactions(groupId, messageId, callback) {
         try {
-            // Unsubscribe from previous reaction listener for this message
             const reactionKey = `reaction_${groupId}_${messageId}`;
             if (this.unsubscribeFunctions.reactions.has(reactionKey)) {
                 const unsub = this.unsubscribeFunctions.reactions.get(reactionKey);
@@ -3192,7 +3110,6 @@ class GroupChat {
 
     async listenToPrivateMessageReactions(chatId, messageId, callback) {
         try {
-            // Unsubscribe from previous reaction listener for this message
             const reactionKey = `private_reaction_${chatId}_${messageId}`;
             if (this.unsubscribeFunctions.privateReactions.has(reactionKey)) {
                 const unsub = this.unsubscribeFunctions.privateReactions.get(reactionKey);
@@ -3530,11 +3447,9 @@ class GroupChat {
         this.removeReplyIndicator();
     }
 
-    // FIXED: Enhanced cleanup that preserves message tracking
     cleanup() {
         console.log('Cleaning up chat listeners...');
         
-        // Clean up all unsubscribe functions
         this.unsubscribeFunctions.groupMessages.forEach((unsub, groupId) => {
             if (unsub && typeof unsub === 'function') {
                 try {
@@ -3601,7 +3516,6 @@ class GroupChat {
         });
         this.unsubscribeFunctions.privateReactions.clear();
         
-        // Clean up auth listener
         if (this.unsubscribeAuth && typeof this.unsubscribeAuth === 'function') {
             try {
                 this.unsubscribeAuth();
@@ -3615,7 +3529,6 @@ class GroupChat {
         this.sentMessageIds.clear();
         this.pendingMessages.clear();
         
-        // Clear typing timeouts
         this.typingUsers.forEach((userTyping, groupId) => {
             userTyping.forEach((timeout, userId) => {
                 clearTimeout(timeout);
@@ -3623,16 +3536,13 @@ class GroupChat {
         });
         this.typingUsers.clear();
         
-        // Clear streak timers
         this.userStreakTimers.forEach(timer => {
             clearTimeout(timer);
         });
         this.userStreakTimers.clear();
         
-        // FIXED: Mark current chat as inactive but don't clear tracking
         this.markChatAsInactive();
         
-        // Reset current IDs
         this.currentGroupId = null;
         this.currentChatPartnerId = null;
     }
@@ -3644,7 +3554,6 @@ class GroupChat {
             this.currentUser = null;
             this.clearAllCache();
             
-            // FIXED: Clear ALL tracking when logging out
             this.renderedMessagesPerChat.clear();
             this.lastActiveChatKey = null;
             this.pageListeners.clear();
@@ -3691,6 +3600,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'message':
                 initMessagesPage();
+                break;
+            case 'prepare':
                 break;
             default:
                 if (currentPage === 'login' || currentPage === 'signup' || currentPage === 'index') {
@@ -3958,7 +3869,7 @@ function initCreateGroupPage() {
             
             navigator.clipboard.writeText(result.inviteLink);
             
-            window.location.href = `group.html?id=${result.groupId}`;
+            window.location.href = `prepare.html?id=${result.groupId}`;
         } catch (error) {
             console.error('Error creating group:', error);
             alert('Failed to create group. Please try again.');
@@ -4136,7 +4047,7 @@ function initGroupsPage() {
                 } else {
                     try {
                         await groupChat.joinGroup(groupId);
-                        window.location.href = `group.html?id=${groupId}`;
+                        window.location.href = `prepare.html?id=${groupId}`;
                     } catch (error) {
                         alert(error.message || 'Failed to join group. Please try again.');
                     }
@@ -4287,7 +4198,7 @@ function initSetPage() {
                 try {
                     await groupChat.joinGroup(groupId);
                     alert('Profile saved and joined group successfully!');
-                    window.location.href = `group.html?id=${groupId}`;
+                    window.location.href = `prepare.html?id=${groupId}`;
                 } catch (error) {
                     alert('Profile saved, but could not join group: ' + error.message);
                     window.location.href = 'groups.html';
@@ -4330,7 +4241,6 @@ function initSetPage() {
     }
 }
 
-// Create typing indicator element at top
 function createTypingIndicator() {
     const typingIndicator = document.createElement('div');
     typingIndicator.id = 'typingIndicator';
@@ -4348,7 +4258,6 @@ function createTypingIndicator() {
     return typingIndicator;
 }
 
-// Update typing indicator
 function updateTypingIndicator(typingUsers) {
     const typingIndicator = document.getElementById('typingIndicator');
     const typingText = document.getElementById('typingText');
@@ -4375,13 +4284,11 @@ function updateTypingIndicator(typingUsers) {
     typingText.textContent = typingMessage;
     typingIndicator.style.display = 'block';
     
-    // Trigger reflow to enable animation
     void typingIndicator.offsetWidth;
     
     typingIndicator.classList.add('show');
 }
 
-// FIXED: initGroupPage with proper message tracking and listener conflict resolution
 function initGroupPage() {
     const sidebar = document.getElementById('sidebar');
     const backBtn = document.getElementById('backBtn');
@@ -4412,13 +4319,11 @@ function initGroupPage() {
     let reactionUnsubscribers = new Map();
     let reactionsCache = new Map();
     
-    // Typing indicator variables
     let typingIndicator = null;
     let typingUnsubscribe = null;
     let typingTimeout = null;
     let lastTypingInputTime = 0;
     
-    // FIXED: Get or create chat key tracking
     const chatKey = `group_${groupId}`;
     
     if (!groupId) {
@@ -4434,19 +4339,15 @@ function initGroupPage() {
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
     
-    // FIXED: Mark this as the active chat
     groupChat.lastActiveChatKey = chatKey;
     
-    // Get or create rendered messages tracking for this chat
     if (!groupChat.renderedMessagesPerChat.has(chatKey)) {
         groupChat.renderedMessagesPerChat.set(chatKey, new Set());
     }
     const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
     
-    // Create typing indicator at top
     typingIndicator = createTypingIndicator();
     
-    // FIXED: Clean up previous listeners BEFORE setting up new ones
     groupChat.cleanupPreviousPageListeners();
     
     (async () => {
@@ -4479,7 +4380,6 @@ function initGroupPage() {
         });
         reactionUnsubscribers.clear();
         
-        // Clean up typing indicator
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             try {
                 typingUnsubscribe();
@@ -4495,7 +4395,6 @@ function initGroupPage() {
         window.location.href = 'groups.html';
     });
     
-    // FIXED: Remove the cloning logic - it breaks event listeners
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -4532,32 +4431,27 @@ function initGroupPage() {
         });
     }
     
-    // Typing indicator for message input
     messageInput.addEventListener('input', () => {
         sendBtn.disabled = !messageInput.value.trim();
         
         messageInput.style.height = 'auto';
         messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
         
-        // Start typing indicator when user types
         const now = Date.now();
-        if (now - lastTypingInputTime > 1000) { // Throttle to 1 second
+        if (now - lastTypingInputTime > 1000) {
             groupChat.startTyping(groupId);
             lastTypingInputTime = now;
         }
         
-        // Reset typing timeout
         if (typingTimeout) {
             clearTimeout(typingTimeout);
         }
         
-        // Stop typing after 3 seconds of inactivity
         typingTimeout = setTimeout(() => {
             groupChat.stopTyping(groupId);
         }, 3000);
     });
     
-    // Stop typing when input loses focus
     messageInput.addEventListener('blur', () => {
         groupChat.stopTyping(groupId);
         if (typingTimeout) {
@@ -4565,7 +4459,6 @@ function initGroupPage() {
         }
     });
     
-    // Send button always shows airplane icon, no loader - prevent form submission
     sendBtn.addEventListener('click', (e) => {
         e.preventDefault();
         sendMessage();
@@ -4637,7 +4530,6 @@ function initGroupPage() {
         const tempMsgIndex = messages.findIndex(m => m.id === tempId);
         if (tempMsgIndex !== -1) {
             messages.splice(tempMsgIndex, 1);
-            // Remove the temp message from DOM
             const tempMessageElement = document.getElementById(`message-${tempId}`);
             if (tempMessageElement) {
                 tempMessageElement.remove();
@@ -4662,7 +4554,6 @@ function initGroupPage() {
             if (groupNameSidebar) groupNameSidebar.textContent = groupData.name;
             if (groupMembersCount) groupMembersCount.textContent = `${groupData.memberCount || 0} members`;
             
-            // Truncate group name to 6 words in chat header
             const truncatedGroupName = groupChat.truncateName(groupData.name);
             if (chatTitle) chatTitle.textContent = truncatedGroupName;
             if (chatSubtitle) chatSubtitle.textContent = groupData.description;
@@ -4705,7 +4596,6 @@ function initGroupPage() {
     function renderNewMessages(newMessages) {
         if (!messagesContainer || newMessages.length === 0) return;
         
-        // Filter out messages that have already been rendered
         const messagesToRender = newMessages.filter(msg => !renderedMessageIds.has(msg.id));
         
         if (messagesToRender.length === 0) {
@@ -4715,16 +4605,13 @@ function initGroupPage() {
         
         console.log(`Rendering ${messagesToRender.length} new messages`);
         
-        // Track which messages we've rendered
         messagesToRender.forEach(msg => {
             renderedMessageIds.add(msg.id);
             console.log(`Added message ${msg.id} to rendered set`);
         });
         
-        // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
         
-        // Group new messages by sender and time
         const groupedMessages = [];
         let currentGroup = null;
         
@@ -4758,7 +4645,6 @@ function initGroupPage() {
             const firstMessage = group.messages[0];
             const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
             
-            // Get user profile for reward tag
             const userProfile = groupChat.cache.userProfiles ? 
                 groupChat.cache.userProfiles.get(`user_${group.senderId}`)?.data : null;
             
@@ -4809,11 +4695,9 @@ function initGroupPage() {
                         
                         const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
                         
-                        // Add soft glowing effect class if message has glowEffect
                         const hasGlowEffect = msg.glowEffect || false;
                         const extraClasses = hasGlowEffect ? ' glowing-message' : '';
                         
-                        // Check if this is a reward upgrade message
                         const isRewardUpgrade = msg.rewardUpgrade || false;
                         const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
                         
@@ -4876,7 +4760,6 @@ function initGroupPage() {
                         
                         const cachedReactions = reactionsCache.get(msg.id) || [];
                         
-                        // Add sending indicator on message (not on button)
                         const sendingIndicator = isTemp ? 
                             `<div class="sending-indicator" id="sending-${msg.id}">
                                 <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
@@ -4914,10 +4797,8 @@ function initGroupPage() {
             fragment.appendChild(groupDiv);
         });
         
-        // Append new messages to the container
         messagesContainer.appendChild(fragment);
         
-        // Remove sending indicators for messages that are no longer temp
         document.querySelectorAll('.sending-indicator').forEach(indicator => {
             const messageId = indicator.id.replace('sending-', '');
             if (!tempMessages.has(messageId)) {
@@ -4929,13 +4810,11 @@ function initGroupPage() {
         
         setupReactionListenersForNewMessages(messagesToRender);
         
-        // Scroll to bottom after rendering
         setTimeout(() => {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }, 50);
     }
     
-    // FIXED: displayAllMessages function - renders ALL initial messages without filtering
     function displayAllMessages() {
         if (!messagesContainer) return;
         
@@ -4949,15 +4828,12 @@ function initGroupPage() {
         
         window.currentMessages = messages;
         
-        // Clear container first
         messagesContainer.innerHTML = '';
         
-        // Clear the renderedMessageIds for this chat to start fresh
         renderedMessageIds.clear();
         
         console.log(`Displaying ${messages.length} initial messages (cleared tracking)`);
         
-        // Render ALL messages without filtering
         renderNewMessages(messages);
     }
     
@@ -5249,7 +5125,6 @@ function initGroupPage() {
     }
     
     function setupListeners() {
-        // Clear any existing listeners first
         if (groupChat.areListenersSetup) {
             groupChat.cleanup();
             reactionUnsubscribers.forEach(unsub => {
@@ -5264,7 +5139,6 @@ function initGroupPage() {
             reactionUnsubscribers.clear();
         }
         
-        // Clear typing listener
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             try {
                 typingUnsubscribe();
@@ -5273,7 +5147,6 @@ function initGroupPage() {
             }
         }
         
-        // Set up new listeners
         const messagesUnsub = groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Received messages from listener:', newMessages.length);
             
@@ -5293,15 +5166,12 @@ function initGroupPage() {
                 }
             });
             
-            // FIXED: Only update messages array if it's actually different
-            // Check if messages are the same (initial load duplicate)
             const isSameMessages = messages.length === uniqueMessages.length && 
                 messages.every((msg, index) => msg.id === uniqueMessages[index]?.id);
             
             if (!isSameMessages) {
                 messages = uniqueMessages;
                 
-                // Only render new messages
                 const newMessagesToRender = uniqueMessages.filter(msg => !renderedMessageIds.has(msg.id));
                 if (newMessagesToRender.length > 0) {
                     console.log(`Rendering ${newMessagesToRender.length} new messages from listener`);
@@ -5326,7 +5196,6 @@ function initGroupPage() {
             }
         });
         
-        // Set up typing indicator listener
         typingUnsubscribe = groupChat.listenToTyping(groupId, (typingUsers) => {
             updateTypingIndicator(typingUsers);
         });
@@ -5352,7 +5221,6 @@ function initGroupPage() {
             });
             reactionUnsubscribers.clear();
             
-            // Clean up typing
             if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
                 try {
                 typingUnsubscribe();
@@ -5387,7 +5255,6 @@ function initGroupPage() {
             const isAdmin = member.role === 'creator';
             const isCurrentUser = member.id === groupChat.firebaseUser?.uid;
             
-            // Get user profile for reward tag
             const userProfile = groupChat.cache.userProfiles ? 
                 groupChat.cache.userProfiles.get(`user_${member.id}`)?.data : null;
             
@@ -5462,15 +5329,12 @@ function initGroupPage() {
         
         if (!text) return;
         
-        // Clear typing timeout before sending
         if (typingTimeout) {
             clearTimeout(typingTimeout);
         }
         
-        // Stop typing indicator
         await groupChat.stopTyping(groupId);
         
-        // Send button always shows airplane icon, no loader
         const originalHTML = sendBtn.innerHTML;
         const originalDisabled = sendBtn.disabled;
         sendBtn.disabled = true;
@@ -5482,14 +5346,12 @@ function initGroupPage() {
             messageInput.style.height = 'auto';
             messageInput.dispatchEvent(new Event('input'));
             
-            // Clear the reply indicator after sending
             groupChat.clearReply();
             
         } catch (error) {
             console.error('Error sending message:', error);
             alert(error.message || 'Failed to send message. Please try again.');
         } finally {
-            // Always restore airplane icon immediately
             sendBtn.disabled = originalDisabled;
             sendBtn.innerHTML = originalHTML;
         }
@@ -5530,7 +5392,6 @@ function initGroupPage() {
         });
         reactionUnsubscribers.clear();
         
-        // Clean up typing
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             try {
                 typingUnsubscribe();
@@ -5749,7 +5610,7 @@ function initAdminGroupsPage() {
                         </div>
                     </div>
                     <div class="group-actions">
-                        <button class="view-group-btn" onclick="window.location.href='group.html?id=${group.id}'">
+                        <button class="view-group-btn" onclick="window.location.href='prepare.html?id=${group.id}'">
                             <svg class="feather" data-feather="message-circle" style="width: 14px; height: 14px; margin-right: 6px;">
                                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
                             </svg>
@@ -5872,7 +5733,6 @@ function initAdminGroupsPage() {
                         const isCurrentUser = member.id === groupChat.firebaseUser.uid;
                         const isAdmin = member.isAdmin;
                         
-                        // Get user profile for reward tag
                         const userProfile = groupChat.cache.userProfiles ? 
                             groupChat.cache.userProfiles.get(`user_${member.id}`)?.data : null;
                         
@@ -6196,7 +6056,7 @@ function initJoinPage() {
                             `;
                             joinBtn.className = 'join-btn success';
                             joinBtn.onclick = () => {
-                                window.location.href = `group.html?id=${group.id}`;
+                                window.location.href = `prepare.html?id=${group.id}`;
                             };
                         } else {
                             joinBtn.innerHTML = `
@@ -6280,7 +6140,7 @@ function initJoinPage() {
             
             alert('Successfully joined the group!');
             
-            window.location.href = `group.html?id=${groupId}`;
+            window.location.href = `prepare.html?id=${groupId}`;
             
         } catch (error) {
             console.error('Error joining group:', error);
@@ -6457,7 +6317,6 @@ function initUserPage() {
                 return;
             }
             
-            // Check for fire ring and reward tag
             const hasFireRing = userProfile.fireRing || false;
             const rewardTag = userProfile.rewardTag || '';
             
@@ -6503,7 +6362,7 @@ function initUserPage() {
                         `;
                         
                         groupItem.addEventListener('click', () => {
-                            window.location.href = `group.html?id=${group.id}`;
+                            window.location.href = `prepare.html?id=${group.id}`;
                         });
                         
                         mutualGroupsList.appendChild(groupItem);
@@ -6524,7 +6383,6 @@ function initUserPage() {
     }
 }
 
-// FIXED: initChatPage with proper message tracking
 function initChatPage() {
     const sidebar = document.getElementById('sidebar');
     const backBtn = document.getElementById('backBtn');
@@ -6552,7 +6410,6 @@ function initChatPage() {
     let reactionUnsubscribers = new Map();
     let reactionsCache = new Map();
     
-    // FIXED: Get or create chat key tracking for private chat
     const chatId = groupChat.getPrivateChatId(groupChat.firebaseUser.uid, partnerId);
     const chatKey = `private_${chatId}`;
     
@@ -6575,16 +6432,13 @@ function initChatPage() {
     
     groupChat.currentChatPartnerId = partnerId;
     
-    // FIXED: Mark this as the active chat
     groupChat.lastActiveChatKey = chatKey;
     
-    // Get or create rendered messages tracking for this chat
     if (!groupChat.renderedMessagesPerChat.has(chatKey)) {
         groupChat.renderedMessagesPerChat.set(chatKey, new Set());
     }
     const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
     
-    // FIXED: Clean up previous listeners BEFORE setting up new ones
     groupChat.cleanupPreviousPageListeners();
     
     backBtn.addEventListener('click', () => {
@@ -6603,7 +6457,6 @@ function initChatPage() {
         window.location.href = 'message.html';
     });
     
-    // FIXED: Remove the cloning logic - it breaks event listeners
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -6636,7 +6489,6 @@ function initChatPage() {
         messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
     });
     
-    // Send button always shows airplane icon, no loader - prevent form submission
     sendBtn.addEventListener('click', (e) => {
         e.preventDefault();
         sendMessage();
@@ -6708,7 +6560,6 @@ function initChatPage() {
         const tempMsgIndex = messages.findIndex(m => m.id === tempId);
         if (tempMsgIndex !== -1) {
             messages.splice(tempMsgIndex, 1);
-            // Remove the temp message from DOM
             const tempMessageElement = document.getElementById(`message-${tempId}`);
             if (tempMessageElement) {
                 tempMessageElement.remove();
@@ -6728,7 +6579,6 @@ function initChatPage() {
                 return;
             }
             
-            // Check for fire ring and reward tag
             const hasFireRing = partnerProfile.fireRing || false;
             const rewardTag = partnerProfile.rewardTag || '';
             
@@ -6750,7 +6600,6 @@ function initChatPage() {
             if (partnerEmail) partnerEmail.textContent = partnerProfile.email || 'Email not available';
             if (userBio) userBio.textContent = partnerProfile.bio;
             
-            // Truncate partner name to 6 words in chat header
             const truncatedPartnerName = groupChat.truncateName(partnerProfile.name);
             if (chatTitle) chatTitle.textContent = truncatedPartnerName;
             if (chatSubtitle) chatSubtitle.textContent = 'Private Chat';
@@ -6769,7 +6618,6 @@ function initChatPage() {
                 groupChat.listenToPrivateMessages(partnerId, (newMessages) => {
                     messages = newMessages;
                     
-                    // Only render new messages
                     const newMessagesToRender = newMessages.filter(msg => !renderedMessageIds.has(msg.id));
                     if (newMessagesToRender.length > 0) {
                         renderNewPrivateMessages(newMessagesToRender);
@@ -6798,23 +6646,19 @@ function initChatPage() {
     function renderNewPrivateMessages(newMessages) {
         if (!messagesContainer || newMessages.length === 0) return;
         
-        // Filter out messages that have already been rendered
         const messagesToRender = newMessages.filter(msg => !renderedMessageIds.has(msg.id));
         
         if (messagesToRender.length === 0) return;
         
         console.log(`Rendering ${messagesToRender.length} new private messages`);
         
-        // Track which messages we've rendered
         messagesToRender.forEach(msg => {
             renderedMessageIds.add(msg.id);
             console.log(`Added private message ${msg.id} to rendered set`);
         });
         
-        // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
         
-        // Group new messages by sender and time
         const groupedMessages = [];
         let currentGroup = null;
         
@@ -6850,7 +6694,6 @@ function initChatPage() {
             const firstMessage = group.messages[0];
             const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
             
-            // Get user profile for reward tag and fire ring
             let userProfile = null;
             if (group.senderId === groupChat.firebaseUser.uid) {
                 userProfile = groupChat.currentUser;
@@ -6905,7 +6748,6 @@ function initChatPage() {
                         
                         const messageDivClass = 'message-text';
                         
-                        // Add soft glowing effect for private messages too
                         const hasGlowEffect = msg.glowEffect || false;
                         const extraClasses = hasGlowEffect ? ' glowing-message' : '';
                         
@@ -6962,7 +6804,6 @@ function initChatPage() {
                         
                         const cachedReactions = reactionsCache.get(msg.id) || [];
                         
-                        // Add sending indicator on message
                         const sendingIndicator = isTemp ? 
                             `<div class="sending-indicator" id="sending-${msg.id}">
                                 <svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; width: 12px; height: 12px;">
@@ -7000,10 +6841,8 @@ function initChatPage() {
             fragment.appendChild(groupDiv);
         });
         
-        // Append new messages to the container
         messagesContainer.appendChild(fragment);
         
-        // Remove sending indicators for messages that are no longer temp
         document.querySelectorAll('.sending-indicator').forEach(indicator => {
             const messageId = indicator.id.replace('sending-', '');
             if (!groupChat.tempPrivateMessages.has(messageId)) {
@@ -7015,13 +6854,11 @@ function initChatPage() {
         
         setupPrivateReactionListenersForNewMessages(messagesToRender);
         
-        // Scroll to bottom after rendering
         setTimeout(() => {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }, 50);
     }
     
-    // FIXED: displayAllPrivateMessages function - renders ALL initial messages without filtering
     function displayAllPrivateMessages() {
         if (!messagesContainer) return;
         
@@ -7035,15 +6872,12 @@ function initChatPage() {
         
         window.currentMessages = messages;
         
-        // Clear container first
         messagesContainer.innerHTML = '';
         
-        // Clear the renderedMessageIds for this chat to start fresh
         renderedMessageIds.clear();
         
         console.log(`Displaying ${messages.length} initial private messages (cleared tracking)`);
         
-        // Render ALL messages without filtering
         renderNewPrivateMessages(messages);
     }
     
@@ -7159,7 +6993,6 @@ function initChatPage() {
         
         if (!text) return;
         
-        // Send button always shows airplane icon, no loader
         const originalHTML = sendBtn.innerHTML;
         const originalDisabled = sendBtn.disabled;
         sendBtn.disabled = true;
@@ -7183,7 +7016,6 @@ function initChatPage() {
             console.error('Error sending message:', error);
             alert('Failed to send message');
         } finally {
-            // Always restore airplane icon immediately
             sendBtn.disabled = originalDisabled;
             sendBtn.innerHTML = originalHTML;
         }
@@ -7417,7 +7249,6 @@ function initMessagesPage() {
             const messageItem = document.createElement('div');
             messageItem.className = `message-item ${chat.unreadCount > 0 ? 'unread' : ''}`;
             
-            // Get user profile for reward tag
             const userProfile = groupChat.cache.userProfiles ? 
                 groupChat.cache.userProfiles.get(`user_${chat.userId}`)?.data : null;
             
@@ -7493,7 +7324,7 @@ function initMessagesPage() {
             `;
             
             messageItem.addEventListener('click', () => {
-                window.location.href = `group.html?id=${group.id}`;
+                window.location.href = `prepare.html?id=${group.id}`;
             });
             
             messagesList.appendChild(messageItem);

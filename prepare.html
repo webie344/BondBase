@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preparing Group Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        
+        .prepare-container {
+            text-align: center;
+            max-width: 90%;
+            width: 400px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        p {
+            font-size: 16px;
+            line-height: 1.5;
+            opacity: 0.9;
+            margin-bottom: 25px;
+        }
+        
+        .progress-container {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.2);
+            height: 6px;
+            border-radius: 3px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: white;
+            width: 0%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        
+        .status-text {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 15px;
+            min-height: 20px;
+        }
+        
+        .checkmark {
+            font-size: 48px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .error-container {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 0, 0, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+        
+        .retry-btn {
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: none;
+        }
+        
+        .retry-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .back-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: transparent;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: none;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="prepare-container">
+        <div class="loading-spinner" id="loadingSpinner"></div>
+        <div class="checkmark" id="checkmark">✓</div>
+        
+        <h1>Preparing Chat</h1>
+        <p>Checking network stability and cleaning up previous sessions...</p>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <div class="status-text" id="statusText">Initializing...</div>
+        
+        <div class="error-container" id="errorContainer">
+            <p id="errorMessage"></p>
+        </div>
+        
+        <button class="retry-btn" id="retryBtn">Try Again</button>
+        <button class="back-btn" id="backBtn">Back to Groups</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const checkmark = document.getElementById('checkmark');
+            const progressBar = document.getElementById('progressBar');
+            const statusText = document.getElementById('statusText');
+            const errorContainer = document.getElementById('errorContainer');
+            const errorMessage = document.getElementById('errorMessage');
+            const retryBtn = document.getElementById('retryBtn');
+            const backBtn = document.getElementById('backBtn');
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const groupId = urlParams.get('id');
+            
+            if (!groupId) {
+                showError('No group specified');
+                return;
+            }
+            
+            let progress = 0;
+            const maxProgress = 100;
+            const preparationSteps = [
+                { step: 10, text: 'Checking network connection...' },
+                { step: 30, text: 'Cleaning up previous sessions...' },
+                { step: 50, text: 'Verifying user authentication...' },
+                { step: 70, text: 'Loading group data...' },
+                { step: 90, text: 'Optimizing connection...' },
+                { step: 100, text: 'Ready!' }
+            ];
+            
+            function updateProgress(targetProgress, message) {
+                return new Promise(resolve => {
+                    const interval = setInterval(() => {
+                        if (progress < targetProgress) {
+                            progress += 1;
+                            progressBar.style.width = progress + '%';
+                            statusText.textContent = message || `Loading... ${progress}%`;
+                        } else {
+                            clearInterval(interval);
+                            resolve();
+                        }
+                    }, 20);
+                });
+            }
+            
+            function showError(message) {
+                loadingSpinner.style.display = 'none';
+                errorContainer.style.display = 'block';
+                errorMessage.textContent = message;
+                retryBtn.style.display = 'inline-block';
+                backBtn.style.display = 'inline-block';
+                statusText.textContent = 'Preparation failed';
+            }
+            
+            function showSuccess() {
+                loadingSpinner.style.display = 'none';
+                checkmark.style.display = 'block';
+                progressBar.style.width = '100%';
+                statusText.textContent = 'Ready to enter chat!';
+                
+                setTimeout(() => {
+                    window.location.href = `group.html?id=${groupId}`;
+                }, 1000);
+            }
+            
+            async function runPreparation() {
+                try {
+                    for (const step of preparationSteps) {
+                        await updateProgress(step.step, step.text);
+                        
+                        if (step.step === 10) {
+                            if (!navigator.onLine) {
+                                throw new Error('No internet connection');
+                            }
+                        }
+                        
+                        if (step.step === 30) {
+                            localStorage.removeItem('lastGroupCleanup');
+                            sessionStorage.removeItem('tempMessages');
+                        }
+                        
+                        if (step.step === 50) {
+                            const authState = await checkAuthState();
+                            if (!authState) {
+                                throw new Error('User not authenticated');
+                            }
+                        }
+                        
+                        if (step.step === 70) {
+                            const groupValid = await checkGroupExists(groupId);
+                            if (!groupValid) {
+                                throw new Error('Group not found or access denied');
+                            }
+                        }
+                        
+                        if (step.step === 90) {
+                            await optimizeConnection();
+                        }
+                        
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                    
+                    showSuccess();
+                    
+                } catch (error) {
+                    console.error('Preparation error:', error);
+                    showError(error.message || 'Failed to prepare chat. Please try again.');
+                }
+            }
+            
+            async function checkAuthState() {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(true);
+                    }, 500);
+                });
+            }
+            
+            async function checkGroupExists(groupId) {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(true);
+                    }, 500);
+                });
+            }
+            
+            async function optimizeConnection() {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve();
+                    }, 500);
+                });
+            }
+            
+            retryBtn.addEventListener('click', () => {
+                progress = 0;
+                progressBar.style.width = '0%';
+                loadingSpinner.style.display = 'block';
+                checkmark.style.display = 'none';
+                errorContainer.style.display = 'none';
+                retryBtn.style.display = 'none';
+                backBtn.style.display = 'none';
+                runPreparation();
+            });
+            
+            backBtn.addEventListener('click', () => {
+                window.location.href = 'groups.html';
+            });
+            
+            runPreparation();
+            
+            window.addEventListener('offline', () => {
+                showError('Lost internet connection');
+            });
+            
+            window.addEventListener('online', () => {
+                if (progress < 100) {
+                    retryBtn.click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
