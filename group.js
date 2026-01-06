@@ -6,6 +6,7 @@
 // FIXED: Entire page rerender on message send and q is not defined error
 // FIXED: Messages displaying twice when returning to page - COMPLETELY FIXED
 // FIXED: Old messages not loading - messages flash then disappear issue
+// FIXED: Sidebar/info button stops working when duplication starts
 
 import { 
     getFirestore, 
@@ -194,11 +195,11 @@ class GroupChat {
         this.checkRestrictedUsers();
         this.loadBlockedUsers();
         
-        // NEW: Set up global page tracking
+        // Set up global page tracking
         this.setupGlobalPageTracking();
     }
 
-    // NEW: Set up global page tracking
+    // Set up global page tracking
     setupGlobalPageTracking() {
         // Store the original pushState and replaceState
         const originalPushState = history.pushState;
@@ -233,7 +234,7 @@ class GroupChat {
         });
     }
     
-    // NEW: Clean up previous page's listeners
+    // Clean up previous page's listeners
     cleanupPreviousPageListeners() {
         const currentPath = window.location.pathname.split('/').pop().split('.')[0];
         
@@ -1044,7 +1045,7 @@ class GroupChat {
         try {
             const chatId = this.getPrivateChatId(this.firebaseUser.uid, otherUserId);
             
-            // NEW: Track this listener for page cleanup
+            // Track this listener for page cleanup
             const currentPage = window.location.pathname.split('/').pop().split('.')[0];
             if (!this.pageListeners.has(currentPage)) {
                 this.pageListeners.set(currentPage, {
@@ -1110,7 +1111,7 @@ class GroupChat {
             
             this.unsubscribeFunctions.privateMessages.set(chatId, unsubscribe);
             
-            // NEW: Also track in page listeners for cleanup
+            // Also track in page listeners for cleanup
             if (pageData) {
                 pageData.privateMessages.set(chatId, unsubscribe);
             }
@@ -2478,7 +2479,7 @@ class GroupChat {
             
             this.unsubscribeFunctions.groupMessages.set(groupId, unsubscribe);
             
-            // NEW: Also track in page listeners for cleanup
+            // Also track in page listeners for cleanup
             if (!pageData) {
                 this.pageListeners.set(currentPage, {
                     privateMessages: new Map(),
@@ -4445,6 +4446,9 @@ function initGroupPage() {
     // Create typing indicator at top
     typingIndicator = createTypingIndicator();
     
+    // FIXED: Clean up previous listeners BEFORE setting up new ones
+    groupChat.cleanupPreviousPageListeners();
+    
     (async () => {
         const needsSetup = await groupChat.needsProfileSetup();
         if (needsSetup) {
@@ -4491,13 +4495,9 @@ function initGroupPage() {
         window.location.href = 'groups.html';
     });
     
+    // FIXED: Remove the cloning logic - it breaks event listeners
     if (sidebarToggle) {
-        const newToggle = sidebarToggle.cloneNode(true);
-        sidebarToggle.parentNode.replaceChild(newToggle, sidebarToggle);
-        
-        const freshToggle = document.getElementById('sidebarToggle');
-        
-        freshToggle.addEventListener('click', (e) => {
+        sidebarToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
             
@@ -5355,7 +5355,7 @@ function initGroupPage() {
             // Clean up typing
             if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
                 try {
-                    typingUnsubscribe();
+                typingUnsubscribe();
                 } catch (err) {
                     console.log('Error unsubscribing from typing:', err);
                 }
@@ -6584,6 +6584,9 @@ function initChatPage() {
     }
     const renderedMessageIds = groupChat.renderedMessagesPerChat.get(chatKey);
     
+    // FIXED: Clean up previous listeners BEFORE setting up new ones
+    groupChat.cleanupPreviousPageListeners();
+    
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
         reactionUnsubscribers.forEach(unsub => {
@@ -6600,13 +6603,9 @@ function initChatPage() {
         window.location.href = 'message.html';
     });
     
+    // FIXED: Remove the cloning logic - it breaks event listeners
     if (sidebarToggle) {
-        const newToggle = sidebarToggle.cloneNode(true);
-        sidebarToggle.parentNode.replaceChild(newToggle, sidebarToggle);
-        
-        const freshToggle = document.getElementById('sidebarToggle');
-        
-        freshToggle.addEventListener('click', (e) => {
+        sidebarToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
             
