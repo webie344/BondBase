@@ -1,9 +1,10 @@
-// games.js - Complete Gamer Profile Management System
+// games.js - Complete Gamer Profile Management System with Intro Animations
 // Firebase configuration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
-    onAuthStateChanged 
+    onAuthStateChanged,
+    signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -45,6 +46,7 @@ const cloudinaryConfig = {
 // Global variables
 let currentUser = null;
 let currentProfileId = null;
+let selectedIntro = null;
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -80,6 +82,9 @@ async function initGamerSystem() {
                     case 'gamersprofile':
                         initGamersProfilePage();
                         break;
+                    case 'intro':
+                        initIntroSelectionPage();
+                        break;
                     default:
                         console.log('Gamer system not needed on this page');
                 }
@@ -91,12 +96,701 @@ async function initGamerSystem() {
                 const currentPage = window.location.pathname.split('/').pop().split('.')[0];
                 if (currentPage === 'gamersprofile') {
                     initGamersProfilePage();
+                } else if (currentPage === 'intro') {
+                    // Redirect to login if trying to access intro page without auth
+                    window.location.href = 'login.html';
                 }
             }
         });
         
     } catch (error) {
         console.error('Error initializing gamer system:', error);
+    }
+}
+
+// ========== INTRO SELECTION PAGE FUNCTIONS ==========
+function initIntroSelectionPage() {
+    if (!db) {
+        setTimeout(initIntroSelectionPage, 500);
+        return;
+    }
+    
+    console.log('Initializing intro selection page');
+    
+    // Setup event listeners for intro selection
+    setupIntroSelectionListeners();
+}
+
+function setupIntroSelectionListeners() {
+    // Intro card selection
+    const introCards = document.querySelectorAll('.intro-card');
+    introCards.forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('preview-btn')) {
+                selectIntro(card);
+            }
+        });
+    });
+
+    // Preview buttons
+    const previewBtns = document.querySelectorAll('.preview-btn');
+    previewBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const introType = btn.dataset.preview;
+            showPreview(introType);
+        });
+    });
+
+    // Continue button
+    const continueBtn = document.getElementById('continue-btn');
+    if (continueBtn) {
+        continueBtn.addEventListener('click', saveIntroSelection);
+    }
+
+    // Close preview
+    const closePreview = document.querySelector('.close-preview');
+    const previewOverlay = document.getElementById('previewOverlay');
+    
+    if (closePreview && previewOverlay) {
+        closePreview.addEventListener('click', () => {
+            previewOverlay.style.display = 'none';
+        });
+
+        previewOverlay.addEventListener('click', (e) => {
+            if (e.target === previewOverlay) {
+                previewOverlay.style.display = 'none';
+            }
+        });
+    }
+}
+
+function selectIntro(card) {
+    // Remove active class from all cards
+    document.querySelectorAll('.intro-card').forEach(c => {
+        c.classList.remove('active');
+    });
+
+    // Add active class to selected card
+    card.classList.add('active');
+    
+    // Set selected intro
+    selectedIntro = card.dataset.intro;
+    
+    // Update UI
+    const introText = document.getElementById('selected-intro-text');
+    const introName = card.querySelector('h3').textContent;
+    if (introText) {
+        introText.textContent = `Selected: ${introName}`;
+    }
+    
+    // Enable continue button
+    const continueBtn = document.getElementById('continue-btn');
+    if (continueBtn) {
+        continueBtn.disabled = false;
+    }
+}
+
+function showPreview(introType) {
+    const previewContainer = document.getElementById('previewContainer');
+    const previewOverlay = document.getElementById('previewOverlay');
+    
+    if (!previewContainer || !previewOverlay) return;
+    
+    // Create preview based on intro type
+    let previewHTML = '';
+    
+    switch(introType) {
+        case 'hero':
+            previewHTML = createHeroPreview();
+            break;
+        case 'glitch':
+            previewHTML = createGlitchPreview();
+            break;
+        case 'portal':
+            previewHTML = createPortalPreview();
+            break;
+        case 'rank':
+            previewHTML = createRankPreview();
+            break;
+        case 'minimal':
+            previewHTML = createMinimalPreview();
+            break;
+    }
+    
+    previewContainer.innerHTML = previewHTML;
+    previewOverlay.style.display = 'flex';
+    
+    // Start the preview animation
+    setTimeout(() => {
+        startPreviewAnimation(introType);
+    }, 100);
+}
+
+function createHeroPreview() {
+    return `
+        <div class="hero-preview">
+            <div class="preview-stage">
+                <div class="dark-screen"></div>
+                <div class="glitch-text">LOADING PROFILE...</div>
+                <div class="username">DEMO_PLAYER</div>
+                <div class="avatar-placeholder"></div>
+                <div class="light-burst"></div>
+                <div class="enter-text">ENTERING ARENA...</div>
+            </div>
+            <div class="preview-info">
+                <h3><i class="fas fa-fire"></i> Hero Reveal Preview</h3>
+                <p>Dark screen → Glitch text → Username reveals → Avatar slides in with light burst</p>
+            </div>
+        </div>
+        <style>
+            .hero-preview { max-width: 600px; margin: 0 auto; }
+            .preview-stage {
+                position: relative;
+                height: 300px;
+                background: #050510;
+                border-radius: 10px;
+                overflow: hidden;
+                margin-bottom: 1rem;
+            }
+            .dark-screen { 
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: #000;
+            }
+            .glitch-text {
+                position: absolute;
+                top: 30%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: #ff2a6d;
+                font-family: monospace;
+                font-size: 1.2rem;
+                opacity: 0;
+            }
+            .username {
+                position: absolute;
+                top: 40%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: white;
+                font-size: 2rem;
+                font-weight: bold;
+                opacity: 0;
+            }
+            .avatar-placeholder {
+                position: absolute;
+                top: 50%;
+                left: -100px;
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(45deg, #ff2a6d, #00ff88);
+                border-radius: 50%;
+                opacity: 0;
+            }
+            .light-burst {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 200px;
+                height: 200px;
+                background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 70%);
+                opacity: 0;
+            }
+            .enter-text {
+                position: absolute;
+                bottom: 20%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: #00ff88;
+                font-size: 1.5rem;
+                opacity: 0;
+            }
+        </style>
+    `;
+}
+
+function createGlitchPreview() {
+    return `
+        <div class="glitch-preview">
+            <div class="preview-stage">
+                <div class="screen-flicker"></div>
+                <div class="scan-lines"></div>
+                <div class="scrambled-text">D3M0_PL4Y3R</div>
+                <div class="resolved-text">DEMO_PLAYER</div>
+                <div class="glitch-effect"></div>
+            </div>
+            <div class="preview-info">
+                <h3><i class="fas fa-bolt"></i> Glitch Hacker Preview</h3>
+                <p>Screen flickers → Scan lines → Scrambled text resolves → Digital whoosh effect</p>
+            </div>
+        </div>
+        <style>
+            .glitch-preview { max-width: 600px; margin: 0 auto; }
+            .preview-stage {
+                position: relative;
+                height: 300px;
+                background: #0a0a1a;
+                border-radius: 10px;
+                overflow: hidden;
+                margin-bottom: 1rem;
+            }
+            .screen-flicker {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 243, 255, 0.1);
+                opacity: 0;
+            }
+            .scan-lines {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 243, 255, 0.1) 2px,
+                    rgba(0, 243, 255, 0.1) 4px
+                );
+                opacity: 0;
+            }
+            .scrambled-text {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #00f3ff;
+                font-family: monospace;
+                font-size: 2rem;
+                opacity: 0;
+            }
+            .resolved-text {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: white;
+                font-size: 2rem;
+                font-weight: bold;
+                opacity: 0;
+            }
+            .glitch-effect {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(
+                    45deg,
+                    transparent 49%,
+                    rgba(0, 243, 255, 0.2) 50%,
+                    transparent 51%
+                );
+                opacity: 0;
+            }
+        </style>
+    `;
+}
+
+function createPortalPreview() {
+    return `
+        <div class="portal-preview">
+            <div class="preview-stage">
+                <div class="space-bg"></div>
+                <div class="portal-ring"></div>
+                <div class="avatar-emerge"></div>
+                <div class="name-fade">DEMO_PLAYER</div>
+                <div class="portal-collapse"></div>
+            </div>
+            <div class="preview-info">
+                <h3><i class="fas fa-ring"></i> Portal Teleport Preview</h3>
+                <p>Portal opens → Avatar emerges → Name fades in → Portal collapses</p>
+            </div>
+        </div>
+        <style>
+            .portal-preview { max-width: 600px; margin: 0 auto; }
+            .preview-stage {
+                position: relative;
+                height: 300px;
+                background: #050510;
+                border-radius: 10px;
+                overflow: hidden;
+                margin-bottom: 1rem;
+            }
+            .space-bg {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: radial-gradient(circle at center, #0a0a2a 0%, #000 100%);
+            }
+            .portal-ring {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 0;
+                height: 0;
+                border: 2px solid #9d00ff;
+                border-radius: 50%;
+                opacity: 0;
+            }
+            .avatar-emerge {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 60px;
+                height: 60px;
+                background: linear-gradient(45deg, #ff2a6d, #00ff88);
+                border-radius: 50%;
+                opacity: 0;
+            }
+            .name-fade {
+                position: absolute;
+                top: 60%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: white;
+                font-size: 1.5rem;
+                opacity: 0;
+            }
+            .portal-collapse {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 100px;
+                height: 100px;
+                border: 2px solid #9d00ff;
+                border-radius: 50%;
+                opacity: 0;
+            }
+        </style>
+    `;
+}
+
+function createRankPreview() {
+    return `
+        <div class="rank-preview">
+            <div class="preview-stage">
+                <div class="rank-badge">CHAMPION</div>
+                <div class="badge-slam"></div>
+                <div class="camera-shake"></div>
+                <div class="profile-fade"></div>
+            </div>
+            <div class="preview-info">
+                <h3><i class="fas fa-trophy"></i> Rank Flex Preview</h3>
+                <p>Rank badge slams in → Camera shake → Profile fades in → Establish dominance</p>
+            </div>
+        </div>
+        <style>
+            .rank-preview { max-width: 600px; margin: 0 auto; }
+            .preview-stage {
+                position: relative;
+                height: 300px;
+                background: #1a1a2e;
+                border-radius: 10px;
+                overflow: hidden;
+                margin-bottom: 1rem;
+            }
+            .rank-badge {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #FFD700;
+                font-size: 3rem;
+                font-weight: bold;
+                opacity: 0;
+            }
+            .badge-slam {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+                opacity: 0;
+            }
+            .camera-shake {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: rgba(255, 215, 0, 0.1);
+                opacity: 0;
+            }
+            .profile-fade {
+                position: absolute;
+                width: 80%;
+                height: 60%;
+                top: 20%;
+                left: 10%;
+                background: linear-gradient(45deg, rgba(255, 42, 109, 0.1), rgba(0, 255, 136, 0.1));
+                border-radius: 10px;
+                opacity: 0;
+            }
+        </style>
+    `;
+}
+
+function createMinimalPreview() {
+    return `
+        <div class="minimal-preview">
+            <div class="preview-stage">
+                <div class="blur-bg"></div>
+                <div class="soft-zoom"></div>
+                <div class="minimal-avatar"></div>
+                <div class="minimal-name">DEMO_PLAYER</div>
+            </div>
+            <div class="preview-info">
+                <h3><i class="fas fa-star"></i> Minimal Pro Preview</h3>
+                <p>Blur background → Soft zoom → Clean fade in → Professional aesthetic</p>
+            </div>
+        </div>
+        <style>
+            .minimal-preview { max-width: 600px; margin: 0 auto; }
+            .preview-stage {
+                position: relative;
+                height: 300px;
+                background: #050510;
+                border-radius: 10px;
+                overflow: hidden;
+                margin-bottom: 1rem;
+            }
+            .blur-bg {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+                backdrop-filter: blur(20px);
+            }
+            .soft-zoom {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            .minimal-avatar {
+                position: absolute;
+                top: 40%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(45deg, #ff2a6d, #00ff88);
+                border-radius: 50%;
+                opacity: 0;
+            }
+            .minimal-name {
+                position: absolute;
+                top: 65%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: white;
+                font-size: 1.8rem;
+                font-weight: 300;
+                opacity: 0;
+            }
+        </style>
+    `;
+}
+
+function startPreviewAnimation(introType) {
+    const stage = document.querySelector('.preview-stage');
+    
+    // Reset previous animations
+    stage.style.animation = 'none';
+    void stage.offsetWidth; // Trigger reflow
+    
+    switch(introType) {
+        case 'hero':
+            animateHeroPreview();
+            break;
+        case 'glitch':
+            animateGlitchPreview();
+            break;
+        case 'portal':
+            animatePortalPreview();
+            break;
+        case 'rank':
+            animateRankPreview();
+            break;
+        case 'minimal':
+            animateMinimalPreview();
+            break;
+    }
+}
+
+function animateHeroPreview() {
+    const elements = {
+        glitchText: document.querySelector('.glitch-text'),
+        username: document.querySelector('.username'),
+        avatar: document.querySelector('.avatar-placeholder'),
+        lightBurst: document.querySelector('.light-burst'),
+        enterText: document.querySelector('.enter-text'),
+        darkScreen: document.querySelector('.dark-screen')
+    };
+
+    const timeline = [
+        { element: elements.darkScreen, opacity: 1, duration: 0 },
+        { element: elements.glitchText, opacity: 1, delay: 500, duration: 1000 },
+        { element: elements.username, opacity: 1, delay: 1500, duration: 1000 },
+        { element: elements.avatar, opacity: 1, left: '50%', delay: 2000, duration: 800 },
+        { element: elements.lightBurst, opacity: 0.5, delay: 2000, duration: 300 },
+        { element: elements.lightBurst, opacity: 0, delay: 2300, duration: 200 },
+        { element: elements.enterText, opacity: 1, delay: 2500, duration: 1000 }
+    ];
+
+    animateTimeline(timeline);
+}
+
+function animateGlitchPreview() {
+    const elements = {
+        screenFlicker: document.querySelector('.screen-flicker'),
+        scanLines: document.querySelector('.scan-lines'),
+        scrambledText: document.querySelector('.scrambled-text'),
+        resolvedText: document.querySelector('.resolved-text'),
+        glitchEffect: document.querySelector('.glitch-effect')
+    };
+
+    const timeline = [
+        { element: elements.screenFlicker, opacity: 0.3, duration: 100 },
+        { element: elements.screenFlicker, opacity: 0, delay: 100, duration: 50 },
+        { element: elements.screenFlicker, opacity: 0.2, delay: 200, duration: 50 },
+        { element: elements.scanLines, opacity: 0.5, delay: 300, duration: 1000 },
+        { element: elements.scrambledText, opacity: 1, delay: 500, duration: 500 },
+        { element: elements.scrambledText, opacity: 0, delay: 1500, duration: 100 },
+        { element: elements.resolvedText, opacity: 1, delay: 1600, duration: 500 },
+        { element: elements.glitchEffect, opacity: 0.5, delay: 1800, duration: 200 },
+        { element: elements.glitchEffect, opacity: 0, delay: 2000, duration: 100 },
+        { element: elements.scanLines, opacity: 0, delay: 2000, duration: 500 }
+    ];
+
+    animateTimeline(timeline);
+}
+
+function animatePortalPreview() {
+    const elements = {
+        portalRing: document.querySelector('.portal-ring'),
+        avatarEmerge: document.querySelector('.avatar-emerge'),
+        nameFade: document.querySelector('.name-fade'),
+        portalCollapse: document.querySelector('.portal-collapse')
+    };
+
+    const timeline = [
+        { element: elements.portalRing, width: '200px', height: '200px', opacity: 1, delay: 500, duration: 1000 },
+        { element: elements.avatarEmerge, opacity: 1, delay: 1500, duration: 500 },
+        { element: elements.nameFade, opacity: 1, delay: 2000, duration: 1000 },
+        { element: elements.portalCollapse, width: '200px', height: '200px', opacity: 1, delay: 2500, duration: 300 },
+        { element: elements.portalCollapse, width: '0', height: '0', opacity: 0, delay: 2800, duration: 200 }
+    ];
+
+    animateTimeline(timeline);
+}
+
+function animateRankPreview() {
+    const elements = {
+        rankBadge: document.querySelector('.rank-badge'),
+        badgeSlam: document.querySelector('.badge-slam'),
+        cameraShake: document.querySelector('.camera-shake'),
+        profileFade: document.querySelector('.profile-fade')
+    };
+
+    const timeline = [
+        { element: elements.rankBadge, opacity: 1, scale: 0.5, delay: 500, duration: 200 },
+        { element: elements.rankBadge, scale: 1.2, delay: 700, duration: 100 },
+        { element: elements.rankBadge, scale: 1, delay: 800, duration: 100 },
+        { element: elements.badgeSlam, opacity: 0.5, delay: 700, duration: 100 },
+        { element: elements.badgeSlam, opacity: 0, delay: 800, duration: 200 },
+        { element: elements.cameraShake, opacity: 0.3, delay: 700, duration: 300 },
+        { element: elements.cameraShake, opacity: 0, delay: 1000, duration: 200 },
+        { element: elements.profileFade, opacity: 1, delay: 1200, duration: 1000 }
+    ];
+
+    animateTimeline(timeline);
+}
+
+function animateMinimalPreview() {
+    const elements = {
+        softZoom: document.querySelector('.soft-zoom'),
+        minimalAvatar: document.querySelector('.minimal-avatar'),
+        minimalName: document.querySelector('.minimal-name')
+    };
+
+    const timeline = [
+        { element: elements.softZoom, opacity: 1, scale: 1, delay: 500, duration: 1500 },
+        { element: elements.minimalAvatar, opacity: 1, delay: 1000, duration: 1000 },
+        { element: elements.minimalName, opacity: 1, delay: 1500, duration: 1000 }
+    ];
+
+    animateTimeline(timeline);
+}
+
+function animateTimeline(timeline) {
+    timeline.forEach((step, index) => {
+        setTimeout(() => {
+            const element = step.element;
+            if (!element) return;
+            
+            // Apply all properties
+            if (step.opacity !== undefined) {
+                element.style.opacity = step.opacity;
+            }
+            if (step.left !== undefined) {
+                element.style.left = step.left;
+            }
+            if (step.width !== undefined) {
+                element.style.width = step.width;
+            }
+            if (step.height !== undefined) {
+                element.style.height = step.height;
+            }
+            if (step.scale !== undefined) {
+                element.style.transform = `scale(${step.scale})`;
+            }
+            
+            // Set transition
+            element.style.transition = `all ${step.duration || 300}ms ease`;
+            
+        }, step.delay || 0);
+    });
+}
+
+async function saveIntroSelection() {
+    if (!currentUser || !selectedIntro) {
+        showNotification('Please select an intro animation', 'warning');
+        return;
+    }
+    
+    try {
+        // Save intro preference to user's profile
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, {
+            introAnimation: selectedIntro,
+            lastUpdated: serverTimestamp()
+        });
+        
+        // Also update gamer profile if it exists
+        const gamerProfileRef = collection(db, 'users', currentUser.uid, 'gamerProfile');
+        const gamerProfileSnap = await getDocs(gamerProfileRef);
+        
+        if (!gamerProfileSnap.empty) {
+            const profileDoc = gamerProfileSnap.docs[0];
+            await updateDoc(profileDoc.ref, {
+                introAnimation: selectedIntro
+            });
+        }
+        
+        showNotification('Intro animation saved successfully!', 'success');
+        
+        // Redirect to gamersprofile page after a delay
+        setTimeout(() => {
+            window.location.href = 'gamersprofile.html';
+        }, 1500);
+        
+    } catch (error) {
+        console.error('Error saving intro selection:', error);
+        showNotification('Error saving intro animation', 'error');
     }
 }
 
@@ -124,6 +818,9 @@ async function initAccountPageGamerProfile() {
             // Load existing gamer profile
             await loadGamerProfile(currentUser.uid);
             
+            // Check if user has intro animation set
+            await checkIntroAnimation();
+            
             console.log('Account page gamer profile initialized');
             
         } catch (error) {
@@ -139,6 +836,7 @@ function setupAccountPageListeners() {
     const editGamerProfileBtn = document.getElementById('editGamerProfileBtn');
     const screenshotInput = document.getElementById('gamerScreenshot');
     const removeScreenshotBtn = document.getElementById('removeScreenshot');
+    const changeIntroBtn = document.getElementById('changeIntroBtn');
     
     if (gamerProfileForm) {
         gamerProfileForm.addEventListener('submit', handleGamerProfileSubmit);
@@ -162,6 +860,68 @@ function setupAccountPageListeners() {
     
     if (removeScreenshotBtn) {
         removeScreenshotBtn.addEventListener('click', removeScreenshot);
+    }
+    
+    if (changeIntroBtn) {
+        changeIntroBtn.addEventListener('click', () => {
+            window.location.href = 'intro.html';
+        });
+    }
+}
+
+async function checkIntroAnimation() {
+    try {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            
+            // Show intro animation status
+            const introStatus = document.getElementById('introStatus');
+            if (introStatus) {
+                if (userData.introAnimation) {
+                    const introNames = {
+                        'hero': 'Hero Reveal',
+                        'glitch': 'Glitch Hacker',
+                        'portal': 'Portal Teleport',
+                        'rank': 'Rank Flex',
+                        'minimal': 'Minimal Pro'
+                    };
+                    
+                    introStatus.innerHTML = `
+                        <div class="intro-status-card">
+                            <i class="fas fa-film"></i>
+                            <div>
+                                <strong>Active Intro:</strong> ${introNames[userData.introAnimation] || userData.introAnimation}
+                            </div>
+                        </div>
+                    `;
+                    
+                    const changeIntroBtn = document.getElementById('changeIntroBtn');
+                    if (changeIntroBtn) {
+                        changeIntroBtn.style.display = 'block';
+                    }
+                } else {
+                    introStatus.innerHTML = `
+                        <div class="intro-status-card">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <div>
+                                <strong>No intro animation selected</strong>
+                                <p style="font-size: 0.9rem; color: #aaa; margin-top: 0.25rem;">
+                                    Choose an animation to make your profile stand out
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    const setupIntroBtn = document.getElementById('setupIntroBtn');
+                    if (setupIntroBtn) {
+                        setupIntroBtn.style.display = 'block';
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error checking intro animation:', error);
     }
 }
 
@@ -743,9 +1503,722 @@ async function initGamersProfilePage() {
         return;
     }
     
-    // Load the gamer profile
+    // Check if we should show intro animation
+    const showIntro = urlParams.get('intro') !== 'false' && !urlParams.has('skipIntro');
+    
+    if (showIntro) {
+        // Load user data first to check for intro animation
+        try {
+            const userDoc = await getDoc(doc(db, 'users', userId));
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                if (userData.introAnimation) {
+                    // Show intro animation before loading profile
+                    await showIntroAnimation(userData.introAnimation, userId, profileId);
+                    return;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking intro animation:', error);
+            // Continue to load profile normally
+        }
+    }
+    
+    // Load the gamer profile normally
     await loadPublicGamerProfile(userId, profileId);
 }
+
+async function showIntroAnimation(introType, userId, profileId) {
+    // Create intro overlay
+    const introOverlay = document.createElement('div');
+    introOverlay.id = 'introOverlay';
+    introOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #050510;
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+    `;
+    
+    document.body.appendChild(introOverlay);
+    
+    // Create intro content based on type
+    let introHTML = '';
+    
+    switch(introType) {
+        case 'hero':
+            introHTML = createHeroIntro(userId);
+            break;
+        case 'glitch':
+            introHTML = createGlitchIntro(userId);
+            break;
+        case 'portal':
+            introHTML = createPortalIntro(userId);
+            break;
+        case 'rank':
+            introHTML = createRankIntro(userId);
+            break;
+        case 'minimal':
+            introHTML = createMinimalIntro(userId);
+            break;
+        default:
+            // Default animation
+            introHTML = createDefaultIntro(userId);
+    }
+    
+    introOverlay.innerHTML = introHTML;
+    
+    // Play the animation
+    setTimeout(() => {
+        playIntroAnimation(introType);
+    }, 500);
+    
+    // After animation completes, load profile
+    setTimeout(async () => {
+        // Fade out intro
+        introOverlay.style.opacity = '0';
+        introOverlay.style.transition = 'opacity 0.5s ease';
+        
+        setTimeout(() => {
+            if (introOverlay.parentNode) {
+                introOverlay.parentNode.removeChild(introOverlay);
+            }
+            
+            // Load profile
+            loadPublicGamerProfile(userId, profileId);
+        }, 500);
+    }, 5000); // 5 seconds total animation time
+}
+
+function createHeroIntro(userId) {
+    // Get user data for animation
+    const userData = {}; // You would get this from your user data
+    
+    return `
+        <div class="hero-intro">
+            <div class="dark-screen"></div>
+            <div class="glitch-text">LOADING PROFILE...</div>
+            <div class="username">${userData.gamerTag || 'GAMER'}</div>
+            <div class="avatar-placeholder">
+                <img src="${userData.profileImage || 'images-default-profile.jpg'}" alt="Avatar">
+            </div>
+            <div class="light-burst"></div>
+            <div class="enter-text">ENTERING ARENA...</div>
+            <div class="skip-intro">
+                <button onclick="skipIntro()">Skip Intro</button>
+            </div>
+        </div>
+        <style>
+            .hero-intro {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+            }
+            .dark-screen { 
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: #000;
+                animation: fadeOut 1s ease 3s forwards;
+            }
+            .glitch-text {
+                position: absolute;
+                top: 30%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: #ff2a6d;
+                font-family: monospace;
+                font-size: 1.5rem;
+                opacity: 0;
+                animation: glitchText 2s ease 0.5s forwards;
+            }
+            .username {
+                position: absolute;
+                top: 40%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: white;
+                font-size: 3rem;
+                font-weight: bold;
+                opacity: 0;
+                animation: fadeIn 1s ease 2s forwards;
+            }
+            .avatar-placeholder {
+                position: absolute;
+                top: 50%;
+                left: -200px;
+                width: 120px;
+                height: 120px;
+                border-radius: 50%;
+                overflow: hidden;
+                opacity: 0;
+                animation: slideIn 1s ease 2.5s forwards, glow 2s ease 3s infinite alternate;
+            }
+            .avatar-placeholder img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+            .light-burst {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 300px;
+                height: 300px;
+                background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 70%);
+                opacity: 0;
+                animation: burst 0.5s ease 2.5s forwards;
+            }
+            .enter-text {
+                position: absolute;
+                bottom: 20%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: #00ff88;
+                font-size: 2rem;
+                opacity: 0;
+                animation: fadeIn 1s ease 3s forwards;
+            }
+            .skip-intro {
+                position: absolute;
+                bottom: 5%;
+                right: 5%;
+            }
+            .skip-intro button {
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.2);
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                cursor: pointer;
+                backdrop-filter: blur(10px);
+            }
+            @keyframes glitchText {
+                0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                50% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                100% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            }
+            @keyframes slideIn {
+                to { opacity: 1; left: 50%; transform: translateX(-50%); }
+            }
+            @keyframes burst {
+                0% { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+                50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.2); }
+                100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+            }
+            @keyframes glow {
+                from { box-shadow: 0 0 20px rgba(255, 42, 109, 0.5); }
+                to { box-shadow: 0 0 40px rgba(0, 255, 136, 0.8); }
+            }
+            @keyframes fadeIn {
+                to { opacity: 1; }
+            }
+            @keyframes fadeOut {
+                to { opacity: 0; }
+            }
+        </style>
+    `;
+}
+
+function createGlitchIntro(userId) {
+    return `
+        <div class="glitch-intro">
+            <div class="screen-flicker"></div>
+            <div class="scan-lines"></div>
+            <div class="scrambled-text">${getScrambledText('GAMER_PROFILE')}</div>
+            <div class="resolved-text">GAMER PROFILE</div>
+            <div class="digital-whoosh"></div>
+            <div class="skip-intro">
+                <button onclick="skipIntro()">Skip Intro</button>
+            </div>
+        </div>
+        <style>
+            .glitch-intro {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: #0a0a1a;
+            }
+            .screen-flicker {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 243, 255, 0.1);
+                animation: flicker 2s ease infinite;
+            }
+            .scan-lines {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 243, 255, 0.1) 2px,
+                    rgba(0, 243, 255, 0.1) 4px
+                );
+                animation: scan 5s linear infinite;
+            }
+            .scrambled-text {
+                position: absolute;
+                top: 40%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #00f3ff;
+                font-family: monospace;
+                font-size: 2.5rem;
+                animation: scramble 3s ease forwards;
+            }
+            .resolved-text {
+                position: absolute;
+                top: 40%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: white;
+                font-size: 2.5rem;
+                font-weight: bold;
+                opacity: 0;
+                animation: resolve 1s ease 2.5s forwards;
+            }
+            .digital-whoosh {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(
+                    90deg,
+                    transparent 49%,
+                    rgba(0, 243, 255, 0.3) 50%,
+                    transparent 51%
+                );
+                opacity: 0;
+                animation: whoosh 1s ease 3s forwards;
+            }
+            .skip-intro {
+                position: absolute;
+                bottom: 5%;
+                right: 5%;
+            }
+            .skip-intro button {
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.2);
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                cursor: pointer;
+                backdrop-filter: blur(10px);
+            }
+            @keyframes flicker {
+                0%, 100% { opacity: 0.1; }
+                50% { opacity: 0.3; }
+            }
+            @keyframes scan {
+                0% { transform: translateY(-100%); }
+                100% { transform: translateY(100%); }
+            }
+            @keyframes scramble {
+                0% { opacity: 0; }
+                50% { opacity: 1; }
+                100% { opacity: 0; }
+            }
+            @keyframes resolve {
+                to { opacity: 1; }
+            }
+            @keyframes whoosh {
+                0% { opacity: 0; transform: translateX(-100%); }
+                50% { opacity: 0.5; transform: translateX(0); }
+                100% { opacity: 0; transform: translateX(100%); }
+            }
+        </style>
+    `;
+}
+
+function createPortalIntro(userId) {
+    return `
+        <div class="portal-intro">
+            <div class="space-bg"></div>
+            <div class="portal-ring"></div>
+            <div class="avatar-emerge">
+                <div class="avatar-glow"></div>
+            </div>
+            <div class="name-fade">GAMER PROFILE</div>
+            <div class="portal-collapse"></div>
+            <div class="skip-intro">
+                <button onclick="skipIntro()">Skip Intro</button>
+            </div>
+        </div>
+        <style>
+            .portal-intro {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: #050510;
+            }
+            .space-bg {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: radial-gradient(circle at center, #0a0a2a 0%, #000 100%);
+            }
+            .portal-ring {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 0;
+                height: 0;
+                border: 3px solid #9d00ff;
+                border-radius: 50%;
+                animation: portalOpen 2s ease forwards;
+            }
+            .avatar-emerge {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 100px;
+                height: 100px;
+                background: linear-gradient(45deg, #ff2a6d, #00ff88);
+                border-radius: 50%;
+                opacity: 0;
+                animation: emerge 1s ease 2s forwards;
+            }
+            .avatar-glow {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+                background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+                animation: pulse 2s ease infinite;
+            }
+            .name-fade {
+                position: absolute;
+                top: 60%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: white;
+                font-size: 2rem;
+                opacity: 0;
+                animation: fadeIn 1s ease 3s forwards;
+            }
+            .portal-collapse {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 200px;
+                height: 200px;
+                border: 3px solid #9d00ff;
+                border-radius: 50%;
+                opacity: 0;
+                animation: collapse 1s ease 4s forwards;
+            }
+            .skip-intro {
+                position: absolute;
+                bottom: 5%;
+                right: 5%;
+            }
+            .skip-intro button {
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.2);
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                cursor: pointer;
+                backdrop-filter: blur(10px);
+            }
+            @keyframes portalOpen {
+                to { width: 300px; height: 300px; opacity: 1; }
+            }
+            @keyframes emerge {
+                to { opacity: 1; }
+            }
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); opacity: 0.5; }
+                50% { transform: scale(1.2); opacity: 0.8; }
+            }
+            @keyframes fadeIn {
+                to { opacity: 1; }
+            }
+            @keyframes collapse {
+                0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                100% { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+            }
+        </style>
+    `;
+}
+
+function createRankIntro(userId) {
+    return `
+        <div class="rank-intro">
+            <div class="rank-badge">CHAMPION</div>
+            <div class="badge-slam"></div>
+            <div class="camera-shake"></div>
+            <div class="profile-reveal">GAMER PROFILE</div>
+            <div class="skip-intro">
+                <button onclick="skipIntro()">Skip Intro</button>
+            </div>
+        </div>
+        <style>
+            .rank-intro {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: #1a1a2e;
+            }
+            .rank-badge {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%) scale(0.1);
+                color: #FFD700;
+                font-size: 4rem;
+                font-weight: bold;
+                text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+                animation: badgeSlam 1s ease forwards;
+            }
+            .badge-slam {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 400px;
+                height: 400px;
+                background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+                opacity: 0;
+                animation: slamEffect 0.5s ease 0.5s forwards;
+            }
+            .camera-shake {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: rgba(255, 215, 0, 0.1);
+                opacity: 0;
+                animation: shake 0.5s ease 0.5s;
+            }
+            .profile-reveal {
+                position: absolute;
+                top: 65%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: white;
+                font-size: 2rem;
+                opacity: 0;
+                animation: reveal 1s ease 1.5s forwards;
+            }
+            .skip-intro {
+                position: absolute;
+                bottom: 5%;
+                right: 5%;
+            }
+            .skip-intro button {
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.2);
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                cursor: pointer;
+                backdrop-filter: blur(10px);
+            }
+            @keyframes badgeSlam {
+                0% { transform: translate(-50%, -50%) scale(0.1); opacity: 0; }
+                70% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+                100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            }
+            @keyframes slamEffect {
+                0% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
+                100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+            }
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-10px); }
+                50% { transform: translateX(10px); }
+                75% { transform: translateX(-10px); }
+            }
+            @keyframes reveal {
+                to { opacity: 1; }
+            }
+        </style>
+    `;
+}
+
+function createMinimalIntro(userId) {
+    return `
+        <div class="minimal-intro">
+            <div class="blur-bg"></div>
+            <div class="soft-zoom"></div>
+            <div class="minimal-avatar"></div>
+            <div class="minimal-name">GAMER PROFILE</div>
+            <div class="skip-intro">
+                <button onclick="skipIntro()">Skip Intro</button>
+            </div>
+        </div>
+        <style>
+            .minimal-intro {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: #050510;
+            }
+            .blur-bg {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+                backdrop-filter: blur(20px);
+            }
+            .soft-zoom {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                transform: scale(0.8);
+                opacity: 0;
+                animation: zoomIn 2s ease forwards;
+            }
+            .minimal-avatar {
+                position: absolute;
+                top: 40%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 120px;
+                height: 120px;
+                background: linear-gradient(45deg, #ff2a6d, #00ff88);
+                border-radius: 50%;
+                opacity: 0;
+                animation: fadeInUp 1s ease 1.5s forwards;
+            }
+            .minimal-name {
+                position: absolute;
+                top: 65%;
+                left: 50%;
+                transform: translateX(-50%);
+                color: white;
+                font-size: 2.5rem;
+                font-weight: 300;
+                opacity: 0;
+                animation: fadeIn 1s ease 2.5s forwards;
+            }
+            .skip-intro {
+                position: absolute;
+                bottom: 5%;
+                right: 5%;
+            }
+            .skip-intro button {
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.2);
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                cursor: pointer;
+                backdrop-filter: blur(10px);
+            }
+            @keyframes zoomIn {
+                to { opacity: 1; transform: scale(1); }
+            }
+            @keyframes fadeInUp {
+                to { opacity: 1; transform: translate(-50%, -60%); }
+            }
+            @keyframes fadeIn {
+                to { opacity: 1; }
+            }
+        </style>
+    `;
+}
+
+function createDefaultIntro(userId) {
+    return `
+        <div class="default-intro">
+            <div class="loading-text">Loading Gamer Profile...</div>
+            <div class="loading-bar">
+                <div class="loading-progress"></div>
+            </div>
+        </div>
+        <style>
+            .default-intro {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: #050510;
+            }
+            .loading-text {
+                color: white;
+                font-size: 1.5rem;
+                margin-bottom: 2rem;
+                animation: pulse 2s ease infinite;
+            }
+            .loading-bar {
+                width: 300px;
+                height: 4px;
+                background: rgba(255,255,255,0.1);
+                border-radius: 2px;
+                overflow: hidden;
+            }
+            .loading-progress {
+                width: 0%;
+                height: 100%;
+                background: linear-gradient(90deg, #ff2a6d, #00ff88);
+                animation: load 3s ease forwards;
+            }
+            @keyframes pulse {
+                0%, 100% { opacity: 0.5; }
+                50% { opacity: 1; }
+            }
+            @keyframes load {
+                to { width: 100%; }
+            }
+        </style>
+    `;
+}
+
+function getScrambledText(text) {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()';
+    return text.split('').map(char => {
+        if (char === ' ') return ' ';
+        if (Math.random() > 0.5) {
+            return chars[Math.floor(Math.random() * chars.length)];
+        }
+        return char;
+    }).join('');
+}
+
+function playIntroAnimation(introType) {
+    // Animation is handled by CSS animations in the intro HTML
+    console.log(`Playing ${introType} intro animation`);
+}
+
+function skipIntro() {
+    const introOverlay = document.getElementById('introOverlay');
+    if (introOverlay && introOverlay.parentNode) {
+        introOverlay.parentNode.removeChild(introOverlay);
+    }
+    
+    // Get URL parameters and load profile
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('user');
+    const profileId = urlParams.get('profile');
+    
+    if (userId && profileId) {
+        loadPublicGamerProfile(userId, profileId);
+    }
+}
+
+// Make skipIntro available globally
+window.skipIntro = skipIntro;
 
 async function loadPublicGamerProfile(userId, profileId) {
     try {

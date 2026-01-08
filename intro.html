@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choose Your Intro Animation - Gamer Profile</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        :root {
+            --primary: #ff2a6d;
+            --secondary: #00ff88;
+            --dark: #0c0c1d;
+            --darker: #050510;
+            --light: #f8f9fa;
+            --glitch: #00f3ff;
+            --portal: #9d00ff;
+            --rank-gold: #FFD700;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+            color: var(--light);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .intro-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeIn 1s ease;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: #aaa;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .intro-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .intro-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .intro-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--primary);
+            box-shadow: 0 20px 40px rgba(255, 42, 109, 0.2);
+        }
+
+        .intro-card.active {
+            border-color: var(--secondary);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .intro-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .intro-card:nth-child(1) .intro-icon { color: var(--primary); }
+        .intro-card:nth-child(2) .intro-icon { color: var(--glitch); }
+        .intro-card:nth-child(3) .intro-icon { color: var(--portal); }
+        .intro-card:nth-child(4) .intro-icon { color: var(--rank-gold); }
+        .intro-card:nth-child(5) .intro-icon { color: var(--secondary); }
+
+        .intro-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        .intro-card p {
+            color: #aaa;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .intro-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: #ccc;
+        }
+
+        .preview-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+
+        .preview-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .actions {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            margin-top: 2rem;
+            animation: fadeIn 1s ease 0.5s both;
+        }
+
+        .continue-btn {
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 1rem 3rem;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .continue-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(255, 42, 109, 0.4);
+        }
+
+        .continue-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .skip-link {
+            display: block;
+            color: #666;
+            text-decoration: none;
+            margin-top: 1rem;
+            transition: color 0.3s ease;
+        }
+
+        .skip-link:hover {
+            color: var(--secondary);
+        }
+
+        .preview-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .preview-content {
+            background: var(--darker);
+            padding: 2rem;
+            border-radius: 20px;
+            max-width: 800px;
+            width: 90%;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .close-preview {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        @media (max-width: 768px) {
+            .intro-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="intro-container">
+        <div class="header">
+            <h1><i class="fas fa-gamepad"></i> CHOOSE YOUR INTRO</h1>
+            <p>Select an animation style that represents your gamer personality. This intro will play when others view your profile.</p>
+        </div>
+
+        <div class="intro-grid">
+            <!-- Intro A: Hero Reveal -->
+            <div class="intro-card" data-intro="hero">
+                <div class="intro-icon">
+                    <i class="fas fa-fire"></i>
+                </div>
+                <h3>Hero Reveal</h3>
+                <p>Dark screen with glitch text effect, username types in dramatically, avatar slides in with light burst. Perfect for making an epic entrance.</p>
+                <div class="intro-tags">
+                    <span class="tag">Epic</span>
+                    <span class="tag">Dramatic</span>
+                    <span class="tag">Cinematic</span>
+                </div>
+                <button class="preview-btn" data-preview="hero">
+                    <i class="fas fa-play"></i> Preview
+                </button>
+            </div>
+
+            <!-- Intro B: Glitch Hacker -->
+            <div class="intro-card" data-intro="glitch">
+                <div class="intro-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <h3>Glitch Hacker</h3>
+                <p>Screen flickers with digital artifacts, UI lines scan across, username appears in scrambled text that resolves. Cyberpunk vibes.</p>
+                <div class="intro-tags">
+                    <span class="tag">Cyberpunk</span>
+                    <span class="tag">Digital</span>
+                    <span class="tag">Tech</span>
+                </div>
+                <button class="preview-btn" data-preview="glitch">
+                    <i class="fas fa-play"></i> Preview
+                </button>
+            </div>
+
+            <!-- Intro C: Portal Teleport -->
+            <div class="intro-card" data-intro="portal">
+                <div class="intro-icon">
+                    <i class="fas fa-ring"></i>
+                </div>
+                <h3>Portal Teleport</h3>
+                <p>A circular portal opens in space, your avatar emerges from it, name fades in as portal collapses behind you. Mysterious and cool.</p>
+                <div class="intro-tags">
+                    <span class="tag">Sci-Fi</span>
+                    <span class="tag">Mysterious</span>
+                    <span class="tag">Smooth</span>
+                </div>
+                <button class="preview-btn" data-preview="portal">
+                    <i class="fas fa-play"></i> Preview
+                </button>
+            </div>
+
+            <!-- Intro D: Rank Flex -->
+            <div class="intro-card" data-intro="rank">
+                <div class="intro-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <h3>Rank Flex</h3>
+                <p>Show off your rank immediately. Badge slams onto screen with camera shake effect. For players who want to establish dominance.</p>
+                <div class="intro-tags">
+                    <span class="tag">Competitive</span>
+                    <span class="tag">Bold</span>
+                    <span class="tag">Confident</span>
+                </div>
+                <button class="preview-btn" data-preview="rank">
+                    <i class="fas fa-play"></i> Preview
+                </button>
+            </div>
+
+            <!-- Intro E: Minimal Pro -->
+            <div class="intro-card" data-intro="minimal">
+                <div class="intro-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <h3>Minimal Pro</h3>
+                <p>Clean blur background with soft zoom in. Name and avatar fade in elegantly. Professional and classy without unnecessary effects.</p>
+                <div class="intro-tags">
+                    <span class="tag">Clean</span>
+                    <span class="tag">Professional</span>
+                    <span class="tag">Elegant</span>
+                </div>
+                <button class="preview-btn" data-preview="minimal">
+                    <i class="fas fa-play"></i> Preview
+                </button>
+            </div>
+        </div>
+
+        <div class="actions">
+            <p id="selected-intro-text">Select an intro animation to continue</p>
+            <button id="continue-btn" class="continue-btn" disabled>
+                <i class="fas fa-rocket"></i> Continue to Profile
+            </button>
+            <a href="gamersprofile.html" class="skip-link">Skip and use default animation</a>
+        </div>
+    </div>
+
+    <!-- Preview Overlay -->
+    <div id="previewOverlay" class="preview-overlay">
+        <div class="preview-content">
+            <button class="close-preview">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="previewContainer"></div>
+        </div>
+    </div>
+
+    <script  type="module"src="games.js"></script>
+</body>
+</html>
