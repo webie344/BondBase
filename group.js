@@ -8,6 +8,7 @@
 // FIXED: Old messages not loading - messages flash then disappear issue
 // FIXED: Sidebar/info button stops working when duplication starts
 // UPDATED: Added prepare.html integration for stable group entry
+// FIXED: Restricted message display fixed, system messages added for user join and restrictions
 
 import { 
     getFirestore, 
@@ -460,6 +461,12 @@ class GroupChat {
                 restrictedBy: this.firebaseUser?.uid,
                 reason: 'Used restricted word'
             }, { merge: true });
+            
+            // Send system message about restriction
+            await this.sendSystemMessage(
+                groupId, 
+                `${this.currentUser?.name || 'A user'} has been restricted from chatting for 2 hours for using a restricted word.`
+            );
         } catch (error) {
             console.error('Error saving restriction to Firebase:', error);
         }
@@ -1824,6 +1831,12 @@ class GroupChat {
                 expiry: Date.now() + CACHE_DURATION.GROUP_DATA
             });
             
+            // Send system message when user joins
+            await this.sendSystemMessage(
+                groupId,
+                `${this.currentUser.name} has joined the group! 🎉`
+            );
+            
             return true;
         } catch (error) {
             console.error('Error adding member:', error);
@@ -2171,7 +2184,7 @@ class GroupChat {
             
             const isRestricted = await this.isUserRestricted(groupId, this.firebaseUser.uid);
             if (isRestricted) {
-                throw new Error('You are restricted from sending messages in this group for 2 hours due to using restricted words.');
+                throw new Error('You have been restricted from sending messages in this group for 2 hours due to using restricted words.');
             }
             
             if (!text && !imageUrl && !videoUrl) {
@@ -6685,7 +6698,7 @@ function initChatPage() {
                 currentGroup.messages.push(message);
             }
         });
-        
+    
         groupedMessages.forEach(group => {
             const groupDiv = document.createElement('div');
             groupDiv.className = 'message-group';
