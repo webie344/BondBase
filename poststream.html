@@ -6,11 +6,15 @@
     <title>Create Stream - BondBase</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Feather Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
     <style>
         .stream-container {
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
+            width: 100%;
+            overflow: hidden; /* Prevent horizontal scroll */
         }
 
         .stream-header {
@@ -33,10 +37,14 @@
             padding: 30px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             border: 1px solid var(--border-color);
+            width: 100%;
+            overflow: hidden; /* Prevent content from breaking layout */
         }
 
         .form-group {
             margin-bottom: 20px;
+            width: 100%;
+            overflow: hidden;
         }
 
         .form-group label {
@@ -48,6 +56,7 @@
 
         .form-input {
             width: 100%;
+            max-width: 100%;
             padding: 12px 15px;
             border: 1px solid var(--border-color);
             border-radius: 10px;
@@ -76,6 +85,8 @@
             background: var(--bg-dark);
             border-radius: 8px;
             display: none;
+            width: 100%;
+            overflow: hidden;
         }
 
         .file-preview.active {
@@ -86,21 +97,31 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            width: 100%;
+            min-width: 0; /* Allow flex item to shrink */
         }
 
         .file-preview-icon {
             font-size: 24px;
             color: var(--accent-color);
+            flex-shrink: 0; /* Prevent icon from shrinking */
         }
 
         .file-preview-details {
             flex: 1;
+            min-width: 0; /* Crucial for text truncation */
+            overflow: hidden;
         }
 
         .file-preview-name {
             font-weight: 600;
             color: var(--text-dark);
             margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            display: block;
         }
 
         .file-preview-size {
@@ -116,6 +137,7 @@
             padding: 5px;
             border-radius: 50%;
             transition: background-color 0.3s ease;
+            flex-shrink: 0; /* Prevent button from shrinking */
         }
 
         .remove-file:hover {
@@ -138,6 +160,7 @@
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
+            min-width: 0; /* Allow flex item to shrink */
         }
 
         .upload-option.active {
@@ -154,16 +177,24 @@
         .upload-option h4 {
             margin: 0 0 5px 0;
             color: var(--text-dark);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .upload-option p {
             margin: 0;
             font-size: 12px;
             color: var(--text-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .upload-section {
             display: none;
+            width: 100%;
+            overflow: hidden;
         }
 
         .upload-section.active {
@@ -172,6 +203,7 @@
 
         .video-preview {
             width: 100%;
+            max-width: 100%;
             max-height: 200px;
             border-radius: 10px;
             margin-top: 10px;
@@ -183,6 +215,7 @@
             display: flex;
             gap: 15px;
             margin-top: 30px;
+            width: 100%;
         }
 
         .btn-primary {
@@ -199,6 +232,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
+            min-width: 0; /* Allow button to shrink */
         }
 
         .btn-primary:hover {
@@ -218,6 +252,7 @@
             transition: all 0.3s ease;
             text-decoration: none;
             text-align: center;
+            min-width: 0; /* Allow button to shrink */
         }
 
         .btn-secondary:hover {
@@ -234,6 +269,7 @@
             font-size: 12px;
             color: var(--text-light);
             margin-top: 5px;
+            width: 100%;
         }
 
         .url-help a {
@@ -250,6 +286,7 @@
             padding: 15px;
             border-radius: 10px;
             margin-top: 20px;
+            width: 100%;
         }
 
         .supported-platforms h4 {
@@ -271,6 +308,7 @@
             border-radius: 6px;
             font-size: 11px;
             font-weight: 500;
+            white-space: nowrap;
         }
 
         .file-limits {
@@ -278,6 +316,7 @@
             padding: 15px;
             border-radius: 10px;
             margin-top: 20px;
+            width: 100%;
         }
 
         .file-limits h4 {
@@ -301,6 +340,7 @@
             display: none;
             text-align: center;
             padding: 20px;
+            width: 100%;
         }
 
         .success-message {
@@ -311,6 +351,7 @@
             border-radius: 10px;
             margin-bottom: 20px;
             text-align: center;
+            width: 100%;
         }
 
         .error-message {
@@ -321,11 +362,13 @@
             border-radius: 10px;
             margin-bottom: 20px;
             text-align: center;
+            width: 100%;
         }
 
         .upload-progress {
             display: none;
             margin-top: 10px;
+            width: 100%;
         }
 
         .progress-bar {
@@ -350,9 +393,56 @@
             text-align: center;
         }
 
+        /* Feather Icons Integration */
+        .feather-icon {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            vertical-align: middle;
+        }
+        
+        /* Fix for URL input width issue */
+        #videoUrl {
+            word-break: break-all;
+            overflow-wrap: break-word;
+            white-space: normal;
+            min-height: 48px;
+            resize: vertical;
+            width: 100%;
+            max-width: 100%;
+        }
+        
+        /* Loading spinner animation for feather icons */
+        .fa-spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Truncate long text */
+        .text-truncate {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Ensure all containers prevent horizontal overflow */
+        .main-content {
+            width: 100%;
+            overflow-x: hidden;
+        }
+
         @media (max-width: 768px) {
             .stream-container {
                 padding: 15px;
+                max-width: 100%;
             }
 
             .stream-form {
@@ -370,6 +460,15 @@
 
             .btn-primary, .btn-secondary {
                 flex: none;
+                width: 100%;
+            }
+            
+            .file-preview-info {
+                flex-wrap: wrap;
+            }
+            
+            .file-preview-name {
+                font-size: 14px;
             }
         }
 
@@ -389,6 +488,16 @@
             .upload-option p {
                 font-size: 11px;
             }
+            
+            .file-preview-name {
+                font-size: 12px;
+            }
+            
+            .remove-file {
+                position: absolute;
+                right: 10px;
+                top: 10px;
+            }
         }
     </style>
 </head>
@@ -397,51 +506,49 @@
         <div class="navbar-container">
             <a href="index.html" class="logo">BondBase</a>
             <div class="nav-toggle" id="mobile-menu">
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
+                <i data-feather="menu" class="feather-icon"></i>
             </div>
             <ul class="nav-menu">
                 <li class="nav-item">
                     <a href="mingle.html" class="nav-links">
-                        <i class="fas fa-users"></i>
+                        <i data-feather="users" class="feather-icon"></i>
                         <span class="nav-text" style="font-family: 'Dancing Script', cursive; font-size: 1.1rem;">Connect</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="messages.html" class="nav-links">
-                        <i class="fas fa-comments"></i>
+                        <i data-feather="message-circle" class="feather-icon"></i>
                         <span class="nav-text" style="font-family: 'Pacifico', cursive; font-size: 1rem;">Chat</span>
                         <span class="message-count">0</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="stream.html" class="nav-links">
-                        <i class="fas fa-play-circle"></i>
+                        <i data-feather="play-circle" class="feather-icon"></i>
                         <span class="nav-text" style="font-family: 'Great Vibes', cursive; font-size: 1.1rem;">Stream</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="account.html" class="nav-links">
-                        <i class="fas fa-user-shield"></i>
+                        <i data-feather="user" class="feather-icon"></i>
                         <span class="nav-text" style="font-family: 'Great Vibes', cursive; font-size: 1.2rem;">My Profile</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="#" id="logoutBtn" class="nav-links">
-                        <i class="fas fa-sign-out-alt"></i>
+                        <i data-feather="log-out" class="feather-icon"></i>
                         <span class="nav-text" style="font-family: 'Satisfy', cursive; font-size: 1rem;">Logout</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="dashboard.html" class="nav-links">
                         <span class="nav-text" style="font-family: 'Parisienne', cursive; font-size: 1.1rem;">Dashboard</span>
-                        <i class="fas fa-arrow-right"></i>
+                        <i data-feather="arrow-right" class="feather-icon"></i>
                     </a>
                 </li>
-                                <li class="nav-item">
+                <li class="nav-item">
                     <a href="groups.html" class="nav-links">
-                        <i class="fas fa-users"></i>
+                        <i data-feather="users" class="feather-icon"></i>
                         <span>Groups</span>
                     </a>
                 </li>
@@ -452,37 +559,37 @@
     <main class="main-content">
         <div class="stream-container">
             <div class="stream-header">
-                <h1><i class="fas fa-video"></i> Create Stream</h1>
-                <p>Share  videos with the community - completely free!</p>
+                <h1><i data-feather="video" class="feather-icon"></i> Create Stream</h1>
+                <p>Share videos with the community - completely free!</p>
             </div>
 
             <div class="success-message" id="successMessage">
-                <i class="fas fa-check-circle"></i> <span>Stream created successfully! Redirecting...</span>
+                <i data-feather="check-circle" class="feather-icon"></i> <span>Stream created successfully! Redirecting...</span>
             </div>
 
             <div class="error-message" id="errorMessage">
-                <i class="fas fa-exclamation-circle"></i> <span id="errorText"></span>
+                <i data-feather="alert-circle" class="feather-icon"></i> <span id="errorText"></span>
             </div>
 
             <form id="streamForm" class="stream-form">
                 <!-- Upload Method Selection -->
                 <div class="upload-options">
                     <div class="upload-option active" data-method="url">
-                        <i class="fas fa-link"></i>
-                        <h4>Video URL</h4>
-                        <p>YouTube, Vimeo, etc.</p>
+                        <i data-feather="link" class="feather-icon"></i>
+                        <h4 class="text-truncate">Video URL</h4>
+                        <p class="text-truncate">YouTube, Vimeo, etc.</p>
                     </div>
                     <div class="upload-option" data-method="file">
-                        <i class="fas fa-upload"></i>
-                        <h4>Upload File</h4>
-                        <p>From your device</p>
+                        <i data-feather="upload" class="feather-icon"></i>
+                        <h4 class="text-truncate">Upload File</h4>
+                        <p class="text-truncate">From your device</p>
                     </div>
                 </div>
 
                 <!-- URL Upload Section -->
                 <div class="upload-section active" id="urlSection">
                     <div class="form-group">
-                        <label for="videoUrl"><i class="fas fa-link"></i> Video URL</label>
+                        <label for="videoUrl"><i data-feather="link" class="feather-icon"></i> Video URL</label>
                         <input type="url" id="videoUrl" class="form-input" placeholder="https://youtube.com/watch?v=...">
                         <div class="url-help">
                             Supported platforms: YouTube, Vimeo, Dailymotion, or direct video links
@@ -490,7 +597,7 @@
                     </div>
 
                     <div class="supported-platforms">
-                        <h4><i class="fas fa-info-circle"></i> Supported Platforms</h4>
+                        <h4><i data-feather="info" class="feather-icon"></i> Supported Platforms</h4>
                         <div class="platform-list">
                             <span class="platform-tag">YouTube</span>
                             <span class="platform-tag">Vimeo</span>
@@ -504,7 +611,7 @@
                 <!-- File Upload Section -->
                 <div class="upload-section" id="fileSection">
                     <div class="form-group">
-                        <label for="videoFile"><i class="fas fa-upload"></i> Video File</label>
+                        <label for="videoFile"><i data-feather="upload" class="feather-icon"></i> Video File</label>
                         <input type="file" id="videoFile" class="form-input form-file-input" accept="video/*">
                         <div class="url-help">
                             Select a video file from your device (max 100MB)
@@ -513,13 +620,13 @@
                         <!-- File Preview -->
                         <div class="file-preview" id="filePreview">
                             <div class="file-preview-info">
-                                <i class="fas fa-file-video file-preview-icon"></i>
+                                <i data-feather="video" class="feather-icon file-preview-icon"></i>
                                 <div class="file-preview-details">
-                                    <div class="file-preview-name" id="fileName"></div>
+                                    <div class="file-preview-name text-truncate" id="fileName"></div>
                                     <div class="file-preview-size" id="fileSize"></div>
                                 </div>
-                                <button type="button" class="remove-file" id="removeFile">
-                                    <i class="fas fa-times"></i>
+                                <button type="button" class="remove-file" id="removeFile" title="Remove file">
+                                    <i data-feather="x" class="feather-icon"></i>
                                 </button>
                             </div>
                         </div>
@@ -539,7 +646,7 @@
                     </div>
 
                     <div class="file-limits">
-                        <h4><i class="fas fa-info-circle"></i> File Requirements</h4>
+                        <h4><i data-feather="info" class="feather-icon"></i> File Requirements</h4>
                         <ul>
                             <li>Maximum file size: 100MB</li>
                             <li>Supported formats: MP4, WebM, MOV</li>
@@ -551,17 +658,17 @@
 
                 <!-- Common Form Fields -->
                 <div class="form-group">
-                    <label for="headline"><i class="fas fa-heading"></i> Headline</label>
+                    <label for="headline"><i data-feather="type" class="feather-icon"></i> Headline</label>
                     <input type="text" id="headline" class="form-input" placeholder="Enter an engaging headline..." maxlength="100" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="description"><i class="fas fa-align-left"></i> Description</label>
+                    <label for="description"><i data-feather="file-text" class="feather-icon"></i> Description</label>
                     <textarea id="description" class="form-input form-textarea" placeholder="Describe your video content..."></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label for="category"><i class="fas fa-tag"></i> Category</label>
+                    <label for="category"><i data-feather="tag" class="feather-icon"></i> Category</label>
                     <select id="category" class="form-input" required>
                         <option value="">Select a category</option>
                         <option value="sexual-health">Sexual Health</option>
@@ -576,16 +683,16 @@
 
                 <div class="form-actions">
                     <a href="stream.html" class="btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Streams
+                        <i data-feather="arrow-left" class="feather-icon"></i> Back to Streams
                     </a>
                     <button type="submit" id="submitBtn" class="btn-primary">
-                        <i class="fas fa-upload"></i> Create Stream
+                        <i data-feather="upload" class="feather-icon"></i> Create Stream
                     </button>
                 </div>
             </form>
 
             <div class="loading-spinner" id="loadingSpinner">
-                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <i data-feather="loader" class="feather-icon fa-spin"></i>
                 <p>Creating your stream...</p>
             </div>
         </div>
@@ -594,8 +701,14 @@
     <script type="module" src="stream.js"></script>
     <script type="module" src="ap.js"></script>
     <script>
-        // Handle upload method selection and UI interactions only
+        // Initialize Feather icons when DOM loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize all feather icons
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+            
+            // Handle upload method selection and UI interactions only
             const uploadOptions = document.querySelectorAll('.upload-option');
             const urlSection = document.getElementById('urlSection');
             const fileSection = document.getElementById('fileSection');
@@ -608,6 +721,13 @@
             const uploadProgress = document.getElementById('uploadProgress');
             const progressFill = document.getElementById('progressFill');
             const progressText = document.getElementById('progressText');
+            const videoUrlInput = document.getElementById('videoUrl');
+
+            // Fix URL input width issue
+            videoUrlInput.addEventListener('input', function() {
+                this.style.width = '100%';
+                this.style.height = 'auto';
+            });
 
             // Upload method selection
             uploadOptions.forEach(option => {
@@ -626,6 +746,11 @@
                         urlSection.classList.add('active');
                     } else {
                         fileSection.classList.add('active');
+                    }
+                    
+                    // Reinitialize feather icons if needed
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
                     }
                 });
             });
@@ -650,8 +775,15 @@
                         return;
                     }
 
+                    // Truncate long file names
+                    let displayName = file.name;
+                    if (displayName.length > 50) {
+                        displayName = displayName.substring(0, 20) + '...' + displayName.substring(displayName.length - 10);
+                    }
+                    
                     // Show file preview
-                    fileName.textContent = file.name;
+                    fileName.textContent = displayName;
+                    fileName.title = file.name; // Show full name on hover
                     fileSize.textContent = formatFileSize(file.size);
                     filePreview.classList.add('active');
 
@@ -663,6 +795,11 @@
                     // Show upload progress
                     uploadProgress.style.display = 'block';
                     simulateUploadProgress();
+                    
+                    // Reinitialize feather icons
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
                 }
             });
 
@@ -673,6 +810,10 @@
                 videoPreview.style.display = 'none';
                 videoPreview.src = '';
                 uploadProgress.style.display = 'none';
+                // Reinitialize feather icons
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
             });
 
             // Simulate upload progress (for demo purposes)
@@ -707,6 +848,11 @@
                 errorText.textContent = message;
                 errorMessage.style.display = 'block';
                 
+                // Reinitialize feather icons
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+                
                 // Auto-hide after 5 seconds
                 setTimeout(() => {
                     errorMessage.style.display = 'none';
@@ -715,103 +861,132 @@
         });
     </script>
     <script>
-// Simple navigation menu opener script
-document.addEventListener('DOMContentLoaded', function() {
-    // Mobile menu toggle
-    const mobileMenuBtn = document.getElementById('mobile-menu');
-    const navMenu = document.querySelector('.nav-menu');
-    const navLinks = document.querySelectorAll('.nav-links');
-    
-    if (mobileMenuBtn && navMenu) {
-        mobileMenuBtn.addEventListener('click', function() {
-            mobileMenuBtn.classList.toggle('active');
-            navMenu.classList.toggle('active');
-        });
-        
-        // Close menu when clicking on a link
-        navLinks.forEach(link => {
-            link.addEventListener('click', () => {
-                mobileMenuBtn.classList.remove('active');
-                navMenu.classList.remove('active');
-            });
-        });
-        
-        // Close menu when clicking outside
-        document.addEventListener('click', function(event) {
-            if (!mobileMenuBtn.contains(event.target) && 
-                !navMenu.contains(event.target) && 
-                navMenu.classList.contains('active')) {
-                mobileMenuBtn.classList.remove('active');
-                navMenu.classList.remove('active');
+        // Simple navigation menu opener script
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Feather icons
+            if (typeof feather !== 'undefined') {
+                feather.replace();
             }
-        });
-    }
-    
-    // Sidebar toggle (if exists)
-    const sidebarToggle = document.getElementById('sidebar-toggle');
-    const sidebar = document.getElementById('sidebar');
-    
-    if (sidebarToggle && sidebar) {
-        sidebarToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('active');
-        });
-    }
-    
-    // Dropdown menus
-    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
-    
-    dropdownToggles.forEach(toggle => {
-        toggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            const dropdown = this.nextElementSibling;
             
-            // Close all other dropdowns
-            document.querySelectorAll('.dropdown-content').forEach(d => {
-                if (d !== dropdown) {
-                    d.classList.remove('active');
+            // Mobile menu toggle
+            const mobileMenuBtn = document.getElementById('mobile-menu');
+            const navMenu = document.querySelector('.nav-menu');
+            const navLinks = document.querySelectorAll('.nav-links');
+            
+            if (mobileMenuBtn && navMenu) {
+                mobileMenuBtn.addEventListener('click', function() {
+                    mobileMenuBtn.classList.toggle('active');
+                    navMenu.classList.toggle('active');
+                    // Reinitialize feather icons
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+                });
+                
+                // Close menu when clicking on a link
+                navLinks.forEach(link => {
+                    link.addEventListener('click', () => {
+                        mobileMenuBtn.classList.remove('active');
+                        navMenu.classList.remove('active');
+                        // Reinitialize feather icons
+                        if (typeof feather !== 'undefined') {
+                            feather.replace();
+                        }
+                    });
+                });
+                
+                // Close menu when clicking outside
+                document.addEventListener('click', function(event) {
+                    if (!mobileMenuBtn.contains(event.target) && 
+                        !navMenu.contains(event.target) && 
+                        navMenu.classList.contains('active')) {
+                        mobileMenuBtn.classList.remove('active');
+                        navMenu.classList.remove('active');
+                        // Reinitialize feather icons
+                        if (typeof feather !== 'undefined') {
+                            feather.replace();
+                        }
+                    }
+                });
+            }
+            
+            // Sidebar toggle (if exists)
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.getElementById('sidebar');
+            
+            if (sidebarToggle && sidebar) {
+                sidebarToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('active');
+                    // Reinitialize feather icons
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+                });
+            }
+            
+            // Dropdown menus
+            const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+            
+            dropdownToggles.forEach(toggle => {
+                toggle.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const dropdown = this.nextElementSibling;
+                    
+                    // Close all other dropdowns
+                    document.querySelectorAll('.dropdown-content').forEach(d => {
+                        if (d !== dropdown) {
+                            d.classList.remove('active');
+                        }
+                    });
+                    
+                    // Toggle current dropdown
+                    dropdown.classList.toggle('active');
+                    // Reinitialize feather icons
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+                });
+            });
+            
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!event.target.matches('.dropdown-toggle')) {
+                    document.querySelectorAll('.dropdown-content').forEach(dropdown => {
+                        dropdown.classList.remove('active');
+                    });
+                    // Reinitialize feather icons
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
                 }
             });
             
-            // Toggle current dropdown
-            dropdown.classList.toggle('active');
-        });
-    });
-    
-    // Close dropdowns when clicking outside
-    document.addEventListener('click', function(event) {
-        if (!event.target.matches('.dropdown-toggle')) {
-            document.querySelectorAll('.dropdown-content').forEach(dropdown => {
-                dropdown.classList.remove('active');
+            // Logout functionality
+            const logoutButtons = document.querySelectorAll('.logout-btn');
+            
+            logoutButtons.forEach(button => {
+                button.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    try {
+                        // Redirect to login page
+                        window.location.href = 'login.html';
+                    } catch (error) {
+                        console.error('Logout error:', error);
+                    }
+                });
             });
-        }
-    });
-    
-    // Logout functionality
-    const logoutButtons = document.querySelectorAll('.logout-btn');
-    
-    logoutButtons.forEach(button => {
-        button.addEventListener('click', async function(e) {
-            e.preventDefault();
-            try {
-                // Redirect to login page
-                window.location.href = 'login.html';
-            } catch (error) {
-                console.error('Logout error:', error);
-            }
+            
+            // Back button functionality
+            const backButtons = document.querySelectorAll('.back-btn');
+            
+            backButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    window.history.back();
+                });
+            });
         });
-    });
-    
-    // Back button functionality
-    const backButtons = document.querySelectorAll('.back-btn');
-    
-    backButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            window.history.back();
-        });
-    });
-});
-</script>
+    </script>
     
 </body>
 </html>
