@@ -1,4 +1,4 @@
-// games.js - Complete Gamer Profile Management System with Enhanced Animations
+// games.js - Complete Gamer Profile Management System with Intro Animations
 // Firebase configuration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
@@ -252,9 +252,7 @@ function createHeroPreview() {
                 <div class="dark-screen"></div>
                 <div class="glitch-text">LOADING PROFILE...</div>
                 <div class="username">GHOST_WARRIOR</div>
-                <div class="avatar-placeholder">
-                    <div class="avatar-glow"></div>
-                </div>
+                <div class="avatar-placeholder"></div>
                 <div class="light-burst"></div>
                 <div class="rank-display">DIAMOND II</div>
                 <div class="enter-text">ENTERING ARENA...</div>
@@ -309,13 +307,6 @@ function createHeroPreview() {
                 background: linear-gradient(45deg, #ff2a6d, #00ff88);
                 border-radius: 50%;
                 opacity: 0;
-            }
-            .avatar-glow {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
             }
             .light-burst {
                 position: absolute;
@@ -446,30 +437,16 @@ function createPortalPreview() {
     return `
         <div class="portal-preview">
             <div class="preview-stage">
-                <div class="space-bg">
-                    <div class="stars"></div>
-                    <div class="nebula"></div>
-                </div>
-                <div class="portal-container">
-                    <div class="portal-outer-ring"></div>
-                    <div class="portal-middle-ring"></div>
-                    <div class="portal-inner-ring"></div>
-                    <div class="portal-core"></div>
-                    <div class="portal-energy"></div>
-                    <div class="portal-sparks"></div>
-                </div>
-                <div class="avatar-emerge">
-                    <div class="avatar-glow"></div>
-                </div>
+                <div class="space-bg"></div>
+                <div class="portal-ring"></div>
+                <div class="avatar-emerge"></div>
                 <div class="name-fade">GHOST_WARRIOR</div>
                 <div class="rank-portal">⚔️ DIAMOND II</div>
-                <div class="portal-collapse">
-                    <div class="collapse-energy"></div>
-                </div>
+                <div class="portal-collapse"></div>
             </div>
             <div class="preview-info">
                 <h3><i class="fas fa-ring"></i> Portal Teleport Preview</h3>
-                <p>Space background → Portal opens with energy effects → Avatar emerges → Name and rank appear → Portal collapses</p>
+                <p>Portal opens → Avatar emerges → Name fades in → Rank appears → Portal collapses</p>
             </div>
         </div>
         <style>
@@ -488,91 +465,15 @@ function createPortalPreview() {
                 height: 100%;
                 background: radial-gradient(circle at center, #0a0a2a 0%, #000 100%);
             }
-            .stars {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background-image: 
-                    radial-gradient(2px 2px at 20% 30%, white, transparent),
-                    radial-gradient(2px 2px at 40% 70%, white, transparent),
-                    radial-gradient(2px 2px at 60% 20%, white, transparent),
-                    radial-gradient(2px 2px at 80% 50%, white, transparent),
-                    radial-gradient(2px 2px at 30% 80%, white, transparent);
-            }
-            .nebula {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background: radial-gradient(circle at 30% 30%, rgba(157, 0, 255, 0.1) 0%, transparent 50%),
-                           radial-gradient(circle at 70% 70%, rgba(0, 243, 255, 0.1) 0%, transparent 50%);
-            }
-            .portal-container {
+            .portal-ring {
                 position: absolute;
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                width: 150px;
-                height: 150px;
-            }
-            .portal-outer-ring {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                border: 3px solid #9d00ff;
+                width: 0;
+                height: 0;
+                border: 2px solid #9d00ff;
                 border-radius: 50%;
-                opacity: 0;
-                box-shadow: 0 0 20px #9d00ff;
-            }
-            .portal-middle-ring {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 100px;
-                height: 100px;
-                border: 2px solid #00f3ff;
-                border-radius: 50%;
-                opacity: 0;
-                box-shadow: 0 0 15px #00f3ff;
-            }
-            .portal-inner-ring {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 60px;
-                height: 60px;
-                border: 2px solid #00ff88;
-                border-radius: 50%;
-                opacity: 0;
-                box-shadow: 0 0 10px #00ff88;
-            }
-            .portal-core {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 30px;
-                height: 30px;
-                background: radial-gradient(circle, white 0%, #9d00ff 100%);
-                border-radius: 50%;
-                opacity: 0;
-                box-shadow: 0 0 20px white;
-            }
-            .portal-energy {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                background: conic-gradient(from 0deg, transparent, #9d00ff, #00f3ff, #00ff88, transparent);
-                opacity: 0;
-                filter: blur(10px);
-            }
-            .portal-sparks {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background: radial-gradient(circle, transparent 30%, rgba(157, 0, 255, 0.3) 70%);
                 opacity: 0;
             }
             .avatar-emerge {
@@ -585,13 +486,6 @@ function createPortalPreview() {
                 background: linear-gradient(45deg, #ff2a6d, #00ff88);
                 border-radius: 50%;
                 opacity: 0;
-            }
-            .avatar-glow {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                background: radial-gradient(circle, rgba(255,255,255,0.5) 0%, transparent 70%);
             }
             .name-fade {
                 position: absolute;
@@ -611,7 +505,6 @@ function createPortalPreview() {
                 font-size: 1.2rem;
                 font-weight: bold;
                 opacity: 0;
-                text-shadow: 0 0 10px #9d00ff;
             }
             .portal-collapse {
                 position: absolute;
@@ -620,16 +513,9 @@ function createPortalPreview() {
                 transform: translate(-50%, -50%);
                 width: 100px;
                 height: 100px;
+                border: 2px solid #9d00ff;
                 border-radius: 50%;
                 opacity: 0;
-            }
-            .collapse-energy {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                background: radial-gradient(circle, #9d00ff 0%, transparent 70%);
-                filter: blur(20px);
             }
         </style>
     `;
@@ -669,7 +555,6 @@ function createRankPreview() {
                 font-size: 3rem;
                 font-weight: bold;
                 opacity: 0;
-                text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
             }
             .badge-slam {
                 position: absolute;
@@ -864,12 +749,7 @@ function animateGlitchPreview() {
 
 function animatePortalPreview() {
     const elements = {
-        portalOuterRing: document.querySelector('.portal-outer-ring'),
-        portalMiddleRing: document.querySelector('.portal-middle-ring'),
-        portalInnerRing: document.querySelector('.portal-inner-ring'),
-        portalCore: document.querySelector('.portal-core'),
-        portalEnergy: document.querySelector('.portal-energy'),
-        portalSparks: document.querySelector('.portal-sparks'),
+        portalRing: document.querySelector('.portal-ring'),
         avatarEmerge: document.querySelector('.avatar-emerge'),
         nameFade: document.querySelector('.name-fade'),
         rankPortal: document.querySelector('.rank-portal'),
@@ -877,17 +757,12 @@ function animatePortalPreview() {
     };
 
     const timeline = [
-        { element: elements.portalOuterRing, opacity: 1, delay: 500, duration: 1000 },
-        { element: elements.portalMiddleRing, opacity: 1, delay: 800, duration: 800 },
-        { element: elements.portalInnerRing, opacity: 1, delay: 1100, duration: 600 },
-        { element: elements.portalCore, opacity: 1, delay: 1400, duration: 400 },
-        { element: elements.portalEnergy, opacity: 0.3, delay: 1400, duration: 400 },
-        { element: elements.portalSparks, opacity: 0.5, delay: 1400, duration: 400 },
-        { element: elements.avatarEmerge, opacity: 1, delay: 1800, duration: 500 },
-        { element: elements.nameFade, opacity: 1, delay: 2300, duration: 1000 },
-        { element: elements.rankPortal, opacity: 1, delay: 2800, duration: 1000 },
-        { element: elements.portalCollapse, opacity: 0.8, delay: 3300, duration: 300 },
-        { element: elements.portalCollapse, opacity: 0, delay: 3600, duration: 200 }
+        { element: elements.portalRing, width: '200px', height: '200px', opacity: 1, delay: 500, duration: 1000 },
+        { element: elements.avatarEmerge, opacity: 1, delay: 1500, duration: 500 },
+        { element: elements.nameFade, opacity: 1, delay: 2000, duration: 1000 },
+        { element: elements.rankPortal, opacity: 1, delay: 2500, duration: 1000 },
+        { element: elements.portalCollapse, width: '200px', height: '200px', opacity: 1, delay: 3000, duration: 300 },
+        { element: elements.portalCollapse, width: '0', height: '0', opacity: 0, delay: 3300, duration: 200 }
     ];
 
     animateTimeline(timeline);
@@ -955,13 +830,7 @@ function animateTimeline(timeline) {
                 element.style.height = step.height;
             }
             if (step.scale !== undefined) {
-                const currentTransform = element.style.transform;
-                const scaleRegex = /scale\([^)]*\)/;
-                if (scaleRegex.test(currentTransform)) {
-                    element.style.transform = currentTransform.replace(scaleRegex, `scale(${step.scale})`);
-                } else {
-                    element.style.transform = currentTransform + ` scale(${step.scale})`;
-                }
+                element.style.transform = element.style.transform.replace(/scale\([^)]*\)/, '') + ` scale(${step.scale})`;
             }
             
             // Set transition
@@ -1150,7 +1019,7 @@ async function showIntroAnimation(introType, userData, gamerProfileData, userId,
             // Load profile
             loadPublicGamerProfile(userId, profileId);
         }, 500);
-    }, 5500); // 5.5 seconds total animation time
+    }, 5000); // 5 seconds total animation time
 }
 
 function createHeroIntro(gamerTag, rank, profileImage) {
@@ -1161,7 +1030,6 @@ function createHeroIntro(gamerTag, rank, profileImage) {
             <div class="username">${gamerTag}</div>
             <div class="avatar-placeholder">
                 <img src="${profileImage}" alt="Avatar" onerror="this.src='images-default-profile.jpg'">
-                <div class="avatar-glow"></div>
             </div>
             <div class="light-burst"></div>
             <div class="rank-display">${rank}</div>
@@ -1205,7 +1073,6 @@ function createHeroIntro(gamerTag, rank, profileImage) {
                 font-weight: bold;
                 opacity: 0;
                 animation: fadeIn 1s ease 2s forwards;
-                text-shadow: 0 0 20px rgba(255, 42, 109, 0.5);
             }
             .avatar-placeholder {
                 position: absolute;
@@ -1217,25 +1084,11 @@ function createHeroIntro(gamerTag, rank, profileImage) {
                 overflow: hidden;
                 opacity: 0;
                 animation: slideIn 1s ease 2.5s forwards, glow 2s ease 3s infinite alternate;
-                border: 3px solid #ff2a6d;
-                box-shadow: 0 0 30px rgba(255, 42, 109, 0.3);
             }
             .avatar-placeholder img {
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
-                position: relative;
-                z-index: 1;
-            }
-            .avatar-glow {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                background: radial-gradient(circle, rgba(255, 42, 109, 0.5) 0%, transparent 70%);
-                animation: pulse 2s ease infinite;
             }
             .light-burst {
                 position: absolute;
@@ -1258,7 +1111,6 @@ function createHeroIntro(gamerTag, rank, profileImage) {
                 font-weight: bold;
                 opacity: 0;
                 animation: fadeIn 1s ease 3s forwards;
-                text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
             }
             .enter-text {
                 position: absolute;
@@ -1269,13 +1121,11 @@ function createHeroIntro(gamerTag, rank, profileImage) {
                 font-size: 2rem;
                 opacity: 0;
                 animation: fadeIn 1s ease 3.5s forwards;
-                text-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
             }
             .skip-intro {
                 position: absolute;
                 bottom: 5%;
                 right: 5%;
-                z-index: 10;
             }
             .skip-intro button {
                 background: rgba(255,255,255,0.1);
@@ -1308,10 +1158,6 @@ function createHeroIntro(gamerTag, rank, profileImage) {
                 from { box-shadow: 0 0 20px rgba(255, 42, 109, 0.5); }
                 to { box-shadow: 0 0 40px rgba(0, 255, 136, 0.8); }
             }
-            @keyframes pulse {
-                0%, 100% { opacity: 0.5; transform: scale(1); }
-                50% { opacity: 0.8; transform: scale(1.1); }
-            }
             @keyframes fadeIn {
                 to { opacity: 1; }
             }
@@ -1329,13 +1175,11 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
         <div class="glitch-intro">
             <div class="screen-flicker"></div>
             <div class="scan-lines"></div>
-            <div class="digital-grid"></div>
             <div class="scrambled-text">${scrambledTag}</div>
             <div class="resolved-text">${gamerTag}</div>
             <div class="rank-badge">${rank}</div>
             <div class="avatar-glitch">
                 <img src="${profileImage}" alt="Avatar" onerror="this.src='images-default-profile.jpg'">
-                <div class="glitch-distortion"></div>
             </div>
             <div class="digital-whoosh"></div>
             <div class="skip-intro">
@@ -1355,7 +1199,7 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
                 width: 100%;
                 height: 100%;
                 background: rgba(0, 243, 255, 0.1);
-                animation: flicker 0.1s ease infinite;
+                animation: flicker 2s ease infinite;
             }
             .scan-lines {
                 position: absolute;
@@ -1370,16 +1214,6 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
                 );
                 animation: scan 5s linear infinite;
             }
-            .digital-grid {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background-image: 
-                    linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
-                background-size: 20px 20px;
-                opacity: 0.3;
-            }
             .scrambled-text {
                 position: absolute;
                 top: 40%;
@@ -1388,9 +1222,7 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
                 color: #00f3ff;
                 font-family: monospace;
                 font-size: 2.5rem;
-                letter-spacing: 2px;
                 animation: scramble 3s ease forwards;
-                text-shadow: 0 0 10px #00f3ff;
             }
             .resolved-text {
                 position: absolute;
@@ -1402,7 +1234,6 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
                 font-weight: bold;
                 opacity: 0;
                 animation: resolve 1s ease 2.5s forwards;
-                text-shadow: 0 0 15px #00f3ff;
             }
             .rank-badge {
                 position: absolute;
@@ -1414,7 +1245,6 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
                 font-size: 1.8rem;
                 opacity: 0;
                 animation: fadeIn 1s ease 3s forwards;
-                text-shadow: 0 0 10px #00ff88;
             }
             .avatar-glitch {
                 position: absolute;
@@ -1428,27 +1258,11 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
                 opacity: 0;
                 animation: fadeIn 1s ease 3.5s forwards;
                 border: 2px solid #00f3ff;
-                box-shadow: 0 0 20px #00f3ff;
             }
             .avatar-glitch img {
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
-                position: relative;
-                z-index: 1;
-            }
-            .glitch-distortion {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(45deg, 
-                    transparent 49%, 
-                    rgba(0, 243, 255, 0.3) 50%, 
-                    transparent 51%
-                );
-                animation: distort 0.5s ease infinite;
             }
             .digital-whoosh {
                 position: absolute;
@@ -1467,7 +1281,6 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
                 position: absolute;
                 bottom: 5%;
                 right: 5%;
-                z-index: 10;
             }
             .skip-intro button {
                 background: rgba(255,255,255,0.1);
@@ -1492,19 +1305,13 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
                 100% { transform: translateY(100%); }
             }
             @keyframes scramble {
-                0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-                20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-                80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-                100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+                0% { opacity: 0; }
+                20% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { opacity: 0; }
             }
             @keyframes resolve {
-                0% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
-                100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            }
-            @keyframes distort {
-                0%, 100% { transform: translateX(0); }
-                25% { transform: translateX(-2px); }
-                75% { transform: translateX(2px); }
+                to { opacity: 1; }
             }
             @keyframes whoosh {
                 0% { opacity: 0; transform: translateX(-100%); }
@@ -1518,29 +1325,15 @@ function createGlitchIntro(gamerTag, rank, profileImage) {
 function createPortalIntro(gamerTag, rank, profileImage) {
     return `
         <div class="portal-intro">
-            <div class="space-bg">
-                <div class="stars"></div>
-                <div class="nebula-1"></div>
-                <div class="nebula-2"></div>
-                <div class="distant-stars"></div>
-            </div>
-            <div class="portal-container">
-                <div class="portal-outer-ring"></div>
-                <div class="portal-middle-ring"></div>
-                <div class="portal-inner-ring"></div>
-                <div class="portal-core"></div>
-                <div class="portal-energy"></div>
-                <div class="portal-sparks"></div>
-                <div class="portal-vortex"></div>
-            </div>
+            <div class="space-bg"></div>
+            <div class="portal-ring"></div>
             <div class="avatar-emerge">
                 <img src="${profileImage}" alt="Avatar" onerror="this.src='images-default-profile.jpg'">
-                <div class="teleport-beams"></div>
-                <div class="teleport-glow"></div>
+                <div class="avatar-glow"></div>
             </div>
             <div class="name-fade">${gamerTag}</div>
             <div class="rank-portal">${rank}</div>
-            <div class="teleport-complete">TELEPORT COMPLETE</div>
+            <div class="portal-collapse"></div>
             <div class="skip-intro">
                 <button onclick="skipIntro()">Skip Intro</button>
             </div>
@@ -1558,188 +1351,17 @@ function createPortalIntro(gamerTag, rank, profileImage) {
                 width: 100%;
                 height: 100%;
                 background: radial-gradient(circle at center, #0a0a2a 0%, #000 100%);
-                overflow: hidden;
             }
-            .stars {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background-image: 
-                    radial-gradient(2px 2px at 10% 20%, white, transparent),
-                    radial-gradient(2px 2px at 20% 40%, white, transparent),
-                    radial-gradient(2px 2px at 30% 60%, white, transparent),
-                    radial-gradient(2px 2px at 40% 80%, white, transparent),
-                    radial-gradient(2px 2px at 50% 10%, white, transparent),
-                    radial-gradient(2px 2px at 60% 30%, white, transparent),
-                    radial-gradient(2px 2px at 70% 50%, white, transparent),
-                    radial-gradient(2px 2px at 80% 70%, white, transparent),
-                    radial-gradient(2px 2px at 90% 90%, white, transparent),
-                    radial-gradient(2px 2px at 15% 75%, white, transparent),
-                    radial-gradient(2px 2px at 25% 15%, white, transparent),
-                    radial-gradient(2px 2px at 35% 35%, white, transparent),
-                    radial-gradient(2px 2px at 45% 55%, white, transparent),
-                    radial-gradient(2px 2px at 55% 75%, white, transparent),
-                    radial-gradient(2px 2px at 65% 15%, white, transparent),
-                    radial-gradient(2px 2px at 75% 35%, white, transparent),
-                    radial-gradient(2px 2px at 85% 55%, white, transparent),
-                    radial-gradient(2px 2px at 95% 85%, white, transparent);
-                animation: twinkle 3s ease-in-out infinite;
-            }
-            .distant-stars {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background-image: 
-                    radial-gradient(1px 1px at 5% 10%, rgba(255,255,255,0.5), transparent),
-                    radial-gradient(1px 1px at 15% 30%, rgba(255,255,255,0.5), transparent),
-                    radial-gradient(1px 1px at 25% 50%, rgba(255,255,255,0.5), transparent),
-                    radial-gradient(1px 1px at 35% 70%, rgba(255,255,255,0.5), transparent),
-                    radial-gradient(1px 1px at 45% 90%, rgba(255,255,255,0.5), transparent),
-                    radial-gradient(1px 1px at 55% 20%, rgba(255,255,255,0.5), transparent),
-                    radial-gradient(1px 1px at 65% 40%, rgba(255,255,255,0.5), transparent),
-                    radial-gradient(1px 1px at 75% 60%, rgba(255,255,255,0.5), transparent),
-                    radial-gradient(1px 1px at 85% 80%, rgba(255,255,255,0.5), transparent),
-                    radial-gradient(1px 1px at 95% 30%, rgba(255,255,255,0.5), transparent);
-            }
-            .nebula-1 {
-                position: absolute;
-                top: 20%;
-                left: 20%;
-                width: 200px;
-                height: 200px;
-                background: radial-gradient(circle, rgba(157, 0, 255, 0.3) 0%, transparent 70%);
-                filter: blur(40px);
-                animation: float 20s ease-in-out infinite;
-            }
-            .nebula-2 {
-                position: absolute;
-                bottom: 30%;
-                right: 20%;
-                width: 150px;
-                height: 150px;
-                background: radial-gradient(circle, rgba(0, 243, 255, 0.2) 0%, transparent 70%);
-                filter: blur(30px);
-                animation: float 15s ease-in-out infinite reverse;
-            }
-            .portal-container {
+            .portal-ring {
                 position: absolute;
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                width: 200px;
-                height: 200px;
-                animation: portalFloat 4s ease-in-out infinite;
-            }
-            .portal-outer-ring {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                border: 4px solid #9d00ff;
+                width: 0;
+                height: 0;
+                border: 3px solid #9d00ff;
                 border-radius: 50%;
-                opacity: 0;
-                box-shadow: 
-                    0 0 30px #9d00ff,
-                    inset 0 0 30px #9d00ff;
-                animation: rotate 20s linear infinite;
-            }
-            .portal-middle-ring {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 140px;
-                height: 140px;
-                border: 3px solid #00f3ff;
-                border-radius: 50%;
-                opacity: 0;
-                box-shadow: 
-                    0 0 25px #00f3ff,
-                    inset 0 0 25px #00f3ff;
-                animation: rotate 15s linear infinite reverse;
-            }
-            .portal-inner-ring {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 80px;
-                height: 80px;
-                border: 2px solid #00ff88;
-                border-radius: 50%;
-                opacity: 0;
-                box-shadow: 
-                    0 0 20px #00ff88,
-                    inset 0 0 20px #00ff88;
-                animation: rotate 10s linear infinite;
-            }
-            .portal-core {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 40px;
-                height: 40px;
-                background: radial-gradient(circle, white 0%, #9d00ff 100%);
-                border-radius: 50%;
-                opacity: 0;
-                box-shadow: 
-                    0 0 40px white,
-                    0 0 60px #9d00ff,
-                    0 0 80px rgba(157, 0, 255, 0.5);
-                animation: pulseCore 2s ease-in-out infinite;
-            }
-            .portal-energy {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                background: conic-gradient(from 0deg, 
-                    transparent 0%, 
-                    #9d00ff 10%, 
-                    #00f3ff 30%, 
-                    #00ff88 50%, 
-                    #00f3ff 70%, 
-                    #9d00ff 90%, 
-                    transparent 100%
-                );
-                opacity: 0;
-                filter: blur(15px);
-                animation: rotate 5s linear infinite;
-            }
-            .portal-sparks {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                opacity: 0;
-            }
-            .portal-sparks::before, .portal-sparks::after {
-                content: '';
-                position: absolute;
-                width: 4px;
-                height: 4px;
-                background: #00ff88;
-                border-radius: 50%;
-                box-shadow: 0 0 10px #00ff88;
-                animation: spark 1.5s ease-out infinite;
-            }
-            .portal-sparks::before {
-                top: 10%;
-                left: 50%;
-                animation-delay: 0s;
-            }
-            .portal-sparks::after {
-                top: 50%;
-                right: 10%;
-                animation-delay: 0.5s;
-            }
-            .portal-vortex {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                background: radial-gradient(circle, transparent 40%, rgba(157, 0, 255, 0.4) 100%);
-                opacity: 0;
-                animation: vortex 3s linear infinite;
+                animation: portalOpen 2s ease forwards;
             }
             .avatar-emerge {
                 position: absolute;
@@ -1751,11 +1373,8 @@ function createPortalIntro(gamerTag, rank, profileImage) {
                 border-radius: 50%;
                 overflow: hidden;
                 opacity: 0;
-                border: 3px solid #9d00ff;
-                box-shadow: 
-                    0 0 30px #9d00ff,
-                    inset 0 0 20px #9d00ff;
-                z-index: 2;
+                animation: emerge 1s ease 2s forwards;
+                border: 2px solid #9d00ff;
             }
             .avatar-emerge img {
                 width: 100%;
@@ -1764,26 +1383,15 @@ function createPortalIntro(gamerTag, rank, profileImage) {
                 position: relative;
                 z-index: 1;
             }
-            .teleport-beams {
+            .avatar-glow {
                 position: absolute;
-                top: -50px;
-                left: -50px;
-                width: 200px;
-                height: 200px;
-                background: radial-gradient(circle, transparent 30%, rgba(157, 0, 255, 0.6) 100%);
-                border-radius: 50%;
-                opacity: 0;
-                animation: beamPulse 1s ease-in-out infinite;
-            }
-            .teleport-glow {
-                position: absolute;
-                top: 0;
-                left: 0;
                 width: 100%;
                 height: 100%;
                 border-radius: 50%;
-                background: radial-gradient(circle, rgba(157, 0, 255, 0.5) 0%, transparent 70%);
-                animation: glowPulse 2s ease-in-out infinite;
+                background: radial-gradient(circle, rgba(157, 0, 255, 0.3) 0%, transparent 70%);
+                animation: pulse 2s ease infinite;
+                top: 0;
+                left: 0;
             }
             .name-fade {
                 position: absolute;
@@ -1791,45 +1399,37 @@ function createPortalIntro(gamerTag, rank, profileImage) {
                 left: 50%;
                 transform: translateX(-50%);
                 color: white;
-                font-size: 2.5rem;
-                font-weight: bold;
+                font-size: 2rem;
                 opacity: 0;
-                text-shadow: 
-                    0 0 10px #9d00ff,
-                    0 0 20px #9d00ff,
-                    0 0 30px #9d00ff;
-                letter-spacing: 2px;
+                animation: fadeIn 1s ease 3s forwards;
             }
             .rank-portal {
                 position: absolute;
                 top: 70%;
                 left: 50%;
                 transform: translateX(-50%);
-                color: #00ff88;
-                font-size: 1.8rem;
+                color: #9d00ff;
+                font-size: 1.5rem;
                 font-weight: bold;
                 opacity: 0;
-                text-shadow: 
-                    0 0 10px #00ff88,
-                    0 0 20px #00ff88;
+                animation: fadeIn 1s ease 3.5s forwards;
             }
-            .teleport-complete {
+            .portal-collapse {
                 position: absolute;
-                bottom: 20%;
+                top: 50%;
                 left: 50%;
-                transform: translateX(-50%);
-                color: #00f3ff;
-                font-size: 1.5rem;
-                font-family: monospace;
+                transform: translate(-50%, -50%);
+                width: 200px;
+                height: 200px;
+                border: 3px solid #9d00ff;
+                border-radius: 50%;
                 opacity: 0;
-                text-shadow: 0 0 10px #00f3ff;
-                letter-spacing: 1px;
+                animation: collapse 1s ease 4s forwards;
             }
             .skip-intro {
                 position: absolute;
                 bottom: 5%;
                 right: 5%;
-                z-index: 10;
             }
             .skip-intro button {
                 background: rgba(255,255,255,0.1);
@@ -1845,43 +1445,22 @@ function createPortalIntro(gamerTag, rank, profileImage) {
             .skip-intro button:hover {
                 background: rgba(255,255,255,0.2);
             }
-            @keyframes twinkle {
-                0%, 100% { opacity: 0.7; }
-                50% { opacity: 1; }
+            @keyframes portalOpen {
+                to { width: 300px; height: 300px; opacity: 1; }
             }
-            @keyframes float {
-                0%, 100% { transform: translate(0, 0); }
-                50% { transform: translate(20px, 20px); }
+            @keyframes emerge {
+                to { opacity: 1; }
             }
-            @keyframes portalFloat {
-                0%, 100% { transform: translate(-50%, -50%) translateY(0); }
-                50% { transform: translate(-50%, -50%) translateY(-10px); }
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); opacity: 0.5; }
+                50% { transform: scale(1.2); opacity: 0.8; }
             }
-            @keyframes rotate {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
+            @keyframes fadeIn {
+                to { opacity: 1; }
             }
-            @keyframes pulseCore {
-                0%, 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
-                50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
-            }
-            @keyframes spark {
-                0% { opacity: 0; transform: scale(0) translate(0, 0); }
-                50% { opacity: 1; transform: scale(1) translate(30px, 30px); }
-                100% { opacity: 0; transform: scale(0) translate(60px, 60px); }
-            }
-            @keyframes vortex {
-                0% { transform: rotate(0deg) scale(1); opacity: 0.3; }
-                50% { transform: rotate(180deg) scale(1.2); opacity: 0.5; }
-                100% { transform: rotate(360deg) scale(1); opacity: 0.3; }
-            }
-            @keyframes beamPulse {
-                0%, 100% { opacity: 0.3; transform: scale(1); }
-                50% { opacity: 0.6; transform: scale(1.1); }
-            }
-            @keyframes glowPulse {
-                0%, 100% { opacity: 0.5; }
-                50% { opacity: 0.8; }
+            @keyframes collapse {
+                0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                100% { opacity: 0; transform: translate(-50%, -50%) scale(0); }
             }
         </style>
     `;
@@ -1890,9 +1469,6 @@ function createPortalIntro(gamerTag, rank, profileImage) {
 function createRankIntro(gamerTag, rank, profileImage) {
     return `
         <div class="rank-intro">
-            <div class="arena-bg"></div>
-            <div class="crowd-cheer"></div>
-            <div class="spotlight"></div>
             <div class="rank-badge">${rank}</div>
             <div class="badge-slam"></div>
             <div class="camera-shake"></div>
@@ -1900,10 +1476,8 @@ function createRankIntro(gamerTag, rank, profileImage) {
             <div class="profile-reveal">
                 <div class="profile-avatar">
                     <img src="${profileImage}" alt="Avatar" onerror="this.src='images-default-profile.jpg'">
-                    <div class="avatar-frame"></div>
                 </div>
             </div>
-            <div class="victory-text">VICTORY</div>
             <div class="skip-intro">
                 <button onclick="skipIntro()">Skip Intro</button>
             </div>
@@ -1914,39 +1488,7 @@ function createRankIntro(gamerTag, rank, profileImage) {
                 width: 100%;
                 height: 100%;
                 overflow: hidden;
-                background: linear-gradient(45deg, #1a1a2e, #0f3460);
-            }
-            .arena-bg {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background: 
-                    radial-gradient(circle at 30% 30%, rgba(255, 215, 0, 0.1) 0%, transparent 50%),
-                    radial-gradient(circle at 70% 70%, rgba(255, 42, 109, 0.1) 0%, transparent 50%);
-            }
-            .crowd-cheer {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background: repeating-linear-gradient(
-                    0deg,
-                    transparent,
-                    transparent 10px,
-                    rgba(255, 215, 0, 0.05) 10px,
-                    rgba(255, 215, 0, 0.05) 20px
-                );
-                animation: cheer 0.5s ease infinite;
-            }
-            .spotlight {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 300px;
-                height: 300px;
-                background: radial-gradient(circle, rgba(255, 215, 0, 0.2) 0%, transparent 70%);
-                opacity: 0;
-                animation: spotlightOn 1s ease 0.5s forwards;
+                background: #1a1a2e;
             }
             .rank-badge {
                 position: absolute;
@@ -1956,12 +1498,8 @@ function createRankIntro(gamerTag, rank, profileImage) {
                 color: #FFD700;
                 font-size: 4rem;
                 font-weight: bold;
-                text-shadow: 
-                    0 0 20px rgba(255, 215, 0, 0.5),
-                    0 0 40px rgba(255, 215, 0, 0.3),
-                    0 0 60px rgba(255, 215, 0, 0.1);
+                text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
                 animation: badgeSlam 1s ease forwards;
-                letter-spacing: 2px;
             }
             .badge-slam {
                 position: absolute;
@@ -1988,14 +1526,9 @@ function createRankIntro(gamerTag, rank, profileImage) {
                 left: 50%;
                 transform: translateX(-50%);
                 color: white;
-                font-size: 2.5rem;
-                font-weight: bold;
+                font-size: 2rem;
                 opacity: 0;
-                text-shadow: 
-                    0 0 10px rgba(255, 42, 109, 0.5),
-                    0 0 20px rgba(255, 42, 109, 0.3);
                 animation: reveal 1s ease 1.5s forwards;
-                letter-spacing: 1px;
             }
             .profile-reveal {
                 position: absolute;
@@ -2012,44 +1545,18 @@ function createRankIntro(gamerTag, rank, profileImage) {
                 height: 100%;
                 border-radius: 50%;
                 overflow: hidden;
-                position: relative;
+                border: 3px solid #FFD700;
+                box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
             }
             .profile-avatar img {
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
             }
-            .avatar-frame {
-                position: absolute;
-                top: -5px;
-                left: -5px;
-                width: calc(100% + 10px);
-                height: calc(100% + 10px);
-                border: 3px solid #FFD700;
-                border-radius: 50%;
-                box-shadow: 
-                    0 0 20px #FFD700,
-                    inset 0 0 20px #FFD700;
-                animation: frameGlow 2s ease-in-out infinite;
-            }
-            .victory-text {
-                position: absolute;
-                bottom: 15%;
-                left: 50%;
-                transform: translateX(-50%);
-                color: #00ff88;
-                font-size: 1.8rem;
-                font-family: monospace;
-                opacity: 0;
-                animation: fadeIn 1s ease 2.5s forwards;
-                text-shadow: 0 0 10px #00ff88;
-                letter-spacing: 3px;
-            }
             .skip-intro {
                 position: absolute;
                 bottom: 5%;
                 right: 5%;
-                z-index: 10;
             }
             .skip-intro button {
                 background: rgba(255,255,255,0.1);
@@ -2064,13 +1571,6 @@ function createRankIntro(gamerTag, rank, profileImage) {
             }
             .skip-intro button:hover {
                 background: rgba(255,255,255,0.2);
-            }
-            @keyframes cheer {
-                0%, 100% { transform: translateY(0); }
-                50% { transform: translateY(-5px); }
-            }
-            @keyframes spotlightOn {
-                to { opacity: 0.3; }
             }
             @keyframes badgeSlam {
                 0% { transform: translate(-50%, -50%) scale(0.1); opacity: 0; }
@@ -2090,10 +1590,6 @@ function createRankIntro(gamerTag, rank, profileImage) {
             @keyframes reveal {
                 to { opacity: 1; }
             }
-            @keyframes frameGlow {
-                0%, 100% { box-shadow: 0 0 20px #FFD700, inset 0 0 20px #FFD700; }
-                50% { box-shadow: 0 0 40px #FFD700, inset 0 0 40px #FFD700; }
-            }
         </style>
     `;
 }
@@ -2102,15 +1598,12 @@ function createMinimalIntro(gamerTag, rank, profileImage) {
     return `
         <div class="minimal-intro">
             <div class="blur-bg"></div>
-            <div class="gradient-overlay"></div>
             <div class="soft-zoom"></div>
             <div class="minimal-avatar">
                 <img src="${profileImage}" alt="Avatar" onerror="this.src='images-default-profile.jpg'">
-                <div class="avatar-shine"></div>
             </div>
             <div class="minimal-name">${gamerTag}</div>
             <div class="minimal-rank">${rank}</div>
-            <div class="minimal-line"></div>
             <div class="skip-intro">
                 <button onclick="skipIntro()">Skip Intro</button>
             </div>
@@ -2127,22 +1620,8 @@ function createMinimalIntro(gamerTag, rank, profileImage) {
                 position: absolute;
                 width: 100%;
                 height: 100%;
-                background: linear-gradient(135deg, 
-                    rgba(255,255,255,0.05) 0%, 
-                    rgba(255,255,255,0.02) 50%,
-                    rgba(255,255,255,0.01) 100%
-                );
-                backdrop-filter: blur(30px);
-            }
-            .gradient-overlay {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(45deg, 
-                    rgba(255, 42, 109, 0.05) 0%, 
-                    rgba(0, 243, 255, 0.05) 50%,
-                    rgba(0, 255, 136, 0.05) 100%
-                );
+                background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+                backdrop-filter: blur(20px);
             }
             .soft-zoom {
                 position: absolute;
@@ -2164,30 +1643,11 @@ function createMinimalIntro(gamerTag, rank, profileImage) {
                 opacity: 0;
                 animation: fadeInUp 1s ease 1.5s forwards;
                 border: 2px solid rgba(255,255,255,0.1);
-                box-shadow: 
-                    0 10px 40px rgba(0,0,0,0.3),
-                    inset 0 1px 0 rgba(255,255,255,0.1);
             }
             .minimal-avatar img {
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
-                filter: grayscale(20%);
-            }
-            .avatar-shine {
-                position: absolute;
-                top: -50%;
-                left: -50%;
-                width: 200%;
-                height: 200%;
-                background: linear-gradient(
-                    45deg,
-                    transparent 30%,
-                    rgba(255,255,255,0.1) 50%,
-                    transparent 70%
-                );
-                transform: rotate(45deg);
-                animation: shine 3s ease-in-out infinite;
             }
             .minimal-name {
                 position: absolute;
@@ -2197,10 +1657,8 @@ function createMinimalIntro(gamerTag, rank, profileImage) {
                 color: white;
                 font-size: 2.5rem;
                 font-weight: 300;
-                letter-spacing: 1px;
                 opacity: 0;
                 animation: fadeIn 1s ease 2.5s forwards;
-                font-family: 'Segoe UI', system-ui, sans-serif;
             }
             .minimal-rank {
                 position: absolute;
@@ -2210,27 +1668,13 @@ function createMinimalIntro(gamerTag, rank, profileImage) {
                 color: #00ff88;
                 font-size: 1.5rem;
                 font-weight: 500;
-                letter-spacing: 2px;
                 opacity: 0;
                 animation: fadeIn 1s ease 3s forwards;
-                font-family: monospace;
-            }
-            .minimal-line {
-                position: absolute;
-                top: 68%;
-                left: 50%;
-                transform: translateX(-50%);
-                width: 0;
-                height: 2px;
-                background: linear-gradient(90deg, transparent, #00ff88, transparent);
-                opacity: 0;
-                animation: lineExpand 1s ease 3.5s forwards;
             }
             .skip-intro {
                 position: absolute;
                 bottom: 5%;
                 right: 5%;
-                z-index: 10;
             }
             .skip-intro button {
                 background: rgba(255,255,255,0.1);
@@ -2252,12 +1696,8 @@ function createMinimalIntro(gamerTag, rank, profileImage) {
             @keyframes fadeInUp {
                 to { opacity: 1; transform: translate(-50%, -60%); }
             }
-            @keyframes shine {
-                0%, 100% { transform: rotate(45deg) translateX(-100%); }
-                50% { transform: rotate(45deg) translateX(100%); }
-            }
-            @keyframes lineExpand {
-                to { width: 200px; opacity: 0.5; }
+            @keyframes fadeIn {
+                to { opacity: 1; }
             }
         </style>
     `;
@@ -2294,7 +1734,6 @@ function createDefaultIntro(gamerTag, rank, profileImage) {
                 font-size: 1.5rem;
                 margin-bottom: 2rem;
                 animation: pulse 2s ease infinite;
-                font-family: 'Segoe UI', system-ui, sans-serif;
             }
             .loading-bar {
                 width: 300px;
@@ -2322,7 +1761,6 @@ function createDefaultIntro(gamerTag, rank, profileImage) {
                 overflow: hidden;
                 margin: 0 auto 1rem;
                 border: 2px solid #00ff88;
-                box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
             }
             .preview-avatar img {
                 width: 100%;
@@ -2334,13 +1772,11 @@ function createDefaultIntro(gamerTag, rank, profileImage) {
                 font-size: 2rem;
                 font-weight: bold;
                 margin-bottom: 0.5rem;
-                font-family: 'Segoe UI', system-ui, sans-serif;
             }
             .preview-rank {
                 color: #00ff88;
                 font-size: 1.2rem;
                 font-weight: 500;
-                font-family: monospace;
             }
             @keyframes pulse {
                 0%, 100% { opacity: 0.5; }
@@ -2355,14 +1791,13 @@ function createDefaultIntro(gamerTag, rank, profileImage) {
 
 function getScrambledText(text) {
     const chars = '0123456789!@#$%^&*()';
-    const numbers = '0123456789';
     return text.split('').map(char => {
         if (char === ' ' || char === '_') return char;
         if (Math.random() > 0.6) {
             return chars[Math.floor(Math.random() * chars.length)];
         }
         if (Math.random() > 0.5) {
-            return numbers[Math.floor(Math.random() * numbers.length)];
+            return Math.floor(Math.random() * 10).toString();
         }
         return char;
     }).join('');
@@ -3441,6 +2876,7 @@ async function loadProfileGamerInfo(profileId) {
                                 <div class="gamer-stat-card">
                                     <div class="stat-value">${stat.value}</div>
                                     <div class="stat-label">${stat.label}</div>
+                                </div>
                             `;
                         }
                     });
