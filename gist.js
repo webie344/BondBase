@@ -1,5 +1,5 @@
 // gist.js - Complete Independent Anonymous Gist System for Group Chat
-// FIXED: Prevents duplicate message display
+// UPDATED: Professional design with dotted borders (no reaction buttons)
 
 import { 
     getFirestore, 
@@ -195,7 +195,7 @@ class GistSystem {
             }
             
             .make-gist-btn {
-                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
                 border: none;
                 width: 56px;
@@ -205,7 +205,7 @@ class GistSystem {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                box-shadow: 0 6px 20px rgba(240, 147, 251, 0.4);
+                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 position: relative;
                 z-index: 1001;
@@ -222,7 +222,7 @@ class GistSystem {
             
             .make-gist-btn:hover {
                 transform: scale(1.15) rotate(5deg);
-                box-shadow: 0 8px 25px rgba(240, 147, 251, 0.6);
+                box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
             }
             
             .make-gist-btn:active {
@@ -385,8 +385,8 @@ class GistSystem {
             
             .gist-input:focus {
                 outline: none;
-                border-color: #f093fb;
-                box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
                 background: rgba(255, 255, 255, 0.08);
             }
             
@@ -437,14 +437,14 @@ class GistSystem {
             }
             
             .gist-post-btn {
-                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
-                box-shadow: 0 6px 20px rgba(240, 147, 251, 0.3);
+                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
             }
             
             .gist-post-btn:hover:not(:disabled) {
                 transform: translateY(-2px);
-                box-shadow: 0 8px 25px rgba(240, 147, 251, 0.4);
+                box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
             }
             
             .gist-post-btn:disabled {
@@ -458,7 +458,7 @@ class GistSystem {
                 background: rgba(255, 255, 255, 0.05);
                 padding: 20px;
                 border-radius: 16px;
-                border-left: 4px solid #f093fb;
+                border-left: 4px solid #667eea;
                 margin-top: 24px;
             }
             
@@ -494,28 +494,35 @@ class GistSystem {
                 gap: 10px;
             }
             
-            /* Gist Message Styling */
+            /* UPDATED Gist Message Styling - Professional with Dotted Borders */
             .gist-message-bubble {
-                background: linear-gradient(135deg, rgba(240, 147, 251, 0.15) 0%, rgba(245, 87, 108, 0.15) 100%);
+                background: rgba(255, 255, 255, 0.02);
                 border-radius: 20px;
-                padding: 18px 22px;
-                margin: 16px 12px;
+                padding: 20px 24px;
+                margin: 20px 16px;
                 color: white;
                 position: relative;
-                border: 2px solid rgba(240, 147, 251, 0.3);
-                box-shadow: 0 10px 40px rgba(240, 147, 251, 0.15);
+                border: 2px dashed rgba(102, 126, 234, 0.4);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
                 animation: gist-bubble-appear 0.4s cubic-bezier(0.4, 0, 0.2, 1);
                 backdrop-filter: blur(10px);
                 overflow: hidden;
+                transition: all 0.3s ease;
+            }
+            
+            .gist-message-bubble:hover {
+                border-color: rgba(102, 126, 234, 0.6);
+                box-shadow: 0 12px 40px rgba(102, 126, 234, 0.15);
+                transform: translateY(-2px);
             }
             
             @keyframes gist-bubble-appear {
                 from {
-                    transform: scale(0.8);
+                    transform: translateY(10px) scale(0.95);
                     opacity: 0;
                 }
                 to {
-                    transform: scale(1);
+                    transform: translateY(0) scale(1);
                     opacity: 1;
                 }
             }
@@ -523,55 +530,49 @@ class GistSystem {
             .gist-message-bubble::before {
                 content: '';
                 position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 4px;
-                background: linear-gradient(90deg, #f093fb, #f5576c);
+                top: -2px;
+                left: -2px;
+                right: -2px;
+                bottom: -2px;
+                background: linear-gradient(135deg, 
+                    rgba(102, 126, 234, 0.2) 0%, 
+                    rgba(118, 75, 162, 0.2) 50%, 
+                    transparent 50%);
+                border-radius: 22px;
+                z-index: -1;
             }
             
             .gist-header {
                 display: flex;
                 align-items: center;
                 gap: 12px;
-                margin-bottom: 10px;
+                margin-bottom: 12px;
+                padding-bottom: 12px;
+                border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
             }
             
             .gist-icon {
-                font-size: 22px;
-                animation: gist-icon-glow 2s ease-in-out infinite;
-                filter: drop-shadow(0 0 8px rgba(240, 147, 251, 0.5));
-            }
-            
-            @keyframes gist-icon-glow {
-                0%, 100% { 
-                    transform: scale(1);
-                    filter: drop-shadow(0 0 8px rgba(240, 147, 251, 0.5));
-                }
-                50% { 
-                    transform: scale(1.1);
-                    filter: drop-shadow(0 0 12px rgba(240, 147, 251, 0.7));
-                }
+                font-size: 20px;
+                opacity: 0.8;
             }
             
             .gist-title {
-                font-weight: 700;
-                font-size: 15px;
+                font-weight: 600;
+                font-size: 14px;
                 text-transform: uppercase;
-                letter-spacing: 1.2px;
-                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
+                letter-spacing: 1px;
+                color: #667eea;
+                opacity: 0.9;
             }
             
             .gist-content {
-                font-size: 17px;
+                font-size: 16px;
                 line-height: 1.6;
-                margin-bottom: 14px;
+                margin-bottom: 16px;
                 word-break: break-word;
-                color: rgba(255, 255, 255, 0.95);
+                color: rgba(255, 255, 255, 0.9);
                 padding-right: 10px;
+                font-style: italic;
             }
             
             .gist-footer {
@@ -579,14 +580,14 @@ class GistSystem {
                 justify-content: space-between;
                 align-items: center;
                 font-size: 12px;
-                opacity: 0.8;
-                border-top: 1px solid rgba(255, 255, 255, 0.15);
+                opacity: 0.7;
                 padding-top: 12px;
+                border-top: 1px dashed rgba(255, 255, 255, 0.1);
             }
             
             .gist-time {
                 font-style: italic;
-                color: rgba(255, 255, 255, 0.7);
+                color: rgba(255, 255, 255, 0.6);
             }
             
             .gist-id {
@@ -594,8 +595,9 @@ class GistSystem {
                 background: rgba(0, 0, 0, 0.3);
                 padding: 4px 10px;
                 border-radius: 12px;
-                color: rgba(255, 255, 255, 0.8);
+                color: rgba(255, 255, 255, 0.7);
                 letter-spacing: 1px;
+                font-size: 11px;
             }
             
             /* Success Toast */
@@ -603,11 +605,11 @@ class GistSystem {
                 position: fixed;
                 top: 30px;
                 right: 30px;
-                background: linear-gradient(135deg, rgba(240, 147, 251, 0.95) 0%, rgba(245, 87, 108, 0.95) 100%);
+                background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
                 color: white;
                 padding: 16px 24px;
                 border-radius: 16px;
-                box-shadow: 0 15px 35px rgba(240, 147, 251, 0.4);
+                box-shadow: 0 15px 35px rgba(102, 126, 234, 0.4);
                 z-index: 10002;
                 animation: toast-slide-in 0.4s cubic-bezier(0.4, 0, 0.2, 1);
                 backdrop-filter: blur(10px);
@@ -651,6 +653,27 @@ class GistSystem {
                 flex: 1;
             }
             
+            /* Copy Feedback */
+            .copy-feedback {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background: rgba(76, 175, 80, 0.9);
+                color: white;
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 11px;
+                opacity: 0;
+                transform: translateY(-10px);
+                transition: all 0.3s ease;
+                z-index: 10;
+            }
+            
+            .copy-feedback.show {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            
             /* Responsive adjustments */
             @media (max-width: 768px) {
                 .gist-button-container {
@@ -669,8 +692,8 @@ class GistSystem {
                 }
                 
                 .gist-message-bubble {
-                    margin: 12px 8px;
-                    padding: 16px 18px;
+                    margin: 16px 12px;
+                    padding: 16px 20px;
                 }
             }
             
@@ -1213,19 +1236,17 @@ class GistSystem {
                 <span class="gist-time">${formattedTime}</span>
                 <span class="gist-id">#${shortGistId}</span>
             </div>
+            <div class="copy-feedback">Copied!</div>
         `;
         
         // Add click to copy functionality
         bubble.addEventListener('click', () => {
             navigator.clipboard.writeText(text).then(() => {
-                const originalId = bubble.querySelector('.gist-id');
-                const originalText = originalId.textContent;
-                originalId.textContent = '📋 Copied!';
-                originalId.style.color = '#4CAF50';
+                const feedback = bubble.querySelector('.copy-feedback');
+                feedback.classList.add('show');
                 
                 setTimeout(() => {
-                    originalId.textContent = originalText;
-                    originalId.style.color = '';
+                    feedback.classList.remove('show');
                 }, 2000);
             });
         });
@@ -1371,7 +1392,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Wait a moment for other scripts to load
     setTimeout(() => {
         window.gistSystem = new GistSystem();
-        console.log('💭 Gist System Initialized');
+        console.log('💭 Gist System Initialized with Professional Design');
     }, 1000);
 });
 

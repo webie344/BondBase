@@ -2013,16 +2013,19 @@
                 <div class="group-header-info">
                     <img src="" alt="Group Avatar" class="group-avatar" id="groupAvatar">
                     <h3 class="group-name-sidebar" id="groupNameSidebar"></h3>
+                                        <p class="chat-subtitle" id="chatSubtitle">..</p>
                     <p class="group-members-count" id="groupMembersCount"></p>
                     
                     <!-- CALL BUTTONS IN SIDEBAR - ADDED -->
-                    <div class="call-buttons">
-                        <button id="groupVoiceCallBtn" class="call-btn group-call" type="button">
-                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                        <div class="call-buttons">
+      
+                                              <button id="groupVoiceCallBtn" class="call-btn group-call" type="button"> 
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" >
                                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                             </svg>
-                            Start Group Call
-                        </button>
+                                                             Start Group Call
+                        </button>                
+                      
                     </div>
                 </div>
             </div>
@@ -2047,16 +2050,13 @@
             <div class="chat-header">
                 <div>
                     <h2 class="chat-title" id="chatTitle">Loading..</h2>
-                    <p class="chat-subtitle" id="chatSubtitle">..</p>
+
                 </div>
                 <div class="chat-header-actions">
                     <!-- CALL BUTTON IN HEADER - ADDED -->
-                    <button id="groupVoiceCallBtnMobile" class="call-btn group-call" type="button" style="padding: 8px 15px; font-size: 0.9rem;">
-                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
-                        Group Call
-                    </button>
+                   
+
+                        
                     <button class="header-btn" id="sidebarToggle" type="button">
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -2133,7 +2133,7 @@
     
     <script  src="clean.js"></script>
     <script type="module" src="edi.js"></script>
-    <script type="module" src="caljs"></script>
+    <script type="module" src="calls.js"></script>
     <script type="module" src="group.js"></script>
     <!-- Add AFTER group.js but BEFORE any other scripts -->
     <!-- Add this line to group.html -->
