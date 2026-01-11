@@ -304,7 +304,7 @@ function showLoginMessage() {
     }
 }
 
-// Setup notification creators (messages, likes, and posts)
+// Setup notification creators (messages, likes, posts, and groups)
 function setupNotificationCreators() {
     if (!currentUser) return;
 
@@ -330,13 +330,232 @@ function setupNotificationCreators() {
     }, 30000);
     checkIntervals.push(postInterval);
 
-    // Initial check
+    // Check for group notifications every 30 seconds
+    const groupInterval = setInterval(() => {
+        checkForGroupNotifications();
+    }, 30000);
+    checkIntervals.push(groupInterval);
+
+    // Initial checks
     checkForNewMessages();
     checkForNewLikes();
     checkForNewPosts();
+    checkForGroupNotifications();
 }
 
-// Check for new messages
+// Check for group-related notifications
+async function checkForGroupNotifications() {
+    if (!currentUser) return;
+
+    try {
+        // Check for new group messages
+        await checkForNewGroupMessages();
+        
+        // Check for group invites
+        await checkForGroupInvites();
+        
+        // Check for group member events
+        await checkForGroupMemberEvents();
+        
+        // Check for admin notifications
+        await checkForAdminNotifications();
+
+    } catch (error) {
+        console.error('Error checking group notifications:', error);
+    }
+}
+
+// Check for new group messages
+async function checkForNewGroupMessages() {
+    if (!currentUser) return;
+
+    try {
+        // Get all groups the user is a member of
+        const groupsQuery = query(
+            collection(db, 'groups')
+        );
+        const groupsSnap = await getDocs(groupsQuery);
+
+        for (const groupDoc of groupsSnap.docs) {
+            const group = groupDoc.data();
+            const groupId = groupDoc.id;
+            
+            // Check if user is a member
+            const memberRef = doc(db, 'groups', groupId, 'members', currentUser.uid);
+            const memberSnap = await getDoc(memberRef);
+            
+            if (!memberSnap.exists()) continue;
+
+            // Get last message time from localStorage
+            const lastMessageKey = `lastGroupMessage_${groupId}_${currentUser.uid}`;
+            const lastMessageTime = localStorage.getItem(lastMessageKey) || 0;
+
+            // Get recent messages
+            const messagesRef = collection(db, 'groups', groupId, 'messages');
+            const messagesQuery = query(
+                messagesRef,
+                orderBy('timestamp', 'desc')
+            );
+            const messagesSnap = await getDocs(messagesQuery);
+            
+            for (const messageDoc of messagesSnap.docs) {
+                const message = messageDoc.data();
+                const messageTime = message.timestamp?.toDate?.()?.getTime() || new Date(message.timestamp).getTime();
+                
+                // Skip if message is from current user
+                if (message.senderId === currentUser.uid) continue;
+                
+                // Skip if message is older than last checked time
+                if (messageTime <= lastMessageTime) break;
+                
+                // Create notification for new message
+                await createGroupMessageNotification(groupId, group.name, message, messageDoc.id);
+                
+                // Update last message time
+                localStorage.setItem(lastMessageKey, messageTime.toString());
+                break; // Only create one notification per check
+            }
+        }
+    } catch (error) {
+        console.error('Error checking group messages:', error);
+    }
+}
+
+// Create group message notification
+async function createGroupMessageNotification(groupId, groupName, message, messageId) {
+    try {
+        const existing = await checkExistingNotification('group_message', messageId, message.senderId);
+        if (existing) return;
+
+        const senderDoc = await getDoc(doc(db, 'group_users', message.senderId));
+        const senderName = senderDoc.exists() ? senderDoc.data().displayName : 'Someone';
+
+        const messageText = message.text ? 
+            (message.text.length > 50 ? message.text.substring(0, 50) + '...' : message.text) : 
+            (message.imageUrl ? 'sent a photo' : message.videoUrl ? 'sent a video' : 'sent a message');
+
+        await addDoc(collection(db, 'notifications'), {
+            type: 'group_message',
+            title: `New Message in ${groupName}`,
+            message: `${senderName}: ${messageText}`,
+            senderId: message.senderId,
+            relatedId: messageId,
+            groupId: groupId,
+            groupName: groupName,
+            userId: currentUser.uid,
+            timestamp: serverTimestamp(),
+            read: false
+        });
+
+    } catch (error) {
+        console.error('Error creating group message notification:', error);
+    }
+}
+
+// Check for group invites
+async function checkForGroupInvites() {
+    if (!currentUser) return;
+
+    try {
+        // Check if user was recently added to any groups
+        const groupsQuery = query(
+            collection(db, 'groups')
+        );
+        const groupsSnap = await getDocs(groupsQuery);
+
+        for (const groupDoc of groupsSnap.docs) {
+            const group = groupDoc.data();
+            const groupId = groupDoc.id;
+            
+            // Check if user is a member
+            const memberRef = doc(db, 'groups', groupId, 'members', currentUser.uid);
+            const memberSnap = await getDoc(memberRef);
+            
+            if (!memberSnap.exists()) continue;
+
+            // Check join time
+            const joinTime = memberSnap.data().joinedAt?.toDate?.()?.getTime() || 0;
+            const now = Date.now();
+            
+            // If joined within the last 5 minutes, create notification
+            if ((now - joinTime) < 5 * 60 * 1000) {
+                const notificationKey = `group_join_${groupId}_${currentUser.uid}`;
+                if (!localStorage.getItem(notificationKey)) {
+                    await createGroupInviteNotification(groupId, group.name);
+                    localStorage.setItem(notificationKey, 'true');
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error checking group invites:', error);
+    }
+}
+
+// Create group invite notification
+async function createGroupInviteNotification(groupId, groupName) {
+    try {
+        await addDoc(collection(db, 'notifications'), {
+            type: 'group_invite',
+            title: 'Joined New Group',
+            message: `You have joined the group "${groupName}"`,
+            groupId: groupId,
+            groupName: groupName,
+            userId: currentUser.uid,
+            timestamp: serverTimestamp(),
+            read: false
+        });
+    } catch (error) {
+        console.error('Error creating group invite notification:', error);
+    }
+}
+
+// Check for group member events (member added, removed, etc.)
+async function checkForGroupMemberEvents() {
+    if (!currentUser) return;
+
+    try {
+        // Check for member removal notifications
+        const removalQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', currentUser.uid),
+            where('type', '==', 'group_member_removed')
+        );
+        const removalSnap = await getDocs(removalQuery);
+        
+        // Already handled by the existing notification system from group.js
+        // We just need to ensure they appear in the notification list
+        
+    } catch (error) {
+        console.error('Error checking group member events:', error);
+    }
+}
+
+// Check for admin notifications (when user is admin of a group)
+async function checkForAdminNotifications() {
+    if (!currentUser) return;
+
+    try {
+        // Get groups where user is admin
+        const groupsQuery = query(
+            collection(db, 'groups'),
+            where('createdBy', '==', currentUser.uid)
+        );
+        const groupsSnap = await getDocs(groupsQuery);
+
+        for (const groupDoc of groupsSnap.docs) {
+            const group = groupDoc.data();
+            const groupId = groupDoc.id;
+            
+            // Check for new join requests (if implementing request system)
+            // Check for reported messages (if implementing report system)
+            // These would be additional features to implement
+        }
+    } catch (error) {
+        console.error('Error checking admin notifications:', error);
+    }
+}
+
+// Check for new messages (existing function)
 async function checkForNewMessages() {
     if (!currentUser) return;
 
@@ -373,7 +592,7 @@ async function checkForNewMessages() {
     }
 }
 
-// Create message notification
+// Create message notification (existing function)
 async function createMessageNotification(messageId, partnerId, message) {
     try {
         const existing = await checkExistingNotification('message', messageId, partnerId);
@@ -403,7 +622,7 @@ async function createMessageNotification(messageId, partnerId, message) {
     }
 }
 
-// Check for new likes
+// Check for new likes (existing function)
 async function checkForNewLikes() {
     if (!currentUser) return;
 
@@ -421,7 +640,7 @@ async function checkForNewLikes() {
     }
 }
 
-// Create like notification
+// Create like notification (existing function)
 async function createLikeNotification(likeId, likerId) {
     try {
         const existing = await checkExistingNotification('like', likeId, likerId);
@@ -448,7 +667,7 @@ async function createLikeNotification(likeId, likerId) {
     }
 }
 
-// Check for new posts
+// Check for new posts (existing function)
 async function checkForNewPosts() {
     if (!currentUser) return;
 
@@ -483,7 +702,7 @@ async function checkForNewPosts() {
     }
 }
 
-// Create post notification
+// Create post notification (existing function)
 async function createPostNotification(postId, post) {
     try {
         const existing = await checkExistingNotification('post', postId, post.userId);
@@ -513,8 +732,8 @@ async function createPostNotification(postId, post) {
     }
 }
 
-// Check if notification already exists
-async function checkExistingNotification(type, relatedId, senderId) {
+// Check if notification already exists (updated for group notifications)
+async function checkExistingNotification(type, relatedId, senderId = null) {
     try {
         // SIMPLE QUERY - No composite index needed
         const notificationsQuery = query(
@@ -529,7 +748,7 @@ async function checkExistingNotification(type, relatedId, senderId) {
             const data = doc.data();
             return data.type === type && 
                    data.relatedId === relatedId && 
-                   data.senderId === senderId;
+                   (senderId === null || data.senderId === senderId);
         });
     } catch (error) {
         console.error('Error checking existing notification:', error);
@@ -537,7 +756,7 @@ async function checkExistingNotification(type, relatedId, senderId) {
     }
 }
 
-// Setup notification listener
+// Setup notification listener (existing function)
 function setupNotificationListener() {
     if (!currentUser) return;
 
@@ -603,7 +822,7 @@ function setupNotificationListener() {
     }
 }
 
-// Update notification badge
+// Update notification badge (existing function)
 function updateNotificationBadge(count) {
     if (count === undefined) {
         count = localStorage.getItem(`notification_count_${currentUser ? currentUser.uid : 'anonymous'}`) || 0;
@@ -621,7 +840,7 @@ function updateNotificationBadge(count) {
     });
 }
 
-// Show real-time toast notification
+// Show real-time toast notification (updated for group notifications)
 function showRealTimeToast(notification) {
     const toast = document.createElement('div');
     toast.className = `notification-toast ${notification.type}`;
@@ -675,6 +894,14 @@ function showRealTimeToast(notification) {
                 border-left-color: var(--accent);
                 background: linear-gradient(135deg, var(--bg-card), rgba(68, 68, 68, 0.1));
             }
+            .notification-toast.group_message {
+                border-left-color: #4CAF50;
+                background: linear-gradient(135deg, var(--bg-card), rgba(76, 175, 80, 0.1));
+            }
+            .notification-toast.group_invite {
+                border-left-color: #2196F3;
+                background: linear-gradient(135deg, var(--bg-card), rgba(33, 150, 243, 0.1));
+            }
             .toast-icon {
                 width: 40px;
                 height: 40px;
@@ -696,6 +923,14 @@ function showRealTimeToast(notification) {
             .notification-toast.post .toast-icon {
                 background: linear-gradient(135deg, var(--accent), #2a2a2a);
                 color: var(--text-primary);
+            }
+            .notification-toast.group_message .toast-icon {
+                background: linear-gradient(135deg, #4CAF50, #2E7D32);
+                color: white;
+            }
+            .notification-toast.group_invite .toast-icon {
+                background: linear-gradient(135deg, #2196F3, #0D47A1);
+                color: white;
             }
             .toast-content {
                 flex: 1;
@@ -838,11 +1073,15 @@ function showRealTimeToast(notification) {
         dismissToast(toast);
     });
 
-    // Click to navigate
+    // Click to navigate (updated for group notifications)
     toast.addEventListener('click', (e) => {
         if (!isSwiping) {
             if (notification.type === 'message' && notification.senderId) {
                 window.location.href = `chat.html?id=${notification.senderId}`;
+            } else if (notification.type === 'group_message' && notification.groupId) {
+                window.location.href = `prepare.html?id=${notification.groupId}`;
+            } else if (notification.type === 'group_invite' && notification.groupId) {
+                window.location.href = `prepare.html?id=${notification.groupId}`;
             } else if (notification.type === 'post' && notification.senderId) {
                 window.location.href = 'posts.html';
                 // Mark post as viewed when clicking notification
@@ -869,17 +1108,21 @@ function showRealTimeToast(notification) {
     }
 }
 
-// Get notification icon
+// Get notification icon (updated for group notifications)
 function getNotificationIcon(type) {
     switch (type) {
         case 'message': return 'fas fa-comment-alt';
         case 'like': return 'fas fa-heart';
         case 'post': return 'fas fa-newspaper';
+        case 'group_message': return 'fas fa-users';
+        case 'group_invite': return 'fas fa-user-plus';
+        case 'group_member_removed': return 'fas fa-user-minus';
+        case 'group_deleted': return 'fas fa-trash-alt';
         default: return 'fas fa-bell';
     }
 }
 
-// Format time
+// Format time (existing function)
 function formatTime(timestamp) {
     if (!timestamp) return '';
     
@@ -911,7 +1154,7 @@ function formatTime(timestamp) {
     return date.toLocaleDateString();
 }
 
-// Clean up listeners
+// Clean up listeners (existing function)
 function cleanupListeners() {
     if (unsubscribeNotifications) unsubscribeNotifications();
     checkIntervals.forEach(interval => clearInterval(interval));
@@ -925,7 +1168,7 @@ if (document.readyState === 'loading') {
     initNotificationSystem();
 }
 
-// Export functions for external use
+// Export functions for external use (updated)
 window.NotificationSystem = {
     init: initNotificationSystem,
     updateBadge: updateNotificationBadge,
@@ -937,5 +1180,25 @@ window.NotificationSystem = {
         saveViewedPosts();
         dismissedNotifications.add(`post_${postId}`);
         saveDismissedNotifications();
+    },
+    // New group notification functions
+    createGroupNotification: async (type, title, message, groupId, groupName, relatedId = null) => {
+        if (!currentUser) return;
+        
+        try {
+            await addDoc(collection(db, 'notifications'), {
+                type: type,
+                title: title,
+                message: message,
+                groupId: groupId,
+                groupName: groupName,
+                relatedId: relatedId,
+                userId: currentUser.uid,
+                timestamp: serverTimestamp(),
+                read: false
+            });
+        } catch (error) {
+            console.error('Error creating group notification:', error);
+        }
     }
 };
