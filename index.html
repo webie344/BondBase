@@ -3,528 +3,344 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BondBase - secret hangout</title>
+    <title>BondBase - Anonymous Social Gaming</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Reset and Base Styles */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
+
         body {
-           background: url('bondbaseaction.png') no-repeat center/cover;"
-            background-color: #0a0a0a;
-            color: #ffffff;
-            line-height: 1.6;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            overflow-x: hidden;
+            background-color: #0f0a0a;
+            color: #f0e6e6;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
         }
-        
-        /* Secret Wallpaper Background */
-        body::before {
-            content: '';
+
+        .background-container {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-image: url('https://images.unsplash.com/photo-1550684376-efcbd6e3f031?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            opacity: 0.15;
             z-index: -1;
         }
-        
-        /* Overlay for better readability */
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(to bottom, rgba(10, 10, 10, 0.9) 0%, rgba(10, 10, 10, 0.7) 100%);
-            z-index: -1;
-        }
-        
-        /* Main Container */
-        .container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 2rem;
-            text-align: center;
-            position: relative;
-            z-index: 1;
-        }
 
-        /* Illustration Container */
-        .illustration-container {
-            margin: 2rem 0;
-            position: relative;
-            z-index: 1;
-            width: 280px;
-            height: 280px;
-        }
-
-        .illustration {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: contain;
-            border: 5px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 
-                0 0 0 1px rgba(255, 255, 255, 0.05),
-                0 10px 40px rgba(0, 0, 0, 0.5),
-                0 0 60px rgba(255, 85, 85, 0.1);
-            transition: all 0.4s ease;
-            background-color: rgba(26, 26, 26, 0.9);
-            backdrop-filter: blur(10px);
-            padding: 20px;
-            opacity: 0;
-            transform: scale(0.95);
+        .floating-icons {
             position: absolute;
-            top: 0;
-            left: 0;
-        }
-
-        .illustration.active {
-            opacity: 1;
-            transform: scale(1);
-            z-index: 2;
-        }
-
-        .illustration:hover {
-            transform: scale(1.03);
-            box-shadow: 
-                0 0 0 1px rgba(255, 255, 255, 0.1),
-                0 15px 50px rgba(0, 0, 0, 0.6),
-                0 0 80px rgba(255, 85, 85, 0.15);
-        }
-
-        /* Optional: Add a subtle glow animation */
-        @keyframes gentleGlow {
-            0%, 100% { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(255, 85, 85, 0.1); }
-            50% { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 70px rgba(255, 85, 85, 0.12); }
-        }
-
-        .illustration {
-            animation: gentleGlow 4s ease-in-out infinite;
-        }
-
-        /* Dot Navigation */
-        .dot-navigation {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 1.5rem;
-            gap: 12px;
-        }
-
-        .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.2);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .dot.active {
-            background-color: #ff5555;
-            transform: scale(1.2);
-        }
-
-        .dot:hover {
-            background-color: rgba(255, 85, 85, 0.7);
-            transform: scale(1.1);
-        }
-
-        /* Animation for the active dot */
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.4); }
-        }
-
-        .dot.active {
-            animation: pulse 2s infinite;
-        }
-
-        /* Illustration Description */
-        .illustration-description {
-            margin-top: 1.5rem;
-            max-width: 500px;
-            min-height: 60px;
-            font-size: 1.1rem;
-            color: #dddddd;
-            transition: all 0.5s ease;
-            padding: 0 1rem;
-            background-color: rgba(17, 17, 17, 0.6);
-            backdrop-filter: blur(5px);
-            border-radius: 10px;
-            padding: 15px;
-            border-left: 3px solid #ff5555;
-        }
-
-        /* Chain Logo */
-        .chain-logo {
-            font-size: 4rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            letter-spacing: 1px;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
-        }
-
-        .chain-logo::before {
-            content: "⛓️";
-            font-size: 4.5rem;
-            filter: brightness(1.2);
-            text-shadow: 0 0 15px rgba(255, 85, 85, 0.3);
-        }
-        
-        .tagline {
-            font-size: 1.5rem;
-            margin-bottom: 1.5rem;
-            opacity: 0.9;
-            color: #ffffff;
-            font-weight: 300;
-            text-shadow: 0 1px 5px rgba(0, 0, 0, 0.7);
-            background-color: rgba(0, 0, 0, 0.3);
-            padding: 8px 20px;
-            border-radius: 20px;
-            display: inline-block;
-        }
-
-        .lounge-text {
-            font-size: 1rem;
-            color: #ff5555;
-            margin-top: 1.5rem;
-            font-weight: 400;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            opacity: 0.9;
-            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Get Started Button */
-        .get-started-container {
             width: 100%;
-            padding: 2.5rem;
-            background-color: rgba(10, 10, 10, 0.85);
-            text-align: center;
-            backdrop-filter: blur(10px);
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            position: relative;
-            z-index: 1;
+            height: 100%;
         }
-        
-        .btn-get-started {
-            background-color: #ff5555;
+
+        .icon {
+            position: absolute;
+            font-size: 28px;
+            opacity: 0.4;
+            animation: float 20s infinite linear;
+            text-shadow: 0 0 10px rgba(220, 20, 60, 0.5);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .icon:hover {
+            opacity: 1;
+            color: #FF3366;
+            transform: scale(1.3);
+            text-shadow: 0 0 20px rgba(255, 51, 102, 0.8);
+        }
+
+        .content {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .app-info {
+            text-align: center;
+            max-width: 600px;
+            margin-top: 20vh;
+        }
+
+        .app-name {
+            font-size: 64px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            letter-spacing: 3px;
+            background: linear-gradient(to right, #8B0000, #B22222, #DC143C);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 20px rgba(139, 0, 0, 0.3);
+        }
+
+        .app-tagline {
+            font-size: 22px;
+            color: #d8a7a7;
+            line-height: 1.4;
+            margin-bottom: 30px;
+        }
+
+        .button-container {
+            width: 100%;
+            padding: 20px;
+        }
+
+        .get-started-btn {
             color: white;
             border: none;
-            padding: 1.2rem 3.5rem;
-            border-radius: 50px;
-            text-decoration: none;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            font-size: 22px;
             font-weight: 600;
-            font-size: 1.2rem;
-            transition: all 0.3s ease;
-            display: inline-block;
+            border-radius: 50px;
             cursor: pointer;
-            width: 100%;
-            max-width: 350px;
-            letter-spacing: 0.5px;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 25px rgba(139, 0, 0, 0.4);
+            display: block;
+            margin: 0 auto;
+            letter-spacing: 1.5px;
+            
+            /* Animated gradient background */
+            background: linear-gradient(
+                90deg,
+                #8B0000,
+                #A52A2A,
+                #B22222,
+                #8B0000
+            );
+            background-size: 300% 300%;
+            animation: gradientShift 3s ease-in-out infinite;
         }
-        
-        .btn-get-started:hover {
-            background-color: #ff3d3d;
+
+        .get-started-btn:hover {
             transform: translateY(-3px);
-            box-shadow: 0 7px 20px rgba(255, 85, 85, 0.25);
-        }
-        
-        .btn-get-started:active {
-            transform: translateY(-1px);
+            box-shadow: 0 8px 30px rgba(139, 0, 0, 0.6);
+            animation-play-state: paused;
         }
 
-        .btn-get-started::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-            transition: left 0.7s;
+        /* Keyframe animations */
+        @keyframes float {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+            25% {
+                transform: translate(calc(100vw * 0.05), calc(100vh * 0.05)) rotate(90deg);
+            }
+            50% {
+                transform: translate(calc(100vw * -0.03), calc(100vh * 0.08)) rotate(180deg);
+            }
+            75% {
+                transform: translate(calc(100vw * 0.08), calc(100vh * -0.02)) rotate(270deg);
+            }
+            100% {
+                transform: translate(0, 0) rotate(360deg);
+            }
         }
 
-        .btn-get-started:hover::after {
-            left: 100%;
+        @keyframes gradientShift {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
         }
-        
-        /* Additional styling for very dark theme */
-        ::selection {
-            background-color: rgba(255, 85, 85, 0.3);
+
+        /* Pulse animation for extra effect */
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 5px 25px rgba(139, 0, 0, 0.4);
+            }
+            50% {
+                box-shadow: 0 5px 30px rgba(220, 20, 60, 0.6);
+            }
+            100% {
+                box-shadow: 0 5px 25px rgba(139, 0, 0, 0.4);
+            }
         }
-        
-        /* Responsive Design */
+
+        .get-started-btn {
+            animation: gradientShift 3s ease-in-out infinite, pulse 2s ease-in-out infinite;
+        }
+
+        /* Glow effect for icons */
+        @keyframes glow {
+            0%, 100% {
+                filter: drop-shadow(0 0 5px rgba(220, 20, 60, 0.6));
+            }
+            50% {
+                filter: drop-shadow(0 0 15px rgba(255, 51, 102, 0.8));
+            }
+        }
+
+        .icon {
+            animation: float 20s infinite linear, glow 3s infinite ease-in-out;
+        }
+
         @media (max-width: 768px) {
-            .chain-logo {
-                font-size: 3.2rem;
-            }
-
-            .chain-logo::before {
-                font-size: 3.5rem;
+            .app-name {
+                font-size: 48px;
             }
             
-            .tagline {
-                font-size: 1.3rem;
-                padding: 6px 16px;
-            }
-
-            .illustration-container {
-                width: 240px;
-                height: 240px;
+            .app-tagline {
+                font-size: 20px;
             }
             
-            .container {
-                padding: 1.5rem;
+            .get-started-btn {
+                font-size: 20px;
+                padding: 18px;
             }
             
-            .get-started-container {
-                padding: 2rem;
-            }
-            
-            .btn-get-started {
-                padding: 1rem 2.5rem;
-                font-size: 1.1rem;
-                max-width: 300px;
+            .icon {
+                font-size: 24px;
+                opacity: 0.5;
             }
         }
-        
+
         @media (max-width: 480px) {
-            .chain-logo {
-                font-size: 2.8rem;
+            .app-name {
+                font-size: 36px;
             }
             
-            .chain-logo::before {
-                font-size: 3rem;
+            .app-tagline {
+                font-size: 18px;
             }
             
-            .tagline {
-                font-size: 1.1rem;
-                margin-bottom: 2rem;
-                padding: 5px 14px;
-            }
-
-            .illustration-container {
-                width: 150px;
-                height: 150px;
-            }
-
-            .lounge-text {
-                font-size: 1.1rem;
+            .get-started-btn {
+                font-size: 18px;
+                padding: 16px;
             }
             
-            .get-started-container {
-                padding: 1.5rem;
+            .icon {
+                font-size: 22px;
+                opacity: 0.6;
             }
-            
-            .btn-get-started {
-                padding: 0.9rem 2rem;
-                font-size: 1rem;
-                max-width: 280px;
-            }
-            
-            .illustration-description {
-                font-size: 1rem;
-                padding: 12px;
-            }
-            
-            .dot-navigation {
-                margin-top: 1rem;
-            }
-        }
-        
-        /* Hint text for dot navigation */
-        .hint-text {
-            font-size: 0.9rem;
-            color: rgba(255, 255, 255, 0.5);
-            margin-top: 0.5rem;
-            font-style: italic;
         }
     </style>
 </head>
 <body>
-    <!-- Background Overlay -->
-    <div class="overlay"></div>
-    
-    <!-- Main Content -->
-    <div class="container">
-        <!-- Chain Logo -->
-        <div class="chain-logo">BondBase</div>
-        
-        <p class="tagline">
-            chill & talk secret 
-        </p>
-        
-        <!-- Illustration Container -->
-        <div class="illustration-container">
-            <!-- Illustration 1: Secure Chat -->
-            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f511.svg" alt="Secure Chat" class="illustration active" id="illustration-1">
-            
-            <!-- Illustration 2: Private Group -->
-            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f465.svg" alt="Private Group" class="illustration" id="illustration-2">
-            
-            <!-- Illustration 3: Anonymous -->
-            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f576.svg" alt="Anonymous" class="illustration" id="illustration-3">
-            
-            <!-- Illustration 4: Connections -->
-            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f9f6.svg" alt="Connections" class="illustration" id="illustration-4">
-        </div>
-        
-        <!-- Dot Navigation -->
-        <div class="dot-navigation">
-            <div class="dot active" data-illustration="1"></div>
-            <div class="dot" data-illustration="2"></div>
-            <div class="dot" data-illustration="3"></div>
-            <div class="dot" data-illustration="4"></div>
-        </div>
-        
-
-        <!-- Illustration Description -->
-        <div class="illustration-description" id="illustration-description">
-            Secure, encrypted conversations where only you and your chosen connections have access.
-        </div>
-        
-        <p class="lounge-text">BondBase Lounge</p>
+    <div class="background-container">
+        <div class="floating-icons" id="floatingIcons"></div>
     </div>
-    
-    <!-- Get Started Button at Bottom -->
-    <div class="get-started-container">
-        <a href="login.html" class="btn-get-started">Get Started</a>
+
+    <div class="content">
+        <div class="app-info">
+            <h1 class="app-name">BondBase</h1>
+            <p class="app-tagline">The anonymous social gaming platform where you connect, play, and bond without revealing your identity. Experience gaming freedom.</p>
+        </div>
+
+        <div class="button-container">
+            <button class="get-started-btn" id="getStartedBtn">GET STARTED</button>
+        </div>
     </div>
 
     <script>
-        // Illustration data
-        const illustrations = [
-            {
-                id: 1,
-                emoji: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f511.svg",
-                title: "Secure Chat",
-                description: "Secure, encrypted conversations where only you and your chosen connections have access."
-            },
-            {
-                id: 2,
-                emoji: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f465.svg",
-                title: "Private Groups",
-                description: "Create private groups for your closest friends. Share thoughts, media, and moments in a safe space."
-            },
-            {
-                id: 3,
-                emoji: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f576.svg",
-                title: "Stay Anonymous",
-                description: "Choose your level of anonymity. Share what you want, when you want, with who you want."
-            },
-            {
-                id: 4,
-                emoji: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f9f6.svg",
-                title: "Build Connections",
-                description: "Forge meaningful connections in a judgment-free zone. Bond over shared interests and experiences."
-            }
+        // Icon options for the floating background
+        const iconClasses = [
+            'fas fa-dice', 'fas fa-gamepad', 'fas fa-headset', 'fas fa-mask',
+            'fas fa-user-secret', 'fas fa-ghost', 'fas fa-vr-cardboard', 'fas fa-key',
+            'fas fa-lock', 'fas fa-shield-alt', 'fas fa-comment-alt', 'fas fa-users',
+            'fas fa-wine-glass-alt', 'fas fa-gem', 'fas fa-fire', 'fas fa-heart',
+            'fas fa-crown', 'fas fa-trophy', 'fas fa-bolt', 'fas fa-star'
         ];
-        
-        // DOM Elements
-        const dots = document.querySelectorAll('.dot');
-        const illustrationDescription = document.getElementById('illustration-description');
-        
-        // Set up illustration switching via dots
-        dots.forEach(dot => {
-            dot.addEventListener('click', function() {
-                const illustrationId = this.getAttribute('data-illustration');
-                switchIllustration(illustrationId);
-                clearInterval(autoCycleInterval); // Stop auto-cycling when user interacts
-            });
-        });
-        
-        // Function to switch illustrations
-        function switchIllustration(id) {
-            // Update active dot
-            dots.forEach(dot => {
-                dot.classList.remove('active');
-                if (dot.getAttribute('data-illustration') === id) {
-                    dot.classList.add('active');
-                }
-            });
+
+        // Create floating icons with increased visibility
+        function createFloatingIcons() {
+            const container = document.getElementById('floatingIcons');
+            const iconCount = 50; // Increased number of icons
             
-            // Update active illustration
-            const illustrationElements = document.querySelectorAll('.illustration');
-            illustrationElements.forEach(illustration => {
-                illustration.classList.remove('active');
-            });
-            
-            const activeIllustration = document.getElementById(`illustration-${id}`);
-            activeIllustration.classList.add('active');
-            
-            // Update description with fade effect
-            illustrationDescription.style.opacity = '0';
-            
-            setTimeout(() => {
-                illustrationDescription.textContent = getDescriptionForId(id);
-                illustrationDescription.style.opacity = '1';
-            }, 300);
-        }
-        
-        // Get description for illustration ID
-        function getDescriptionForId(id) {
-            const index = parseInt(id) - 1;
-            return illustrations[index].description;
-        }
-        
-        // Auto-cycle through illustrations
-        let currentIllustration = 1;
-        const autoCycleInterval = setInterval(() => {
-            currentIllustration = currentIllustration < 4 ? currentIllustration + 1 : 1;
-            switchIllustration(currentIllustration);
-        }, 5000);
-        
-        // Pause animation on hover
-        document.querySelectorAll('.illustration').forEach(illustration => {
-            illustration.addEventListener('mouseenter', function() {
-                this.style.animationPlayState = 'paused';
-            });
-            
-            illustration.addEventListener('mouseleave', function() {
-                this.style.animationPlayState = 'running';
-            });
-        });
-        
-        // Add keyboard navigation
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                currentIllustration = currentIllustration > 1 ? currentIllustration - 1 : 4;
-                switchIllustration(currentIllustration);
-                clearInterval(autoCycleInterval);
-            } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                currentIllustration = currentIllustration < 4 ? currentIllustration + 1 : 1;
-                switchIllustration(currentIllustration);
-                clearInterval(autoCycleInterval);
+            for (let i = 0; i < iconCount; i++) {
+                const icon = document.createElement('div');
+                icon.className = 'icon';
+                
+                // Random icon
+                const randomIcon = iconClasses[Math.floor(Math.random() * iconClasses.length)];
+                icon.innerHTML = `<i class="${randomIcon}"></i>`;
+                
+                // Random position
+                const posX = Math.random() * 100;
+                const posY = Math.random() * 100;
+                
+                // Random size - slightly larger
+                const size = Math.random() * 25 + 20;
+                
+                // Random animation
+                const duration = Math.random() * 30 + 20;
+                const delay = Math.random() * 5;
+                
+                icon.style.left = `${posX}%`;
+                icon.style.top = `${posY}%`;
+                icon.style.fontSize = `${size}px`;
+                icon.style.animation = `float ${duration}s linear ${delay}s infinite, glow ${Math.random() * 4 + 3}s infinite ease-in-out`;
+                
+                // More vibrant wine red colors
+                const colors = [
+                    '#DC143C', // Crimson - more vibrant
+                    '#FF3366', // Bright pink-red
+                    '#B22222', // Fire brick
+                    '#FF0033', // Bright red
+                    '#FF6B6B', // Coral red
+                    '#8B0000'  // Dark red
+                ];
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                icon.style.color = randomColor;
+                
+                // Vary opacity for depth
+                const opacity = Math.random() * 0.3 + 0.5; // 0.5 to 0.8 opacity
+                icon.style.opacity = opacity;
+                
+                container.appendChild(icon);
             }
+        }
+
+        // Handle button click
+        document.getElementById('getStartedBtn').addEventListener('click', function() {
+            window.location.href = 'login.html';
+        });
+
+        // Add subtle color variation to button
+        function animateButtonColors() {
+            const button = document.getElementById('getStartedBtn');
+            const wineColors = [
+                '#8B0000',  // Dark Red
+                '#A52A2A',  // Brown Red
+                '#B22222',  // Fire Brick
+                '#DC143C',  // Crimson
+                '#FF0033'   // Bright Red
+            ];
+            
+            let colorIndex = 0;
+            
+            // Change gradient colors every 5 seconds
+            setInterval(() => {
+                const nextIndex = (colorIndex + 1) % wineColors.length;
+                const nextNextIndex = (colorIndex + 2) % wineColors.length;
+                
+                button.style.background = `linear-gradient(
+                    90deg,
+                    ${wineColors[colorIndex]},
+                    ${wineColors[nextIndex]},
+                    ${wineColors[nextNextIndex]},
+                    ${wineColors[colorIndex]}
+                )`;
+                
+                colorIndex = (colorIndex + 1) % wineColors.length;
+            }, 5000);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            createFloatingIcons();
+            animateButtonColors();
         });
     </script>
 </body>
