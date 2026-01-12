@@ -3,25 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connect - BondBase</title>
+    <title>Gamers Directory - Dating Connect</title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Add this AFTER Feather Icons but BEFORE your stream.js -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Feather Icons (Modern Line Icons) -->
+    <!-- Feather Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
     
     <style>
         :root {
-            /*  – Dark, Leather, Steel */
+            /* Dark, Leather, Steel Theme */
             --primary: #b3004b; /* deep crimson */
             --primary-dark: #7a0034;
             --primary-light: #e63986;
-
             --secondary: #8b0000; /* dark red for alerts/badges */
             --accent: #444; /* metal/steel tone */
             --text-primary: #ffffff;
@@ -56,7 +53,7 @@
             min-height: 100vh;
             position: relative;
             cursor: default;
-            padding-bottom: 70px; /* Space for bottom nav */
+            padding-bottom: 70px;
         }
 
         /* Icon Styling */
@@ -69,7 +66,7 @@
             fill: none;
         }
 
-        /* Top Navigation Bar - Simplified with only logo and notification */
+        /* Top Navigation */
         .top-nav {
             background: rgba(255, 255, 255, 0.06);
             backdrop-filter: blur(6px);
@@ -111,7 +108,6 @@
             color: var(--primary-light);
         }
 
-        /* Notification bell at top right */
         .notification-top {
             display: flex;
             align-items: center;
@@ -154,14 +150,354 @@
             font-weight: 600;
         }
 
-        /* Hide the full navbar */
-        .navbar {
-            display: none;
+        /* Main Content */
+        .main-content {
+            margin-top: 60px;
+            padding: 15px;
+            min-height: calc(100vh - 130px);
         }
-        
-        /* Bottom Navigation - Style from stream.html */
+
+        /* Page Header */
+        .page-header {
+            text-align: center;
+            padding: 15px;
+            background: var(--bg-card);
+            margin: 15px auto;
+            max-width: 1200px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .page-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .page-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* Gamers List Container - Single Line Format */
+        .gamers-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        /* Search Bar */
+        .search-container {
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-light);
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 25px;
+            padding: 8px 15px;
+        }
+
+        .search-bar .feather {
+            color: var(--text-light);
+            margin-right: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+        }
+
+        .search-input::placeholder {
+            color: var(--text-light);
+        }
+
+        /* Filter Buttons */
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .filter-btn:hover {
+            background: var(--primary-light);
+            color: white;
+            border-color: var(--primary-light);
+        }
+
+        /* Gamers List */
+        .gamers-list {
+            padding: 0;
+        }
+
+        /* Gamer Item - Single Line Format */
+        .gamer-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.3s ease;
+            cursor: pointer;
+            gap: 15px;
+        }
+
+        .gamer-item:hover {
+            background: var(--bg-light);
+        }
+
+        .gamer-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary);
+        }
+
+        .gamer-info {
+            flex: 1;
+            min-width: 0; /* Important for text truncation */
+        }
+
+        .gamer-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .gamer-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .gamer-tag {
+            font-size: 13px;
+            color: var(--primary-light);
+            background: rgba(255, 42, 109, 0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .gamer-stats {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 4px;
+        }
+
+        .gamer-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .gamer-stat .feather {
+            width: 14px;
+            height: 14px;
+        }
+
+        .gamer-rank {
+            color: #FFD700;
+            font-weight: 600;
+        }
+
+        .gamer-level {
+            color: #00ff88;
+        }
+
+        .gamer-kd {
+            color: #ff2a6d;
+        }
+
+        .gamer-attributes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .attribute-tag {
+            font-size: 11px;
+            color: var(--text-light);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 6px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .gamer-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .clan-section {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-right: 10px;
+        }
+
+        .clan-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: rgba(0, 255, 136, 0.1);
+            padding: 2px 6px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .clan-count .feather {
+            width: 12px;
+            height: 12px;
+            color: #00ff88;
+        }
+
+        .add-clan-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            min-width: 85px;
+            justify-content: center;
+        }
+
+        .add-clan-btn:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            transform: translateY(-1px);
+        }
+
+        .add-clan-btn.added {
+            background: var(--secondary);
+            padding: 6px 8px;
+        }
+
+        .add-clan-btn.added:hover {
+            background: #a30000;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+
+        .empty-state .feather {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 15px;
+            color: var(--primary-light);
+        }
+
+        .empty-title {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+        }
+
+        /* Loading State */
+        .gamer-item.loading {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .loading-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        .loading-info {
+            flex: 1;
+        }
+
+        .loading-line {
+            height: 12px;
+            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+
+        .loading-line.short {
+            width: 40%;
+        }
+
+        .loading-line.medium {
+            width: 60%;
+        }
+
+        @keyframes loading {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* Bottom Navigation */
         .bottom-nav {
-            position: fixed !important; /* Ensure it's fixed */
+            position: fixed !important;
             bottom: 0;
             left: 0;
             right: 0;
@@ -173,7 +509,7 @@
             border-top: 1px solid rgba(255,255,255,0.1);
             z-index: 1000;
             width: 100%;
-            height: 70px; /* Fixed height */
+            height: 70px;
         }
 
         .nav-item {
@@ -188,7 +524,7 @@
             transition: opacity 0.3s;
             padding: 5px;
             flex: 1;
-            max-width: 16.666%; /* 6 items = ~16.666% each */
+            max-width: 16.666%;
             height: 100%;
         }
 
@@ -222,316 +558,6 @@
             font-weight: 500;
             text-align: center;
         }
-        
-        /* Special style for Stream link */
-        .nav-item.stream-link .nav-label {
-            font-family: 'Inter', sans-serif; /* Changed from Great Vibes for consistency */
-            font-size: 11px;
-        }
-
-        /* Main Content Area for Grid */
-        .main-content {
-            margin-top: 60px; /* Space for top nav */
-            padding: 15px;
-            min-height: calc(100vh - 130px); /* Account for top nav + bottom nav */
-        }
-
-        /* Grid Layout Styles - Multiple small profiles per row */
-        .mingle-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 10px;
-            padding: 10px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        /* For larger screens, show more profiles per row */
-        @media (min-width: 1400px) {
-            .mingle-grid {
-                grid-template-columns: repeat(7, 1fr);
-            }
-        }
-
-        @media (min-width: 1200px) and (max-width: 1399px) {
-            .mingle-grid {
-                grid-template-columns: repeat(6, 1fr);
-            }
-        }
-
-        @media (min-width: 992px) and (max-width: 1199px) {
-            .mingle-grid {
-                grid-template-columns: repeat(5, 1fr);
-            }
-        }
-
-        @media (min-width: 768px) and (max-width: 991px) {
-            .mingle-grid {
-                grid-template-columns: repeat(4, 1fr);
-            }
-        }
-
-        @media (min-width: 480px) and (max-width: 767px) {
-            .mingle-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
-
-        /* For very small phones, show 2 per row */
-        @media (max-width: 479px) {
-            .mingle-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 8px;
-                padding: 8px;
-            }
-        }
-
-        /* For extremely small phones */
-        @media (max-width: 320px) {
-            .mingle-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 6px;
-                padding: 6px;
-            }
-        }
-
-        .profile-grid-card {
-            background: var(--bg-card);
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: var(--shadow);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            border: 1px solid var(--border);
-            min-height: 180px;
-        }
-
-        .profile-grid-card:hover {
-            transform: translateY(-3px);
-            box-shadow: var(--shadow-lg);
-            border-color: var(--primary-light);
-        }
-
-        .profile-grid-image {
-            width: 100%;
-            height: 110px;
-            object-fit: cover;
-            border-bottom: 1px solid var(--border);
-            transition: transform 0.3s ease;
-        }
-
-        .profile-grid-card:hover .profile-grid-image {
-            transform: scale(1.05);
-        }
-
-        .profile-grid-content {
-            padding: 8px;
-        }
-
-        .profile-grid-name {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 3px;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .profile-grid-details {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .profile-grid-bio {
-            font-size: 10px;
-            color: var(--text-light);
-            line-height: 1.3;
-            margin-bottom: 6px;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            height: 26px;
-        }
-
-        .profile-grid-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 4px;
-        }
-
-        .profile-grid-likes {
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            font-size: 10px;
-            color: var(--text-secondary);
-        }
-
-        .profile-grid-likes .feather {
-            width: 10px;
-            height: 10px;
-            color: var(--primary-light);
-        }
-
-        .profile-grid-like-btn {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 4px 8px;
-            cursor: pointer;
-            font-size: 10px;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            min-width: 45px;
-            justify-content: center;
-        }
-
-        .profile-grid-like-btn .feather {
-            width: 10px;
-            height: 10px;
-        }
-
-        .profile-grid-like-btn:hover {
-            background: linear-gradient(135deg, var(--primary-light), var(--primary));
-            transform: translateY(-1px);
-        }
-
-        .profile-grid-like-btn.liked {
-            background: var(--secondary);
-            padding: 4px 6px;
-        }
-
-        .profile-grid-like-btn.liked:hover {
-            background: #a30000;
-        }
-
-        .profile-grid-status {
-            position: absolute;
-            top: 6px;
-            right: 6px;
-            width: 3px;
-            height: 3px;
-            border-radius: 50%;
-            border: 2px solid var(--bg-card);
-            z-index: 2;
-        }
-
-        .profile-grid-status.online {
-            background-color: #00FF00;
-        }
-
-        .profile-grid-status.offline {
-            background-color: #9E9E9E;
-        }
-
-        .no-profiles-message {
-            grid-column: 1 / -1;
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--text-light);
-            font-size: 16px;
-            background: var(--bg-card);
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-        }
-
-        .no-profiles-message .feather {
-            width: 36px;
-            height: 36px;
-            margin-bottom: 15px;
-            color: var(--primary-light);
-            display: block;
-            margin: 0 auto 15px;
-        }
-
-        /* Loading State */
-        .profile-grid-card.loading {
-            background: var(--bg-card);
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: var(--shadow);
-            border: 1px solid var(--border);
-            min-height: 180px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .loading-image {
-            width: 100%;
-            height: 110px;
-            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-
-        .loading-content {
-            padding: 8px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .loading-line {
-            height: 8px;
-            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-            border-radius: 4px;
-        }
-
-        .loading-line.short {
-            width: 60%;
-        }
-
-        .loading-line.medium {
-            width: 80%;
-        }
-
-        @keyframes loading {
-            0% {
-                background-position: 200% 0;
-            }
-            100% {
-                background-position: -200% 0;
-            }
-        }
-
-        /* Page Header */
-        .page-header {
-            text-align: center;
-            padding: 15px;
-            background: var(--bg-card);
-            margin: 15px auto;
-            max-width: 1200px;
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-        }
-
-        .page-title {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 6px;
-        }
-
-        .page-subtitle {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            max-width: 500px;
-            margin: 0 auto;
-        }
 
         /* Responsive Design */
         @media (max-width: 768px) {
@@ -549,83 +575,199 @@
             .page-title {
                 font-size: 1.4rem;
             }
-            
-            /* Bottom nav responsive */
-            .bottom-nav {
-                height: 65px;
-            }
-            
-            .nav-item {
-                max-width: 16.666%;
-                padding: 3px;
-            }
-            
-            .nav-label {
-                font-size: 9px;
-            }
-            
-            .nav-icon .feather {
-                width: 20px;
-                height: 20px;
-            }
-            
-            .nav-item.stream-link .nav-label {
-                font-size: 10px;
-            }
-        }
 
-        @media (max-width: 360px) {
-            .mingle-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 6px;
-                padding: 6px;
+            .gamer-item {
+                padding: 10px;
+                gap: 10px;
             }
 
-            .profile-grid-card {
-                min-height: 170px;
+            .gamer-avatar {
+                width: 45px;
+                height: 45px;
             }
 
-            .profile-grid-image {
-                height: 100px;
+            .gamer-name {
+                font-size: 14px;
             }
 
-            .profile-grid-content {
-                padding: 6px;
-            }
-
-            .profile-grid-name {
+            .gamer-tag {
                 font-size: 12px;
             }
 
-            .profile-grid-like-btn {
-                padding: 3px 6px;
-                font-size: 9px;
-                min-width: 40px;
+            .gamer-stats {
+                gap: 8px;
             }
-            
-            /* Bottom nav small screens */
-            .bottom-nav {
-                height: 60px;
-                padding: 8px 0;
+
+            .gamer-stat {
+                font-size: 11px;
             }
-            
-            .nav-label {
-                font-size: 8px;
+
+            .add-clan-btn {
+                padding: 5px 10px;
+                font-size: 11px;
+                min-width: 75px;
             }
-            
-            .nav-icon .feather {
-                width: 18px;
-                height: 18px;
+        }
+
+        @media (max-width: 480px) {
+            .gamer-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
             }
-            
-            .nav-item.stream-link .nav-label {
-                font-size: 9px;
+
+            .gamer-stats {
+                flex-wrap: wrap;
+                gap: 6px;
             }
+
+            .gamer-actions {
+                flex-direction: column;
+                gap: 5px;
+                align-items: flex-end;
+            }
+
+            .clan-section {
+                margin-right: 0;
+            }
+
+            .gamer-info {
+                min-width: 0;
+                overflow: hidden;
+            }
+
+            .gamer-name, .gamer-tag {
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+        }
+
+        /* Clan Modal */
+        .clan-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .clan-modal-content {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .clan-modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .clan-modal-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .close-modal:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-primary);
+        }
+
+        .clan-modal-body {
+            padding: 20px;
+        }
+
+        .clan-input-group {
+            margin-bottom: 15px;
+        }
+
+        .clan-input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .clan-input {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .clan-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .clan-modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-light);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
         }
     </style>
 </head>
 <body>
-    <!-- Top Navigation with Logo and Notification Bell -->
+    <!-- Top Navigation -->
     <nav class="top-nav">
         <div class="top-nav-container">
             <a href="index.html" class="logo">
@@ -633,100 +775,144 @@
                     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                 </svg>
-                BondBase
+                BondBase Gamers
             </a>
-<div class="notification-top">
-    <a href="notification.html" class="notification-link">
-        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-        </svg>
-        <span class="notification-badge">0</span>
-    </a>
-</div>
+            <div class="notification-top">
+                <a href="notification.html" class="notification-link">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="notification-badge">0</span>
+                </a>
+            </div>
+        </div>
     </nav>
 
     <!-- Main Content -->
     <div class="main-content">
         <!-- Page Header -->
         <div class="page-header">
-            <h1 class="page-title">Discover Connections</h1>
-            <p class="page-subtitle">Browse through verified profiles and find your perfect match. Click on any profile to learn more.</p>
+            <h1 class="page-title">Gamers Directory</h1>
+            <p class="page-subtitle">Find fellow gamers, join clans, and dominate together</p>
         </div>
 
-        <!-- Grid Container -->
-        <div id="mingleGrid" class="mingle-grid">
-            <!-- Loading State - Multiple small loading cards -->
-            <div class="profile-grid-card loading">
-                <div class="loading-image"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line short"></div>
-                    <div class="loading-line" style="width: 40%"></div>
+        <!-- Gamers Container -->
+        <div class="gamers-container">
+            <!-- Search and Filter -->
+            <div class="search-container">
+                <div class="search-bar">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" class="search-input" placeholder="Search gamers by name, tag, or game...">
+                </div>
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="all">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="16"></line>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                        All
+                    </button>
+                    <button class="filter-btn" data-filter="online">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                        </svg>
+                        Online
+                    </button>
+                    <button class="filter-btn" data-filter="highrank">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                        Top Rank
+                    </button>
+                    <button class="filter-btn" data-filter="clan">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        In Clan
+                    </button>
                 </div>
             </div>
-            <div class="profile-grid-card loading">
-                <div class="loading-image"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line short"></div>
-                    <div class="loading-line" style="width: 40%"></div>
+
+            <!-- Gamers List -->
+            <div id="gamersList" class="gamers-list">
+                <!-- Loading State -->
+                <div class="gamer-item loading">
+                    <div class="loading-avatar"></div>
+                    <div class="loading-info">
+                        <div class="loading-line" style="width: 60%"></div>
+                        <div class="loading-line short"></div>
+                        <div class="loading-line medium"></div>
+                    </div>
                 </div>
-            </div>
-            <div class="profile-grid-card loading">
-                <div class="loading-image"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line short"></div>
-                    <div class="loading-line" style="width: 40%"></div>
+                <div class="gamer-item loading">
+                    <div class="loading-avatar"></div>
+                    <div class="loading-info">
+                        <div class="loading-line" style="width: 60%"></div>
+                        <div class="loading-line short"></div>
+                        <div class="loading-line medium"></div>
+                    </div>
                 </div>
-            </div>
-            <div class="profile-grid-card loading">
-                <div class="loading-image"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line short"></div>
-                    <div class="loading-line" style="width: 40%"></div>
-                </div>
-            </div>
-            <div class="profile-grid-card loading">
-                <div class="loading-image"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line short"></div>
-                    <div class="loading-line" style="width: 40%"></div>
-                </div>
-            </div>
-            <div class="profile-grid-card loading">
-                <div class="loading-image"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line short"></div>
-                    <div class="loading-line" style="width: 40%"></div>
-                </div>
-            </div>
-            <div class="profile-grid-card loading">
-                <div class="loading-image"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line short"></div>
-                    <div class="loading-line" style="width: 40%"></div>
-                </div>
-            </div>
-            <div class="profile-grid-card loading">
-                <div class="loading-image"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line short"></div>
-                    <div class="loading-line" style="width: 40%"></div>
+                <div class="gamer-item loading">
+                    <div class="loading-avatar"></div>
+                    <div class="loading-info">
+                        <div class="loading-line" style="width: 60%"></div>
+                        <div class="loading-line short"></div>
+                        <div class="loading-line medium"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bottom Navigation - Style from stream.html -->
+    <!-- Clan Modal -->
+    <div id="clanModal" class="clan-modal">
+        <div class="clan-modal-content">
+            <div class="clan-modal-header">
+                <h3 class="clan-modal-title">Join Clan</h3>
+                <button class="close-modal">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="clan-modal-body">
+                <div class="clan-input-group">
+                    <label>Clan Name</label>
+                    <input type="text" id="clanName" class="clan-input" placeholder="Enter clan name">
+                </div>
+                <div class="clan-input-group">
+                    <label>Role</label>
+                    <select id="clanRole" class="clan-input">
+                        <option value="member">Member</option>
+                        <option value="officer">Officer</option>
+                        <option value="leader">Leader</option>
+                        <option value="recruit">Recruit</option>
+                    </select>
+                </div>
+                <div class="clan-input-group">
+                    <label>Message (Optional)</label>
+                    <textarea id="clanMessage" class="clan-input" rows="3" placeholder="Add a message to the clan leader..."></textarea>
+                </div>
+            </div>
+            <div class="clan-modal-footer">
+                <button class="btn-secondary" id="cancelClan">Cancel</button>
+                <button class="btn-primary" id="submitClan">Send Request</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
     <div class="bottom-nav">
-        <a href="mingle.html" class="nav-item active">
+        <a href="mingle.html" class="nav-item">
             <div class="nav-icon">
                 <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -737,6 +923,24 @@
             </div>
             <span class="nav-label">Connect</span>
         </a>
+        <a href="gamers.html" class="nav-item active">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect>
+                    <path d="M12 6v12"></path>
+                    <path d="M2 12h20"></path>
+                </svg>
+            </div>
+            <span class="nav-label">Gamers</span>
+        </a>
+        <a href="stream.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+            </div>
+            <span class="nav-label">Stream</span>
+        </a>
         <a href="messages.html" class="nav-item">
             <div class="nav-icon">
                 <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -745,23 +949,6 @@
             </div>
             <span class="nav-label">Chat</span>
         </a>
-        <a href="posts.html" class="nav-item">
-            <div class="nav-icon">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                </svg>
-            </div>
-            <span class="nav-label">Resources</span>
-        </a>
-        <a href="stream.html" class="nav-item stream-link">
-            <div class="nav-icon">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-            </div>
-            <span class="nav-label">Stream</span>
-        </a>
         <a href="account.html" class="nav-item">
             <div class="nav-icon">
                 <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -769,43 +956,19 @@
                     <circle cx="12" cy="7" r="4"></circle>
                 </svg>
             </div>
-            <span class="nav-label">My Profile</span>
-        </a>
-        <a href="groups.html" class="nav-item">
-            <div class="nav-icon">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
-            </div>
-            <span class="nav-label">Groups</span>
+            <span class="nav-label">Profile</span>
         </a>
     </div>
 
     <!-- Scripts -->
-         <script type="module" src="group.js"></script>
-    <script type="module" src="call.js"></script>
-    <script type="module" src="mingle-upgrades.js"></script>
-    <script type="module" src="app.js"></script>
-    <script type="module" src="filter.js"></script>
-    <script type="module" src="social.js"></script>
-    <script type="module" src="additional.js"></script>
-    <script type="module" src="creative.js"></script>
-    <script type="module" src="flip.js"></script>
-    <script type="module" src="notification.js"></script>
+    <script type="module" src="gamers.js"></script>
     
     <!-- Initialize Feather Icons -->
     <script>
-        // Initialize Feather Icons
         document.addEventListener('DOMContentLoaded', function() {
             if (typeof feather !== 'undefined') {
                 feather.replace();
             }
-            
-            // You can also manually replace icons with:
-            // feather.replace({ class: 'custom-feather-class' });
         });
     </script>
 </body>
