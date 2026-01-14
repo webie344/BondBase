@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Challenges - BondBase Gamers</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <style>
+        :root {
+            /* Dark, Leather, Steel Theme */
+            --primary: #b3004b; /* deep crimson */
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --secondary: #8b0000; /* dark red for alerts/badges */
+            --accent: #444; /* metal/steel tone */
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b; /* deep black */
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --border-color: #2e2e2e;
+            --bg-light: #1b1b1b;
+            --accent-color: #b3004b;
+            --accent-dark: #7a0034;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.7);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.7);
+            --radius: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+            cursor: default;
+            padding-bottom: 70px;
+        }
+
+        /* Icon Styling */
+        .feather {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
+        /* Top Navigation */
+        .top-nav {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(6px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 0.75rem 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            height: 60px;
+            display: flex;
+            align-items: center;
+        }
+
+        .top-nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+            width: 100%;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            color: var(--primary-light);
+        }
+
+        .notification-top {
+            display: flex;
+            align-items: center;
+        }
+
+        .notification-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text-secondary);
+            padding: 0.5rem;
+            border-radius: var(--radius);
+            position: relative;
+            transition: color 0.2s ease;
+        }
+
+        .notification-link:hover {
+            color: var(--primary-light);
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .notification-link .feather {
+            width: 22px;
+            height: 22px;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            background-color: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: 60px;
+            padding: 15px;
+            min-height: calc(100vh - 130px);
+        }
+
+        /* Page Header */
+        .page-header {
+            text-align: center;
+            padding: 15px;
+            background: var(--bg-card);
+            margin: 15px auto;
+            max-width: 1200px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .page-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .page-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* Challenges Container */
+        .challenges-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        /* Tabs Navigation */
+        .challenges-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-light);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 15px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+        }
+
+        .tab-btn.active {
+            color: var(--primary-light);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary-light);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-primary);
+        }
+
+        .tab-count {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 12px;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .tab-btn.active .tab-count {
+            background: rgba(255, 42, 109, 0.2);
+            color: var(--primary-light);
+        }
+
+        /* Challenge List */
+        .challenges-list {
+            padding: 0;
+        }
+
+        .challenge-item {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.3s ease;
+        }
+
+        .challenge-item:hover {
+            background: var(--bg-light);
+        }
+
+        .challenge-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .challenge-game {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .challenge-status {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid rgba(255, 193, 7, 0.3);
+        }
+
+        .status-accepted {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .status-rejected {
+            background: rgba(255, 42, 109, 0.2);
+            color: #ff2a6d;
+            border: 1px solid rgba(255, 42, 109, 0.3);
+        }
+
+        .status-completed {
+            background: rgba(3, 169, 244, 0.2);
+            color: #03a9f4;
+            border: 1px solid rgba(3, 169, 244, 0.3);
+        }
+
+        .challenge-players {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .player-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary);
+        }
+
+        .player-details h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .player-details p {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .vs-badge {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .challenge-message {
+            background: var(--bg-primary);
+            padding: 12px;
+            border-radius: var(--radius);
+            margin-bottom: 15px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .challenge-message p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .challenge-time {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .challenge-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-light);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #00ff88, #00a854);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff2a6d, #cc2157);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #ff2a6d, #a81b46);
+            transform: translateY(-1px);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+
+        .empty-state .feather {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 20px;
+            color: var(--primary-light);
+        }
+
+        .empty-title {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+        }
+
+        .empty-description {
+            max-width: 400px;
+            margin: 0 auto 20px;
+            font-size: 14px;
+        }
+
+        /* Game Controls */
+        .game-controls {
+            background: var(--bg-primary);
+            padding: 15px;
+            border-radius: var(--radius);
+            margin-top: 15px;
+            border: 1px solid var(--border);
+        }
+
+        .game-controls h4 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .game-stats {
+            display: flex;
+            gap: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .game-timer {
+            font-size: 14px;
+            color: var(--text-light);
+        }
+
+        .game-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed !important;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            z-index: 1000;
+            width: 100%;
+            height: 70px;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: #fff;
+            text-decoration: none;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+            padding: 5px;
+            flex: 1;
+            max-width: 16.666%;
+            height: 100%;
+        }
+
+        .nav-item:hover {
+            opacity: 1;
+        }
+
+        .nav-item.active {
+            opacity: 1;
+            color: #ff2d55;
+        }
+
+        .nav-item.active .feather {
+            stroke: #ff2d55;
+        }
+
+        .nav-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-icon .feather {
+            width: 22px;
+            height: 22px;
+            stroke: currentColor;
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 10px;
+                margin-top: 60px;
+            }
+
+            .page-header {
+                margin: 10px;
+                padding: 12px 10px;
+            }
+
+            .page-title {
+                font-size: 1.4rem;
+            }
+
+            .challenge-item {
+                padding: 15px;
+            }
+
+            .challenge-players {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+
+            .vs-badge {
+                align-self: center;
+            }
+
+            .game-info {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+
+            .game-actions {
+                justify-content: flex-start;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .challenges-tabs {
+                flex-direction: column;
+            }
+
+            .tab-btn {
+                padding: 12px;
+            }
+
+            .challenge-actions {
+                flex-direction: column;
+            }
+
+            .btn-primary, .btn-secondary, .btn-success, .btn-danger {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Loading Animation */
+        .loading-skeleton {
+            animation: shimmer 1.5s infinite linear;
+            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
+            background-size: 200% 100%;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="top-nav-container">
+            <a href="index.html" class="logo">
+                <svg class="logo-icon feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                BondBase Challenges
+            </a>
+            <div class="notification-top">
+                <a href="notification.html" class="notification-link">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="notification-badge" id="notificationCount">0</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">My Challenges</h1>
+            <p class="page-subtitle">Manage your game challenges, accept invites, and track results</p>
+        </div>
+
+        <!-- Challenges Container -->
+        <div class="challenges-container">
+            <!-- Tabs -->
+            <div class="challenges-tabs">
+                <button class="tab-btn active" data-tab="received">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    Received
+                    <span class="tab-count" id="receivedCount">0</span>
+                </button>
+                <button class="tab-btn" data-tab="sent">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <polygon points="22 2 12 13 2 2 22 2"></polygon>
+                        <polyline points="22 2 12 13 2 2"></polyline>
+                    </svg>
+                    Sent
+                    <span class="tab-count" id="sentCount">0</span>
+                </button>
+                <button class="tab-btn" data-tab="active">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                    </svg>
+                    Active
+                    <span class="tab-count" id="activeCount">0</span>
+                </button>
+                <button class="tab-btn" data-tab="history">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    History
+                    <span class="tab-count" id="historyCount">0</span>
+                </button>
+            </div>
+
+            <!-- Challenges List -->
+            <div id="challengesList" class="challenges-list">
+                <!-- Loading state will be inserted here -->
+                <div class="challenge-item loading-skeleton" style="height: 200px; border-radius: var(--radius); margin: 15px;"></div>
+                <div class="challenge-item loading-skeleton" style="height: 200px; border-radius: var(--radius); margin: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <a href="mingle.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </div>
+            <span class="nav-label">Connect</span>
+        </a>
+        <a href="messages.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </div>
+            <span class="nav-label">Chat</span>
+        </a>
+        <a href="posts.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                </svg>
+            </div>
+            <span class="nav-label">Resources</span>
+        </a>
+        <a href="stream.html" class="nav-item stream-link">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+            </div>
+            <span class="nav-label">Stream</span>
+        </a>
+<a href="groups.html" class="nav-item active">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </div>
+            <span class="nav-label">Groups</span>
+        </a>
+        <a href="account.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
+            <span class="nav-label">My Profile</span>
+        </a>
+        <a href="challenge.html" class="nav-item active">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                    <polyline points="13 2 13 9 20 9"></polyline>
+                </svg>
+            </div>
+            <span class="nav-label">Challenges</span>
+        </a>
+    </div>
+
+    
+    <!-- Challenge Management Script -->
+    <script type="module" src="notification.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection,
+            query,
+            where,
+            getDocs,
+            doc,
+            getDoc,
+            updateDoc,
+            serverTimestamp,
+            onSnapshot
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
+            authDomain: "dating-connect.firebaseapp.com",
+            projectId: "dating-connect",
+            storageBucket: "dating-connect.appspot.com",
+            messagingSenderId: "1062172180210",
+            appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let currentTab = 'received';
+        let challenges = [];
+        let userProfilesCache = {};
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            initChallengeSystem();
+            setupTabListeners();
+        });
+
+        async function initChallengeSystem() {
+            onAuthStateChanged(auth, async (user) => {
+                currentUser = user;
+                if (user) {
+                    await loadAllChallenges();
+                    setupRealTimeUpdates();
+                } else {
+                    showLoginPrompt();
+                }
+            });
+        }
+
+        function setupTabListeners() {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Update active tab
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentTab = btn.dataset.tab;
+                    
+                    // Filter and display challenges
+                    displayChallenges();
+                });
+            });
+        }
+
+        async function loadAllChallenges() {
+            const challengesList = document.getElementById('challengesList');
+            if (!challengesList) return;
+            
+            try {
+                // Show loading
+                challengesList.innerHTML = `
+                    <div class="challenge-item loading-skeleton" style="height: 200px; border-radius: var(--radius); margin: 15px;"></div>
+                    <div class="challenge-item loading-skeleton" style="height: 200px; border-radius: var(--radius); margin: 15px;"></div>
+                `;
+                
+                // Load ALL challenges at once (no complex queries that need indexes)
+                const challengesRef = collection(db, 'challenges');
+                const snapshot = await getDocs(challengesRef);
+                
+                challenges = [];
+                
+                // Process challenges
+                for (const docSnap of snapshot.docs) {
+                    const challenge = {
+                        id: docSnap.id,
+                        ...docSnap.data()
+                    };
+                    
+                    // Filter on client side instead of query
+                    if (challenge.challengerId === currentUser.uid || 
+                        challenge.opponentId === currentUser.uid) {
+                        
+                        // Get user profiles
+                        const challengerProfile = await getUserProfile(challenge.challengerId);
+                        const opponentProfile = await getUserProfile(challenge.opponentId);
+                        
+                        challenge.challengerProfile = challengerProfile;
+                        challenge.opponentProfile = opponentProfile;
+                        
+                        challenges.push(challenge);
+                    }
+                }
+                
+                // Update counts
+                updateTabCounts();
+                
+                // Display challenges
+                displayChallenges();
+                
+            } catch (error) {
+                console.error('Error loading challenges:', error);
+                showError('Failed to load challenges');
+            }
+        }
+
+        async function getUserProfile(userId) {
+            // Check cache first
+            if (userProfilesCache[userId]) {
+                return userProfilesCache[userId];
+            }
+            
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                
+                if (userSnap.exists()) {
+                    const profile = {
+                        id: userId,
+                        ...userSnap.data()
+                    };
+                    
+                    // Cache the profile
+                    userProfilesCache[userId] = profile;
+                    return profile;
+                }
+                
+                return null;
+            } catch (error) {
+                console.error('Error getting user profile:', error);
+                return null;
+            }
+        }
+
+        function updateTabCounts() {
+            // Client-side filtering instead of database queries
+            const received = challenges.filter(c => 
+                c.opponentId === currentUser.uid && c.status === 'pending'
+            ).length;
+            
+            const sent = challenges.filter(c => 
+                c.challengerId === currentUser.uid && c.status === 'pending'
+            ).length;
+            
+            const active = challenges.filter(c => 
+                c.status === 'accepted' && 
+                (c.challengerId === currentUser.uid || c.opponentId === currentUser.uid)
+            ).length;
+            
+            const history = challenges.filter(c => 
+                ['completed', 'rejected'].includes(c.status) && 
+                (c.challengerId === currentUser.uid || c.opponentId === currentUser.uid)
+            ).length;
+            
+            document.getElementById('receivedCount').textContent = received;
+            document.getElementById('sentCount').textContent = sent;
+            document.getElementById('activeCount').textContent = active;
+            document.getElementById('historyCount').textContent = history;
+        }
+
+        function displayChallenges() {
+            const challengesList = document.getElementById('challengesList');
+            if (!challengesList) return;
+            
+            // Filter challenges based on current tab - ALL CLIENT-SIDE
+            let filteredChallenges = [];
+            
+            switch(currentTab) {
+                case 'received':
+                    filteredChallenges = challenges.filter(c => 
+                        c.opponentId === currentUser.uid
+                    );
+                    break;
+                case 'sent':
+                    filteredChallenges = challenges.filter(c => 
+                        c.challengerId === currentUser.uid
+                    );
+                    break;
+                case 'active':
+                    filteredChallenges = challenges.filter(c => 
+                        c.status === 'accepted' && 
+                        (c.challengerId === currentUser.uid || c.opponentId === currentUser.uid)
+                    );
+                    break;
+                case 'history':
+                    filteredChallenges = challenges.filter(c => 
+                        ['completed', 'rejected'].includes(c.status) && 
+                        (c.challengerId === currentUser.uid || c.opponentId === currentUser.uid)
+                    );
+                    break;
+            }
+            
+            // Sort by date (most recent first)
+            filteredChallenges.sort((a, b) => {
+                const timeA = a.createdAt?.toDate?.() || new Date(0);
+                const timeB = b.createdAt?.toDate?.() || new Date(0);
+                return timeB - timeA;
+            });
+            
+            if (filteredChallenges.length === 0) {
+                showEmptyState();
+                return;
+            }
+            
+            challengesList.innerHTML = '';
+            
+            filteredChallenges.forEach(challenge => {
+                const challengeElement = createChallengeElement(challenge);
+                challengesList.appendChild(challengeElement);
+            });
+            
+            // Update Feather Icons
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+        }
+
+        function createChallengeElement(challenge) {
+            const div = document.createElement('div');
+            div.className = 'challenge-item';
+            div.dataset.challengeId = challenge.id;
+            
+            const isChallenger = challenge.challengerId === currentUser.uid;
+            const opponentProfile = isChallenger ? challenge.opponentProfile : challenge.challengerProfile;
+            
+            // Format timestamp
+            const timestamp = challenge.createdAt?.toDate?.() || new Date();
+            const timeAgo = getTimeAgo(timestamp);
+            
+            let actionsHTML = '';
+            
+            if (!isChallenger && challenge.status === 'pending') {
+                actionsHTML = `
+                    <div class="challenge-actions">
+                        <button class="btn-success accept-challenge" data-challenge-id="${challenge.id}">
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M20 6L9 17l-5-5"></path>
+                            </svg>
+                            Accept Challenge
+                        </button>
+                        <button class="btn-danger reject-challenge" data-challenge-id="${challenge.id}">
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                            Reject
+                        </button>
+                    </div>
+                `;
+            } else if (challenge.status === 'accepted') {
+                actionsHTML = `
+                    <div class="game-controls">
+                        <h4>Game in Progress</h4>
+                        <div class="game-info">
+                            <div class="game-stats">
+                                <div class="stat-item">
+                                    <div class="stat-value">0</div>
+                                    <div class="stat-label">Score</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-value">00:00</div>
+                                    <div class="stat-label">Time</div>
+                                </div>
+                            </div>
+                            <div class="game-timer">
+                                Started ${timeAgo}
+                            </div>
+                        </div>
+                        <div class="game-actions">
+                            <button class="btn-primary report-result" data-challenge-id="${challenge.id}">
+                                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                                </svg>
+                                Report Result
+                            </button>
+                            <button class="btn-success complete-game" data-challenge-id="${challenge.id}">
+                                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                </svg>
+                                Complete Game
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            div.innerHTML = `
+                <div class="challenge-header">
+                    <div class="challenge-game">${challenge.game}</div>
+                    <div class="challenge-status status-${challenge.status}">${challenge.status.toUpperCase()}</div>
+                </div>
+                
+                <div class="challenge-players">
+                    <div class="player-info">
+                        <img src="${challenge.challengerProfile?.profileImage || 'images-default-profile.jpg'}" 
+                             alt="${challenge.challengerName}" 
+                             class="player-avatar"
+                             onerror="this.src='images-default-profile.jpg';">
+                        <div class="player-details">
+                            <h4>${challenge.challengerName}</h4>
+                            <p>Challenger</p>
+                        </div>
+                    </div>
+                    
+                    <div class="vs-badge">VS</div>
+                    
+                    <div class="player-info">
+                        <img src="${opponentProfile?.profileImage || 'images-default-profile.jpg'}" 
+                             alt="${challenge.opponentName}" 
+                             class="player-avatar"
+                             onerror="this.src='images-default-profile.jpg';">
+                        <div class="player-details">
+                            <h4>${challenge.opponentName}</h4>
+                            <p>Opponent</p>
+                        </div>
+                    </div>
+                </div>
+                
+                ${challenge.message ? `
+                    <div class="challenge-message">
+                        <p>"${challenge.message}"</p>
+                        <div class="challenge-time">Challenge sent ${timeAgo}</div>
+                    </div>
+                ` : ''}
+                
+                ${actionsHTML}
+            `;
+            
+            // Add event listeners for buttons
+            setupChallengeButtonListeners(div, challenge);
+            
+            return div;
+        }
+
+        function setupChallengeButtonListeners(element, challenge) {
+            // Accept challenge
+            const acceptBtn = element.querySelector('.accept-challenge');
+            if (acceptBtn) {
+                acceptBtn.addEventListener('click', async () => {
+                    try {
+                        await acceptChallenge(challenge.id);
+                        await loadAllChallenges(); // Refresh list
+                    } catch (error) {
+                        console.error('Error accepting challenge:', error);
+                        showNotification('Failed to accept challenge', 'error');
+                    }
+                });
+            }
+            
+            // Reject challenge
+            const rejectBtn = element.querySelector('.reject-challenge');
+            if (rejectBtn) {
+                rejectBtn.addEventListener('click', async () => {
+                    try {
+                        await rejectChallenge(challenge.id);
+                        await loadAllChallenges();
+                    } catch (error) {
+                        console.error('Error rejecting challenge:', error);
+                        showNotification('Failed to reject challenge', 'error');
+                    }
+                });
+            }
+            
+            // Complete game
+            const completeBtn = element.querySelector('.complete-game');
+            if (completeBtn) {
+                completeBtn.addEventListener('click', async () => {
+                    try {
+                        await completeGame(challenge.id);
+                        await loadAllChallenges();
+                    } catch (error) {
+                        console.error('Error completing game:', error);
+                        showNotification('Failed to complete game', 'error');
+                    }
+                });
+            }
+            
+            // Report result
+            const reportBtn = element.querySelector('.report-result');
+            if (reportBtn) {
+                reportBtn.addEventListener('click', () => {
+                    showResultReportModal(challenge);
+                });
+            }
+        }
+
+        async function acceptChallenge(challengeId) {
+            try {
+                // Update challenge status
+                const challengeRef = doc(db, 'challenges', challengeId);
+                await updateDoc(challengeRef, {
+                    status: 'accepted',
+                    acceptedAt: serverTimestamp()
+                });
+                
+                // Set both users as "in game"
+                const challengeDoc = await getDoc(challengeRef);
+                const challengeData = challengeDoc.data();
+                
+                // Set challenger in game
+                await updateDoc(doc(db, 'users', challengeData.challengerId), {
+                    inGame: true,
+                    currentGame: challengeData.game,
+                    currentOpponent: challengeData.opponentId,
+                    currentChallenge: challengeId,
+                    lastGameStart: serverTimestamp()
+                });
+                
+                // Set opponent in game
+                await updateDoc(doc(db, 'users', challengeData.opponentId), {
+                    inGame: true,
+                    currentGame: challengeData.game,
+                    currentOpponent: challengeData.challengerId,
+                    currentChallenge: challengeId,
+                    lastGameStart: serverTimestamp()
+                });
+                
+                showNotification('Challenge accepted! Good luck!', 'success');
+                
+            } catch (error) {
+                console.error('Error accepting challenge:', error);
+                throw error;
+            }
+        }
+
+        async function rejectChallenge(challengeId) {
+            try {
+                const challengeRef = doc(db, 'challenges', challengeId);
+                await updateDoc(challengeRef, {
+                    status: 'rejected',
+                    rejectedAt: serverTimestamp()
+                });
+                
+                showNotification('Challenge rejected', 'info');
+                
+            } catch (error) {
+                console.error('Error rejecting challenge:', error);
+                throw error;
+            }
+        }
+
+        async function completeGame(challengeId) {
+            try {
+                const challengeRef = doc(db, 'challenges', challengeId);
+                const challengeDoc = await getDoc(challengeRef);
+                const challengeData = challengeDoc.data();
+                
+                // Update challenge status
+                await updateDoc(challengeRef, {
+                    status: 'completed',
+                    completedAt: serverTimestamp()
+                });
+                
+                // Remove "in game" status from both users
+                await updateDoc(doc(db, 'users', challengeData.challengerId), {
+                    inGame: false,
+                    currentGame: null,
+                    currentOpponent: null,
+                    currentChallenge: null
+                });
+                
+                await updateDoc(doc(db, 'users', challengeData.opponentId), {
+                    inGame: false,
+                    currentGame: null,
+                    currentOpponent: null,
+                    currentChallenge: null
+                });
+                
+                showNotification('Game completed! Results saved.', 'success');
+                
+            } catch (error) {
+                console.error('Error completing game:', error);
+                throw error;
+            }
+        }
+
+        function showResultReportModal(challenge) {
+            // Create result report modal
+            const modal = document.createElement('div');
+            modal.className = 'result-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.9);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 2000;
+                padding: 20px;
+                backdrop-filter: blur(10px);
+            `;
+            
+            modal.innerHTML = `
+                <div style="
+                    background: var(--bg-card);
+                    border-radius: var(--radius-lg);
+                    width: 100%;
+                    max-width: 500px;
+                    padding: 20px;
+                    border: 1px solid var(--border);
+                ">
+                    <h3 style="color: var(--text-primary); margin-bottom: 20px;">Report Game Result</h3>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">
+                            Winner
+                        </label>
+                        <select id="winnerSelect" style="
+                            width: 100%;
+                            padding: 12px;
+                            background: var(--bg-primary);
+                            border: 1px solid var(--border);
+                            border-radius: var(--radius);
+                            color: var(--text-primary);
+                            font-size: 14px;
+                        ">
+                            <option value="${challenge.challengerId}">${challenge.challengerName} (You)</option>
+                            <option value="${challenge.opponentId}">${challenge.opponentName}</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">
+                            Score (Optional)
+                        </label>
+                        <input type="text" id="gameScore" placeholder="e.g., 3-2" style="
+                            width: 100%;
+                            padding: 12px;
+                            background: var(--bg-primary);
+                            border: 1px solid var(--border);
+                            border-radius: var(--radius);
+                            color: var(--text-primary);
+                            font-size: 14px;
+                        ">
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button class="cancel-report" style="
+                            background: var(--bg-primary);
+                            border: 1px solid var(--border);
+                            color: var(--text-primary);
+                            padding: 10px 20px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                        ">Cancel</button>
+                        <button class="submit-report" style="
+                            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+                            border: none;
+                            color: white;
+                            padding: 10px 20px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                        ">Submit Result</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Close modal
+            modal.querySelector('.cancel-report').addEventListener('click', () => {
+                modal.remove();
+            });
+            
+            // Submit result
+            modal.querySelector('.submit-report').addEventListener('click', async () => {
+                const winnerId = modal.querySelector('#winnerSelect').value;
+                const score = modal.querySelector('#gameScore').value.trim();
+                
+                try {
+                    // Update challenge with result
+                    const challengeRef = doc(db, 'challenges', challenge.id);
+                    await updateDoc(challengeRef, {
+                        winnerId: winnerId,
+                        score: score || null,
+                        status: 'completed',
+                        completedAt: serverTimestamp()
+                    });
+                    
+                    // Complete the game (removes "in game" status)
+                    await completeGame(challenge.id);
+                    
+                    modal.remove();
+                    await loadAllChallenges();
+                    
+                    showNotification('Result submitted successfully!', 'success');
+                    
+                } catch (error) {
+                    console.error('Error submitting result:', error);
+                    showNotification('Failed to submit result', 'error');
+                }
+            });
+            
+            // Close on outside click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+        }
+
+        function setupRealTimeUpdates() {
+            // Listen for ALL challenges and filter client-side
+            const challengesRef = collection(db, 'challenges');
+            
+            onSnapshot(challengesRef, (snapshot) => {
+                // Update all challenges
+                const updatedChallenges = [];
+                
+                snapshot.forEach(docSnap => {
+                    const challenge = {
+                        id: docSnap.id,
+                        ...docSnap.data()
+                    };
+                    
+                    // Only include challenges involving current user
+                    if (currentUser && 
+                        (challenge.challengerId === currentUser.uid || 
+                         challenge.opponentId === currentUser.uid)) {
+                        updatedChallenges.push(challenge);
+                    }
+                });
+                
+                // Update notification count for pending received challenges
+                const pendingReceived = updatedChallenges.filter(c => 
+                    c.opponentId === currentUser.uid && c.status === 'pending'
+                ).length;
+                
+                const notificationCount = document.getElementById('notificationCount');
+                if (notificationCount) {
+                    notificationCount.textContent = pendingReceived;
+                }
+                
+                // Reload challenges if we're on challenges page
+                if (window.location.pathname.includes('challenge.html')) {
+                    loadAllChallenges();
+                }
+            });
+        }
+
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            if (seconds < 60) return 'just now';
+            
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            
+            const days = Math.floor(hours / 24);
+            if (days < 7) return `${days}d ago`;
+            
+            const weeks = Math.floor(days / 7);
+            if (weeks < 4) return `${weeks}w ago`;
+            
+            const months = Math.floor(days / 30);
+            if (months < 12) return `${months}mo ago`;
+            
+            const years = Math.floor(days / 365);
+            return `${years}y ago`;
+        }
+
+        function showEmptyState() {
+            const challengesList = document.getElementById('challengesList');
+            if (!challengesList) return;
+            
+            let message = '';
+            let icon = 'inbox';
+            
+            switch(currentTab) {
+                case 'received':
+                    message = 'No pending challenges';
+                    icon = 'inbox';
+                    break;
+                case 'sent':
+                    message = 'No challenges sent';
+                    icon = 'send';
+                    break;
+                case 'active':
+                    message = 'No active games';
+                    icon = 'play-circle';
+                    break;
+                case 'history':
+                    message = 'No challenge history';
+                    icon = 'archive';
+                    break;
+            }
+            
+            challengesList.innerHTML = `
+                <div class="empty-state">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        ${getEmptyStateIcon(icon)}
+                    </svg>
+                    <h3 class="empty-title">${message}</h3>
+                    ${currentTab === 'received' ? `
+                        <p class="empty-description">
+                            When other gamers challenge you, they'll appear here.
+                        </p>
+                        <button class="btn-primary" onclick="window.location.href='gamers.html'" style="margin-top: 10px;">
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Browse Gamers
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function getEmptyStateIcon(icon) {
+            switch(icon) {
+                case 'inbox':
+                    return '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>';
+                case 'send':
+                    return '<line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>';
+                case 'play-circle':
+                    return '<circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon>';
+                case 'archive':
+                    return '<polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line>';
+                default:
+                    return '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
+            }
+        }
+
+        function showLoginPrompt() {
+            const challengesList = document.getElementById('challengesList');
+            if (challengesList) {
+                challengesList.innerHTML = `
+                    <div class="empty-state">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                            <polyline points="10 17 15 12 10 7"></polyline>
+                            <line x1="15" y1="12" x2="3" y2="12"></line>
+                        </svg>
+                        <h3 class="empty-title">Please Log In</h3>
+                        <p class="empty-description">
+                            You need to be logged in to view and manage challenges.
+                        </p>
+                        <button class="btn-primary" onclick="window.location.href='login.html'" style="margin-top: 20px;">
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                                <polyline points="10 17 15 12 10 7"></polyline>
+                                <line x1="15" y1="12" x2="3" y2="12"></line>
+                            </svg>
+                            Go to Login
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            const bgColor = type === 'error' ? '#dc2626' : 
+                           type === 'success' ? '#16a34a' : 
+                           type === 'warning' ? '#f59e0b' : '#3b82f6';
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: ${bgColor};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                max-width: 400px;
+                backdrop-filter: blur(10px);
+                font-family: 'Inter', sans-serif;
+            `;
+            
+            notification.innerHTML = `
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        function showError(message) {
+            const challengesList = document.getElementById('challengesList');
+            if (challengesList) {
+                challengesList.innerHTML = `
+                    <div class="empty-state">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <h3 class="empty-title">Error Loading Challenges</h3>
+                        <p>${message}</p>
+                        <button onclick="location.reload()" style="
+                            background: var(--primary);
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 20px;
+                            cursor: pointer;
+                            margin-top: 15px;
+                        ">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Add animation styles
+        if (!document.querySelector('#challenge-animations')) {
+            const style = document.createElement('style');
+            style.id = 'challenge-animations';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    </script>
+
+    <!-- Initialize Feather Icons -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+        });
+    </script>
+</body>
+</html>
