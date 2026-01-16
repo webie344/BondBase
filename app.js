@@ -1,4 +1,4 @@
-// Firebase configuration
+//this my app.js help me fix some issues firstly for the chat page the message disappearing when I scroll fastly up and down so fix that when you enter the chat page only render the last 10 message between the user so when you still up to the left there should be a load more button that fetches another 15 if there is and so on until the message are rendered completely also in the messages page with the service worker when I go to the message page it first displays all the old messages that you started the app with like all the old messages list even if you have added new messages list especially when yoh have a long chat history it loads all the old messages until after like a minute before it  shows the newly organisesd  message properly and also add timestamps also I'm the chat page  sometimes when you send messages it doesn't display for the other user until they leave the chat page and go back to it://here's my app.js so you'll know how the profiles are stored:// Firebase configuration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -23,7 +23,6 @@ import {
     onSnapshot,
     orderBy,
     limit,
-    startAfter,
     arrayUnion,
     arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -437,15 +436,6 @@ let unsubscribeChat = null;
 let typingTimeout = null;
 let userChatPoints = 0;
 let globalMessageListener = null;
-
-// Chat pagination variables
-let chatMessagesPage = 0;
-let chatMessagesLimit = 15;
-let chatHasMoreMessages = true;
-let chatMessagesLoading = false;
-let chatMessagesAllLoaded = false;
-let lastVisibleMessage = null;
-let initialMessagesLoaded = false;
 
 // Voice recording variables
 let mediaRecorder = null;
@@ -1970,40 +1960,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         .upload-button:disabled {
             background: #ccc;
             cursor: not-allowed;
-        }
-        
-        .load-more-container {
-            text-align: center;
-            padding: 10px;
-            margin: 10px 0;
-        }
-        
-        .load-more-btn {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.2s;
-        }
-        
-        .load-more-btn:hover {
-            background: var(--accent-dark);
-        }
-        
-        .load-more-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        
-        .no-more-messages {
-            text-align: center;
-            padding: 10px;
-            color: var(--text-light);
-            font-style: italic;
-            font-size: 14px;
         }
         
         @keyframes pulse {
@@ -3679,338 +3635,101 @@ function cleanupChatPage() {
     chatPartnerId = null;
 }
 
-// FIXED: Chat messages loading with pagination and proper scrolling
-async function loadChatMessages(userId, partnerId, loadMore = false) {
-    if (chatMessagesLoading) return;
-    
+// UPDATED: Chat messages loading with IndexedDB caching and offline support
+function loadChatMessages(userId, partnerId) {
     const messagesContainer = document.getElementById('chatMessages');
     
-    if (!loadMore) {
-        // Reset pagination for initial load
-        chatMessagesPage = 0;
-        chatMessagesAllLoaded = false;
-        lastVisibleMessage = null;
-        initialMessagesLoaded = false;
-        
-        if (unsubscribeChat) {
-            unsubscribeChat();
-            unsubscribeChat = null;
-        }
-        
-        messagesContainer.innerHTML = '';
-        showChatLoadingMessage();
-    } else {
-        if (chatMessagesAllLoaded) return;
-        
-        chatMessagesLoading = true;
-        const loadMoreContainer = messagesContainer.querySelector('.load-more-container');
-        if (loadMoreContainer) {
-            const loadMoreBtn = loadMoreContainer.querySelector('.load-more-btn');
-            loadMoreBtn.disabled = true;
-            loadMoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-        }
-    }
-    
-    const threadId = [userId, partnerId].sort().join('_');
-    
-    try {
-        let messagesQuery;
-        
-        if (loadMore && lastVisibleMessage) {
-            // Load older messages
-            messagesQuery = query(
-                collection(db, 'conversations', threadId, 'messages'),
-                orderBy('timestamp', 'desc'),
-                startAfter(lastVisibleMessage),
-                limit(chatMessagesLimit)
-            );
-        } else {
-            // Load initial messages
-            messagesQuery = query(
-                collection(db, 'conversations', threadId, 'messages'),
-                orderBy('timestamp', 'desc'),
-                limit(chatMessagesLimit)
-            );
-        }
-        
-        const querySnapshot = await getDocs(messagesQuery);
-        
-        if (querySnapshot.empty) {
-            if (!loadMore) {
-                messagesContainer.innerHTML = '<div class="no-messages">No messages yet. Start the conversation!</div>';
-            } else {
-                chatMessagesAllLoaded = true;
-                updateLoadMoreButton();
-            }
-            hideChatLoadingMessage();
-            chatMessagesLoading = false;
-            return;
-        }
-        
-        const messages = [];
-        querySnapshot.forEach(doc => {
-            const messageData = doc.data();
-            messages.push({
-                id: doc.id,
-                ...messageData,
-                timestamp: messageData.timestamp ? 
-                    (messageData.timestamp.toDate ? messageData.timestamp.toDate().toISOString() : messageData.timestamp) 
-                    : new Date().toISOString()
-            });
-        });
-        
-        // Store the last document for pagination
-        lastVisibleMessage = querySnapshot.docs[querySnapshot.docs.length - 1];
-        
-        // Check if we have more messages
-        if (querySnapshot.size < chatMessagesLimit) {
-            chatMessagesAllLoaded = true;
-        }
-        
-        // Sort messages by timestamp (oldest to newest for display)
-        messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-        
-        // Cache messages
-        cache.set(`messages_${userId}_${partnerId}`, messages, 'short');
-        await cache.setMessages(threadId, messages);
-        
-        if (loadMore) {
-            // Get scroll position before adding new messages
-            const scrollBefore = messagesContainer.scrollHeight - messagesContainer.scrollTop;
-            
-            // Add older messages at the top
-            const fragment = document.createDocumentFragment();
-            messages.forEach(message => {
-                const existingMessage = document.querySelector(`[data-message-id="${message.id}"]`);
-                if (!existingMessage) {
-                    const messageDiv = createMessageElement(message, userId);
-                    fragment.appendChild(messageDiv);
-                }
-            });
-            
-            messagesContainer.insertBefore(fragment, messagesContainer.firstChild);
-            
-            // Restore scroll position
-            messagesContainer.scrollTop = messagesContainer.scrollHeight - scrollBefore;
-        } else {
-            // Initial load - display all messages
-            updateMessagesDisplay(messages, userId);
-            
-            // Scroll to bottom after initial load
-            setTimeout(() => {
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                initialMessagesLoaded = true;
-            }, 100);
-        }
-        
-        // Mark messages as read
-        const hasUnreadMessages = messages.some(msg => 
-            msg.senderId === partnerId && !msg.read
-        );
-        
-        if (hasUnreadMessages) {
-            await markMessagesAsRead(threadId, partnerId, userId);
-        }
-        
-        // Setup real-time listener for new messages only on initial load
-        if (!loadMore && !unsubscribeChat) {
-            setupRealtimeChatListener(threadId, userId, partnerId);
-        }
-        
-        hideChatLoadingMessage();
-        chatMessagesLoading = false;
-        updateLoadMoreButton();
-        
-    } catch (error) {
-        logError(error, 'loading chat messages');
-        hideChatLoadingMessage();
-        chatMessagesLoading = false;
-        
-        if (!loadMore) {
-            // Try to load cached messages
-            const cachedMessages = await cache.getMessages(threadId);
-            if (cachedMessages && cachedMessages.length > 0) {
-                updateMessagesDisplay(cachedMessages, userId);
-            }
-        }
-    }
-}
-
-// Setup real-time listener for new messages
-function setupRealtimeChatListener(threadId, userId, partnerId) {
     if (unsubscribeChat) {
         unsubscribeChat();
     }
     
-    const newMessagesQuery = query(
-        collection(db, 'conversations', threadId, 'messages'),
-        orderBy('timestamp', 'desc'),
-        limit(1)
-    );
+    const threadId = [userId, partnerId].sort().join('_');
     
-    unsubscribeChat = onSnapshot(newMessagesQuery, (snapshot) => {
-        snapshot.docChanges().forEach(change => {
-            if (change.type === 'added') {
-                const messageData = change.doc.data();
-                const message = {
-                    id: change.doc.id,
-                    ...messageData,
-                    timestamp: messageData.timestamp ? 
-                        (messageData.timestamp.toDate ? messageData.timestamp.toDate().toISOString() : messageData.timestamp) 
-                        : new Date().toISOString()
-                };
-                
-                // Check if this is a new message (not already displayed)
-                const existingMessage = document.querySelector(`[data-message-id="${message.id}"]`);
-                if (!existingMessage) {
-                    displayMessage(message, userId);
-                    
-                    // Scroll to bottom if user is near bottom
-                    const messagesContainer = document.getElementById('chatMessages');
-                    const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
-                    
-                    if (isNearBottom) {
-                        setTimeout(() => {
-                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                        }, 100);
-                    }
-                    
-                    // Update cache
-                    const cacheKey = `messages_${userId}_${partnerId}`;
-                    const cachedMessages = cache.get(cacheKey) || [];
-                    cachedMessages.push(message);
-                    cache.set(cacheKey, cachedMessages, 'short');
-                    
-                    // Mark as read if from partner
-                    if (message.senderId === partnerId && !message.read) {
-                        markMessageAsRead(threadId, partnerId, userId, message.id);
-                    }
-                }
-            }
-        });
+    showChatLoadingMessage();
+    
+    // NEW: Show instant loading for background sync
+    showInstantLoading();
+    
+    // Try to load cached messages first
+    const cacheKey = `messages_${userId}_${partnerId}`;
+    const cachedMessages = cache.get(cacheKey);
+    
+    if (cachedMessages && cachedMessages.length > 0) {
+        displayCachedMessages(cachedMessages);
+    }
+    
+    // Also try IndexedDB
+    cache.getMessages(threadId).then(messages => {
+        if (messages && messages.length > 0 && (!cachedMessages || messages.length > cachedMessages.length)) {
+            displayCachedMessages(messages);
+        }
     });
-}
-
-// Update load more button
-function updateLoadMoreButton() {
-    const messagesContainer = document.getElementById('chatMessages');
-    if (!messagesContainer) return;
     
-    let loadMoreContainer = messagesContainer.querySelector('.load-more-container');
-    
-    if (chatMessagesAllLoaded) {
-        if (loadMoreContainer) {
-            loadMoreContainer.innerHTML = '<div class="no-more-messages">No more messages</div>';
-        }
-    } else {
-        if (!loadMoreContainer) {
-            loadMoreContainer = document.createElement('div');
-            loadMoreContainer.className = 'load-more-container';
-            loadMoreContainer.innerHTML = `
-                <button class="load-more-btn">
-                    <i class="fas fa-arrow-up"></i> Load older messages
-                </button>
-            `;
-            messagesContainer.insertBefore(loadMoreContainer, messagesContainer.firstChild);
-            
-            const loadMoreBtn = loadMoreContainer.querySelector('.load-more-btn');
-            loadMoreBtn.addEventListener('click', () => {
-                loadChatMessages(currentUser.uid, chatPartnerId, true);
-            });
-        } else {
-            const loadMoreBtn = loadMoreContainer.querySelector('.load-more-btn');
-            loadMoreBtn.disabled = false;
-            loadMoreBtn.innerHTML = '<i class="fas fa-arrow-up"></i> Load older messages';
-        }
-    }
-}
-
-// Create message element for DOM
-function createMessageElement(message, currentUserId) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${message.senderId === currentUserId ? 'sent' : 'received'}`;
-    messageDiv.dataset.messageId = message.id;
-    
-    let messageContent = '';
-    
-    if (message.replyTo) {
-        const repliedMessage = getRepliedMessage(message.replyTo);
-        if (repliedMessage) {
-            const senderName = repliedMessage.senderId === currentUserId ? 'You' : document.getElementById('chatPartnerName').textContent;
-            let previewText = '';
-            
-            if (repliedMessage.text) {
-                previewText = repliedMessage.text;
-            } else if (repliedMessage.imageUrl) {
-                previewText = '📷 Photo';
-            } else if (repliedMessage.audioUrl) {
-                previewText = '🎤 Voice message';
-            } else if (repliedMessage.videoUrl) {
-                previewText = '🎥 Video message';
+    try {
+        unsubscribeChat = onSnapshot(
+            collection(db, 'conversations', threadId, 'messages'),
+            async (snapshot) => {
+                const messages = [];
+                let hasUnreadMessages = false;
+                
+                snapshot.forEach(doc => {
+                    const messageData = doc.data();
+                    const serializableMessage = {
+                        id: doc.id,
+                        ...messageData,
+                        timestamp: messageData.timestamp ? 
+                            (messageData.timestamp.toDate ? messageData.timestamp.toDate().toISOString() : messageData.timestamp) 
+                            : new Date().toISOString()
+                    };
+                    messages.push(serializableMessage);
+                    
+                    if (messageData.senderId === partnerId && !messageData.read) {
+                        hasUnreadMessages = true;
+                    }
+                });
+                
+                messages.sort((a, b) => {
+                    const timeA = new Date(a.timestamp).getTime();
+                    const timeB = new Date(b.timestamp).getTime();
+                    return timeA - timeB;
+                });
+                
+                cache.set(cacheKey, messages, 'short');
+                await cache.setMessages(threadId, messages);
+                
+                updateMessagesDisplay(messages, userId);
+                
+                if (hasUnreadMessages) {
+                    await markMessagesAsRead(threadId, partnerId, userId);
+                }
+                
+                setTimeout(() => {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }, 100);
+                
+                if (document.querySelector('#chatMessages .loading-message')) {
+                    hideChatLoadingMessage();
+                }
+                
+                // NEW: Hide instant loading after data is loaded
+                hideInstantLoading();
+                
+                refreshUnreadMessageCount();
+            },
+            (error) => {
+                logError(error, 'chat messages listener');
+                if (cachedMessages) {
+                    displayCachedMessages(cachedMessages);
+                }
+                hideChatLoadingMessage();
+                hideInstantLoading();
             }
-            
-            messageContent += `
-                <div class="reply-indicator">
-                    <i class="fas fa-reply"></i> Replying to ${senderName}
-                </div>
-                <div class="reply-message-preview">${previewText}</div>
-            `;
-        }
+        );
+    } catch (error) {
+        logError(error, 'setting up chat messages listener');
+        hideChatLoadingMessage();
+        hideInstantLoading();
     }
-    
-    if (message.imageUrl) {
-        const imageContainer = document.createElement('div');
-        imageContainer.style.position = 'relative';
-        imageContainer.style.display = 'inline-block';
-        
-        const img = document.createElement('img');
-        img.src = message.imageUrl;
-        img.alt = "Message image";
-        img.className = 'message-image';
-        
-        imageContainer.appendChild(img);
-        messageContent += imageContainer.outerHTML;
-    } else if (message.text) {
-        messageContent += `<p>${message.text}</p>`;
-    }
-    
-    if (message.reactions && Object.keys(message.reactions).length > 0) {
-        messageContent += `<div class="message-reactions">`;
-        for (const [emoji, users] of Object.entries(message.reactions)) {
-            messageContent += `<span class="reaction">${emoji} <span class="reaction-count">${users.length}</span></span>`;
-        }
-        messageContent += `</div>`;
-    }
-    
-    let timestampText = formatTime(message.timestamp);
-    if (message.senderId === currentUserId && message.read) {
-        timestampText += ' ✓✓';
-    }
-    
-    messageContent += `<span class="message-time">${timestampText}</span>`;
-    
-    messageDiv.innerHTML = messageContent;
-    
-    if (message.audioUrl) {
-        const voiceMessageDiv = document.createElement('div');
-        voiceMessageDiv.className = `voice-message ${message.senderId === currentUserId ? 'sent' : 'received'}`;
-        
-        const audioPlayer = createAudioPlayer(message.audioUrl, message.duration || 0);
-        voiceMessageDiv.appendChild(audioPlayer);
-        
-        const timeSpan = document.createElement('span');
-        timeSpan.className = 'message-time';
-        timeSpan.textContent = timestampText;
-        
-        messageDiv.appendChild(voiceMessageDiv);
-    }
-    
-    if (message.videoUrl) {
-        const videoPlayer = createVideoPlayer(message.videoUrl, message.duration || 0);
-        messageDiv.appendChild(videoPlayer);
-    }
-    
-    return messageDiv;
 }
 
 // FIXED: Mark messages as read when viewing chat
@@ -4040,19 +3759,6 @@ async function markMessagesAsRead(threadId, partnerId, userId) {
     }
 }
 
-async function markMessageAsRead(threadId, partnerId, userId, messageId) {
-    try {
-        const messageRef = doc(db, 'conversations', threadId, 'messages', messageId);
-        await updateDoc(messageRef, {
-            read: true
-        });
-        
-        refreshUnreadMessageCount();
-    } catch (error) {
-        logError(error, 'marking single message as read');
-    }
-}
-
 // FIXED: Updated message display function to prevent duplicates
 function updateMessagesDisplay(newMessages, currentUserId) {
     const messagesContainer = document.getElementById('chatMessages');
@@ -4062,27 +3768,19 @@ function updateMessagesDisplay(newMessages, currentUserId) {
     
     hideChatLoadingMessage();
     
-    // Clear only if no messages exist
-    if (messagesContainer.children.length === 0 || messagesContainer.querySelector('.no-messages')) {
+    const existingMessages = messagesContainer.querySelectorAll('.message:not([data-message-id^="temp_"])');
+    if (existingMessages.length === 0 && newMessages.length > 0) {
         messagesContainer.innerHTML = '';
     }
     
-    // Remove load more container if it exists
-    const loadMoreContainer = messagesContainer.querySelector('.load-more-container');
-    if (loadMoreContainer) {
-        loadMoreContainer.remove();
-    }
-    
-    const fragment = document.createDocumentFragment();
     newMessages.forEach(message => {
         const existingMessage = messagesContainer.querySelector(`[data-message-id="${message.id}"]`);
         if (!existingMessage) {
-            const messageElement = createMessageElement(message, currentUserId);
-            fragment.appendChild(messageElement);
+            displayMessage(message, currentUserId);
+        } else {
+            updateExistingMessage(existingMessage, message, currentUserId);
         }
     });
-    
-    messagesContainer.appendChild(fragment);
     
     if (newMessages.length === 0 && messagesContainer.children.length === 0) {
         const noMessagesDiv = document.createElement('div');
@@ -4090,9 +3788,86 @@ function updateMessagesDisplay(newMessages, currentUserId) {
         noMessagesDiv.textContent = 'No messages yet. Start the conversation!';
         messagesContainer.appendChild(noMessagesDiv);
     }
+}
+
+// UPDATED: Add message function with offline support and optimistic updates
+async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDuration = null, videoUrl = null, videoDuration = null) {
+    if (!text && !imageUrl && !audioUrl && !videoUrl) return;
     
-    // Add load more button if there might be more messages
-    updateLoadMoreButton();
+    try {
+        const threadId = [currentUser.uid, chatPartnerId].sort().join('_');
+        
+        const messageData = {
+            senderId: currentUser.uid,
+            text: text || null,
+            imageUrl: imageUrl || null,
+            audioUrl: audioUrl || null,
+            duration: audioDuration || videoDuration || null,
+            videoUrl: videoUrl || null,
+            read: false,
+            timestamp: serverTimestamp()
+        };
+        
+        if (selectedMessageForReply) {
+            messageData.replyTo = selectedMessageForReply;
+        }
+        
+        const tempMessageId = 'temp_' + Date.now();
+        const tempMessage = {
+            id: tempMessageId,
+            ...messageData,
+            timestamp: new Date().toISOString()
+        };
+        
+        window.lastTempMessageId = tempMessageId;
+        
+        displayMessage(tempMessage, currentUser.uid);
+        
+        const messagesContainer = document.getElementById('chatMessages');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // NEW: Add to pending messages if offline
+        if (!isOnline) {
+            await cache.addPendingMessage({
+                type: 'text',
+                tempId: tempMessageId,
+                data: messageData,
+                threadId: threadId,
+                timestamp: new Date().toISOString()
+            });
+            showNotification('Message saved offline. Will send when connection is restored.', 'info');
+            return;
+        }
+        
+        const docRef = await addDoc(collection(db, 'conversations', threadId, 'messages'), messageData);
+        
+        let lastMessageText = '';
+        if (text) lastMessageText = text;
+        else if (imageUrl) lastMessageText = 'Image';
+        else if (audioUrl) lastMessageText = 'Voice message';
+        else if (videoUrl) lastMessageText = 'Video message';
+        
+        await setDoc(doc(db, 'conversations', threadId), {
+            participants: [currentUser.uid, chatPartnerId],
+            lastMessage: {
+                text: lastMessageText,
+                senderId: currentUser.uid,
+                timestamp: serverTimestamp()
+            },
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        
+        cancelReply();
+        
+    } catch (error) {
+        logError(error, 'adding message');
+        showNotification('Error sending message. Please try again.', 'error');
+        
+        const tempMessageElement = document.querySelector(`[data-message-id="${window.lastTempMessageId}"]`);
+        if (tempMessageElement) {
+            tempMessageElement.remove();
+        }
+    }
 }
 
 // FIXED: Update existing message without recreating it
@@ -4209,86 +3984,6 @@ function displayCachedMessages(messages) {
 function getRepliedMessage(messageId) {
     const cachedMessages = cache.get(`messages_${currentUser.uid}_${chatPartnerId}`) || [];
     return cachedMessages.find(m => m.id === messageId);
-}
-
-// UPDATED: Add message function with offline support and optimistic updates
-async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDuration = null, videoUrl = null, videoDuration = null) {
-    if (!text && !imageUrl && !audioUrl && !videoUrl) return;
-    
-    try {
-        const threadId = [currentUser.uid, chatPartnerId].sort().join('_');
-        
-        const messageData = {
-            senderId: currentUser.uid,
-            text: text || null,
-            imageUrl: imageUrl || null,
-            audioUrl: audioUrl || null,
-            duration: audioDuration || videoDuration || null,
-            videoUrl: videoUrl || null,
-            read: false,
-            timestamp: serverTimestamp()
-        };
-        
-        if (selectedMessageForReply) {
-            messageData.replyTo = selectedMessageForReply;
-        }
-        
-        const tempMessageId = 'temp_' + Date.now();
-        const tempMessage = {
-            id: tempMessageId,
-            ...messageData,
-            timestamp: new Date().toISOString()
-        };
-        
-        window.lastTempMessageId = tempMessageId;
-        
-        displayMessage(tempMessage, currentUser.uid);
-        
-        const messagesContainer = document.getElementById('chatMessages');
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        // NEW: Add to pending messages if offline
-        if (!isOnline) {
-            await cache.addPendingMessage({
-                type: 'text',
-                tempId: tempMessageId,
-                data: messageData,
-                threadId: threadId,
-                timestamp: new Date().toISOString()
-            });
-            showNotification('Message saved offline. Will send when connection is restored.', 'info');
-            return;
-        }
-        
-        const docRef = await addDoc(collection(db, 'conversations', threadId, 'messages'), messageData);
-        
-        let lastMessageText = '';
-        if (text) lastMessageText = text;
-        else if (imageUrl) lastMessageText = 'Image';
-        else if (audioUrl) lastMessageText = 'Voice message';
-        else if (videoUrl) lastMessageText = 'Video message';
-        
-        await setDoc(doc(db, 'conversations', threadId), {
-            participants: [currentUser.uid, chatPartnerId],
-            lastMessage: {
-                text: lastMessageText,
-                senderId: currentUser.uid,
-                timestamp: serverTimestamp()
-            },
-            updatedAt: serverTimestamp()
-        }, { merge: true });
-        
-        cancelReply();
-        
-    } catch (error) {
-        logError(error, 'adding message');
-        showNotification('Error sending message. Please try again.', 'error');
-        
-        const tempMessageElement = document.querySelector(`[data-message-id="${window.lastTempMessageId}"]`);
-        if (tempMessageElement) {
-            tempMessageElement.remove();
-        }
-    }
 }
 
 // UPDATED: Page Initialization Functions with preloading
@@ -5688,7 +5383,15 @@ function setupOnlineStatusListener(userId, elementId = 'onlineStatus') {
     }
 }
 
-
+async function markMessageAsRead(messageRef) {
+    try {
+        await updateDoc(messageRef, {
+            read: true
+        });
+    } catch (error) {
+        logError(error, 'marking message as read');
+    }
+}
 
 // UPDATED: Load message threads with IndexedDB caching
 async function loadMessageThreads(forceRefresh = false) {
