@@ -1,4 +1,4 @@
-// gist.js - COMPLETELY INDEPENDENT Gist functionality
+// gist.js - COMPLETE FIXED VERSION
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -36,10 +36,11 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Cloudinary configuration (same as your app.js)
+// Cloudinary configuration (EXACTLY like your app.js)
 const cloudinaryConfig = {
     cloudName: "ddtdqrh1b",
-    uploadPreset: "profile-pictures"
+    uploadPreset: "profile-pictures",
+    apiUrl: "https://api.cloudinary.com/v1_1"
 };
 
 // Dicebear avatar types
@@ -71,6 +72,11 @@ function getRandomAvatar() {
 
 // Initialize on DOM content loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
     // Check which page we're on
     const currentPage = window.location.pathname.split('/').pop().split('.')[0];
     
@@ -233,18 +239,17 @@ function showAttachmentPreview(file) {
     attachmentsContainer.style.display = 'block';
     
     let fileType = 'Image';
+    let icon = '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>';
     if (file.type.startsWith('audio/')) {
         fileType = 'Voice Note';
+        icon = '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line>';
     }
     
     attachmentsContainer.innerHTML = `
         <div class="attachment-preview">
             <div class="attachment-info">
                 <svg class="feather attachment-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    ${file.type.startsWith('audio/') ? 
-                        '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line>' : 
-                        '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>'
-                    }
+                    ${icon}
                 </svg>
                 <span class="attachment-name">${fileType}: ${file.name} (${formatFileSize(file.size)})</span>
             </div>
@@ -274,14 +279,15 @@ function formatFileSize(bytes) {
     else return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-// Voice recording functions
+// Voice recording functions - SAME as your app.js
 async function startVoiceRecording() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showNotification('Voice recording is not supported in your browser', 'warning');
-        return;
-    }
-
     try {
+        const voiceIndicator = document.getElementById('voiceRecordingIndicator');
+        const gistContent = document.getElementById('gistContent');
+        
+        if (voiceIndicator) voiceIndicator.style.display = 'flex';
+        if (gistContent) gistContent.style.display = 'none';
+        
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
@@ -290,29 +296,28 @@ async function startVoiceRecording() {
         updateRecordingTimer();
         recordingTimer = setInterval(updateRecordingTimer, 1000);
         
-        // Show recording indicator
-        const voiceRecordingIndicator = document.getElementById('voiceRecordingIndicator');
-        if (voiceRecordingIndicator) {
-            voiceRecordingIndicator.style.display = 'flex';
-        }
-        
         mediaRecorder.ondataavailable = (event) => {
             audioChunks.push(event.data);
         };
         
         mediaRecorder.start(100);
         
-        // Stop recording after 60 seconds max
+        // Auto-stop recording after 30 seconds (like your app.js)
         setTimeout(() => {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 stopVoiceRecording();
             }
-        }, 60000);
+        }, 30000);
         
     } catch (error) {
-        console.error('Error accessing microphone:', error);
-        showNotification('Microphone access denied. Please allow microphone access to record voice notes.', 'error');
-        cancelVoiceRecording();
+        console.error('Error starting recording:', error);
+        showNotification('Could not access microphone. Please check permissions.', 'error');
+        
+        const voiceIndicator = document.getElementById('voiceRecordingIndicator');
+        const gistContent = document.getElementById('gistContent');
+        
+        if (voiceIndicator) voiceIndicator.style.display = 'none';
+        if (gistContent) gistContent.style.display = 'block';
     }
 }
 
@@ -332,18 +337,17 @@ function stopVoiceRecording() {
     clearInterval(recordingTimer);
     mediaRecorder.stop();
     
-    // Stop all tracks in the stream
     mediaRecorder.stream.getTracks().forEach(track => track.stop());
     
-    mediaRecorder.onstop = async () => {
-        // Hide recording indicator
-        const voiceRecordingIndicator = document.getElementById('voiceRecordingIndicator');
-        if (voiceRecordingIndicator) {
-            voiceRecordingIndicator.style.display = 'none';
-        }
+    mediaRecorder.onstop = () => {
+        const voiceIndicator = document.getElementById('voiceRecordingIndicator');
+        const gistContent = document.getElementById('gistContent');
+        
+        if (voiceIndicator) voiceIndicator.style.display = 'none';
+        if (gistContent) gistContent.style.display = 'block';
         
         const duration = Math.floor((Date.now() - recordingStartTime) / 1000);
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
         
         // Show voice preview modal
         showVoicePreview(audioBlob, duration);
@@ -364,18 +368,17 @@ function cancelVoiceRecording() {
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
     
-    // Hide recording indicator
-    const voiceRecordingIndicator = document.getElementById('voiceRecordingIndicator');
-    if (voiceRecordingIndicator) {
-        voiceRecordingIndicator.style.display = 'none';
-    }
+    const voiceIndicator = document.getElementById('voiceRecordingIndicator');
+    const gistContent = document.getElementById('gistContent');
     
-    // Reset media buttons
-    resetMediaButtons();
+    if (voiceIndicator) voiceIndicator.style.display = 'none';
+    if (gistContent) gistContent.style.display = 'block';
     
     mediaRecorder = null;
     audioChunks = [];
     recordingStartTime = null;
+    
+    resetMediaButtons();
 }
 
 function showVoicePreview(audioBlob, duration) {
@@ -449,10 +452,9 @@ function showVoicePreview(audioBlob, duration) {
         URL.revokeObjectURL(audioUrl);
         
         pendingAudioBlob = audioBlob;
-        // Create a file from the blob with correct name and type
-        const voiceFile = new File([audioBlob], `voice-note-${Date.now()}.webm`, { 
-            type: 'audio/webm',
-            lastModified: Date.now()
+        // Create a file from the blob
+        const voiceFile = new File([audioBlob], `voice-note-${Date.now()}.mp3`, { 
+            type: 'audio/mp3'
         });
         showAttachmentPreview(voiceFile);
         previewModal.style.display = 'none';
@@ -498,7 +500,74 @@ function updateSubmitButton() {
     submitBtn.disabled = !(hasContent || hasMedia);
 }
 
-// FIXED: Submit Gist function
+// UPLOAD FUNCTIONS - EXACTLY LIKE YOUR app.js
+async function uploadAudioToCloudinary(audioBlob) {
+    const formData = new FormData();
+    formData.append('file', audioBlob);
+    formData.append('upload_preset', cloudinaryConfig.uploadPreset);
+    formData.append('resource_type', 'auto');
+    
+    try {
+        const response = await fetch(
+            `${cloudinaryConfig.apiUrl}/${cloudinaryConfig.cloudName}/upload`,
+            {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }
+        );
+        
+        if (!response.ok) {
+            throw new Error(`Cloudinary error: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        if (!data.secure_url) {
+            throw new Error('Invalid response from Cloudinary');
+        }
+        return data.secure_url;
+    } catch (error) {
+        showNotification('Error uploading audio: ' + error.message, 'error');
+        throw error;
+    }
+}
+
+async function uploadImageToCloudinary(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', cloudinaryConfig.uploadPreset);
+    formData.append('resource_type', 'image');
+    
+    try {
+        const response = await fetch(
+            `${cloudinaryConfig.apiUrl}/${cloudinaryConfig.cloudName}/upload`,
+            {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }
+        );
+        
+        if (!response.ok) {
+            throw new Error(`Cloudinary error: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        if (!data.secure_url) {
+            throw new Error('Invalid response from Cloudinary');
+        }
+        return data.secure_url;
+    } catch (error) {
+        showNotification('Error uploading image: ' + error.message, 'error');
+        throw error;
+    }
+}
+
+// FIXED Submit Gist function
 async function submitGist() {
     const submitBtn = document.getElementById('submitBtn');
     const gistContent = document.getElementById('gistContent');
@@ -510,6 +579,7 @@ async function submitGist() {
     
     // Disable submit button
     submitBtn.disabled = true;
+    const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = `
         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
             <line x1="12" y1="2" x2="12" y2="6"></line>
@@ -530,55 +600,30 @@ async function submitGist() {
         let mediaType = null;
         let duration = null;
         
-        console.log('Pending media:', { pendingImageFile, pendingAudioBlob, pendingMediaType });
-        
         // Upload media if exists
         if (pendingImageFile || pendingAudioBlob) {
             showNotification('Uploading media...', 'info');
             
             if (pendingImageFile && pendingAudioBlob) {
-                console.log('Uploading both image and audio');
-                // Upload image
-                const imageUrl = await uploadToCloudinary(pendingImageFile);
-                console.log('Image uploaded:', imageUrl);
+                // Upload both
+                const imageUrl = await uploadImageToCloudinary(pendingImageFile);
+                const audioUrl = await uploadAudioToCloudinary(pendingAudioBlob);
                 
-                // Upload audio
-                const audioFile = new File([pendingAudioBlob], `voice-note-${Date.now()}.webm`, { 
-                    type: 'audio/webm',
-                    lastModified: Date.now()
-                });
-                const audioUrl = await uploadToCloudinary(audioFile);
-                console.log('Audio uploaded:', audioUrl);
-                
-                // For simplicity, we'll store only audio for "both" type
+                // For both, we'll use audio as primary
                 mediaUrl = audioUrl;
                 mediaType = 'audio';
-                duration = Math.floor(pendingAudioBlob.size / 16000); // Approximate duration
+                duration = Math.floor((Date.now() - recordingStartTime) / 1000);
                 
             } else if (pendingImageFile) {
-                console.log('Uploading image only');
-                mediaUrl = await uploadToCloudinary(pendingImageFile);
+                mediaUrl = await uploadImageToCloudinary(pendingImageFile);
                 mediaType = 'image';
-                console.log('Image URL:', mediaUrl);
                 
             } else if (pendingAudioBlob) {
-                console.log('Uploading audio only');
-                // Create a proper file from the blob
-                const audioFile = new File([pendingAudioBlob], `voice-note-${Date.now()}.webm`, { 
-                    type: 'audio/webm',
-                    lastModified: Date.now()
-                });
-                mediaUrl = await uploadToCloudinary(audioFile);
+                mediaUrl = await uploadAudioToCloudinary(pendingAudioBlob);
                 mediaType = 'audio';
-                // Calculate duration based on recording time
-                duration = pendingAudioBlob.size > 0 ? 
-                    Math.floor(pendingAudioBlob.size / 16000) : // Approximate based on size
-                    5; // Fallback duration
-                console.log('Audio URL:', mediaUrl, 'Duration:', duration);
+                duration = Math.floor((Date.now() - recordingStartTime) / 1000);
             }
         }
-        
-        console.log('Creating gist with:', { content, mediaUrl, mediaType, duration });
         
         // Create gist
         const gistId = await createGist(content, mediaUrl, mediaType, duration);
@@ -608,74 +653,15 @@ async function submitGist() {
             setTimeout(() => {
                 window.location.href = 'gist.html';
             }, 1500);
-        } else {
-            showNotification('Failed to create gist', 'error');
         }
         
     } catch (error) {
         console.error('Error creating gist:', error);
-        showNotification('Failed to create gist. Please try again.', 'error');
+        showNotification('Failed to create gist: ' + error.message, 'error');
     } finally {
         // Reset submit button
         submitBtn.disabled = false;
-        submitBtn.innerHTML = `
-            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M22 2L11 13"></path>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-            Post Gist
-        `;
-    }
-}
-
-// Upload to Cloudinary (same function as in your app.js)
-async function uploadToCloudinary(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', cloudinaryConfig.uploadPreset);
-    
-    // Determine resource type
-    let resourceType = 'auto';
-    if (file.type.startsWith('image/')) {
-        resourceType = 'image';
-    } else if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
-        resourceType = 'video'; // Cloudinary treats audio as video resource type
-    }
-    formData.append('resource_type', resourceType);
-    
-    console.log('Uploading to Cloudinary:', {
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        resourceType: resourceType
-    });
-    
-    try {
-        const response = await fetch(
-            `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/upload`,
-            {
-                method: 'POST',
-                body: formData
-            }
-        );
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Cloudinary upload failed:', response.status, errorText);
-            throw new Error(`Cloudinary upload failed: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('Cloudinary response:', data);
-        
-        if (!data.secure_url) {
-            throw new Error('Invalid response from Cloudinary - no secure_url');
-        }
-        
-        return data.secure_url;
-    } catch (error) {
-        console.error('Cloudinary upload error:', error);
-        throw error;
+        submitBtn.innerHTML = originalText;
     }
 }
 
@@ -697,14 +683,10 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
             authorId: currentUser.uid,
             authorAvatar: getRandomAvatar(),
             timestamp: serverTimestamp(),
-            isAnonymous: true,
-            createdAt: new Date().toISOString()
+            isAnonymous: true
         };
         
-        console.log('Creating gist with data:', gistData);
-        
         const docRef = await addDoc(collection(db, 'gists'), gistData);
-        console.log('Gist created with ID:', docRef.id);
         return docRef.id;
     } catch (error) {
         console.error('Error creating gist:', error);
@@ -747,11 +729,6 @@ async function loadGists(lastVisible = null, limitCount = 10) {
     
     isLoading = true;
     
-    // Show loading state if first load
-    if (lastVisible === null && gistsContainer.querySelector('.loading')) {
-        // Keep loading state
-    }
-    
     try {
         let q;
         if (lastVisible) {
@@ -770,7 +747,6 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         }
         
         const querySnapshot = await getDocs(q);
-        console.log('Loaded gists:', querySnapshot.size);
         
         if (querySnapshot.empty) {
             if (lastVisible === null) {
@@ -809,7 +785,6 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         
         querySnapshot.forEach((doc) => {
             const gist = { id: doc.id, ...doc.data() };
-            console.log('Displaying gist:', gist);
             if (!document.querySelector(`[data-gist-id="${gist.id}"]`)) {
                 displayGist(gist);
             }
@@ -817,8 +792,6 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         
         if (loadMoreBtn) {
             loadMoreBtn.style.display = 'block';
-            
-            // Update icon
             loadMoreBtn.innerHTML = `
                 <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                     <path d="M12 5v14"></path>
@@ -830,6 +803,8 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         
     } catch (error) {
         console.error('Error loading gists:', error);
+        showNotification('Error loading gists: ' + error.message, 'error');
+        
         if (lastVisible === null) {
             gistsContainer.innerHTML = `
                 <div class="empty-state">
@@ -848,18 +823,12 @@ async function loadGists(lastVisible = null, limitCount = 10) {
     }
 }
 
-// Display a gist in the UI
+// Display a gist in the UI - FIXED ICONS
 function displayGist(gist) {
     const gistsContainer = document.getElementById('gistsContainer');
     if (!gistsContainer) return;
     
     const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
-    
-    console.log('Rendering gist media:', {
-        mediaUrl: gist.mediaUrl,
-        mediaType: gist.mediaType,
-        duration: gist.duration
-    });
     
     let mediaContent = '';
     if (gist.mediaUrl && gist.mediaType) {
@@ -987,8 +956,6 @@ async function likeGist(gistId, button) {
         if (gistSnap.exists()) {
             const gistData = gistSnap.data();
             
-            // Check if user already liked (you might want to store likes in a subcollection)
-            // For simplicity, we'll just update the count directly
             const newLikes = (gistData.likes || 0) + 1;
             
             await updateDoc(gistRef, {
@@ -1005,7 +972,7 @@ async function likeGist(gistId, button) {
         }
     } catch (error) {
         console.error('Error liking gist:', error);
-        showNotification('Failed to like gist', 'error');
+        showNotification('Failed to like gist: ' + error.message, 'error');
     }
 }
 
@@ -1022,11 +989,13 @@ function shareGist(gistId) {
             title: 'Anonymous Gist',
             text: 'Check out this anonymous gist!',
             url: url
-        }).catch(console.error);
+        }).catch(err => {
+            showNotification('Failed to share: ' + err.message, 'error');
+        });
     } else {
         navigator.clipboard.writeText(url)
             .then(() => showNotification('Link copied to clipboard!', 'success'))
-            .catch(() => showNotification('Failed to copy link', 'error'));
+            .catch(err => showNotification('Failed to copy link: ' + err.message, 'error'));
     }
 }
 
@@ -1117,15 +1086,31 @@ function formatTime(timestamp) {
     }
 }
 
+// IMPROVED NOTIFICATION FUNCTION with better error display
 function showNotification(message, type = 'info') {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    
     // Create notification element
     const notification = document.createElement('div');
     notification.className = `custom-notification ${type}`;
-    notification.innerHTML = `
-        <div class="notification-content">
-            <i class="notification-icon ${getNotificationIcon(type)}"></i>
-            <span>${message}</span>
-        </div>
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#dc3545' : 
+                    type === 'success' ? '#28a745' : 
+                    type === 'warning' ? '#ffc107' : '#007bff'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        max-width: 350px;
+        animation: slideIn 0.3s ease;
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
     `;
     
     // Add styles if not already added
@@ -1133,54 +1118,6 @@ function showNotification(message, type = 'info') {
         const styles = document.createElement('style');
         styles.id = 'notification-styles';
         styles.textContent = `
-            .custom-notification {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: white;
-                padding: 15px 20px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                z-index: 10000;
-                display: flex;
-                align-items: center;
-                max-width: 350px;
-                animation: slideIn 0.3s ease;
-                border-left: 4px solid;
-            }
-            .custom-notification.success {
-                border-left-color: #28a745;
-            }
-            .custom-notification.error {
-                border-left-color: #dc3545;
-            }
-            .custom-notification.info {
-                border-left-color: #007bff;
-            }
-            .custom-notification.warning {
-                border-left-color: #ffc107;
-            }
-            .notification-content {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                color: black;
-            }
-            .notification-icon {
-                font-size: 18px;
-            }
-            .success .notification-icon {
-                color: #28a745;
-            }
-            .error .notification-icon {
-                color: #dc3545;
-            }
-            .info .notification-icon {
-                color: #007bff;
-            }
-            .warning .notification-icon {
-                color: #ffc107;
-            }
             @keyframes slideIn {
                 from { transform: translateX(100%); opacity: 0; }
                 to { transform: translateX(0); opacity: 1; }
@@ -1192,6 +1129,19 @@ function showNotification(message, type = 'info') {
         `;
         document.head.appendChild(styles);
     }
+    
+    notification.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+            ${type === 'error' ? '❌' : 
+              type === 'success' ? '✅' : 
+              type === 'warning' ? '⚠️' : 'ℹ️'}
+            <span>${message}</span>
+        </div>
+    `;
+    
+    // Remove any existing notifications
+    const existingNotifications = document.querySelectorAll('.custom-notification');
+    existingNotifications.forEach(n => n.remove());
     
     document.body.appendChild(notification);
     
@@ -1206,13 +1156,4 @@ function showNotification(message, type = 'info') {
     }, 3000);
     
     return notification;
-}
-
-function getNotificationIcon(type) {
-    switch(type) {
-        case 'success': return 'fas fa-check-circle';
-        case 'error': return 'fas fa-exclamation-circle';
-        case 'warning': return 'fas fa-exclamation-triangle';
-        default: return 'fas fa-info-circle';
-    }
 }
