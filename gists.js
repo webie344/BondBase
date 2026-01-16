@@ -231,15 +231,22 @@ function showAttachmentPreview(file) {
     if (!attachmentsContainer) return;
 
     attachmentsContainer.style.display = 'block';
+    
+    let fileType = 'Image';
+    if (file.type.startsWith('audio/')) {
+        fileType = 'Voice Note';
+    }
+    
     attachmentsContainer.innerHTML = `
         <div class="attachment-preview">
             <div class="attachment-info">
                 <svg class="feather attachment-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                    <polyline points="21 15 16 10 5 21"></polyline>
+                    ${file.type.startsWith('audio/') ? 
+                        '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line>' : 
+                        '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>'
+                    }
                 </svg>
-                <span class="attachment-name">${file.name} (${formatFileSize(file.size)})</span>
+                <span class="attachment-name">${fileType}: ${file.name} (${formatFileSize(file.size)})</span>
             </div>
             <button type="button" class="attachment-remove" id="removeAttachmentBtn">
                 <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -442,7 +449,12 @@ function showVoicePreview(audioBlob, duration) {
         URL.revokeObjectURL(audioUrl);
         
         pendingAudioBlob = audioBlob;
-        showAttachmentPreview(new File([audioBlob], 'voice-note.webm', { type: 'audio/webm' }));
+        // Create a file from the blob with correct name and type
+        const voiceFile = new File([audioBlob], `voice-note-${Date.now()}.webm`, { 
+            type: 'audio/webm',
+            lastModified: Date.now()
+        });
+        showAttachmentPreview(voiceFile);
         previewModal.style.display = 'none';
         updateSubmitButton();
     });
@@ -486,6 +498,7 @@ function updateSubmitButton() {
     submitBtn.disabled = !(hasContent || hasMedia);
 }
 
+// FIXED: Submit Gist function
 async function submitGist() {
     const submitBtn = document.getElementById('submitBtn');
     const gistContent = document.getElementById('gistContent');
@@ -517,33 +530,55 @@ async function submitGist() {
         let mediaType = null;
         let duration = null;
         
+        console.log('Pending media:', { pendingImageFile, pendingAudioBlob, pendingMediaType });
+        
         // Upload media if exists
         if (pendingImageFile || pendingAudioBlob) {
             showNotification('Uploading media...', 'info');
             
             if (pendingImageFile && pendingAudioBlob) {
-                // Upload both
+                console.log('Uploading both image and audio');
+                // Upload image
                 const imageUrl = await uploadToCloudinary(pendingImageFile);
-                const audioUrl = await uploadToCloudinary(
-                    new File([pendingAudioBlob], 'voice-note.webm', { type: 'audio/webm' })
-                );
+                console.log('Image uploaded:', imageUrl);
                 
-                // For both, we'll store the audio URL and type
-                // You can modify this to store both URLs if needed
+                // Upload audio
+                const audioFile = new File([pendingAudioBlob], `voice-note-${Date.now()}.webm`, { 
+                    type: 'audio/webm',
+                    lastModified: Date.now()
+                });
+                const audioUrl = await uploadToCloudinary(audioFile);
+                console.log('Audio uploaded:', audioUrl);
+                
+                // For simplicity, we'll store only audio for "both" type
                 mediaUrl = audioUrl;
                 mediaType = 'audio';
                 duration = Math.floor(pendingAudioBlob.size / 16000); // Approximate duration
+                
             } else if (pendingImageFile) {
+                console.log('Uploading image only');
                 mediaUrl = await uploadToCloudinary(pendingImageFile);
                 mediaType = 'image';
+                console.log('Image URL:', mediaUrl);
+                
             } else if (pendingAudioBlob) {
-                mediaUrl = await uploadToCloudinary(
-                    new File([pendingAudioBlob], 'voice-note.webm', { type: 'audio/webm' })
-                );
+                console.log('Uploading audio only');
+                // Create a proper file from the blob
+                const audioFile = new File([pendingAudioBlob], `voice-note-${Date.now()}.webm`, { 
+                    type: 'audio/webm',
+                    lastModified: Date.now()
+                });
+                mediaUrl = await uploadToCloudinary(audioFile);
                 mediaType = 'audio';
-                duration = Math.floor(pendingAudioBlob.size / 16000); // Approximate duration
+                // Calculate duration based on recording time
+                duration = pendingAudioBlob.size > 0 ? 
+                    Math.floor(pendingAudioBlob.size / 16000) : // Approximate based on size
+                    5; // Fallback duration
+                console.log('Audio URL:', mediaUrl, 'Duration:', duration);
             }
         }
+        
+        console.log('Creating gist with:', { content, mediaUrl, mediaType, duration });
         
         // Create gist
         const gistId = await createGist(content, mediaUrl, mediaType, duration);
@@ -573,6 +608,8 @@ async function submitGist() {
             setTimeout(() => {
                 window.location.href = 'gist.html';
             }, 1500);
+        } else {
+            showNotification('Failed to create gist', 'error');
         }
         
     } catch (error) {
@@ -596,28 +633,45 @@ async function uploadToCloudinary(file) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', cloudinaryConfig.uploadPreset);
-    formData.append('resource_type', 'auto');
+    
+    // Determine resource type
+    let resourceType = 'auto';
+    if (file.type.startsWith('image/')) {
+        resourceType = 'image';
+    } else if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+        resourceType = 'video'; // Cloudinary treats audio as video resource type
+    }
+    formData.append('resource_type', resourceType);
+    
+    console.log('Uploading to Cloudinary:', {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        resourceType: resourceType
+    });
     
     try {
         const response = await fetch(
             `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/upload`,
             {
                 method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+                body: formData
             }
         );
         
         if (!response.ok) {
-            throw new Error(`Cloudinary error: ${response.statusText}`);
+            const errorText = await response.text();
+            console.error('Cloudinary upload failed:', response.status, errorText);
+            throw new Error(`Cloudinary upload failed: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
+        console.log('Cloudinary response:', data);
+        
         if (!data.secure_url) {
-            throw new Error('Invalid response from Cloudinary');
+            throw new Error('Invalid response from Cloudinary - no secure_url');
         }
+        
         return data.secure_url;
     } catch (error) {
         console.error('Cloudinary upload error:', error);
@@ -643,10 +697,14 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
             authorId: currentUser.uid,
             authorAvatar: getRandomAvatar(),
             timestamp: serverTimestamp(),
-            isAnonymous: true
+            isAnonymous: true,
+            createdAt: new Date().toISOString()
         };
         
+        console.log('Creating gist with data:', gistData);
+        
         const docRef = await addDoc(collection(db, 'gists'), gistData);
+        console.log('Gist created with ID:', docRef.id);
         return docRef.id;
     } catch (error) {
         console.error('Error creating gist:', error);
@@ -689,6 +747,11 @@ async function loadGists(lastVisible = null, limitCount = 10) {
     
     isLoading = true;
     
+    // Show loading state if first load
+    if (lastVisible === null && gistsContainer.querySelector('.loading')) {
+        // Keep loading state
+    }
+    
     try {
         let q;
         if (lastVisible) {
@@ -707,6 +770,7 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         }
         
         const querySnapshot = await getDocs(q);
+        console.log('Loaded gists:', querySnapshot.size);
         
         if (querySnapshot.empty) {
             if (lastVisible === null) {
@@ -745,6 +809,7 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         
         querySnapshot.forEach((doc) => {
             const gist = { id: doc.id, ...doc.data() };
+            console.log('Displaying gist:', gist);
             if (!document.querySelector(`[data-gist-id="${gist.id}"]`)) {
                 displayGist(gist);
             }
@@ -790,15 +855,22 @@ function displayGist(gist) {
     
     const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
     
+    console.log('Rendering gist media:', {
+        mediaUrl: gist.mediaUrl,
+        mediaType: gist.mediaType,
+        duration: gist.duration
+    });
+    
     let mediaContent = '';
-    if (gist.mediaUrl) {
+    if (gist.mediaUrl && gist.mediaType) {
         if (gist.mediaType === 'image') {
             mediaContent = `
                 <div class="gist-media">
-                    <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image">
+                    <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image" onerror="this.style.display='none'">
                 </div>
             `;
         } else if (gist.mediaType === 'audio') {
+            const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
             mediaContent = `
                 <div class="gist-media">
                     <div class="gist-voice-note" data-audio-url="${gist.mediaUrl}">
@@ -814,7 +886,7 @@ function displayGist(gist) {
                             <div class="wave-bar"></div>
                             <div class="wave-bar"></div>
                         </div>
-                        <span class="voice-duration">${gist.duration ? formatDuration(gist.duration) : '0:00'}</span>
+                        <span class="voice-duration">${duration}</span>
                     </div>
                 </div>
             `;
@@ -886,7 +958,7 @@ function displayGist(gist) {
         shareBtn.addEventListener('click', () => shareGist(gist.id));
     }
     
-    if (voicePlayBtn && gist.mediaType === 'audio') {
+    if (voicePlayBtn && gist.mediaType === 'audio' && gist.mediaUrl) {
         voicePlayBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             playGistVoice(gist.mediaUrl, voicePlayBtn, gistElement.querySelector('.voice-waveform'));
@@ -960,7 +1032,7 @@ function shareGist(gistId) {
 
 // Play voice note
 function playGistVoice(audioUrl, button, waveform) {
-    if (!button) return;
+    if (!button || !audioUrl) return;
     
     const audio = new Audio(audioUrl);
     const waveBars = waveform ? waveform.querySelectorAll('.wave-bar') : [];
@@ -1144,4 +1216,3 @@ function getNotificationIcon(type) {
         default: return 'fas fa-info-circle';
     }
 }
-
