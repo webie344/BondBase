@@ -21,7 +21,7 @@ import {
     onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// Firebase configuration (same as your app.js)
+// Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
     authDomain: "dating-connect.firebaseapp.com",
@@ -36,7 +36,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Cloudinary configuration (EXACTLY like your app.js)
+// Cloudinary configuration
 const cloudinaryConfig = {
     cloudName: "ddtdqrh1b",
     uploadPreset: "profile-pictures",
@@ -51,7 +51,7 @@ const DICEBEAR_AVATARS = [
     'personas', 'pixel-art', 'pixel-art-neutral'
 ];
 
-// Gist state variables
+// Gist state
 let currentUser = null;
 let mediaRecorder = null;
 let audioChunks = [];
@@ -72,11 +72,6 @@ function getRandomAvatar() {
 
 // Initialize on DOM content loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Feather icons
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
-    
     // Check which page we're on
     const currentPage = window.location.pathname.split('/').pop().split('.')[0];
     
@@ -94,6 +89,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Initialize create gist page
 function initCreateGistPage() {
+    console.log('Initializing create gist page');
+    
     const gistForm = document.getElementById('gistForm');
     const gistContent = document.getElementById('gistContent');
     const charCount = document.getElementById('charCount');
@@ -134,19 +131,30 @@ function initCreateGistPage() {
         });
     }
 
-    // Voice record button
+    // Voice record button - FIXED: Use mousedown like your app.js
     if (voiceRecordBtn) {
-        voiceRecordBtn.addEventListener('click', () => {
+        voiceRecordBtn.addEventListener('mousedown', async (e) => {
+            e.preventDefault();
             pendingMediaType = 'audio';
             resetMediaButtons();
             voiceRecordBtn.classList.add('active');
-            startVoiceRecording();
+            await startVoiceRecording();
+        });
+        
+        // Also add touchstart for mobile
+        voiceRecordBtn.addEventListener('touchstart', async (e) => {
+            e.preventDefault();
+            pendingMediaType = 'audio';
+            resetMediaButtons();
+            voiceRecordBtn.classList.add('active');
+            await startVoiceRecording();
         });
     }
 
     // Both upload button
     if (bothUploadBtn && bothImageInput) {
-        bothUploadBtn.addEventListener('click', () => {
+        bothUploadBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
             pendingMediaType = 'both';
             resetMediaButtons();
             bothUploadBtn.classList.add('active');
@@ -169,14 +177,17 @@ function initCreateGistPage() {
             if (e.target.files[0]) {
                 handleImageUpload(e.target.files[0]);
                 // After image is selected, start voice recording
-                setTimeout(startVoiceRecording, 500);
+                setTimeout(() => {
+                    startVoiceRecording();
+                }, 500);
             }
         });
     }
 
     // Cancel button
     if (cancelBtn) {
-        cancelBtn.addEventListener('click', () => {
+        cancelBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             if (window.history.length > 1) {
                 window.history.back();
             } else {
@@ -187,12 +198,18 @@ function initCreateGistPage() {
 
     // Cancel recording button
     if (cancelRecordingBtn) {
-        cancelRecordingBtn.addEventListener('click', cancelVoiceRecording);
+        cancelRecordingBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            cancelVoiceRecording();
+        });
     }
 
     // Stop recording button
     if (stopRecordingBtn) {
-        stopRecordingBtn.addEventListener('click', stopVoiceRecording);
+        stopRecordingBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            stopVoiceRecording();
+        });
     }
 
     // Form submit
@@ -206,8 +223,12 @@ function initCreateGistPage() {
     // Initialize submit button
     updateSubmitButton();
 
-    // Add animation styles for waveform
-    addWaveformStyles();
+    // Initialize Feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
+    console.log('Create gist page initialized');
 }
 
 function resetMediaButtons() {
@@ -239,25 +260,17 @@ function showAttachmentPreview(file) {
     attachmentsContainer.style.display = 'block';
     
     let fileType = 'Image';
-    let icon = '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>';
     if (file.type.startsWith('audio/')) {
         fileType = 'Voice Note';
-        icon = '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line>';
     }
     
     attachmentsContainer.innerHTML = `
         <div class="attachment-preview">
             <div class="attachment-info">
-                <svg class="feather attachment-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    ${icon}
-                </svg>
                 <span class="attachment-name">${fileType}: ${file.name} (${formatFileSize(file.size)})</span>
             </div>
             <button type="button" class="attachment-remove" id="removeAttachmentBtn">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
+                <i class="fas fa-times"></i>
             </button>
         </div>
     `;
@@ -279,15 +292,24 @@ function formatFileSize(bytes) {
     else return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-// Voice recording functions - SAME as your app.js
+// Voice recording functions - EXACTLY like your app.js
 async function startVoiceRecording() {
+    console.log('Starting voice recording...');
+    
     try {
+        // Show voice indicator and hide text input
         const voiceIndicator = document.getElementById('voiceRecordingIndicator');
         const gistContent = document.getElementById('gistContent');
         
-        if (voiceIndicator) voiceIndicator.style.display = 'flex';
-        if (gistContent) gistContent.style.display = 'none';
+        if (voiceIndicator) {
+            voiceIndicator.style.display = 'flex';
+        }
         
+        if (gistContent) {
+            gistContent.style.display = 'none';
+        }
+        
+        // Get microphone access
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
@@ -302,7 +324,9 @@ async function startVoiceRecording() {
         
         mediaRecorder.start(100);
         
-        // Auto-stop recording after 30 seconds (like your app.js)
+        console.log('Voice recording started');
+        
+        // Stop recording after 30 seconds max
         setTimeout(() => {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 stopVoiceRecording();
@@ -313,11 +337,19 @@ async function startVoiceRecording() {
         console.error('Error starting recording:', error);
         showNotification('Could not access microphone. Please check permissions.', 'error');
         
+        // Reset UI on error
         const voiceIndicator = document.getElementById('voiceRecordingIndicator');
         const gistContent = document.getElementById('gistContent');
         
-        if (voiceIndicator) voiceIndicator.style.display = 'none';
-        if (gistContent) gistContent.style.display = 'block';
+        if (voiceIndicator) {
+            voiceIndicator.style.display = 'none';
+        }
+        
+        if (gistContent) {
+            gistContent.style.display = 'block';
+        }
+        
+        resetMediaButtons();
     }
 }
 
@@ -334,20 +366,31 @@ function updateRecordingTimer() {
 function stopVoiceRecording() {
     if (!mediaRecorder) return;
     
+    console.log('Stopping voice recording...');
+    
     clearInterval(recordingTimer);
     mediaRecorder.stop();
     
+    // Stop all tracks
     mediaRecorder.stream.getTracks().forEach(track => track.stop());
     
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
+        // Hide voice indicator and show text input
         const voiceIndicator = document.getElementById('voiceRecordingIndicator');
         const gistContent = document.getElementById('gistContent');
         
-        if (voiceIndicator) voiceIndicator.style.display = 'none';
-        if (gistContent) gistContent.style.display = 'block';
+        if (voiceIndicator) {
+            voiceIndicator.style.display = 'none';
+        }
+        
+        if (gistContent) {
+            gistContent.style.display = 'block';
+        }
         
         const duration = Math.floor((Date.now() - recordingStartTime) / 1000);
         const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+        
+        console.log('Voice recorded:', { duration, size: audioBlob.size });
         
         // Show voice preview modal
         showVoicePreview(audioBlob, duration);
@@ -361,6 +404,8 @@ function stopVoiceRecording() {
 function cancelVoiceRecording() {
     if (!mediaRecorder) return;
     
+    console.log('Cancelling voice recording');
+    
     clearInterval(recordingTimer);
     mediaRecorder.stop();
     
@@ -368,76 +413,63 @@ function cancelVoiceRecording() {
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
     
+    // Hide voice indicator and show text input
     const voiceIndicator = document.getElementById('voiceRecordingIndicator');
     const gistContent = document.getElementById('gistContent');
     
-    if (voiceIndicator) voiceIndicator.style.display = 'none';
-    if (gistContent) gistContent.style.display = 'block';
+    if (voiceIndicator) {
+        voiceIndicator.style.display = 'none';
+    }
+    
+    if (gistContent) {
+        gistContent.style.display = 'block';
+    }
+    
+    resetMediaButtons();
     
     mediaRecorder = null;
     audioChunks = [];
     recordingStartTime = null;
-    
-    resetMediaButtons();
 }
 
 function showVoicePreview(audioBlob, duration) {
+    console.log('Showing voice preview');
+    
     const previewModal = document.getElementById('voicePreviewModal');
     const playPreviewBtn = document.getElementById('playPreviewBtn');
     const previewDuration = document.getElementById('previewDuration');
     const cancelPreviewBtn = document.getElementById('cancelPreviewBtn');
     const sendPreviewBtn = document.getElementById('sendPreviewBtn');
-    const previewWaveform = document.getElementById('previewWaveform');
     
-    if (!previewModal) return;
+    if (!previewModal) {
+        console.error('Voice preview modal not found');
+        return;
+    }
     
     previewModal.style.display = 'flex';
-    if (previewDuration) previewDuration.textContent = formatDuration(duration);
+    if (previewDuration) {
+        previewDuration.textContent = formatDuration(duration);
+    }
     
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
     
-    // Create waveform bars if they don't exist
-    if (previewWaveform && previewWaveform.children.length === 0) {
-        previewWaveform.innerHTML = `
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-        `;
-    }
-    
-    const waveBars = previewWaveform ? previewWaveform.querySelectorAll('.wave-bar') : [];
-    
     playPreviewBtn.addEventListener('click', () => {
         if (audio.paused) {
             audio.play();
-            playPreviewBtn.innerHTML = `
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <rect x="6" y="4" width="4" height="16"></rect>
-                    <rect x="14" y="4" width="4" height="16"></rect>
-                </svg>
-            `;
-            animateWaveform(waveBars);
+            playPreviewBtn.innerHTML = '<i class="fas fa-pause"></i>';
         } else {
             audio.pause();
-            playPreviewBtn.innerHTML = `
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-            `;
-            stopWaveformAnimation(waveBars);
+            playPreviewBtn.innerHTML = '<i class="fas fa-play"></i>';
         }
     });
     
     audio.onended = () => {
-        playPreviewBtn.innerHTML = `
-            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-        `;
-        stopWaveformAnimation(waveBars);
+        playPreviewBtn.innerHTML = '<i class="fas fa-play"></i>';
+    };
+    
+    audio.onpause = () => {
+        playPreviewBtn.innerHTML = '<i class="fas fa-play"></i>';
     };
     
     cancelPreviewBtn.addEventListener('click', () => {
@@ -452,39 +484,17 @@ function showVoicePreview(audioBlob, duration) {
         URL.revokeObjectURL(audioUrl);
         
         pendingAudioBlob = audioBlob;
+        
         // Create a file from the blob
         const voiceFile = new File([audioBlob], `voice-note-${Date.now()}.mp3`, { 
             type: 'audio/mp3'
         });
+        
         showAttachmentPreview(voiceFile);
         previewModal.style.display = 'none';
         updateSubmitButton();
-    });
-}
-
-function addWaveformStyles() {
-    if (!document.getElementById('waveform-styles')) {
-        const style = document.createElement('style');
-        style.id = 'waveform-styles';
-        style.textContent = `
-            @keyframes waveform {
-                0%, 100% { height: 5px; }
-                50% { height: 20px; }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-}
-
-function animateWaveform(bars) {
-    bars.forEach((bar, index) => {
-        bar.style.animation = `waveform 1.2s ${index * 0.1}s infinite ease-in-out`;
-    });
-}
-
-function stopWaveformAnimation(bars) {
-    bars.forEach(bar => {
-        bar.style.animation = 'none';
+        
+        console.log('Voice note saved for posting');
     });
 }
 
@@ -498,10 +508,14 @@ function updateSubmitButton() {
     const hasMedia = pendingImageFile || pendingAudioBlob;
     
     submitBtn.disabled = !(hasContent || hasMedia);
+    
+    console.log('Submit button updated:', { hasContent, hasMedia, disabled: submitBtn.disabled });
 }
 
-// UPLOAD FUNCTIONS - EXACTLY LIKE YOUR app.js
+// Upload to Cloudinary - EXACTLY like your app.js
 async function uploadAudioToCloudinary(audioBlob) {
+    console.log('Uploading audio to Cloudinary...');
+    
     const formData = new FormData();
     formData.append('file', audioBlob);
     formData.append('upload_preset', cloudinaryConfig.uploadPreset);
@@ -520,21 +534,28 @@ async function uploadAudioToCloudinary(audioBlob) {
         );
         
         if (!response.ok) {
-            throw new Error(`Cloudinary error: ${response.statusText}`);
+            const errorText = await response.text();
+            console.error('Cloudinary upload failed:', response.status, errorText);
+            throw new Error(`Upload failed: ${response.statusText}`);
         }
         
         const data = await response.json();
+        console.log('Cloudinary upload successful:', data.secure_url);
+        
         if (!data.secure_url) {
-            throw new Error('Invalid response from Cloudinary');
+            throw new Error('No secure URL returned from Cloudinary');
         }
+        
         return data.secure_url;
     } catch (error) {
-        showNotification('Error uploading audio: ' + error.message, 'error');
+        console.error('Cloudinary upload error:', error);
         throw error;
     }
 }
 
 async function uploadImageToCloudinary(file) {
+    console.log('Uploading image to Cloudinary...');
+    
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', cloudinaryConfig.uploadPreset);
@@ -553,22 +574,23 @@ async function uploadImageToCloudinary(file) {
         );
         
         if (!response.ok) {
-            throw new Error(`Cloudinary error: ${response.statusText}`);
+            throw new Error(`Upload failed: ${response.statusText}`);
         }
         
         const data = await response.json();
-        if (!data.secure_url) {
-            throw new Error('Invalid response from Cloudinary');
-        }
+        console.log('Image upload successful:', data.secure_url);
+        
         return data.secure_url;
     } catch (error) {
-        showNotification('Error uploading image: ' + error.message, 'error');
+        console.error('Image upload error:', error);
         throw error;
     }
 }
 
-// FIXED Submit Gist function
+// Submit gist function
 async function submitGist() {
+    console.log('Submitting gist...');
+    
     const submitBtn = document.getElementById('submitBtn');
     const gistContent = document.getElementById('gistContent');
     
@@ -580,19 +602,7 @@ async function submitGist() {
     // Disable submit button
     submitBtn.disabled = true;
     const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = `
-        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <line x1="12" y1="2" x2="12" y2="6"></line>
-            <line x1="12" y1="18" x2="12" y2="22"></line>
-            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
-            <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
-            <line x1="2" y1="12" x2="6" y2="12"></line>
-            <line x1="18" y1="12" x2="22" y2="12"></line>
-            <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
-            <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
-        </svg>
-        Posting...
-    `;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
     
     try {
         const content = gistContent ? gistContent.value.trim() : '';
@@ -600,30 +610,38 @@ async function submitGist() {
         let mediaType = null;
         let duration = null;
         
+        console.log('Gist content:', { content, pendingImageFile: !!pendingImageFile, pendingAudioBlob: !!pendingAudioBlob });
+        
         // Upload media if exists
         if (pendingImageFile || pendingAudioBlob) {
             showNotification('Uploading media...', 'info');
             
             if (pendingImageFile && pendingAudioBlob) {
-                // Upload both
+                console.log('Uploading both image and audio');
+                // Upload image
                 const imageUrl = await uploadImageToCloudinary(pendingImageFile);
+                // Upload audio
                 const audioUrl = await uploadAudioToCloudinary(pendingAudioBlob);
                 
-                // For both, we'll use audio as primary
+                // Store audio as primary for now
                 mediaUrl = audioUrl;
                 mediaType = 'audio';
                 duration = Math.floor((Date.now() - recordingStartTime) / 1000);
                 
             } else if (pendingImageFile) {
+                console.log('Uploading image only');
                 mediaUrl = await uploadImageToCloudinary(pendingImageFile);
                 mediaType = 'image';
                 
             } else if (pendingAudioBlob) {
+                console.log('Uploading audio only');
                 mediaUrl = await uploadAudioToCloudinary(pendingAudioBlob);
                 mediaType = 'audio';
                 duration = Math.floor((Date.now() - recordingStartTime) / 1000);
             }
         }
+        
+        console.log('Creating gist with:', { content, mediaUrl, mediaType, duration });
         
         // Create gist
         const gistId = await createGist(content, mediaUrl, mediaType, duration);
@@ -649,14 +667,16 @@ async function submitGist() {
             const charCount = document.getElementById('charCount');
             if (charCount) charCount.textContent = '0';
             
-            // Redirect to gists page after 1.5 seconds
+            // Redirect after delay
             setTimeout(() => {
                 window.location.href = 'gist.html';
             }, 1500);
+        } else {
+            showNotification('Failed to create gist', 'error');
         }
         
     } catch (error) {
-        console.error('Error creating gist:', error);
+        console.error('Error submitting gist:', error);
         showNotification('Failed to create gist: ' + error.message, 'error');
     } finally {
         // Reset submit button
@@ -683,10 +703,15 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
             authorId: currentUser.uid,
             authorAvatar: getRandomAvatar(),
             timestamp: serverTimestamp(),
-            isAnonymous: true
+            isAnonymous: true,
+            createdAt: new Date().toISOString()
         };
         
+        console.log('Saving gist to Firestore:', gistData);
+        
         const docRef = await addDoc(collection(db, 'gists'), gistData);
+        console.log('Gist created with ID:', docRef.id);
+        
         return docRef.id;
     } catch (error) {
         console.error('Error creating gist:', error);
@@ -694,8 +719,10 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
     }
 }
 
-// Initialize gist page (viewing gists)
+// Initialize gist page
 function initGistPage() {
+    console.log('Initializing gist page');
+    
     const createGistBtn = document.getElementById('createGistBtn');
     const loadMoreBtn = document.getElementById('loadMoreGists');
     
@@ -716,12 +743,18 @@ function initGistPage() {
     // Load initial gists
     loadGists();
     
-    // Add animation styles for waveform
-    addWaveformStyles();
+    // Initialize Feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
+    console.log('Gist page initialized');
 }
 
-// Load gists with pagination
+// Load gists
 async function loadGists(lastVisible = null, limitCount = 10) {
+    console.log('Loading gists...');
+    
     const gistsContainer = document.getElementById('gistsContainer');
     const loadMoreBtn = document.getElementById('loadMoreGists');
     
@@ -747,26 +780,17 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         }
         
         const querySnapshot = await getDocs(q);
+        console.log(`Loaded ${querySnapshot.size} gists`);
         
         if (querySnapshot.empty) {
             if (lastVisible === null) {
                 gistsContainer.innerHTML = `
                     <div class="empty-state">
-                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                            <polyline points="10 9 9 9 8 9"></polyline>
-                        </svg>
+                        <i class="fas fa-file-alt fa-3x" style="margin-bottom: 15px; color: #b3004b;"></i>
                         <h3 class="empty-title">No gists yet</h3>
                         <p class="empty-text">Be the first to share an anonymous post!</p>
                         <button class="create-gist-btn" onclick="window.location.href='create-gist.html'">
-                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <path d="M12 5v14"></path>
-                                <path d="M5 12h14"></path>
-                            </svg>
-                            Create Gist
+                            <i class="fas fa-plus"></i> Create Gist
                         </button>
                     </div>
                 `;
@@ -785,6 +809,7 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         
         querySnapshot.forEach((doc) => {
             const gist = { id: doc.id, ...doc.data() };
+            console.log('Gist data:', gist);
             if (!document.querySelector(`[data-gist-id="${gist.id}"]`)) {
                 displayGist(gist);
             }
@@ -792,13 +817,7 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         
         if (loadMoreBtn) {
             loadMoreBtn.style.display = 'block';
-            loadMoreBtn.innerHTML = `
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <path d="M12 5v14"></path>
-                    <path d="M5 12h14"></path>
-                </svg>
-                Load More
-            `;
+            loadMoreBtn.innerHTML = '<i class="fas fa-plus"></i> Load More';
         }
         
     } catch (error) {
@@ -808,11 +827,7 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         if (lastVisible === null) {
             gistsContainer.innerHTML = `
                 <div class="empty-state">
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
+                    <i class="fas fa-exclamation-triangle fa-3x" style="margin-bottom: 15px; color: #dc3545;"></i>
                     <h3 class="empty-title">Error loading gists</h3>
                     <p class="empty-text">Please try again later.</p>
                 </div>
@@ -823,7 +838,7 @@ async function loadGists(lastVisible = null, limitCount = 10) {
     }
 }
 
-// Display a gist in the UI - FIXED ICONS
+// Display a gist - FIXED: Using Font Awesome instead of Feather for reliability
 function displayGist(gist) {
     const gistsContainer = document.getElementById('gistsContainer');
     if (!gistsContainer) return;
@@ -835,7 +850,8 @@ function displayGist(gist) {
         if (gist.mediaType === 'image') {
             mediaContent = `
                 <div class="gist-media">
-                    <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image" onerror="this.style.display='none'">
+                    <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image" 
+                         onerror="this.onerror=null; this.style.display='none';">
                 </div>
             `;
         } else if (gist.mediaType === 'audio') {
@@ -844,9 +860,7 @@ function displayGist(gist) {
                 <div class="gist-media">
                     <div class="gist-voice-note" data-audio-url="${gist.mediaUrl}">
                         <button class="voice-play-btn">
-                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
+                            <i class="fas fa-play"></i>
                         </button>
                         <div class="voice-waveform">
                             <div class="wave-bar"></div>
@@ -884,27 +898,17 @@ function displayGist(gist) {
         
         <div class="gist-actions">
             <button class="gist-action-btn like-btn" data-gist-id="${gist.id}">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                </svg>
+                <i class="fas fa-heart"></i>
                 <span class="action-count">${gist.likes || 0}</span>
             </button>
             
             <button class="gist-action-btn comment-btn" data-gist-id="${gist.id}">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
+                <i class="fas fa-comment"></i>
                 <span class="action-count">${gist.comments || 0}</span>
             </button>
             
             <button class="gist-action-btn share-btn" data-gist-id="${gist.id}">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <circle cx="18" cy="5" r="3"></circle>
-                    <circle cx="6" cy="12" r="3"></circle>
-                    <circle cx="18" cy="19" r="3"></circle>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                </svg>
+                <i class="fas fa-share"></i>
             </button>
         </div>
     `;
@@ -935,11 +939,6 @@ function displayGist(gist) {
     }
     
     gistsContainer.appendChild(gistElement);
-    
-    // Initialize Feather icons in the new element
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
 }
 
 // Like a gist
@@ -955,7 +954,6 @@ async function likeGist(gistId, button) {
         
         if (gistSnap.exists()) {
             const gistData = gistSnap.data();
-            
             const newLikes = (gistData.likes || 0) + 1;
             
             await updateDoc(gistRef, {
@@ -976,7 +974,7 @@ async function likeGist(gistId, button) {
     }
 }
 
-// Show comments (placeholder)
+// Show comments
 function showComments(gistId) {
     showNotification('Comment system coming soon!', 'info');
 }
@@ -1008,30 +1006,34 @@ function playGistVoice(audioUrl, button, waveform) {
     
     if (audio.paused) {
         audio.play();
-        button.innerHTML = `
-            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <rect x="6" y="4" width="4" height="16"></rect>
-                <rect x="14" y="4" width="4" height="16"></rect>
-            </svg>
-        `;
-        animateWaveform(waveBars);
+        button.innerHTML = '<i class="fas fa-pause"></i>';
+        
+        // Animate waveform
+        waveBars.forEach((bar, index) => {
+            bar.style.animation = `waveform 1.2s ${index * 0.1}s infinite ease-in-out`;
+        });
     } else {
         audio.pause();
-        button.innerHTML = `
-            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-        `;
-        stopWaveformAnimation(waveBars);
+        button.innerHTML = '<i class="fas fa-play"></i>';
+        
+        // Stop animation
+        waveBars.forEach(bar => {
+            bar.style.animation = 'none';
+        });
     }
     
     audio.onended = () => {
-        button.innerHTML = `
-            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-        `;
-        stopWaveformAnimation(waveBars);
+        button.innerHTML = '<i class="fas fa-play"></i>';
+        waveBars.forEach(bar => {
+            bar.style.animation = 'none';
+        });
+    };
+    
+    audio.onpause = () => {
+        button.innerHTML = '<i class="fas fa-play"></i>';
+        waveBars.forEach(bar => {
+            bar.style.animation = 'none';
+        });
     };
 }
 
@@ -1086,17 +1088,18 @@ function formatTime(timestamp) {
     }
 }
 
-// IMPROVED NOTIFICATION FUNCTION with better error display
+// Notification function with better mobile support
 function showNotification(message, type = 'info') {
     console.log(`[${type.toUpperCase()}] ${message}`);
     
-    // Create notification element
+    // Create simple notification
     const notification = document.createElement('div');
-    notification.className = `custom-notification ${type}`;
+    notification.className = `gist-notification ${type}`;
     notification.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
+        left: 20px;
         background: ${type === 'error' ? '#dc3545' : 
                     type === 'success' ? '#28a745' : 
                     type === 'warning' ? '#ffc107' : '#007bff'};
@@ -1107,40 +1110,51 @@ function showNotification(message, type = 'info') {
         z-index: 10000;
         display: flex;
         align-items: center;
-        max-width: 350px;
+        justify-content: space-between;
         animation: slideIn 0.3s ease;
         font-family: 'Inter', sans-serif;
         font-size: 14px;
     `;
     
-    // Add styles if not already added
-    if (!document.getElementById('notification-styles')) {
+    // Add animation styles
+    if (!document.getElementById('gist-notification-styles')) {
         const styles = document.createElement('style');
-        styles.id = 'notification-styles';
+        styles.id = 'gist-notification-styles';
         styles.textContent = `
             @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
+                from { transform: translateY(-20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
             }
             @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
+                from { transform: translateY(0); opacity: 1; }
+                to { transform: translateY(-20px); opacity: 0; }
+            }
+            .wave-bar {
+                width: 3px;
+                background: currentColor;
+                border-radius: 2px;
             }
         `;
         document.head.appendChild(styles);
     }
     
+    let icon = 'ℹ️';
+    if (type === 'success') icon = '✅';
+    else if (type === 'error') icon = '❌';
+    else if (type === 'warning') icon = '⚠️';
+    
     notification.innerHTML = `
         <div style="display: flex; align-items: center; gap: 10px;">
-            ${type === 'error' ? '❌' : 
-              type === 'success' ? '✅' : 
-              type === 'warning' ? '⚠️' : 'ℹ️'}
+            <span style="font-size: 16px;">${icon}</span>
             <span>${message}</span>
         </div>
+        <button onclick="this.parentElement.remove()" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; padding: 0 5px;">
+            ×
+        </button>
     `;
     
     // Remove any existing notifications
-    const existingNotifications = document.querySelectorAll('.custom-notification');
+    const existingNotifications = document.querySelectorAll('.gist-notification');
     existingNotifications.forEach(n => n.remove());
     
     document.body.appendChild(notification);
