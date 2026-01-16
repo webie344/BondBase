@@ -1,4 +1,4 @@
-// gist.js - COMPLETE FIXED VERSION
+// gist.js - FINAL FIXED VERSION
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -39,8 +39,7 @@ const auth = getAuth(app);
 // Cloudinary configuration
 const cloudinaryConfig = {
     cloudName: "ddtdqrh1b",
-    uploadPreset: "profile-pictures",
-    apiUrl: "https://api.cloudinary.com/v1_1"
+    uploadPreset: "profile-pictures"
 };
 
 // Dicebear avatar types
@@ -131,18 +130,9 @@ function initCreateGistPage() {
         });
     }
 
-    // Voice record button - FIXED: Use mousedown like your app.js
+    // Voice record button - CHANGED: Don't hide text box
     if (voiceRecordBtn) {
-        voiceRecordBtn.addEventListener('mousedown', async (e) => {
-            e.preventDefault();
-            pendingMediaType = 'audio';
-            resetMediaButtons();
-            voiceRecordBtn.classList.add('active');
-            await startVoiceRecording();
-        });
-        
-        // Also add touchstart for mobile
-        voiceRecordBtn.addEventListener('touchstart', async (e) => {
+        voiceRecordBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             pendingMediaType = 'audio';
             resetMediaButtons();
@@ -153,7 +143,7 @@ function initCreateGistPage() {
 
     // Both upload button
     if (bothUploadBtn && bothImageInput) {
-        bothUploadBtn.addEventListener('click', async (e) => {
+        bothUploadBtn.addEventListener('click', (e) => {
             e.preventDefault();
             pendingMediaType = 'both';
             resetMediaButtons();
@@ -176,10 +166,10 @@ function initCreateGistPage() {
         bothImageInput.addEventListener('change', (e) => {
             if (e.target.files[0]) {
                 handleImageUpload(e.target.files[0]);
-                // After image is selected, start voice recording
+                // Start voice recording after image selection
                 setTimeout(() => {
                     startVoiceRecording();
-                }, 500);
+                }, 100);
             }
         });
     }
@@ -222,11 +212,6 @@ function initCreateGistPage() {
 
     // Initialize submit button
     updateSubmitButton();
-
-    // Initialize Feather icons
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
     
     console.log('Create gist page initialized');
 }
@@ -267,7 +252,7 @@ function showAttachmentPreview(file) {
     attachmentsContainer.innerHTML = `
         <div class="attachment-preview">
             <div class="attachment-info">
-                <span class="attachment-name">${fileType}: ${file.name} (${formatFileSize(file.size)})</span>
+                <span class="attachment-name">${fileType} ready</span>
             </div>
             <button type="button" class="attachment-remove" id="removeAttachmentBtn">
                 <i class="fas fa-times"></i>
@@ -286,27 +271,16 @@ function showAttachmentPreview(file) {
     });
 }
 
-function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + ' bytes';
-    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    else return (bytes / 1048576).toFixed(1) + ' MB';
-}
-
-// Voice recording functions - EXACTLY like your app.js
+// Voice recording functions - FIXED: Text box stays visible
 async function startVoiceRecording() {
     console.log('Starting voice recording...');
     
     try {
-        // Show voice indicator and hide text input
+        // Show voice indicator but DON'T hide text input
         const voiceIndicator = document.getElementById('voiceRecordingIndicator');
-        const gistContent = document.getElementById('gistContent');
         
         if (voiceIndicator) {
             voiceIndicator.style.display = 'flex';
-        }
-        
-        if (gistContent) {
-            gistContent.style.display = 'none';
         }
         
         // Get microphone access
@@ -339,14 +313,9 @@ async function startVoiceRecording() {
         
         // Reset UI on error
         const voiceIndicator = document.getElementById('voiceRecordingIndicator');
-        const gistContent = document.getElementById('gistContent');
         
         if (voiceIndicator) {
             voiceIndicator.style.display = 'none';
-        }
-        
-        if (gistContent) {
-            gistContent.style.display = 'block';
         }
         
         resetMediaButtons();
@@ -375,16 +344,11 @@ function stopVoiceRecording() {
     mediaRecorder.stream.getTracks().forEach(track => track.stop());
     
     mediaRecorder.onstop = async () => {
-        // Hide voice indicator and show text input
+        // Hide voice indicator
         const voiceIndicator = document.getElementById('voiceRecordingIndicator');
-        const gistContent = document.getElementById('gistContent');
         
         if (voiceIndicator) {
             voiceIndicator.style.display = 'none';
-        }
-        
-        if (gistContent) {
-            gistContent.style.display = 'block';
         }
         
         const duration = Math.floor((Date.now() - recordingStartTime) / 1000);
@@ -413,16 +377,11 @@ function cancelVoiceRecording() {
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
     
-    // Hide voice indicator and show text input
+    // Hide voice indicator
     const voiceIndicator = document.getElementById('voiceRecordingIndicator');
-    const gistContent = document.getElementById('gistContent');
     
     if (voiceIndicator) {
         voiceIndicator.style.display = 'none';
-    }
-    
-    if (gistContent) {
-        gistContent.style.display = 'block';
     }
     
     resetMediaButtons();
@@ -495,24 +454,29 @@ function showVoicePreview(audioBlob, duration) {
         updateSubmitButton();
         
         console.log('Voice note saved for posting');
+        showNotification('Voice note ready! You can add text and post.', 'success');
     });
 }
 
+// FIXED: Update submit button logic
 function updateSubmitButton() {
     const submitBtn = document.getElementById('submitBtn');
-    const gistContent = document.getElementById('gistContent');
     
     if (!submitBtn) return;
     
-    const hasContent = gistContent && gistContent.value.trim().length > 0;
     const hasMedia = pendingImageFile || pendingAudioBlob;
     
-    submitBtn.disabled = !(hasContent || hasMedia);
+    // Enable button if there's any media (voice or image)
+    submitBtn.disabled = !hasMedia;
     
-    console.log('Submit button updated:', { hasContent, hasMedia, disabled: submitBtn.disabled });
+    console.log('Submit button:', { 
+        hasImage: !!pendingImageFile, 
+        hasAudio: !!pendingAudioBlob, 
+        disabled: submitBtn.disabled 
+    });
 }
 
-// Upload to Cloudinary - EXACTLY like your app.js
+// Upload to Cloudinary
 async function uploadAudioToCloudinary(audioBlob) {
     console.log('Uploading audio to Cloudinary...');
     
@@ -523,19 +487,14 @@ async function uploadAudioToCloudinary(audioBlob) {
     
     try {
         const response = await fetch(
-            `${cloudinaryConfig.apiUrl}/${cloudinaryConfig.cloudName}/upload`,
+            `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/upload`,
             {
                 method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+                body: formData
             }
         );
         
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Cloudinary upload failed:', response.status, errorText);
             throw new Error(`Upload failed: ${response.statusText}`);
         }
         
@@ -563,13 +522,10 @@ async function uploadImageToCloudinary(file) {
     
     try {
         const response = await fetch(
-            `${cloudinaryConfig.apiUrl}/${cloudinaryConfig.cloudName}/upload`,
+            `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/upload`,
             {
                 method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+                body: formData
             }
         );
         
@@ -587,7 +543,7 @@ async function uploadImageToCloudinary(file) {
     }
 }
 
-// Submit gist function
+// Submit gist function - FIXED: Handle both image and audio
 async function submitGist() {
     console.log('Submitting gist...');
     
@@ -609,23 +565,30 @@ async function submitGist() {
         let mediaUrl = null;
         let mediaType = null;
         let duration = null;
+        let secondMediaUrl = null; // For when we have both image and audio
         
-        console.log('Gist content:', { content, pendingImageFile: !!pendingImageFile, pendingAudioBlob: !!pendingAudioBlob });
+        console.log('Submitting:', { 
+            content, 
+            hasImage: !!pendingImageFile, 
+            hasAudio: !!pendingAudioBlob,
+            mediaType: pendingMediaType 
+        });
         
         // Upload media if exists
         if (pendingImageFile || pendingAudioBlob) {
             showNotification('Uploading media...', 'info');
             
-            if (pendingImageFile && pendingAudioBlob) {
+            if (pendingMediaType === 'both' && pendingImageFile && pendingAudioBlob) {
                 console.log('Uploading both image and audio');
                 // Upload image
                 const imageUrl = await uploadImageToCloudinary(pendingImageFile);
                 // Upload audio
                 const audioUrl = await uploadAudioToCloudinary(pendingAudioBlob);
                 
-                // Store audio as primary for now
-                mediaUrl = audioUrl;
-                mediaType = 'audio';
+                // Store both URLs - we'll use a custom format
+                mediaUrl = audioUrl; // Primary is audio
+                secondMediaUrl = imageUrl; // Secondary is image
+                mediaType = 'both'; // Special type for both
                 duration = Math.floor((Date.now() - recordingStartTime) / 1000);
                 
             } else if (pendingImageFile) {
@@ -641,10 +604,10 @@ async function submitGist() {
             }
         }
         
-        console.log('Creating gist with:', { content, mediaUrl, mediaType, duration });
+        console.log('Creating gist with:', { content, mediaUrl, mediaType, duration, secondMediaUrl });
         
         // Create gist
-        const gistId = await createGist(content, mediaUrl, mediaType, duration);
+        const gistId = await createGist(content, mediaUrl, mediaType, duration, secondMediaUrl);
         
         if (gistId) {
             showNotification('Gist posted successfully!', 'success');
@@ -685,8 +648,8 @@ async function submitGist() {
     }
 }
 
-// Create a new gist
-async function createGist(content, mediaUrl = null, mediaType = null, duration = null) {
+// Create a new gist - UPDATED: Handle both media
+async function createGist(content, mediaUrl = null, mediaType = null, duration = null, secondMediaUrl = null) {
     if (!currentUser) {
         showNotification('Please login to create gists', 'error');
         return null;
@@ -706,6 +669,12 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
             isAnonymous: true,
             createdAt: new Date().toISOString()
         };
+        
+        // Store second media URL if we have both
+        if (mediaType === 'both' && secondMediaUrl) {
+            gistData.secondMediaUrl = secondMediaUrl;
+            gistData.mediaType = 'both'; // Override to indicate both types
+        }
         
         console.log('Saving gist to Firestore:', gistData);
         
@@ -742,11 +711,6 @@ function initGistPage() {
     
     // Load initial gists
     loadGists();
-    
-    // Initialize Feather icons
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
     
     console.log('Gist page initialized');
 }
@@ -838,7 +802,7 @@ async function loadGists(lastVisible = null, limitCount = 10) {
     }
 }
 
-// Display a gist - FIXED: Using Font Awesome instead of Feather for reliability
+// Display a gist - FIXED: Show both image and audio when both exist
 function displayGist(gist) {
     const gistsContainer = document.getElementById('gistsContainer');
     if (!gistsContainer) return;
@@ -846,34 +810,55 @@ function displayGist(gist) {
     const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
     
     let mediaContent = '';
-    if (gist.mediaUrl && gist.mediaType) {
-        if (gist.mediaType === 'image') {
-            mediaContent = `
-                <div class="gist-media">
-                    <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image" 
-                         onerror="this.onerror=null; this.style.display='none';">
-                </div>
-            `;
-        } else if (gist.mediaType === 'audio') {
-            const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
-            mediaContent = `
-                <div class="gist-media">
-                    <div class="gist-voice-note" data-audio-url="${gist.mediaUrl}">
-                        <button class="voice-play-btn">
-                            <i class="fas fa-play"></i>
-                        </button>
-                        <div class="voice-waveform">
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                        </div>
-                        <span class="voice-duration">${duration}</span>
+    
+    if (gist.mediaType === 'both' && gist.mediaUrl && gist.secondMediaUrl) {
+        // Show both image and audio
+        const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
+        mediaContent = `
+            <div class="gist-media">
+                <img src="${gist.secondMediaUrl}" alt="Gist image" class="gist-image" 
+                     onerror="this.onerror=null; this.style.display='none';">
+                <div class="gist-voice-note" style="margin-top: 10px;">
+                    <button class="voice-play-btn" data-audio-url="${gist.mediaUrl}">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <div class="voice-waveform">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
                     </div>
+                    <span class="voice-duration">${duration}</span>
                 </div>
-            `;
-        }
+            </div>
+        `;
+    } else if (gist.mediaType === 'image' && gist.mediaUrl) {
+        mediaContent = `
+            <div class="gist-media">
+                <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image" 
+                     onerror="this.onerror=null; this.style.display='none';">
+            </div>
+        `;
+    } else if (gist.mediaType === 'audio' && gist.mediaUrl) {
+        const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
+        mediaContent = `
+            <div class="gist-media">
+                <div class="gist-voice-note">
+                    <button class="voice-play-btn" data-audio-url="${gist.mediaUrl}">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <div class="voice-waveform">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                    <span class="voice-duration">${duration}</span>
+                </div>
+            </div>
+        `;
     }
     
     const gistElement = document.createElement('div');
@@ -931,7 +916,7 @@ function displayGist(gist) {
         shareBtn.addEventListener('click', () => shareGist(gist.id));
     }
     
-    if (voicePlayBtn && gist.mediaType === 'audio' && gist.mediaUrl) {
+    if (voicePlayBtn && gist.mediaUrl && (gist.mediaType === 'audio' || gist.mediaType === 'both')) {
         voicePlayBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             playGistVoice(gist.mediaUrl, voicePlayBtn, gistElement.querySelector('.voice-waveform'));
@@ -1087,6 +1072,7 @@ function formatTime(timestamp) {
         return 'Just now';
     }
 }
+
 
 // Notification function with better mobile support
 function showNotification(message, type = 'info') {
