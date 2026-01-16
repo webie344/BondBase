@@ -806,6 +806,47 @@
                 justify-content: center;
             }
         }
+    /* Add this CSS to your posts.html style section */
+.load-more-container {
+    text-align: center;
+    padding: 2rem 1.25rem;
+    border-top: 1px solid var(--border);
+}
+
+.load-more-btn {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    border: none;
+    padding: 0.875rem 2rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.load-more-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(182, 0, 75, 0.3);
+}
+
+.load-more-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.load-more-btn .fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
     </style>
 </head>
 <body>
@@ -953,7 +994,12 @@
             </div>
         </div>
     </main>
-
+                 <!-- Add this right after the posts-feed div in posts.html -->
+<div class="load-more-container">
+    <button id="loadMorePosts" class="load-more-btn">
+        <i class="fas fa-plus"></i> Load More Posts
+    </button>
+</div>
     <!-- Your JavaScript -->
     <script type="module" src="social.js"></script>
     <script type="module" src="app.js"></script>

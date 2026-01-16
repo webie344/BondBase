@@ -1,4 +1,4 @@
-// social.js - Complete independent social features module for dating site
+// social.js - Complete independent social features module for dating site WITH PAGINATION
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -17,6 +17,8 @@ import {
     deleteDoc,
     serverTimestamp,
     orderBy,
+    limit,
+    startAfter,
     arrayUnion,
     increment
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -78,7 +80,11 @@ class SocialManager {
         };
         
         this.viewedPosts = new Set();
-        this.likedPosts = new Set(); // Track liked posts to prevent double likes
+        this.likedPosts = new Set();
+        this.lastVisiblePost = null;
+        this.isLoading = false;
+        this.hasMorePosts = true;
+        this.postsPerPage = 10;
         this.init();
     }
 
@@ -119,6 +125,10 @@ class SocialManager {
             if (e.target.id === 'createPostBtn' || e.target.closest('#createPostBtn')) {
                 window.location.href = 'create.html';
             }
+            // Load More button
+            if (e.target.id === 'loadMorePosts' || e.target.closest('#loadMorePosts')) {
+                this.loadMorePosts();
+            }
         });
     }
 
@@ -127,7 +137,7 @@ class SocialManager {
             await signOut(auth);
             window.location.href = 'login.html';
         } catch (error) {
-            // Error handling without console output
+            console.error('Error logging out:', error);
         }
     }
 
@@ -143,7 +153,7 @@ class SocialManager {
         switch(currentPage) {
             case 'account.html':
                 this.setupAccountSocialLinks();
-                this.setupUserPostsSection(); // NEW: Setup user posts section
+                this.setupUserPostsSection();
                 break;
             case 'mingle.html':
                 this.setupMingleSocialFeatures();
@@ -157,174 +167,88 @@ class SocialManager {
             case 'profile.html':
                 this.setupProfileSocialFeatures();
                 break;
+            case 'comments.html':
+                this.setupCommentsPage();
+                break;
         }
     }
 
-    // NEW: Setup user posts section in account page
-    setupUserPostsSection() {
-        this.createUserPostsSection();
-        this.loadUserPosts();
+    // NEW: Setup comments page
+    setupCommentsPage() {
+        this.loadSinglePostWithComments();
     }
 
-    // NEW: Create user posts section in account page
-    createUserPostsSection() {
-        const accountMain = document.querySelector('.account-main');
-        if (!accountMain) return;
-
-        // Check if posts section already exists
-        if (document.getElementById('userPostsSection')) return;
-
-        const postsSection = document.createElement('div');
-        postsSection.className = 'account-section';
-        postsSection.id = 'userPostsSection';
-        postsSection.style.display = 'none';
-        postsSection.innerHTML = `
-            <h2><i class="fas fa-images"></i> My Posts</h2>
-            <p class="section-description">Manage your posts - click on any post to delete it</p>
-            
-            <div class="user-posts-container" id="userPostsContainer">
-                <div class="loading">Loading your posts...</div>
-            </div>
-
-            <!-- Delete Confirmation Modal -->
-            <div id="deletePostModal" class="modal" style="display: none;">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>Delete Post</h3>
-                        <span class="close-modal">&times;</span>
+    // NEW: Load single post with comments
+    async loadSinglePostWithComments() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const postId = urlParams.get('postId');
+        
+        if (!postId) {
+            const container = document.getElementById('commentsContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p>No post specified</p>
+                        <a href="posts.html" class="btn-primary">Back to Posts</a>
                     </div>
-                    <div class="modal-body">
-                        <p>Are you sure you want to delete this post? This action cannot be undone.</p>
-                        <div class="post-preview" id="postPreview"></div>
-                    </div>
-                    <div class="modal-actions">
-                        <button id="cancelDelete" class="btn-secondary">Cancel</button>
-                        <button id="confirmDelete" class="btn-danger">Delete Post</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        accountMain.appendChild(postsSection);
-        this.setupDeleteModal();
-    }
-
-    // NEW: Setup delete confirmation modal
-    setupDeleteModal() {
-        const modal = document.getElementById('deletePostModal');
-        const closeBtn = document.querySelector('.close-modal');
-        const cancelBtn = document.getElementById('cancelDelete');
-        const confirmBtn = document.getElementById('confirmDelete');
-
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                this.resetDeleteModal();
-                modal.style.display = 'none';
-            });
-        }
-
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', () => {
-                this.resetDeleteModal();
-                modal.style.display = 'none';
-            });
-        }
-
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', () => {
-                this.confirmDeletePost();
-            });
-        }
-
-        // Close modal when clicking outside
-        window.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                this.resetDeleteModal();
-                modal.style.display = 'none';
+                `;
             }
-        });
-    }
-
-    // NEW: Reset delete modal state
-    resetDeleteModal() {
-        const confirmBtn = document.getElementById('confirmDelete');
-        if (confirmBtn) {
-            confirmBtn.innerHTML = 'Delete Post';
-            confirmBtn.disabled = false;
-        }
-    }
-
-    // NEW: Load user's posts
-    async loadUserPosts() {
-        if (!this.currentUser) return;
-
-        const container = document.getElementById('userPostsContainer');
-        if (!container) return;
-
-        try {
-            const postsQuery = query(
-                collection(db, 'posts'), 
-                orderBy('createdAt', 'desc')
-            );
-            const postsSnap = await getDocs(postsQuery);
-            
-            const userPosts = [];
-            postsSnap.forEach(doc => {
-                const post = doc.data();
-                if (post.userId === this.currentUser.uid) {
-                    userPosts.push({ id: doc.id, ...post });
-                }
-            });
-            
-            this.displayUserPosts(userPosts);
-        } catch (error) {
-            // Error handling without console output
-            container.innerHTML = '<div class="error">Error loading your posts</div>';
-        }
-    }
-
-    // NEW: Display user's posts in account page
-    async displayUserPosts(posts) {
-        const container = document.getElementById('userPostsContainer');
-        if (!container) return;
-
-        if (posts.length === 0) {
-            container.innerHTML = `
-                <div class="no-posts-message">
-                    <i class="fas fa-images" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
-                    <h3>No Posts Yet</h3>
-                    <p>You haven't created any posts yet.</p>
-                    <button onclick="window.location.href='create.html'" class="btn-primary">
-                        <i class="fas fa-plus"></i> Create Your First Post
-                    </button>
-                </div>
-            `;
             return;
         }
 
-        container.innerHTML = '';
+        try {
+            const postRef = doc(db, 'posts', postId);
+            const postSnap = await getDoc(postRef);
+            
+            if (!postSnap.exists()) {
+                const container = document.getElementById('commentsContainer');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <p>Post not found</p>
+                            <a href="posts.html" class="btn-primary">Back to Posts</a>
+                        </div>
+                    `;
+                }
+                return;
+            }
 
-        // Get user data for display
-        const userRef = doc(db, 'users', this.currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        const userData = userSnap.exists() ? userSnap.data() : {};
-
-        posts.forEach(post => {
-            const postElement = this.createUserPostElement(post, userData, post.id);
-            container.appendChild(postElement);
-        });
+            const post = { id: postSnap.id, ...postSnap.data() };
+            
+            // Get user data
+            const userRef = doc(db, 'users', post.userId);
+            const userSnap = await getDoc(userRef);
+            const user = userSnap.exists() ? userSnap.data() : {};
+            
+            this.displaySinglePost(post, user);
+            await this.loadCommentsForPage(postId);
+            
+        } catch (error) {
+            console.error('Error loading post:', error);
+            const container = document.getElementById('commentsContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p>Error loading post</p>
+                        <a href="posts.html" class="btn-primary">Back to Posts</a>
+                    </div>
+                `;
+            }
+        }
     }
 
-    // NEW: Create user post element for account page
-    createUserPostElement(post, userData, postId) {
-        const postDiv = document.createElement('div');
-        postDiv.className = 'user-post-item';
-        postDiv.setAttribute('data-post-id', postId);
+    // NEW: Display single post in comments page
+    displaySinglePost(post, user) {
+        const container = document.getElementById('commentsContainer');
+        if (!container) return;
         
         // Build post content HTML
         let postContentHTML = '';
         
-        // Image at the top
+        // IMAGE AT THE TOP
         if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
@@ -336,24 +260,325 @@ class SocialManager {
             }
         }
         
-        // Caption below image
+        // CAPTION BELOW IMAGE
         if (post.caption) {
-            const shortCaption = post.caption.length > 100 ? 
-                post.caption.substring(0, 100) + '...' : post.caption;
-            postContentHTML += `<p class="post-caption">${shortCaption}</p>`;
+            postContentHTML += `<p class="post-caption">${post.caption}</p>`;
         }
+        
+        const isLiked = this.likedPosts.has(post.id);
+        
+        container.innerHTML = `
+            <div class="post-item">
+                <div class="post-header">
+                    <img src="${user.profileImage || 'images/default-profile.jpg'}" 
+                         alt="${user.name}" class="post-author-avatar">
+                    <div class="post-author-info">
+                        <h4>${user.name || 'Unknown User'}</h4>
+                        <span class="post-time">${this.formatTime(post.createdAt)}</span>
+                    </div>
+                    <div class="post-user-actions">
+                        <button class="btn-chat" data-user-id="${post.userId}">
+                            <i class="fas fa-comment"></i> Chat
+                        </button>
+                        <button class="btn-view-profile" data-user-id="${post.userId}">
+                            <i class="fas fa-user"></i> Profile
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="post-content">
+                    ${postContentHTML}
+                </div>
+                
+                <div class="post-actions">
+                    <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${post.id}">
+                        <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> 
+                        <span class="like-count">${post.likes || 0}</span>
+                    </button>
+                    <button class="post-action comment-btn active" data-post-id="${post.id}">
+                        <i class="far fa-comment"></i> 
+                        <span class="comment-count">${post.commentsCount || 0}</span>
+                    </button>
+                </div>
+                
+                <div class="comments-section expanded" id="commentsSection">
+                    <div class="add-comment">
+                        <input type="text" id="commentInput" placeholder="Write a comment..." 
+                               data-post-id="${post.id}">
+                        <button id="sendCommentBtn" data-post-id="${post.id}">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <div class="comments-list" id="commentsList">
+                        <div class="loading">Loading comments...</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        const likeBtn = container.querySelector('.like-btn');
+        const sendCommentBtn = container.querySelector('#sendCommentBtn');
+        const commentInput = container.querySelector('#commentInput');
+        const chatBtn = container.querySelector('.btn-chat');
+        const profileBtn = container.querySelector('.btn-view-profile');
+
+        if (likeBtn) {
+            likeBtn.addEventListener('click', () => this.handleLike(post.id, likeBtn));
+        }
+
+        if (sendCommentBtn) {
+            sendCommentBtn.addEventListener('click', () => this.handleAddComment(post.id, true));
+        }
+
+        if (commentInput) {
+            commentInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleAddComment(post.id, true);
+                }
+            });
+        }
+
+        if (chatBtn) {
+            chatBtn.addEventListener('click', () => {
+                if (post.userId && post.userId !== this.currentUser.uid) {
+                    window.location.href = `chat.html?id=${post.userId}`;
+                } else if (post.userId === this.currentUser.uid) {
+                    alert("You can't chat with yourself!");
+                }
+            });
+        }
+
+        if (profileBtn) {
+            profileBtn.addEventListener('click', () => {
+                if (post.userId) {
+                    window.location.href = `profile.html?id=${post.userId}`;
+                }
+            });
+        }
+    }
+
+    // NEW: Load comments for comments page
+    async loadCommentsForPage(postId) {
+        const commentsList = document.getElementById('commentsList');
+        if (!commentsList) return;
+
+        try {
+            const commentsQuery = query(
+                collection(db, 'posts', postId, 'comments'), 
+                orderBy('createdAt', 'asc')
+            );
+            const commentsSnap = await getDocs(commentsQuery);
+            
+            commentsList.innerHTML = '';
+            
+            if (commentsSnap.empty) {
+                commentsList.innerHTML = '<div class="no-comments">No comments yet. Be the first to comment!</div>';
+                return;
+            }
+
+            const userIds = new Set();
+            commentsSnap.forEach(doc => {
+                const comment = doc.data();
+                userIds.add(comment.userId);
+            });
+
+            const usersData = await this.getUsersData([...userIds]);
+
+            commentsSnap.forEach(doc => {
+                const comment = doc.data();
+                const user = usersData[comment.userId] || {};
+                const commentElement = this.createCommentElement(comment, user);
+                commentsList.appendChild(commentElement);
+            });
+        } catch (error) {
+            console.error('Error loading comments:', error);
+            commentsList.innerHTML = '<div class="error">Error loading comments</div>';
+        }
+    }
+
+    // UPDATED: Load posts with pagination
+    setupPostsPage() {
+        this.loadAllPosts();
+        this.markAllPostsAsViewed();
+    }
+
+    // UPDATED: Load posts with pagination
+    async loadAllPosts(lastVisible = null) {
+        const container = document.getElementById('postsContainer');
+        const loadMoreBtn = document.getElementById('loadMorePosts');
+        
+        if (!container || this.isLoading) return;
+        
+        this.isLoading = true;
+        
+        try {
+            let postsQuery;
+            if (lastVisible) {
+                postsQuery = query(
+                    collection(db, 'posts'), 
+                    orderBy('createdAt', 'desc'),
+                    startAfter(lastVisible),
+                    limit(this.postsPerPage)
+                );
+            } else {
+                postsQuery = query(
+                    collection(db, 'posts'), 
+                    orderBy('createdAt', 'desc'),
+                    limit(this.postsPerPage)
+                );
+            }
+            
+            const postsSnap = await getDocs(postsQuery);
+            
+            // Remove loading skeletons on first load
+            if (lastVisible === null) {
+                const loadingItems = container.querySelectorAll('.post-item.loading');
+                loadingItems.forEach(item => item.remove());
+            }
+            
+            if (postsSnap.empty) {
+                if (lastVisible === null) {
+                    container.innerHTML = '<div class="no-posts">No posts yet. Be the first to post!</div>';
+                }
+                this.hasMorePosts = false;
+                if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+                return;
+            }
+            
+            // Store the last document for pagination
+            const lastDoc = postsSnap.docs[postsSnap.docs.length - 1];
+            this.lastVisiblePost = lastDoc;
+            
+            // Check if we have more posts
+            this.hasMorePosts = postsSnap.size >= this.postsPerPage;
+            
+            const allPosts = [];
+            postsSnap.forEach(doc => {
+                const postData = doc.data();
+                allPosts.push({ id: doc.id, ...postData });
+            });
+            
+            await this.displayPosts(allPosts, lastVisible !== null);
+            
+            // Show/hide load more button
+            if (loadMoreBtn) {
+                if (this.hasMorePosts) {
+                    loadMoreBtn.style.display = 'block';
+                    loadMoreBtn.disabled = false;
+                    loadMoreBtn.innerHTML = '<i class="fas fa-plus"></i> Load More';
+                } else {
+                    loadMoreBtn.style.display = 'none';
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error loading posts:', error);
+            if (lastVisible === null) {
+                container.innerHTML = '<div class="error">Error loading posts</div>';
+            }
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    // NEW: Load more posts function
+    async loadMorePosts() {
+        if (!this.lastVisiblePost || !this.hasMorePosts || this.isLoading) return;
+        
+        const loadMoreBtn = document.getElementById('loadMorePosts');
+        if (loadMoreBtn) {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        }
+        
+        await this.loadAllPosts(this.lastVisiblePost);
+    }
+
+    async displayPosts(posts, append = false) {
+        const container = document.getElementById('postsContainer');
+        if (!container) return;
+
+        // If not appending, clear container first
+        if (!append) {
+            const existingPosts = container.querySelectorAll('.post-item:not(.loading)');
+            existingPosts.forEach(post => post.remove());
+        }
+
+        const userIds = [...new Set(posts.map(post => post.userId))];
+        const usersData = await this.getUsersData(userIds);
+
+        for (const post of posts) {
+            const user = usersData[post.userId] || {};
+            const postElement = this.createPostElement(post, user, post.id);
+            container.appendChild(postElement);
+        }
+    }
+
+    async getUsersData(userIds) {
+        const usersData = {};
+        
+        for (const userId of userIds) {
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                if (userSnap.exists()) {
+                    usersData[userId] = userSnap.data();
+                }
+            } catch (error) {
+                console.error('Error fetching user data:', error);
+            }
+        }
+        
+        return usersData;
+    }
+
+    // UPDATED: Create post element WITHOUT "View all comments" link
+    createPostElement(post, user, postId) {
+        const postDiv = document.createElement('div');
+        postDiv.className = 'post-item';
+        
+        const userId = user.id || post.userId;
+        const userName = user.name || 'Unknown User';
+        const userProfileImage = user.profileImage || 'images/default-profile.jpg';
+        
+        // Build post content HTML
+        let postContentHTML = '';
+        
+        // IMAGE AT THE TOP
+        if (post.imageUrl) {
+            const imageUrl = String(post.imageUrl).trim();
+            if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
+                postContentHTML += `
+                    <div class="post-image-container">
+                        <img src="${imageUrl}" alt="Post image" class="post-image">
+                    </div>
+                `;
+            }
+        }
+        
+        // CAPTION BELOW IMAGE
+        if (post.caption) {
+            postContentHTML += `<p class="post-caption">${post.caption}</p>`;
+        }
+        
+        const isLiked = this.likedPosts.has(postId);
         
         postDiv.innerHTML = `
             <div class="post-header">
-                <img src="${userData.profileImage || 'images/default-profile.jpg'}" 
-                     alt="${userData.name}" class="post-author-avatar">
+                <img src="${userProfileImage}" 
+                     alt="${userName}" class="post-author-avatar">
                 <div class="post-author-info">
-                    <h4>${userData.name || 'You'}</h4>
+                    <h4>${userName}</h4>
                     <span class="post-time">${this.formatTime(post.createdAt)}</span>
                 </div>
-                <div class="post-stats">
-                    <span class="post-stat"><i class="far fa-heart"></i> ${post.likes || 0}</span>
-                    <span class="post-stat"><i class="far fa-comment"></i> ${post.commentsCount || 0}</span>
+                <div class="post-user-actions">
+                    <button class="btn-chat" data-user-id="${userId}">
+                        <i class="fas fa-comment"></i> Chat
+                    </button>
+                    <button class="btn-view-profile" data-user-id="${userId}">
+                        <i class="fas fa-user"></i> Profile
+                    </button>
                 </div>
             </div>
             
@@ -361,218 +586,346 @@ class SocialManager {
                 ${postContentHTML}
             </div>
             
-            <div class="post-actions-account">
-                <button class="btn-delete-post" data-post-id="${postId}">
-                    <i class="fas fa-trash"></i> Delete Post
+            <div class="post-actions">
+                <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${postId}">
+                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> 
+                    <span class="like-count">${post.likes || 0}</span>
                 </button>
+                <button class="post-action comment-btn" data-post-id="${postId}">
+                    <i class="far fa-comment"></i> 
+                    <span class="comment-count">${post.commentsCount || 0}</span>
+                </button>
+            </div>
+            
+            <div class="comments-section" id="comments-${postId}" style="display: none;">
+                <div class="add-comment">
+                    <input type="text" class="comment-input" placeholder="Write a comment..." data-post-id="${postId}">
+                    <button class="send-comment-btn" data-post-id="${postId}">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="comments-list" id="comments-list-${postId}"></div>
             </div>
         `;
 
-        // Add click event to delete button only (not the entire post)
-        const deleteBtn = postDiv.querySelector('.btn-delete-post');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showDeleteConfirmation(postId, post);
+        const likeBtn = postDiv.querySelector('.like-btn');
+        const commentBtn = postDiv.querySelector('.comment-btn');
+        const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
+        const commentInput = postDiv.querySelector('.comment-input');
+        const chatBtn = postDiv.querySelector('.btn-chat');
+        const profileBtn = postDiv.querySelector('.btn-view-profile');
+
+        if (likeBtn) {
+            likeBtn.addEventListener('click', () => this.handleLike(postId, likeBtn));
+        }
+
+        if (commentBtn) {
+            // Now it shows/hides comments inline
+            commentBtn.addEventListener('click', () => this.toggleComments(postId));
+        }
+
+        if (sendCommentBtn) {
+            sendCommentBtn.addEventListener('click', () => this.handleAddComment(postId, false));
+        }
+
+        if (commentInput) {
+            commentInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleAddComment(postId, false);
+                }
             });
         }
+
+        if (chatBtn) {
+            chatBtn.addEventListener('click', () => {
+                if (userId && userId !== this.currentUser.uid) {
+                    window.location.href = `chat.html?id=${userId}`;
+                } else if (userId === this.currentUser.uid) {
+                    alert("You can't chat with yourself!");
+                }
+            });
+        }
+
+        if (profileBtn) {
+            profileBtn.addEventListener('click', () => {
+                if (userId) {
+                    window.location.href = `profile.html?id=${userId}`;
+                }
+            });
+        }
+
+        // Mark post as viewed when displayed
+        this.markPostAsViewed(postId);
 
         return postDiv;
     }
 
-    // NEW: Show delete confirmation modal
-    showDeleteConfirmation(postId, post) {
-        const modal = document.getElementById('deletePostModal');
-        const preview = document.getElementById('postPreview');
+    // COMMENT FUNCTIONALITY
+    async toggleComments(postId) {
+        const commentsSection = document.getElementById(`comments-${postId}`);
+        const commentBtn = document.querySelector(`.comment-btn[data-post-id="${postId}"]`);
         
-        if (!modal || !preview) return;
-
-        // Reset modal state first
-        this.resetDeleteModal();
-
-        // Store the post ID to be deleted
-        modal.setAttribute('data-post-id', postId);
-
-        // Build preview content
-        let previewHTML = '';
-        
-        if (post.imageUrl) {
-            const imageUrl = String(post.imageUrl).trim();
-            if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
-                previewHTML += `
-                    <div class="preview-image">
-                        <img src="${imageUrl}" alt="Post image">
-                    </div>
-                `;
-            }
-        }
-        
-        if (post.caption) {
-            previewHTML += `<div class="preview-caption">${post.caption}</div>`;
-        }
-
-        preview.innerHTML = previewHTML;
-        modal.style.display = 'block';
-
-        // Make modal scrollable if content is long
-        const modalBody = modal.querySelector('.modal-body');
-        if (modalBody) {
-            const contentHeight = modalBody.scrollHeight;
-            const maxHeight = window.innerHeight * 0.6; // 60% of viewport height
-            
-            if (contentHeight > maxHeight) {
-                modalBody.style.maxHeight = maxHeight + 'px';
-                modalBody.style.overflowY = 'auto';
+        if (commentsSection) {
+            if (commentsSection.style.display === 'none' || commentsSection.style.display === '') {
+                commentsSection.style.display = 'block';
+                if (commentBtn) {
+                    commentBtn.classList.add('active');
+                }
+                await this.loadComments(postId);
             } else {
-                modalBody.style.maxHeight = 'none';
-                modalBody.style.overflowY = 'visible';
+                commentsSection.style.display = 'none';
+                if (commentBtn) {
+                    commentBtn.classList.remove('active');
+                }
             }
-        }
-
-        // Ensure delete button is always visible by making modal actions sticky
-        const modalActions = modal.querySelector('.modal-actions');
-        if (modalActions) {
-            modalActions.style.position = 'sticky';
-            modalActions.style.bottom = '0';
-            modalActions.style.background = 'var(--discord-darker)';
-            modalActions.style.padding = '20px';
-            modalActions.style.borderTop = '1px solid var(--discord-border)';
-            modalActions.style.marginTop = 'auto';
         }
     }
 
-    // NEW: Confirm and delete post
-    async confirmDeletePost() {
-        const modal = document.getElementById('deletePostModal');
-        const postId = modal.getAttribute('data-post-id');
-        
-        if (!postId) return;
+    async loadComments(postId) {
+        const commentsList = document.getElementById(`comments-list-${postId}`);
+        if (!commentsList) return;
 
         try {
-            // Show loading state
-            const confirmBtn = document.getElementById('confirmDelete');
-            const originalText = confirmBtn.innerHTML;
+            const commentsQuery = query(
+                collection(db, 'posts', postId, 'comments'), 
+                orderBy('createdAt', 'asc')
+            );
+            const commentsSnap = await getDocs(commentsQuery);
             
-            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-            confirmBtn.disabled = true;
+            commentsList.innerHTML = '';
+            
+            if (commentsSnap.empty) {
+                commentsList.innerHTML = '<div class="no-comments">No comments yet</div>';
+                return;
+            }
 
-            // Delete the post from Firestore
-            await deleteDoc(doc(db, 'posts', postId));
+            const userIds = new Set();
+            commentsSnap.forEach(doc => {
+                const comment = doc.data();
+                userIds.add(comment.userId);
+            });
 
-            // Remove from viewed posts if it exists
-            this.viewedPosts.delete(postId);
-            this.saveViewedPosts();
+            const usersData = await this.getUsersData([...userIds]);
 
-            // Remove from liked posts if it exists
-            this.likedPosts.delete(postId);
-            this.saveLikedPosts();
+            commentsSnap.forEach(doc => {
+                const comment = doc.data();
+                const user = usersData[comment.userId] || {};
+                const commentElement = this.createCommentElement(comment, user);
+                commentsList.appendChild(commentElement);
+            });
+        } catch (error) {
+            console.error('Error loading comments:', error);
+            commentsList.innerHTML = '<div class="error">Error loading comments</div>';
+        }
+    }
 
-            // Hide modal
-            modal.style.display = 'none';
+    createCommentElement(comment, user) {
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'comment-item';
+        commentDiv.innerHTML = `
+            <div class="comment-header">
+                <img src="${user.profileImage || 'images/default-profile.jpg'}" 
+                     alt="${user.name}" class="comment-avatar">
+                <div class="comment-info">
+                    <strong>${user.name || 'Unknown User'}</strong>
+                    <span class="comment-time">${this.formatTime(comment.createdAt)}</span>
+                </div>
+            </div>
+            <div class="comment-text">${comment.text}</div>
+        `;
+        return commentDiv;
+    }
 
-            // Reset modal state
-            this.resetDeleteModal();
+    // UPDATED: Handle add comment
+    async handleAddComment(postId, isCommentsPage = false) {
+        if (!this.currentUser) {
+            alert('Please login to comment');
+            return;
+        }
 
-            // Reload user posts
-            await this.loadUserPosts();
+        let commentInput;
+        if (isCommentsPage) {
+            commentInput = document.querySelector(`#commentInput[data-post-id="${postId}"]`);
+        } else {
+            commentInput = document.querySelector(`.comment-input[data-post-id="${postId}"]`);
+        }
+        
+        if (!commentInput) return;
 
-            // Show success message
-            this.showNotification('Post deleted successfully!', 'success');
+        const commentText = commentInput.value.trim();
+        if (!commentText) {
+            alert('Please enter a comment');
+            return;
+        }
+
+        try {
+            // Add comment to subcollection
+            await addDoc(collection(db, 'posts', postId, 'comments'), {
+                userId: this.currentUser.uid,
+                text: commentText,
+                createdAt: serverTimestamp()
+            });
+
+            // Update comments count
+            const postRef = doc(db, 'posts', postId);
+            await updateDoc(postRef, {
+                commentsCount: increment(1),
+                updatedAt: serverTimestamp()
+            });
+
+            // Clear input
+            commentInput.value = '';
+            
+            // Reload comments based on page
+            if (isCommentsPage) {
+                await this.loadCommentsForPage(postId);
+                // Update comment count in UI
+                const commentCount = document.querySelector('.comment-count');
+                if (commentCount) {
+                    const currentCount = parseInt(commentCount.textContent) || 0;
+                    commentCount.textContent = currentCount + 1;
+                }
+            } else {
+                await this.loadComments(postId);
+                // Update comment count in UI for posts page
+                const commentCount = document.querySelector(`.comment-btn[data-post-id="${postId}"] .comment-count`);
+                if (commentCount) {
+                    const currentCount = parseInt(commentCount.textContent) || 0;
+                    commentCount.textContent = currentCount + 1;
+                }
+            }
 
         } catch (error) {
-            // Error handling without console output
-            this.showNotification('Error deleting post. Please try again.', 'error');
+            console.error('Error adding comment:', error);
+            alert('Error adding comment: ' + error.message);
+        }
+    }
+
+    // FIXED: HandleLike function
+    async handleLike(postId, likeButton) {
+        if (!this.currentUser) {
+            alert('Please login to like posts');
+            return;
+        }
+
+        if (this.likedPosts.has(postId)) {
+            return;
+        }
+
+        try {
+            const postRef = doc(db, 'posts', postId);
+            const postSnap = await getDoc(postRef);
             
-            // Reset button state
-            this.resetDeleteModal();
-        }
-    }
+            if (postSnap.exists()) {
+                const post = postSnap.data();
+                const newLikes = (post.likes || 0) + 1;
+                
+                await updateDoc(postRef, {
+                    likes: newLikes,
+                    updatedAt: serverTimestamp()
+                });
 
-    // NEW: Show notification
-    showNotification(message, type = 'info') {
-        // Remove existing notification
-        const existingNotification = document.getElementById('postDeleteNotification');
-        if (existingNotification) {
-            existingNotification.remove();
-        }
-
-        const notification = document.createElement('div');
-        notification.id = 'postDeleteNotification';
-        notification.className = `notification ${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-                <span>${message}</span>
-            </div>
-        `;
-
-        document.body.appendChild(notification);
-
-        // Show notification
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 100);
-
-        // Hide after 3 seconds
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
+                const likeCount = likeButton.querySelector('.like-count');
+                const likeIcon = likeButton.querySelector('i');
+                
+                if (likeCount) {
+                    likeCount.textContent = newLikes;
                 }
-            }, 300);
-        }, 3000);
-    }
-
-    // Load viewed posts from localStorage
-    loadViewedPosts() {
-        if (!this.currentUser) return;
-        const stored = localStorage.getItem(`viewedPosts_${this.currentUser.uid}`);
-        if (stored) {
-            this.viewedPosts = new Set(JSON.parse(stored));
+                
+                if (likeIcon) {
+                    likeIcon.className = 'fas fa-heart';
+                }
+                
+                likeButton.classList.add('liked');
+                
+                this.likedPosts.add(postId);
+                this.saveLikedPosts();
+            }
+        } catch (error) {
+            console.error('Error liking post:', error);
         }
     }
 
-    // Save viewed posts to localStorage
-    saveViewedPosts() {
-        if (!this.currentUser) return;
-        localStorage.setItem(`viewedPosts_${this.currentUser.uid}`, JSON.stringify([...this.viewedPosts]));
-    }
-
-    // Load liked posts from localStorage
-    loadLikedPosts() {
-        if (!this.currentUser) return;
-        const stored = localStorage.getItem(`likedPosts_${this.currentUser.uid}`);
-        if (stored) {
-            this.likedPosts = new Set(JSON.parse(stored));
-        }
-    }
-
-    // Save liked posts to localStorage
-    saveLikedPosts() {
-        if (!this.currentUser) return;
-        localStorage.setItem(`likedPosts_${this.currentUser.uid}`, JSON.stringify([...this.likedPosts]));
-    }
-
-    // Mark a post as viewed
-    markPostAsViewed(postId) {
-        this.viewedPosts.add(postId);
-        this.saveViewedPosts();
-        this.updateNewPostsCount();
-    }
-
-    // Mark all posts as viewed (when visiting posts page)
-    markAllPostsAsViewed() {
-        if (!this.currentUser) return;
+    formatTime(timestamp) {
+        if (!timestamp) return 'Just now';
         
-        const postsQuery = query(collection(db, 'posts'));
-        getDocs(postsQuery).then(postsSnap => {
+        try {
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (minutes < 1) return 'Just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days}d ago`;
+            return date.toLocaleDateString();
+        } catch (error) {
+            return 'Recently';
+        }
+    }
+
+    // ==============================================
+    // MISSING FUNCTIONS THAT WERE CAUSING ERRORS
+    // ==============================================
+
+    // Update new posts count (was missing)
+    async updateNewPostsCount() {
+        if (!this.currentUser) return;
+
+        try {
+            const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+            const postsSnap = await getDocs(postsQuery);
+            
+            let newPostsCount = 0;
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            
             postsSnap.forEach(doc => {
-                this.viewedPosts.add(doc.id);
+                const post = doc.data();
+                const postDate = post.createdAt?.toDate ? post.createdAt.toDate() : new Date();
+                
+                if (postDate > oneDayAgo && !this.viewedPosts.has(doc.id)) {
+                    newPostsCount++;
+                }
             });
-            this.saveViewedPosts();
+            
+            this.displayNewPostsCount(newPostsCount);
+        } catch (error) {
+            console.error('Error updating new posts count:', error);
             this.displayNewPostsCount(0);
-        });
+        }
+    }
+
+    // Display new posts count (was missing)
+    displayNewPostsCount(count) {
+        // Find or create indicator
+        let indicator = document.getElementById('newPostsIndicator');
+        
+        if (!indicator) {
+            // Try to find a place to put it
+            const nav = document.querySelector('nav');
+            if (nav) {
+                indicator = document.createElement('div');
+                indicator.id = 'newPostsIndicator';
+                indicator.className = 'posts-indicator';
+                indicator.onclick = () => {
+                    this.markAllPostsAsViewed();
+                    window.location.href = 'posts.html';
+                };
+                nav.appendChild(indicator);
+            }
+        }
+
+        if (indicator) {
+            if (count > 0) {
+                indicator.innerHTML = `<i class="fas fa-images"></i><span style="font-size: 10px; margin-left: 2px;">${count}</span>`;
+                indicator.style.display = 'flex';
+            } else {
+                indicator.style.display = 'none';
+            }
+        }
     }
 
     // ACCOUNT PAGE - Social Links Setup
@@ -627,31 +980,6 @@ class SocialManager {
                     this.updateSocialIconsPreview();
                 });
             }
-        });
-    }
-
-    setupAccountMenu() {
-        const menuItems = document.querySelectorAll('.account-menu .menu-item');
-        const sections = document.querySelectorAll('.account-section');
-        
-        menuItems.forEach(item => {
-            item.addEventListener('click', () => {
-                const targetSection = item.dataset.section;
-                
-                menuItems.forEach(i => i.classList.remove('active'));
-                item.classList.add('active');
-                
-                sections.forEach(section => {
-                    section.style.display = section.id === targetSection + 'Section' ? 'block' : 'none';
-                });
-
-                // If posts section is selected, reload posts
-                if (targetSection === 'posts') {
-                    setTimeout(() => {
-                        this.loadUserPosts();
-                    }, 100);
-                }
-            });
         });
     }
 
@@ -716,7 +1044,7 @@ class SocialManager {
                 this.updateSocialIconsPreview();
             }
         } catch (error) {
-            // Error handling without console output
+            console.error('Error loading user social links:', error);
         }
     }
 
@@ -755,15 +1083,45 @@ class SocialManager {
             });
             return true;
         } catch (error) {
-            // Error handling without console output
+            console.error('Error saving social links:', error);
             return false;
         }
     }
 
-    // MINGLE PAGE - Social Features
+    setupAccountMenu() {
+        const menuItems = document.querySelectorAll('.account-menu .menu-item');
+        const sections = document.querySelectorAll('.account-section');
+        
+        menuItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const targetSection = item.dataset.section;
+                
+                menuItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                
+                sections.forEach(section => {
+                    section.style.display = section.id === targetSection + 'Section' ? 'block' : 'none';
+                });
+
+                if (targetSection === 'posts') {
+                    setTimeout(() => {
+                        this.loadUserPosts();
+                    }, 100);
+                }
+            });
+        });
+    }
+
+    // Setup Mingle Social Features
     setupMingleSocialFeatures() {
         this.setupNewPostsIndicator();
         this.addSocialIconsToMinglePage();
+    }
+
+    setupNewPostsIndicator() {
+        setTimeout(() => {
+            this.updateNewPostsCount();
+        }, 3000);
     }
 
     addSocialIconsToMinglePage() {
@@ -790,318 +1148,13 @@ class SocialManager {
             socialContainer.appendChild(icon);
         });
 
-        const message = document.createElement('div');
-        message.className = 'no-social-links';
-        message.innerHTML = `<i class="fas fa-info-circle"></i> `;
-        socialContainer.appendChild(message);
-
         const profileBio = document.querySelector('#profileBio');
         if (profileBio) {
             profileBio.parentNode.insertBefore(socialContainer, profileBio);
         }
     }
 
-    setupNewPostsIndicator() {
-        setTimeout(() => {
-            this.updateNewPostsCount();
-        }, 3000);
-    }
-
-    async updateNewPostsCount() {
-        if (!this.currentUser) return;
-
-        try {
-            const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-            const postsSnap = await getDocs(postsQuery);
-            
-            let newPostsCount = 0;
-            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            
-            postsSnap.forEach(doc => {
-                const post = doc.data();
-                const postDate = post.createdAt?.toDate ? post.createdAt.toDate() : new Date();
-                
-                // Check if post is within 24 hours and not viewed
-                if (postDate > oneDayAgo && !this.viewedPosts.has(doc.id)) {
-                    newPostsCount++;
-                }
-            });
-            
-            this.displayNewPostsCount(newPostsCount);
-        } catch (error) {
-            // Error handling without console output
-            this.displayNewPostsCount(0);
-        }
-    }
-
-    displayNewPostsCount(count) {
-        let indicator = document.getElementById('newPostsIndicator');
-        let navBadge = document.getElementById('navPostsBadge');
-        
-        if (!indicator) {
-            const nav = document.querySelector('nav');
-            if (nav) {
-                indicator = document.createElement('div');
-                indicator.id = 'newPostsIndicator';
-                indicator.className = 'posts-indicator';
-                indicator.onclick = () => {
-                    this.markAllPostsAsViewed();
-                    window.location.href = 'posts.html';
-                };
-                nav.appendChild(indicator);
-            }
-        }
-
-        if (!navBadge) {
-            const postsNav = document.querySelector('a[href="posts.html"]');
-            if (postsNav) {
-                navBadge = document.createElement('span');
-                navBadge.id = 'navPostsBadge';
-                navBadge.className = 'posts-badge';
-                postsNav.appendChild(navBadge);
-            }
-        }
-
-        if (indicator) {
-            if (count > 0) {
-                indicator.innerHTML = `<i class="fas fa-images"></i><span style="font-size: 10px; margin-left: 2px;">${count}</span>`;
-                indicator.style.display = 'flex';
-            } else {
-                indicator.style.display = 'none';
-            }
-        }
-
-        if (navBadge) {
-            if (count > 0) {
-                navBadge.textContent = count > 99 ? '99+' : count;
-                navBadge.style.display = 'flex';
-            } else {
-                navBadge.style.display = 'none';
-            }
-        }
-    }
-
-    // PROFILE PAGE - Social Features
-    setupProfileSocialFeatures() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const profileId = urlParams.get('id');
-        
-        if (profileId) {
-            this.loadProfileSocialLinks(profileId);
-            this.loadAllProfilePosts(profileId);
-            this.setupProfileButtons(profileId);
-        }
-    }
-
-    async loadProfileSocialLinks(profileId) {
-        try {
-            const userRef = doc(db, 'users', profileId);
-            const userSnap = await getDoc(userRef);
-            
-            if (userSnap.exists()) {
-                const userData = userSnap.data();
-                const socialLinks = userData.socialLinks || {};
-                const userName = userData.name || 'This user';
-                
-                this.displayProfileSocialIcons(socialLinks, userName);
-            } else {
-                this.displayProfileSocialIcons({}, 'User');
-            }
-        } catch (error) {
-            // Error handling without console output
-            this.displayProfileSocialIcons({}, 'User');
-        }
-    }
-
-    displayProfileSocialIcons(socialLinks, userName) {
-        const socialContainer = document.getElementById('profileSocialLinks');
-        if (!socialContainer) return;
-
-        socialContainer.innerHTML = '';
-
-        Object.entries(this.SOCIAL_PLATFORMS).forEach(([platformKey, platform]) => {
-            const hasLink = socialLinks[platformKey];
-            const icon = document.createElement(hasLink ? 'a' : 'div');
-            
-            if (hasLink) {
-                // FIXED: Use the correct platform key and build proper URL
-                const username = socialLinks[platformKey];
-                const socialUrl = this.buildSocialUrl(platformKey, username);
-                icon.href = socialUrl;
-                icon.target = '_blank';
-                icon.rel = 'noopener noreferrer';
-                icon.title = `Visit ${userName}'s ${platform.name}: ${username}`;
-                icon.style.cursor = 'pointer';
-                icon.style.opacity = '1';
-            } else {
-                icon.title = `${platform.name} - ${userName} hasn't added ${platform.name} link`;
-                icon.style.cursor = 'default';
-                icon.style.opacity = '0.6';
-            }
-            
-            icon.className = 'social-profile-icon';
-            icon.innerHTML = `<i class="${platform.icon}"></i>`;
-            icon.style.color = platform.color;
-            socialContainer.appendChild(icon);
-        });
-
-        const socialSection = document.getElementById('socialLinksSection');
-        if (socialSection) {
-            socialSection.style.display = 'block';
-        }
-    }
-
-    // FIXED: Proper social URL builder
-    buildSocialUrl(platform, username) {
-        const platformData = this.SOCIAL_PLATFORMS[platform];
-        if (!platformData) return '#';
-        
-        // Clean the username - remove @ symbols and URLs
-        let cleanUsername = username.trim();
-        cleanUsername = cleanUsername.replace(/^@/, ''); // Remove leading @
-        cleanUsername = cleanUsername.replace(/^https?:\/\/[^\/]+\//, ''); // Remove URL prefixes
-        cleanUsername = cleanUsername.split('/')[0]; // Take only the first part if there are slashes
-        
-        return platformData.baseUrl + cleanUsername;
-    }
-
-    async loadAllProfilePosts(profileId) {
-        try {
-            const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-            const postsSnap = await getDocs(postsQuery);
-            
-            const userPosts = [];
-            postsSnap.forEach(doc => {
-                const post = doc.data();
-                if (post.userId === profileId) {
-                    userPosts.push({ id: doc.id, ...post });
-                }
-            });
-            
-            this.displayAllProfilePosts(userPosts, profileId);
-        } catch (error) {
-            // Error handling without console output
-            const postsContainer = document.getElementById('profilePostsContainer');
-            if (postsContainer) {
-                postsContainer.innerHTML = '<div class="no-posts-message">Error loading posts</div>';
-            }
-        }
-    }
-
-    async displayAllProfilePosts(posts, profileId) {
-        const postsContainer = document.getElementById('profilePostsContainer');
-        
-        if (!postsContainer) return;
-
-        if (posts.length === 0) {
-            postsContainer.innerHTML = '<div class="no-posts-message">This user hasn\'t posted anything yet.</div>';
-            return;
-        }
-
-        postsContainer.innerHTML = '';
-
-        const userRef = doc(db, 'users', profileId);
-        const userSnap = await getDoc(userRef);
-        const userData = userSnap.exists() ? userSnap.data() : {};
-
-        for (const post of posts) {
-            const postElement = this.createProfilePostElement(post, userData, post.id);
-            postsContainer.appendChild(postElement);
-        }
-    }
-
-    createProfilePostElement(post, userData, postId) {
-        const postDiv = document.createElement('div');
-        postDiv.className = 'profile-post-item';
-        
-        // Build post content HTML - Image at the top
-        let postContentHTML = '';
-        
-        // IMAGE AT THE TOP
-        if (post.imageUrl) {
-            const imageUrl = String(post.imageUrl).trim();
-            if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
-                postContentHTML += `
-                    <div class="post-image-container">
-                        <img src="${imageUrl}" alt="Post image" class="post-image">
-                    </div>
-                `;
-            }
-        }
-        
-        // CAPTION BELOW IMAGE
-        if (post.caption) {
-            postContentHTML += `<p class="post-caption">${post.caption}</p>`;
-        }
-        
-        const isLiked = this.likedPosts.has(postId);
-        
-        postDiv.innerHTML = `
-            <div class="post-header">
-                <img src="${userData.profileImage || 'images/default-profile.jpg'}" 
-                     alt="${userData.name}" class="post-author-avatar">
-                <div class="post-author-info">
-                    <h4>${userData.name || 'Unknown User'}</h4>
-                    <span class="post-time">${this.formatTime(post.createdAt)}</span>
-                </div>
-            </div>
-            
-            <div class="post-content">
-                ${postContentHTML}
-            </div>
-            
-            <div class="post-actions">
-                <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${postId}">
-                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> <span class="like-count">${post.likes || 0}</span>
-                </button>
-                <button class="post-action comment-btn" data-post-id="${postId}">
-                    <i class="far fa-comment"></i> <span class="comment-count">${post.commentsCount || 0}</span>
-                </button>
-            </div>
-            
-            <div class="comments-section" id="comments-${postId}" style="display: none;">
-                <div class="add-comment">
-                    <input type="text" class="comment-input" placeholder="Write a comment..." data-post-id="${postId}">
-                    <button class="send-comment-btn" data-post-id="${postId}">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
-                <div class="comments-list" id="comments-list-${postId}"></div>
-            </div>
-        `;
-
-        const likeBtn = postDiv.querySelector('.like-btn');
-        const commentBtn = postDiv.querySelector('.comment-btn');
-        const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
-        const commentInput = postDiv.querySelector('.comment-input');
-
-        if (likeBtn) {
-            likeBtn.addEventListener('click', () => this.handleLike(postId, likeBtn));
-        }
-
-        if (commentBtn) {
-            commentBtn.addEventListener('click', () => this.toggleComments(postId));
-        }
-
-        if (sendCommentBtn) {
-            sendCommentBtn.addEventListener('click', () => this.handleAddComment(postId));
-        }
-
-        if (commentInput) {
-            commentInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    this.handleAddComment(postId);
-                }
-            });
-        }
-
-        // Load existing comments
-        this.loadComments(postId);
-
-        return postDiv;
-    }
-
-    // CREATE POST PAGE
+    // Setup Create Post
     setupCreatePost() {
         const form = document.getElementById('createPostForm');
         if (!form) return;
@@ -1196,20 +1249,17 @@ class SocialManager {
             let imageUrl = null;
             
             if (imageFile) {
-                // Show uploading state
                 const submitBtn = document.querySelector('#createPostForm button[type="submit"]');
                 const originalText = submitBtn.innerHTML;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
                 submitBtn.disabled = true;
                 
                 try {
-                    // Upload to Cloudinary
                     imageUrl = await this.uploadImageToCloudinary(imageFile);
                 } catch (uploadError) {
                     throw uploadError;
                 }
                 
-                // Reset button state
                 submitBtn.innerHTML = originalText;
                 submitBtn.disabled = false;
             }
@@ -1224,7 +1274,6 @@ class SocialManager {
                 updatedAt: serverTimestamp()
             };
 
-            // Add post to Firestore
             await addDoc(collection(db, 'posts'), postData);
             
             alert('Post created successfully!');
@@ -1233,7 +1282,6 @@ class SocialManager {
         } catch (error) {
             alert('Error creating post: ' + error.message);
             
-            // Reset button state on error
             const submitBtn = document.querySelector('#createPostForm button[type="submit"]');
             if (submitBtn) {
                 submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
@@ -1242,86 +1290,138 @@ class SocialManager {
         }
     }
 
-    // POSTS PAGE - Display posts from ALL users
-    setupPostsPage() {
-        this.loadAllPosts();
-        this.markAllPostsAsViewed();
+    // Setup Profile Social Features
+    setupProfileSocialFeatures() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const profileId = urlParams.get('id');
+        
+        if (profileId) {
+            this.loadProfileSocialLinks(profileId);
+            this.loadAllProfilePosts(profileId);
+            this.setupProfileButtons(profileId);
+        }
     }
 
-    async loadAllPosts() {
-        const container = document.getElementById('postsContainer');
-        if (!container) return;
+    async loadProfileSocialLinks(profileId) {
+        try {
+            const userRef = doc(db, 'users', profileId);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                const socialLinks = userData.socialLinks || {};
+                const userName = userData.name || 'This user';
+                
+                this.displayProfileSocialIcons(socialLinks, userName);
+            } else {
+                this.displayProfileSocialIcons({}, 'User');
+            }
+        } catch (error) {
+            console.error('Error loading profile social links:', error);
+            this.displayProfileSocialIcons({}, 'User');
+        }
+    }
 
-        container.innerHTML = '<div class="loading">Loading posts...</div>';
+    displayProfileSocialIcons(socialLinks, userName) {
+        const socialContainer = document.getElementById('profileSocialLinks');
+        if (!socialContainer) return;
 
+        socialContainer.innerHTML = '';
+
+        Object.entries(this.SOCIAL_PLATFORMS).forEach(([platformKey, platform]) => {
+            const hasLink = socialLinks[platformKey];
+            const icon = document.createElement(hasLink ? 'a' : 'div');
+            
+            if (hasLink) {
+                const username = socialLinks[platformKey];
+                const socialUrl = this.buildSocialUrl(platformKey, username);
+                icon.href = socialUrl;
+                icon.target = '_blank';
+                icon.rel = 'noopener noreferrer';
+                icon.title = `Visit ${userName}'s ${platform.name}: ${username}`;
+                icon.style.cursor = 'pointer';
+                icon.style.opacity = '1';
+            } else {
+                icon.title = `${platform.name} - ${userName} hasn't added ${platform.name} link`;
+                icon.style.cursor = 'default';
+                icon.style.opacity = '0.6';
+            }
+            
+            icon.className = 'social-profile-icon';
+            icon.innerHTML = `<i class="${platform.icon}"></i>`;
+            icon.style.color = platform.color;
+            socialContainer.appendChild(icon);
+        });
+
+        const socialSection = document.getElementById('socialLinksSection');
+        if (socialSection) {
+            socialSection.style.display = 'block';
+        }
+    }
+
+    buildSocialUrl(platform, username) {
+        const platformData = this.SOCIAL_PLATFORMS[platform];
+        if (!platformData) return '#';
+        
+        let cleanUsername = username.trim();
+        cleanUsername = cleanUsername.replace(/^@/, '');
+        cleanUsername = cleanUsername.replace(/^https?:\/\/[^\/]+\//, '');
+        cleanUsername = cleanUsername.split('/')[0];
+        
+        return platformData.baseUrl + cleanUsername;
+    }
+
+    async loadAllProfilePosts(profileId) {
         try {
             const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
             const postsSnap = await getDocs(postsQuery);
             
-            const allPosts = [];
+            const userPosts = [];
             postsSnap.forEach(doc => {
-                const postData = doc.data();
-                allPosts.push({ id: doc.id, ...postData });
+                const post = doc.data();
+                if (post.userId === profileId) {
+                    userPosts.push({ id: doc.id, ...post });
+                }
             });
             
-            this.displayPosts(allPosts);
+            this.displayAllProfilePosts(userPosts, profileId);
         } catch (error) {
-            // Error handling without console output
-            container.innerHTML = '<div class="error">Error loading posts</div>';
+            console.error('Error loading profile posts:', error);
+            const postsContainer = document.getElementById('profilePostsContainer');
+            if (postsContainer) {
+                postsContainer.innerHTML = '<div class="no-posts-message">Error loading posts</div>';
+            }
         }
     }
 
-    async displayPosts(posts) {
-        const container = document.getElementById('postsContainer');
-        if (!container) return;
+    async displayAllProfilePosts(posts, profileId) {
+        const postsContainer = document.getElementById('profilePostsContainer');
+        
+        if (!postsContainer) return;
 
         if (posts.length === 0) {
-            container.innerHTML = '<div class="no-posts">No posts yet. Be the first to post!</div>';
+            postsContainer.innerHTML = '<div class="no-posts-message">This user hasn\'t posted anything yet.</div>';
             return;
         }
 
-        const userIds = [...new Set(posts.map(post => post.userId))];
-        const usersData = await this.getUsersData(userIds);
+        postsContainer.innerHTML = '';
 
-        container.innerHTML = '';
+        const userRef = doc(db, 'users', profileId);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? userSnap.data() : {};
 
         for (const post of posts) {
-            const user = usersData[post.userId] || {};
-            const postElement = this.createPostElement(post, user, post.id);
-            container.appendChild(postElement);
+            const postElement = this.createProfilePostElement(post, userData, post.id);
+            postsContainer.appendChild(postElement);
         }
     }
 
-    async getUsersData(userIds) {
-        const usersData = {};
-        
-        for (const userId of userIds) {
-            try {
-                const userRef = doc(db, 'users', userId);
-                const userSnap = await getDoc(userRef);
-                if (userSnap.exists()) {
-                    usersData[userId] = userSnap.data();
-                }
-            } catch (error) {
-                // Error handling without console output
-            }
-        }
-        
-        return usersData;
-    }
-
-    createPostElement(post, user, postId) {
+    createProfilePostElement(post, userData, postId) {
         const postDiv = document.createElement('div');
-        postDiv.className = 'post-card';
+        postDiv.className = 'profile-post-item';
         
-        const userId = user.id || post.userId;
-        const userName = user.name || 'Unknown User';
-        const userProfileImage = user.profileImage || 'images/default-profile.jpg';
-        
-        // Build post content HTML - IMAGE AT THE TOP
         let postContentHTML = '';
         
-        // IMAGE AT THE TOP
         if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
@@ -1333,7 +1433,6 @@ class SocialManager {
             }
         }
         
-        // CAPTION BELOW IMAGE
         if (post.caption) {
             postContentHTML += `<p class="post-caption">${post.caption}</p>`;
         }
@@ -1342,19 +1441,11 @@ class SocialManager {
         
         postDiv.innerHTML = `
             <div class="post-header">
-                <img src="${userProfileImage}" 
-                     alt="${userName}" class="post-author-avatar">
+                <img src="${userData.profileImage || 'images/default-profile.jpg'}" 
+                     alt="${userData.name}" class="post-author-avatar">
                 <div class="post-author-info">
-                    <h4>${userName}</h4>
+                    <h4>${userData.name || 'Unknown User'}</h4>
                     <span class="post-time">${this.formatTime(post.createdAt)}</span>
-                </div>
-                <div class="post-user-actions">
-                    <button class="btn-chat" data-user-id="${userId}">
-                        <i class="fas fa-comment"></i> Chat
-                    </button>
-                    <button class="btn-view-profile" data-user-id="${userId}">
-                        <i class="fas fa-user"></i> Profile
-                    </button>
                 </div>
             </div>
             
@@ -1386,8 +1477,6 @@ class SocialManager {
         const commentBtn = postDiv.querySelector('.comment-btn');
         const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
         const commentInput = postDiv.querySelector('.comment-input');
-        const chatBtn = postDiv.querySelector('.btn-chat');
-        const profileBtn = postDiv.querySelector('.btn-view-profile');
 
         if (likeBtn) {
             likeBtn.addEventListener('click', () => this.handleLike(postId, likeBtn));
@@ -1398,221 +1487,20 @@ class SocialManager {
         }
 
         if (sendCommentBtn) {
-            sendCommentBtn.addEventListener('click', () => this.handleAddComment(postId));
+            sendCommentBtn.addEventListener('click', () => this.handleAddComment(postId, false));
         }
 
         if (commentInput) {
             commentInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    this.handleAddComment(postId);
+                    this.handleAddComment(postId, false);
                 }
             });
         }
 
-        if (chatBtn) {
-            chatBtn.addEventListener('click', () => {
-                if (userId && userId !== this.currentUser.uid) {
-                    window.location.href = `chat.html?id=${userId}`;
-                } else if (userId === this.currentUser.uid) {
-                    alert("You can't chat with yourself!");
-                }
-            });
-        }
-
-        if (profileBtn) {
-            profileBtn.addEventListener('click', () => {
-                if (userId) {
-                    window.location.href = `profile.html?id=${userId}`;
-                }
-            });
-        }
-
-        // Load existing comments
         this.loadComments(postId);
 
-        // Mark post as viewed when displayed
-        this.markPostAsViewed(postId);
-
         return postDiv;
-    }
-
-    // COMMENT FUNCTIONALITY
-    async toggleComments(postId) {
-        const commentsSection = document.getElementById(`comments-${postId}`);
-        if (commentsSection) {
-            if (commentsSection.style.display === 'none') {
-                commentsSection.style.display = 'block';
-                await this.loadComments(postId);
-            } else {
-                commentsSection.style.display = 'none';
-            }
-        }
-    }
-
-    async loadComments(postId) {
-        const commentsList = document.getElementById(`comments-list-${postId}`);
-        if (!commentsList) return;
-
-        try {
-            const commentsQuery = query(
-                collection(db, 'posts', postId, 'comments'), 
-                orderBy('createdAt', 'asc')
-            );
-            const commentsSnap = await getDocs(commentsQuery);
-            
-            commentsList.innerHTML = '';
-            
-            if (commentsSnap.empty) {
-                commentsList.innerHTML = '<div class="no-comments">No comments yet</div>';
-                return;
-            }
-
-            const userIds = new Set();
-            commentsSnap.forEach(doc => {
-                const comment = doc.data();
-                userIds.add(comment.userId);
-            });
-
-            const usersData = await this.getUsersData([...userIds]);
-
-            commentsSnap.forEach(doc => {
-                const comment = doc.data();
-                const user = usersData[comment.userId] || {};
-                const commentElement = this.createCommentElement(comment, user);
-                commentsList.appendChild(commentElement);
-            });
-        } catch (error) {
-            // Error handling without console output
-            commentsList.innerHTML = '<div class="error">Error loading comments</div>';
-        }
-    }
-
-    createCommentElement(comment, user) {
-        const commentDiv = document.createElement('div');
-        commentDiv.className = 'comment-item';
-        commentDiv.innerHTML = `
-            <div class="comment-header">
-                <img src="${user.profileImage || 'images/default-profile.jpg'}" 
-                     alt="${user.name}" class="comment-avatar">
-                <div class="comment-info">
-                    <strong>${user.name || 'Unknown User'}</strong>
-                    <span class="comment-time">${this.formatTime(comment.createdAt)}</span>
-                </div>
-            </div>
-            <div class="comment-text">${comment.text}</div>
-        `;
-        return commentDiv;
-    }
-
-    async handleAddComment(postId) {
-        if (!this.currentUser) return;
-
-        const commentInput = document.querySelector(`.comment-input[data-post-id="${postId}"]`);
-        if (!commentInput) return;
-
-        const commentText = commentInput.value.trim();
-        if (!commentText) {
-            alert('Please enter a comment');
-            return;
-        }
-
-        try {
-            // Add comment to subcollection
-            await addDoc(collection(db, 'posts', postId, 'comments'), {
-                userId: this.currentUser.uid,
-                text: commentText,
-                createdAt: serverTimestamp()
-            });
-
-            // Update comments count
-            const postRef = doc(db, 'posts', postId);
-            await updateDoc(postRef, {
-                commentsCount: increment(1),
-                updatedAt: serverTimestamp()
-            });
-
-            // Clear input and reload comments
-            commentInput.value = '';
-            await this.loadComments(postId);
-
-            // Update comment count in UI
-            const commentCount = document.querySelector(`.comment-btn[data-post-id="${postId}"] .comment-count`);
-            if (commentCount) {
-                const currentCount = parseInt(commentCount.textContent) || 0;
-                commentCount.textContent = currentCount + 1;
-            }
-
-        } catch (error) {
-            // Error handling without console output
-            alert('Error adding comment: ' + error.message);
-        }
-    }
-
-    // FIXED: HandleLike function with immediate UI update
-    async handleLike(postId, likeButton) {
-        if (!this.currentUser) return;
-
-        // Prevent double liking
-        if (this.likedPosts.has(postId)) {
-            return;
-        }
-
-        try {
-            const postRef = doc(db, 'posts', postId);
-            const postSnap = await getDoc(postRef);
-            
-            if (postSnap.exists()) {
-                const post = postSnap.data();
-                const newLikes = (post.likes || 0) + 1;
-                
-                // Update Firestore
-                await updateDoc(postRef, {
-                    likes: newLikes,
-                    updatedAt: serverTimestamp()
-                });
-
-                // Update UI immediately
-                const likeCount = likeButton.querySelector('.like-count');
-                const likeIcon = likeButton.querySelector('i');
-                
-                if (likeCount) {
-                    likeCount.textContent = newLikes;
-                }
-                
-                if (likeIcon) {
-                    likeIcon.className = 'fas fa-heart'; // Solid heart
-                }
-                
-                likeButton.classList.add('liked');
-                
-                // Mark as liked to prevent double likes
-                this.likedPosts.add(postId);
-                this.saveLikedPosts();
-            }
-        } catch (error) {
-            // Error handling without console output
-        }
-    }
-
-    formatTime(timestamp) {
-        if (!timestamp) return 'Just now';
-        
-        try {
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            const now = new Date();
-            const diff = now - date;
-            const minutes = Math.floor(diff / 60000);
-            const hours = Math.floor(minutes / 60);
-            const days = Math.floor(hours / 24);
-
-            if (minutes < 1) return 'Just now';
-            if (minutes < 60) return `${minutes}m ago`;
-            if (hours < 24) return `${hours}h ago`;
-            if (days < 7) return `${days}d ago`;
-            return date.toLocaleDateString();
-        } catch (error) {
-            return 'Recently';
-        }
     }
 
     setupProfileButtons(profileId) {
@@ -1627,10 +1515,382 @@ class SocialManager {
             });
         }
     }
+
+    // Setup User Posts Section
+    setupUserPostsSection() {
+        this.createUserPostsSection();
+        this.loadUserPosts();
+    }
+
+    createUserPostsSection() {
+        const accountMain = document.querySelector('.account-main');
+        if (!accountMain) return;
+
+        if (document.getElementById('userPostsSection')) return;
+
+        const postsSection = document.createElement('div');
+        postsSection.className = 'account-section';
+        postsSection.id = 'userPostsSection';
+        postsSection.style.display = 'none';
+        postsSection.innerHTML = `
+            <h2><i class="fas fa-images"></i> My Posts</h2>
+            <p class="section-description">Manage your posts - click on any post to delete it</p>
+            
+            <div class="user-posts-container" id="userPostsContainer">
+                <div class="loading">Loading your posts...</div>
+            </div>
+
+            <div id="deletePostModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Delete Post</h3>
+                        <span class="close-modal">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete this post? This action cannot be undone.</p>
+                        <div class="post-preview" id="postPreview"></div>
+                    </div>
+                    <div class="modal-actions">
+                        <button id="cancelDelete" class="btn-secondary">Cancel</button>
+                        <button id="confirmDelete" class="btn-danger">Delete Post</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        accountMain.appendChild(postsSection);
+        this.setupDeleteModal();
+    }
+
+    setupDeleteModal() {
+        const modal = document.getElementById('deletePostModal');
+        const closeBtn = document.querySelector('.close-modal');
+        const cancelBtn = document.getElementById('cancelDelete');
+        const confirmBtn = document.getElementById('confirmDelete');
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.resetDeleteModal();
+                modal.style.display = 'none';
+            });
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.resetDeleteModal();
+                modal.style.display = 'none';
+            });
+        }
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => {
+                this.confirmDeletePost();
+            });
+        }
+
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.resetDeleteModal();
+                modal.style.display = 'none';
+            }
+        });
+    }
+
+    resetDeleteModal() {
+        const confirmBtn = document.getElementById('confirmDelete');
+        if (confirmBtn) {
+            confirmBtn.innerHTML = 'Delete Post';
+            confirmBtn.disabled = false;
+        }
+    }
+
+    async loadUserPosts() {
+        if (!this.currentUser) return;
+
+        const container = document.getElementById('userPostsContainer');
+        if (!container) return;
+
+        try {
+            const postsQuery = query(
+                collection(db, 'posts'), 
+                orderBy('createdAt', 'desc')
+            );
+            const postsSnap = await getDocs(postsQuery);
+            
+            const userPosts = [];
+            postsSnap.forEach(doc => {
+                const post = doc.data();
+                if (post.userId === this.currentUser.uid) {
+                    userPosts.push({ id: doc.id, ...post });
+                }
+            });
+            
+            this.displayUserPosts(userPosts);
+        } catch (error) {
+            console.error('Error loading user posts:', error);
+            container.innerHTML = '<div class="error">Error loading your posts</div>';
+        }
+    }
+
+    async displayUserPosts(posts) {
+        const container = document.getElementById('userPostsContainer');
+        if (!container) return;
+
+        if (posts.length === 0) {
+            container.innerHTML = `
+                <div class="no-posts-message">
+                    <i class="fas fa-images" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                    <h3>No Posts Yet</h3>
+                    <p>You haven't created any posts yet.</p>
+                    <button onclick="window.location.href='create.html'" class="btn-primary">
+                        <i class="fas fa-plus"></i> Create Your First Post
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = '';
+
+        const userRef = doc(db, 'users', this.currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? userSnap.data() : {};
+
+        posts.forEach(post => {
+            const postElement = this.createUserPostElement(post, userData, post.id);
+            container.appendChild(postElement);
+        });
+    }
+
+    createUserPostElement(post, userData, postId) {
+        const postDiv = document.createElement('div');
+        postDiv.className = 'user-post-item';
+        postDiv.setAttribute('data-post-id', postId);
+        
+        let postContentHTML = '';
+        
+        if (post.imageUrl) {
+            const imageUrl = String(post.imageUrl).trim();
+            if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
+                postContentHTML += `
+                    <div class="post-image-container">
+                        <img src="${imageUrl}" alt="Post image" class="post-image">
+                    </div>
+                `;
+            }
+        }
+        
+        if (post.caption) {
+            const shortCaption = post.caption.length > 100 ? 
+                post.caption.substring(0, 100) + '...' : post.caption;
+            postContentHTML += `<p class="post-caption">${shortCaption}</p>`;
+        }
+        
+        postDiv.innerHTML = `
+            <div class="post-header">
+                <img src="${userData.profileImage || 'images/default-profile.jpg'}" 
+                     alt="${userData.name}" class="post-author-avatar">
+                <div class="post-author-info">
+                    <h4>${userData.name || 'You'}</h4>
+                    <span class="post-time">${this.formatTime(post.createdAt)}</span>
+                </div>
+                <div class="post-stats">
+                    <span class="post-stat"><i class="far fa-heart"></i> ${post.likes || 0}</span>
+                    <span class="post-stat"><i class="far fa-comment"></i> ${post.commentsCount || 0}</span>
+                </div>
+            </div>
+            
+            <div class="post-content">
+                ${postContentHTML}
+            </div>
+            
+            <div class="post-actions-account">
+                <button class="btn-delete-post" data-post-id="${postId}">
+                    <i class="fas fa-trash"></i> Delete Post
+                </button>
+            </div>
+        `;
+
+        const deleteBtn = postDiv.querySelector('.btn-delete-post');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showDeleteConfirmation(postId, post);
+            });
+        }
+
+        return postDiv;
+    }
+
+    showDeleteConfirmation(postId, post) {
+        const modal = document.getElementById('deletePostModal');
+        const preview = document.getElementById('postPreview');
+        
+        if (!modal || !preview) return;
+
+        this.resetDeleteModal();
+
+        modal.setAttribute('data-post-id', postId);
+
+        let previewHTML = '';
+        
+        if (post.imageUrl) {
+            const imageUrl = String(post.imageUrl).trim();
+            if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
+                previewHTML += `
+                    <div class="preview-image">
+                        <img src="${imageUrl}" alt="Post image">
+                    </div>
+                `;
+            }
+        }
+        
+        if (post.caption) {
+            previewHTML += `<div class="preview-caption">${post.caption}</div>`;
+        }
+
+        preview.innerHTML = previewHTML;
+        modal.style.display = 'block';
+
+        const modalBody = modal.querySelector('.modal-body');
+        if (modalBody) {
+            const contentHeight = modalBody.scrollHeight;
+            const maxHeight = window.innerHeight * 0.6;
+            
+            if (contentHeight > maxHeight) {
+                modalBody.style.maxHeight = maxHeight + 'px';
+                modalBody.style.overflowY = 'auto';
+            } else {
+                modalBody.style.maxHeight = 'none';
+                modalBody.style.overflowY = 'visible';
+            }
+        }
+
+        const modalActions = modal.querySelector('.modal-actions');
+        if (modalActions) {
+            modalActions.style.position = 'sticky';
+            modalActions.style.bottom = '0';
+            modalActions.style.background = 'var(--discord-darker)';
+            modalActions.style.padding = '20px';
+            modalActions.style.borderTop = '1px solid var(--discord-border)';
+            modalActions.style.marginTop = 'auto';
+        }
+    }
+
+    async confirmDeletePost() {
+        const modal = document.getElementById('deletePostModal');
+        const postId = modal.getAttribute('data-post-id');
+        
+        if (!postId) return;
+
+        try {
+            const confirmBtn = document.getElementById('confirmDelete');
+            const originalText = confirmBtn.innerHTML;
+            
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+            confirmBtn.disabled = true;
+
+            await deleteDoc(doc(db, 'posts', postId));
+
+            this.viewedPosts.delete(postId);
+            this.saveViewedPosts();
+
+            this.likedPosts.delete(postId);
+            this.saveLikedPosts();
+
+            modal.style.display = 'none';
+            this.resetDeleteModal();
+            await this.loadUserPosts();
+
+            this.showNotification('Post deleted successfully!', 'success');
+
+        } catch (error) {
+            console.error('Error deleting post:', error);
+            this.showNotification('Error deleting post. Please try again.', 'error');
+            this.resetDeleteModal();
+        }
+    }
+
+    showNotification(message, type = 'info') {
+        const existingNotification = document.getElementById('postDeleteNotification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+
+        const notification = document.createElement('div');
+        notification.id = 'postDeleteNotification';
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                <span>${message}</span>
+            </div>
+        `;
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+        }, 3000);
+    }
+
+    loadViewedPosts() {
+        if (!this.currentUser) return;
+        const stored = localStorage.getItem(`viewedPosts_${this.currentUser.uid}`);
+        if (stored) {
+            this.viewedPosts = new Set(JSON.parse(stored));
+        }
+    }
+
+    saveViewedPosts() {
+        if (!this.currentUser) return;
+        localStorage.setItem(`viewedPosts_${this.currentUser.uid}`, JSON.stringify([...this.viewedPosts]));
+    }
+
+    loadLikedPosts() {
+        if (!this.currentUser) return;
+        const stored = localStorage.getItem(`likedPosts_${this.currentUser.uid}`);
+        if (stored) {
+            this.likedPosts = new Set(JSON.parse(stored));
+        }
+    }
+
+    saveLikedPosts() {
+        if (!this.currentUser) return;
+        localStorage.setItem(`likedPosts_${this.currentUser.uid}`, JSON.stringify([...this.likedPosts]));
+    }
+
+    markPostAsViewed(postId) {
+        this.viewedPosts.add(postId);
+        this.saveViewedPosts();
+        this.updateNewPostsCount();
+    }
+
+    markAllPostsAsViewed() {
+        if (!this.currentUser) return;
+        
+        const postsQuery = query(collection(db, 'posts'));
+        getDocs(postsQuery).then(postsSnap => {
+            postsSnap.forEach(doc => {
+                this.viewedPosts.add(doc.id);
+            });
+            this.saveViewedPosts();
+            this.displayNewPostsCount(0);
+        }).catch(error => {
+            console.error('Error marking all posts as viewed:', error);
+        });
+    }
 }
 
-// Initialize social manager when script loads
+// Initialize social manager
 const socialManager = new SocialManager();
-
-// Make it available globally for integration with existing code
 window.socialManager = socialManager;
