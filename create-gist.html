@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Gist - Anonymous Post</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <style>
+        :root {
+            /* Dark, Leather, Steel Theme */
+            --primary: #b3004b; /* deep crimson */
+            --primary-dark: #7a0034;
+            --primary-light: #e63986;
+            --secondary: #8b0000; /* dark red for alerts/badges */
+            --accent: #444; /* metal/steel tone */
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-light: #9ca3af;
+            --bg-primary: #0b0b0b; /* deep black */
+            --bg-secondary: #141414;
+            --bg-card: #1a1a1a;
+            --border: #2e2e2e;
+            --border-color: #2e2e2e;
+            --bg-light: #1b1b1b;
+            --accent-color: #b3004b;
+            --accent-dark: #7a0034;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.7);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.7);
+            --radius: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+            cursor: default;
+            padding-bottom: 70px;
+        }
+
+        /* Icon Styling */
+        .feather {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
+        /* Top Navigation */
+        .top-nav {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(6px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 0.75rem 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            height: 60px;
+            display: flex;
+            align-items: center;
+        }
+
+        .top-nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+            width: 100%;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            color: var(--primary-light);
+        }
+
+        .notification-top {
+            display: flex;
+            align-items: center;
+        }
+
+        .notification-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text-secondary);
+            padding: 0.5rem;
+            border-radius: var(--radius);
+            position: relative;
+            transition: color 0.2s ease;
+        }
+
+        .notification-link:hover {
+            color: var(--primary-light);
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .notification-link .feather {
+            width: 22px;
+            height: 22px;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            background-color: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: 60px;
+            padding: 15px;
+            min-height: calc(100vh - 130px);
+        }
+
+        /* Page Header */
+        .page-header {
+            text-align: center;
+            padding: 15px;
+            background: var(--bg-card);
+            margin: 15px auto;
+            max-width: 800px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .page-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .page-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* Gist Form Container */
+        .gist-form-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        /* Gist Form */
+        .gist-form {
+            padding: 20px;
+        }
+
+        /* Avatar Preview */
+        .avatar-preview {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: var(--bg-light);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .avatar-title {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        .gist-avatar-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .gist-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid var(--primary);
+            background: var(--bg-light);
+        }
+
+        .gist-avatar-pointer {
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid var(--primary);
+        }
+
+        .anonymous-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        /* Content Input */
+        .content-input-group {
+            margin-bottom: 20px;
+        }
+
+        .content-label {
+            display: block;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .gist-textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 15px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+
+        .gist-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .char-counter {
+            text-align: right;
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 5px;
+        }
+
+        /* Media Upload Section */
+        .media-upload-section {
+            margin-bottom: 20px;
+        }
+
+        .media-label {
+            display: block;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .media-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .media-option-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 12px;
+            border-radius: var(--radius);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .media-option-btn:hover {
+            background: var(--bg-light);
+            border-color: var(--primary-light);
+            color: var(--text-primary);
+        }
+
+        .media-option-btn .feather {
+            width: 24px;
+            height: 24px;
+        }
+
+        .media-option-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Voice Recording Indicator */
+        .voice-recording-indicator {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: var(--bg-light);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            margin-top: 15px;
+        }
+
+        .recording-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .recording-dot {
+            width: 12px;
+            height: 12px;
+            background-color: #ff4444;
+            border-radius: 50%;
+            animation: recording-pulse 1.5s infinite;
+        }
+
+        @keyframes recording-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .recording-timer {
+            font-size: 14px;
+            color: #ff4444;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .recording-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .recording-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .recording-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .recording-btn .feather {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Attachments Preview */
+        .attachments-container {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: var(--bg-light);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .attachment-preview {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .attachment-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .attachment-icon {
+            color: var(--primary-light);
+        }
+
+        .attachment-name {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .attachment-remove {
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .attachment-remove:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        /* Form Actions */
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-cancel {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-cancel:hover {
+            background: var(--bg-light);
+        }
+
+        .btn-submit {
+            flex: 2;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            transform: translateY(-1px);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* File Input Hidden */
+        .file-input {
+            display: none;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed !important;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            z-index: 1000;
+            width: 100%;
+            height: 70px;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: #fff;
+            text-decoration: none;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+            padding: 5px;
+            flex: 1;
+            max-width: 16.666%;
+            height: 100%;
+        }
+
+        .nav-item:hover {
+            opacity: 1;
+        }
+
+        .nav-item.active {
+            opacity: 1;
+            color: #ff2d55;
+        }
+
+        .nav-item.active .feather {
+            stroke: #ff2d55;
+        }
+
+        .nav-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-icon .feather {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        /* Voice Preview Modal */
+        .voice-preview-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .voice-preview-content {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .voice-preview-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .voice-preview-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .voice-preview-body {
+            padding: 20px;
+        }
+
+        .voice-preview-player {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: var(--bg-light);
+            padding: 15px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .play-preview-btn {
+            background: var(--primary);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .play-preview-btn:hover {
+            background: var(--primary-light);
+        }
+
+        .preview-waveform {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 30px;
+            gap: 3px;
+        }
+
+        .wave-bar {
+            width: 4px;
+            background: var(--text-secondary);
+            border-radius: 2px;
+        }
+
+        .preview-duration {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            font-family: monospace;
+            min-width: 45px;
+        }
+
+        .preview-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .cancel-preview-btn {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .cancel-preview-btn:hover {
+            background: var(--bg-light);
+        }
+
+        .send-preview-btn {
+            flex: 2;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            color: white;
+            padding: 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .send-preview-btn:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 10px;
+            }
+
+            .page-header {
+                margin: 10px;
+                padding: 12px 10px;
+            }
+
+            .gist-form {
+                padding: 15px;
+            }
+
+            .media-options {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .btn-cancel, .btn-submit {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .media-options {
+                grid-template-columns: 1fr;
+            }
+
+            .gist-avatar {
+                width: 60px;
+                height: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="top-nav-container">
+            <a href="index.html" class="logo">
+                <svg class="logo-icon feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                Create Gist
+            </a>
+            <div class="notification-top">
+                <a href="gist.html" class="notification-link">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">Create Anonymous Gist</h1>
+            <p class="page-subtitle">Share your thoughts, images, or voice notes anonymously. Your identity is protected.</p>
+        </div>
+
+        <!-- Gist Form Container -->
+        <div class="gist-form-container">
+            <form id="gistForm" class="gist-form">
+                <!-- Avatar Preview -->
+                <div class="avatar-preview">
+                    <div class="avatar-title">Your anonymous avatar:</div>
+                    <div class="gist-avatar-container">
+                        <img src="" id="gistAvatar" class="gist-avatar" alt="Anonymous Avatar">
+                        <div class="gist-avatar-pointer"></div>
+                    </div>
+                    <div class="anonymous-label">Posting as: Anonymous</div>
+                </div>
+
+                <!-- Content Input -->
+                <div class="content-input-group">
+                    <label class="content-label">What's on your mind?</label>
+                    <textarea 
+                        id="gistContent" 
+                        class="gist-textarea" 
+                        placeholder="Share your thoughts... (Optional)"
+                        maxlength="1000"
+                    ></textarea>
+                    <div class="char-counter">
+                        <span id="charCount">0</span>/1000
+                    </div>
+                </div>
+
+                <!-- Media Upload Section -->
+                <div class="media-upload-section">
+                    <label class="media-label">Add media (optional):</label>
+                    
+                    <div class="media-options">
+                        <button type="button" class="media-option-btn" id="imageUploadBtn">
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            Image
+                        </button>
+                        
+                        <button type="button" class="media-option-btn" id="voiceRecordBtn">
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="23"></line>
+                                <line x1="8" y1="23" x2="16" y2="23"></line>
+                            </svg>
+                            Voice Note
+                        </button>
+                        
+                        <button type="button" class="media-option-btn" id="bothUploadBtn">
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            Both
+                        </button>
+                    </div>
+
+                    <!-- Voice Recording Indicator -->
+                    <div id="voiceRecordingIndicator" class="voice-recording-indicator">
+                        <div class="recording-info">
+                            <div class="recording-dot"></div>
+                            <div class="recording-timer" id="recordingTimer">0:00</div>
+                        </div>
+                        <div class="recording-controls">
+                            <button type="button" class="recording-btn" id="cancelRecordingBtn">
+                                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                                </svg>
+                            </button>
+                            <button type="button" class="recording-btn" id="stopRecordingBtn">
+                                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                    <rect x="6" y="6" width="12" height="12"></rect>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Attachments Preview -->
+                    <div id="attachmentsContainer" class="attachments-container">
+                        <!-- Will be filled with attachment previews -->
+                    </div>
+
+                    <!-- Hidden File Inputs -->
+                    <input type="file" id="imageInput" class="file-input" accept="image/*">
+                    <input type="file" id="bothImageInput" class="file-input" accept="image/*">
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="cancelBtn">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-submit" id="submitBtn" disabled>
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M22 2L11 13"></path>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                        Post Gist
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Voice Preview Modal -->
+    <div id="voicePreviewModal" class="voice-preview-modal">
+        <div class="voice-preview-content">
+            <div class="voice-preview-header">
+                <h3 class="voice-preview-title">Voice Note Preview</h3>
+            </div>
+            <div class="voice-preview-body">
+                <div class="voice-preview-player">
+                    <button class="play-preview-btn" id="playPreviewBtn">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                    </button>
+                    <div class="preview-waveform" id="previewWaveform">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                    <span class="preview-duration" id="previewDuration">0:00</span>
+                </div>
+                <div class="preview-actions">
+                    <button type="button" class="cancel-preview-btn" id="cancelPreviewBtn">Cancel</button>
+                    <button type="button" class="send-preview-btn" id="sendPreviewBtn">Use Voice Note</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <a href="mingle.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </div>
+            <span class="nav-label">Connect</span>
+        </a>
+        <a href="messages.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </div>
+            <span class="nav-label">Chat</span>
+        </a>
+        <a href="posts.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                </svg>
+            </div>
+            <span class="nav-label">Resources</span>
+        </a>
+        <a href="gist.html" class="nav-item active">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+            </div>
+            <span class="nav-label">Gists</span>
+        </a>
+        <a href="stream.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+            </div>
+            <span class="nav-label">Stream</span>
+        </a>
+        <a href="account.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
+            <span class="nav-label">Profile</span>
+        </a>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="gists.js"></script>
+    
+    <!-- Initialize Feather Icons -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+        });
+    </script>
+</body>
+</html>
