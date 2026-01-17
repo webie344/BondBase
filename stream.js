@@ -2054,138 +2054,82 @@ class TikTokFeed {
         const wasPlaying = currentVideoId ? 
             (this.videoElements.get(currentVideoId)?.videoElement?.paused === false) : false;
         
-        if (this.videoFeed.children.length > 0) {
+        // Get existing slides to preserve video elements
+        const existingSlides = Array.from(this.videoFeed.children);
+        
+        // Clear only if necessary (when videos have changed significantly)
+        if (existingSlides.length !== this.videos.length) {
             this.videoFeed.innerHTML = '';
+            existingSlides.forEach(slide => {
+                const videoElement = slide.querySelector('video');
+                if (videoElement) {
+                    videoElement.pause();
+                    videoElement.src = '';
+                    videoElement.load();
+                }
+            });
         }
-        this.videoElements.clear();
+        
+        // Track which videos we have rendered
+        const renderedVideoIds = new Set();
         
         this.videos.forEach((video, index) => {
-            const slide = document.createElement('div');
-            slide.className = 'video-slide';
-            slide.dataset.index = index;
-            slide.dataset.streamId = video.id;
+            // Check if this video already exists in the DOM
+            const existingSlide = existingSlides.find(slide => 
+                slide.dataset.streamId === video.id
+            );
             
-            const thumbnailUrl = getVideoThumbnail(video);
-            const isLiked = likedStreams.has(video.id);
-            const description = video.description || '';
-            const shouldShowSeeMore = description.length > 100;
-            const displayDescription = shouldShowSeeMore ? 
-                description.substring(0, 100) + '...' : description;
-            
-            slide.innerHTML = `
-                <div class="video-container">
-                    <video id="video-${video.id}" playsinline preload="none" 
-                           poster="${thumbnailUrl}" style="display: none;">
-                        <source src="${video.videoUrl}" type="video/mp4">
-                    </video>
-                    <div class="video-loading" id="loading-${video.id}">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <div>Loading video...</div>
-                    </div>
-                    
-                    <!-- Progress Bar -->
-                    <div class="video-progress-container">
-                        <div class="video-progress-fill" style="width: 0%">
-                            <div class="video-progress-handle"></div>
-                        </div>
-                    </div>
-                </div>
+            if (existingSlide) {
+                // Update existing slide
+                existingSlide.dataset.index = index;
+                existingSlide.className = 'video-slide';
                 
-                <div class="video-info-overlay">
-                    <!-- Profile picture now links to user's profile -->
-                    <div class="video-author" onclick="navigateToUserProfile('${video.authorId}')" style="cursor: pointer;">
-                        <img src="${video.authorImage || 'images-defaultse-profile.jpg'}" 
-                             alt="${video.authorName}" 
-                             class="video-author-avatar">
-                        <div class="video-author-info">
-                            <div class="video-author-name">${video.authorName}</div>
-                        </div>
-                    </div>
-                    <div class="video-headline">${video.headline}</div>
-                    <div class="video-description-container">
-                        <div class="video-description">${displayDescription}</div>
-                        ${shouldShowSeeMore ? '<button class="video-see-more">See More</button>' : ''}
-                    </div>
-                    <div class="video-category">${formatCategory(video.category)}</div>
-                </div>
+                // Update video info
+                this.updateVideoSlide(existingSlide, video, index);
+                renderedVideoIds.add(video.id);
                 
-                <div class="video-side-actions">
-                    <button class="side-action like-btn ${isLiked ? 'liked' : ''}" 
-                            data-stream-id="${video.id}">
-                        <div class="side-action-icon">
-                            <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i>
-                        </div>
-                        <div class="side-action-count like-count">${video.likes || 0}</div>
-                    </button>
-                    
-                    <button class="side-action comment-btn" 
-                            data-stream-id="${video.id}">
-                        <div class="side-action-icon">
-                            <i class="far fa-comment"></i>
-                        </div>
-                        <div class="side-action-count comment-count">${video.commentsCount || 0}</div>
-                    </button>
-                    
-                    <button class="side-action share-btn" 
-                            data-stream-id="${video.id}">
-                        <div class="side-action-icon">
-                            <i class="far fa-share-square"></i>
-                        </div>
-                        <div class="side-action-count">Share</div>
-                    </button>
-                </div>
-            `;
-            
-            this.videoFeed.appendChild(slide);
-            this.videoElements.set(video.id, {
-                slide: slide,
-                videoElement: null,
-                loadingElement: slide.querySelector(`#loading-${video.id}`),
-                progressContainer: slide.querySelector('.video-progress-container'),
-                progressFill: slide.querySelector('.video-progress-fill'),
-                progressHandle: slide.querySelector('.video-progress-handle'),
-                descriptionElement: slide.querySelector('.video-description'),
-                seeMoreBtn: slide.querySelector('.video-see-more')
-            });
-            
-            // Add event listeners
-            const likeBtn = slide.querySelector('.like-btn');
-            const commentBtn = slide.querySelector('.comment-btn');
-            const shareBtn = slide.querySelector('.share-btn');
-            const seeMoreBtn = slide.querySelector('.video-see-more');
-            const progressContainer = slide.querySelector('.video-progress-container');
-            
-            if (likeBtn) {
-                likeBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.handleLike(video.id, likeBtn);
-                });
+                // Keep the existing video element
+                const videoElement = existingSlide.querySelector('video');
+                if (videoElement) {
+                    this.videoElements.set(video.id, {
+                        slide: existingSlide,
+                        videoElement: videoElement,
+                        loadingElement: existingSlide.querySelector(`#loading-${video.id}`),
+                        progressContainer: existingSlide.querySelector('.video-progress-container'),
+                        progressFill: existingSlide.querySelector('.video-progress-fill'),
+                        progressHandle: existingSlide.querySelector('.video-progress-handle'),
+                        descriptionElement: existingSlide.querySelector('.video-description'),
+                        seeMoreBtn: existingSlide.querySelector('.video-see-more')
+                    });
+                }
+            } else {
+                // Create new slide
+                const slide = this.createVideoSlide(video, index);
+                this.videoFeed.appendChild(slide);
+                renderedVideoIds.add(video.id);
             }
-            
-            if (commentBtn) {
-                commentBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.openCommentsModal(video.id);
-                });
+        });
+        
+        // Remove any slides that are no longer in the videos array
+        existingSlides.forEach(slide => {
+            const streamId = slide.dataset.streamId;
+            if (!renderedVideoIds.has(streamId)) {
+                const videoElement = slide.querySelector('video');
+                if (videoElement) {
+                    videoElement.pause();
+                    videoElement.src = '';
+                    videoElement.load();
+                }
+                slide.remove();
+                this.videoElements.delete(streamId);
             }
-            
-            if (shareBtn) {
-                shareBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.shareVideo(video.id);
-                });
-            }
-            
-            if (seeMoreBtn) {
-                seeMoreBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.toggleDescription(video.id);
-                });
-            }
-            
-            if (progressContainer) {
-                progressContainer.addEventListener('mousedown', (e) => this.handleProgressClick(e, video.id));
-                progressContainer.addEventListener('touchstart', (e) => this.handleProgressClick(e, video.id));
+        });
+        
+        // Ensure slides are in correct order
+        this.videos.forEach((video, index) => {
+            const slide = this.videoFeed.querySelector(`[data-stream-id="${video.id}"]`);
+            if (slide && slide.dataset.index !== index.toString()) {
+                slide.dataset.index = index;
             }
         });
         
@@ -2206,27 +2150,266 @@ class TikTokFeed {
         isRendering = false;
     }
 
+    createVideoSlide(video, index) {
+        const slide = document.createElement('div');
+        slide.className = 'video-slide';
+        slide.dataset.index = index;
+        slide.dataset.streamId = video.id;
+        
+        const thumbnailUrl = getVideoThumbnail(video);
+        const isLiked = likedStreams.has(video.id);
+        const description = video.description || '';
+        const shouldShowSeeMore = description.length > 100;
+        const displayDescription = shouldShowSeeMore ? 
+            description.substring(0, 100) + '...' : description;
+        
+        slide.innerHTML = `
+            <div class="video-container">
+                <video id="video-${video.id}" playsinline preload="none" 
+                       poster="${thumbnailUrl}" style="display: none;">
+                    <source src="${video.videoUrl}" type="video/mp4">
+                </video>
+                <div class="video-loading" id="loading-${video.id}">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <div>Loading video...</div>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="video-progress-container">
+                    <div class="video-progress-fill" style="width: 0%">
+                        <div class="video-progress-handle"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="video-info-overlay">
+                <!-- Profile picture now links to user's profile -->
+                <div class="video-author" onclick="navigateToUserProfile('${video.authorId}')" style="cursor: pointer;">
+                    <img src="${video.authorImage || 'images-defaultse-profile.jpg'}" 
+                         alt="${video.authorName}" 
+                         class="video-author-avatar">
+                    <div class="video-author-info">
+                        <div class="video-author-name">${video.authorName}</div>
+                    </div>
+                </div>
+                <div class="video-headline">${video.headline}</div>
+                <div class="video-description-container">
+                    <div class="video-description">${displayDescription}</div>
+                    ${shouldShowSeeMore ? '<button class="video-see-more">See More</button>' : ''}
+                </div>
+                <div class="video-category">${formatCategory(video.category)}</div>
+            </div>
+            
+            <div class="video-side-actions">
+                <button class="side-action like-btn ${isLiked ? 'liked' : ''}" 
+                        data-stream-id="${video.id}">
+                    <div class="side-action-icon">
+                        <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i>
+                    </div>
+                    <div class="side-action-count like-count">${video.likes || 0}</div>
+                </button>
+                
+                <button class="side-action comment-btn" 
+                        data-stream-id="${video.id}">
+                    <div class="side-action-icon">
+                        <i class="far fa-comment"></i>
+                    </div>
+                    <div class="side-action-count comment-count">${video.commentsCount || 0}</div>
+                </button>
+                
+                <button class="side-action share-btn" 
+                        data-stream-id="${video.id}">
+                    <div class="side-action-icon">
+                        <i class="far fa-share-square"></i>
+                    </div>
+                    <div class="side-action-count">Share</div>
+                </button>
+            </div>
+        `;
+        
+        this.setupVideoSlideEventListeners(slide, video);
+        
+        this.videoElements.set(video.id, {
+            slide: slide,
+            videoElement: null,
+            loadingElement: slide.querySelector(`#loading-${video.id}`),
+            progressContainer: slide.querySelector('.video-progress-container'),
+            progressFill: slide.querySelector('.video-progress-fill'),
+            progressHandle: slide.querySelector('.video-progress-handle'),
+            descriptionElement: slide.querySelector('.video-description'),
+            seeMoreBtn: slide.querySelector('.video-see-more')
+        });
+        
+        return slide;
+    }
+
+    updateVideoSlide(slide, video, index) {
+        const thumbnailUrl = getVideoThumbnail(video);
+        const isLiked = likedStreams.has(video.id);
+        const description = video.description || '';
+        const shouldShowSeeMore = description.length > 100;
+        const displayDescription = shouldShowSeeMore ? 
+            description.substring(0, 100) + '...' : description;
+        
+        // Update thumbnail if needed
+        const videoElement = slide.querySelector('video');
+        if (videoElement && videoElement.poster !== thumbnailUrl) {
+            videoElement.poster = thumbnailUrl;
+        }
+        
+        // Update video source if needed
+        if (videoElement && videoElement.querySelector('source').src !== video.videoUrl) {
+            videoElement.querySelector('source').src = video.videoUrl;
+            if (videoElement.dataset.listenersAdded !== 'true') {
+                videoElement.load();
+            }
+        }
+        
+        // Update content
+        const authorName = slide.querySelector('.video-author-name');
+        if (authorName) authorName.textContent = video.authorName;
+        
+        const headline = slide.querySelector('.video-headline');
+        if (headline) headline.textContent = video.headline;
+        
+        const descriptionElement = slide.querySelector('.video-description');
+        if (descriptionElement) {
+            descriptionElement.textContent = displayDescription;
+            if (shouldShowSeeMore) {
+                descriptionElement.dataset.fullText = description;
+            }
+        }
+        
+        const seeMoreBtn = slide.querySelector('.video-see-more');
+        if (seeMoreBtn) {
+            seeMoreBtn.style.display = shouldShowSeeMore ? 'block' : 'none';
+        }
+        
+        const category = slide.querySelector('.video-category');
+        if (category) category.textContent = formatCategory(video.category);
+        
+        const likeBtn = slide.querySelector('.like-btn');
+        if (likeBtn) {
+            likeBtn.className = `side-action like-btn ${isLiked ? 'liked' : ''}`;
+            likeBtn.dataset.streamId = video.id;
+            const likeIcon = likeBtn.querySelector('.side-action-icon i');
+            if (likeIcon) likeIcon.className = isLiked ? 'fas fa-heart' : 'far fa-heart';
+            const likeCount = likeBtn.querySelector('.like-count');
+            if (likeCount) likeCount.textContent = video.likes || 0;
+        }
+        
+        const commentBtn = slide.querySelector('.comment-btn');
+        if (commentBtn) {
+            commentBtn.dataset.streamId = video.id;
+            const commentCount = commentBtn.querySelector('.comment-count');
+            if (commentCount) commentCount.textContent = video.commentsCount || 0;
+        }
+        
+        const shareBtn = slide.querySelector('.share-btn');
+        if (shareBtn) {
+            shareBtn.dataset.streamId = video.id;
+        }
+        
+        // Update author image
+        const authorAvatar = slide.querySelector('.video-author-avatar');
+        if (authorAvatar) {
+            authorAvatar.src = video.authorImage || 'images-defaultse-profile.jpg';
+            authorAvatar.alt = video.authorName;
+        }
+        
+        // Update author click handler
+        const authorDiv = slide.querySelector('.video-author');
+        if (authorDiv) {
+            authorDiv.onclick = () => navigateToUserProfile(video.authorId);
+        }
+        
+        // Re-attach event listeners if needed
+        this.setupVideoSlideEventListeners(slide, video);
+    }
+
+    setupVideoSlideEventListeners(slide, video) {
+        const likeBtn = slide.querySelector('.like-btn');
+        const commentBtn = slide.querySelector('.comment-btn');
+        const shareBtn = slide.querySelector('.share-btn');
+        const seeMoreBtn = slide.querySelector('.video-see-more');
+        const progressContainer = slide.querySelector('.video-progress-container');
+        
+        // Remove existing listeners
+        const newLikeBtn = likeBtn.cloneNode(true);
+        if (likeBtn.parentNode) {
+            likeBtn.parentNode.replaceChild(newLikeBtn, likeBtn);
+        }
+        
+        const newCommentBtn = commentBtn.cloneNode(true);
+        if (commentBtn.parentNode) {
+            commentBtn.parentNode.replaceChild(newCommentBtn, commentBtn);
+        }
+        
+        const newShareBtn = shareBtn.cloneNode(true);
+        if (shareBtn.parentNode) {
+            shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
+        }
+        
+        // Add new listeners
+        if (newLikeBtn) {
+            newLikeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleLike(video.id, newLikeBtn);
+            });
+        }
+        
+        if (newCommentBtn) {
+            newCommentBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openCommentsModal(video.id);
+            });
+        }
+        
+        if (newShareBtn) {
+            newShareBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.shareVideo(video.id);
+            });
+        }
+        
+        if (seeMoreBtn) {
+            seeMoreBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleDescription(video.id);
+            });
+        }
+        
+        if (progressContainer) {
+            progressContainer.addEventListener('mousedown', (e) => this.handleProgressClick(e, video.id));
+            progressContainer.addEventListener('touchstart', (e) => this.handleProgressClick(e, video.id));
+        }
+    }
+
     showVideo(index) {
         if (index < 0 || index >= this.videos.length) return;
         
-        document.querySelectorAll('.video-slide').forEach(slide => {
-            slide.classList.remove('active', 'next');
+        // Remove active/next classes from all slides
+        this.videoElements.forEach((videoData, videoId) => {
+            if (videoData.slide) {
+                videoData.slide.classList.remove('active', 'next');
+            }
         });
         
-        const currentSlide = document.querySelector(`.video-slide[data-index="${index}"]`);
+        const currentSlide = this.videoElements.get(this.videos[index].id)?.slide;
         if (currentSlide) {
             currentSlide.classList.add('active');
             this.currentIndex = index;
             const videoId = this.videos[index].id;
             this.loadAndPlayVideo(videoId);
             
-            const nextSlide = document.querySelector(`.video-slide[data-index="${index + 1}"]`);
-            if (nextSlide) {
-                nextSlide.classList.add('next');
-                
-                // Preload next video from cache if available
-                const nextVideoId = this.videos[index + 1]?.id;
-                if (nextVideoId) {
+            // Add next class to next slide if exists
+            if (index + 1 < this.videos.length) {
+                const nextVideoId = this.videos[index + 1].id;
+                const nextSlide = this.videoElements.get(nextVideoId)?.slide;
+                if (nextSlide) {
+                    nextSlide.classList.add('next');
+                    
+                    // Preload next video from cache if available
                     const cachedVideo = videoCache.getCachedVideo(nextVideoId);
                     if (cachedVideo && cachedVideo.loaded) {
                         // Video is already cached, no need to preload
@@ -2270,9 +2453,19 @@ class TikTokFeed {
         // Check if video is cached
         const cachedVideo = videoCache.getCachedVideo(videoId);
         if (cachedVideo && cachedVideo.loaded) {
-            videoElement = cachedVideo.element.cloneNode();
-            videoElement.id = `video-${videoId}`;
-            slide.querySelector('.video-container').appendChild(videoElement);
+            // Use cached video element
+            const newVideoElement = cachedVideo.element.cloneNode();
+            newVideoElement.id = `video-${videoId}`;
+            newVideoElement.poster = videoElement.poster;
+            
+            // Replace existing video element
+            const videoContainer = slide.querySelector('.video-container');
+            const existingVideo = slide.querySelector(`#video-${videoId}`);
+            if (existingVideo) {
+                existingVideo.remove();
+            }
+            videoContainer.prepend(newVideoElement);
+            videoElement = newVideoElement;
         }
         
         videoData.videoElement = videoElement;
@@ -2349,12 +2542,10 @@ class TikTokFeed {
         }
         
         // Only reload if needed
-        if (!videoElement.src || videoElement.src !== this.videos.find(v => v.id === videoId)?.videoUrl) {
-            const video = this.videos.find(v => v.id === videoId);
-            if (video) {
-                videoElement.src = video.videoUrl;
-                videoElement.load();
-            }
+        const currentVideo = this.videos.find(v => v.id === videoId);
+        if (currentVideo && (!videoElement.src || videoElement.src !== currentVideo.videoUrl)) {
+            videoElement.src = currentVideo.videoUrl;
+            videoElement.load();
         } else if (videoElement.readyState >= 2) {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
@@ -2419,6 +2610,7 @@ class TikTokFeed {
         
         if (isExpanded) {
             videoData.descriptionElement.style.webkitLineClamp = '3';
+            videoData.descriptionElement.textContent = fullDescription.substring(0, 100) + '...';
             videoData.seeMoreBtn.textContent = 'See More';
         } else {
             videoData.descriptionElement.style.webkitLineClamp = 'unset';
@@ -2902,7 +3094,7 @@ function initializeProfilePageVideos() {
         loadUserVideos(profileId);
         
         document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('comment-avatar') || 
+            if (e.target.classList.contains('.comment-avatar') || 
                 e.target.closest('.comment-avatar')) {
                 const commentItem = e.target.closest('.comment-item');
                 if (commentItem) {
