@@ -43,7 +43,199 @@
     background: var(--bg-primary);
     position: relative;
 }
+/* ===== FIXED VIDEO MESSAGE ALIGNMENT FOR DISCORD-STYLE ===== */
 
+/* Reset video message positioning completely for Discord-style */
+body.discord-style .video-message,
+body.discord-style .message-video,
+body.discord-style .message-image {
+    display: block !important;
+    position: relative !important;
+    width: 240px !important; /* Fixed width */
+    height: 180px !important; /* Fixed height - same as TikTok thumbnail */
+    margin: 4px 0 4px 52px !important; /* 52px = avatar width + gap */
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    background: #000 !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Video element styling - make it fill container */
+body.discord-style .video-message video,
+body.discord-style .message-video video {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: #000 !important;
+    border-radius: 8px !important;
+    object-fit: cover !important; /* Cover to fill container */
+}
+
+/* Image element styling - make it fill container */
+body.discord-style .message-image img {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    object-fit: cover !important; /* Cover to fill container */
+}
+
+/* Sent media messages alignment - CORRECTED */
+body.discord-style .message-sent .video-message,
+body.discord-style .message-sent .message-video,
+body.discord-style .message-sent .message-image {
+    margin-left: auto !important;
+    margin-right: 52px !important;
+}
+
+/* Received media messages alignment */
+body.discord-style .message-received .video-message,
+body.discord-style .message-received .message-video,
+body.discord-style .message-received .message-image {
+    margin-left: 52px !important;
+    margin-right: auto !important;
+}
+
+/* Video message metadata (timestamp, status) */
+body.discord-style .message:has(.video-message) .message-meta,
+body.discord-style .message:has(.message-video) .message-meta,
+body.discord-style .message:has(.message-image) .message-meta {
+    margin-left: 52px !important;
+    margin-top: 4px !important;
+    margin-bottom: 8px !important;
+    background: rgba(0, 0, 0, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    border: none !important;
+    border-radius: 20px !important;
+    padding: 4px 10px !important;
+    color: white !important;
+    font-size: 0.75rem !important;
+    display: inline-block !important;
+    position: relative !important;
+    z-index: 2 !important;
+    max-width: 80% !important;
+}
+
+/* Sent media metadata alignment - CORRECTED */
+body.discord-style .message-sent:has(.video-message) .message-meta,
+body.discord-style .message-sent:has(.message-video) .message-meta,
+body.discord-style .message-sent:has(.message-image) .message-meta {
+    margin-left: auto !important;
+    margin-right: 52px !important;
+    background: rgba(179, 0, 75, 0.8) !important;
+}
+
+/* For non-Discord style (regular chat bubbles) - also make consistent size */
+.message-image,
+.message-video {
+    width: 240px !important;
+    height: 180px !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    background: #000 !important;
+    margin: 4px 0 !important;
+    position: relative !important;
+    display: block !important;
+}
+
+/* Make images/videos fill container in regular chat style too */
+.message-image img,
+.message-video video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 12px !important;
+    background: #000 !important;
+}
+
+/* Sent media in regular chat style */
+.message-sent .message-image,
+.message-sent .message-video {
+    margin-left: auto !important;
+    margin-right: 0 !important;
+}
+
+/* Received media in regular chat style */
+.message-received .message-image,
+.message-received .message-video {
+    margin-left: 0 !important;
+    margin-right: auto !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    body.discord-style .video-message,
+    body.discord-style .message-video,
+    body.discord-style .message-image {
+        width: 200px !important;
+        height: 150px !important;
+        margin-left: 48px !important;
+    }
+    
+    body.discord-style .message-sent .video-message,
+    body.discord-style .message-sent .message-video,
+    body.discord-style .message-sent .message-image {
+        margin-left: auto !important;
+        margin-right: 48px !important;
+    }
+    
+    .message-image,
+    .message-video {
+        width: 200px !important;
+        height: 150px !important;
+    }
+    
+    body.discord-style .message:has(.video-message) .message-meta,
+    body.discord-style .message:has(.message-video) .message-meta,
+    body.discord-style .message:has(.message-image) .message-meta {
+        margin-left: 48px !important;
+    }
+    
+    body.discord-style .message-sent:has(.video-message) .message-meta,
+    body.discord-style .message-sent:has(.message-video) .message-meta,
+    body.discord-style .message-sent:has(.message-image) .message-meta {
+        margin-left: auto !important;
+        margin-right: 48px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    body.discord-style .video-message,
+    body.discord-style .message-video,
+    body.discord-style .message-image {
+        width: 180px !important;
+        height: 135px !important;
+        margin-left: 44px !important;
+    }
+    
+    body.discord-style .message-sent .video-message,
+    body.discord-style .message-sent .message-video,
+    body.discord-style .message-sent .message-image {
+        margin-left: auto !important;
+        margin-right: 44px !important;
+    }
+    
+    .message-image,
+    .message-video {
+        width: 180px !important;
+        height: 135px !important;
+    }
+    
+    body.discord-style .message:has(.video-message) .message-meta,
+    body.discord-style .message:has(.message-video) .message-meta,
+    body.discord-style .message:has(.message-image) .message-meta {
+        margin-left: 44px !important;
+    }
+    
+    body.discord-style .message-sent:has(.video-message) .message-meta,
+    body.discord-style .message-sent:has(.message-video) .message-meta,
+    body.discord-style .message-sent:has(.message-image) .message-meta {
+        margin-left: auto !important;
+        margin-right: 44px !important;
+    }
+}
 /* For regular chat pages - override existing styles */
 body.discord-style .chat-messages,
 body.discord-style #chatMessages {
@@ -388,7 +580,7 @@ body.discord-style .message-image {
 
 body.discord-style .message-image img {
     display: block !important;
-    width: 100% !important;
+    width:200px!important;
     height: auto !important;
     max-height: 250px !important;
     border-radius: 8px !important;
@@ -1848,7 +2040,7 @@ body.account-page .account-container {
 }
 
 .message-image {
-    max-width: 100%;
+    max-width: 200px;
     max-height: 300px;
     border-radius: 16px; /* More rounded images */
     cursor: pointer;
