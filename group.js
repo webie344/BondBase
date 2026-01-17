@@ -1,11 +1,9 @@
 // group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
-// UPDATED: Added typing indicators, glowing messages, fire ring avatars, and reward tags
-// UPDATED: Replaced Font Awesome icons with Feather icons, fixed message sending status display
-// UPDATED: Fixed issues - soft glow, page refresh, send button loader, group name truncation, SVG icons
-// FIXED: Message disappearing/reappearing issue and typing indicators not working
+// UPDATED: Removed temporary messages, fixed message duplication issues
+// UPDATED: Added cancel button for uploads, removed prepare.html redirection
+// UPDATED: Fixed all event listener issues to prevent duplication
 // FIXED: Entire page rerender on message send and q is not defined error
 // FIXED: Double message display and unsub errors
-// REMOVED: Temporary message system, added sending modal with cancel button
 
 import { 
     getFirestore, 
@@ -146,7 +144,6 @@ class GroupChat {
         
         this.isLoadingMessages = false;
         
-        // REMOVED: Temporary messages
         this.sentMessageIds = new Set();
         this.pendingMessages = new Set();
         
@@ -154,11 +151,6 @@ class GroupChat {
         
         this.reactionModal = null;
         this.currentMessageForReaction = null;
-        
-        // NEW: Sending modal for media uploads
-        this.sendingModal = null;
-        this.currentUpload = null;
-        this.uploadCancelController = null;
         
         this.touchStartX = 0;
         this.touchStartY = 0;
@@ -179,9 +171,11 @@ class GroupChat {
         this.userRewards = new Map(); // userId -> current reward tag
         this.userActiveDurations = new Map(); // userId -> active duration in ms
         
+        // NEW: Upload tracking
+        this.activeUploads = new Map(); // uploadId -> { cancelFunction, progress, type }
+        
         this.setupAuthListener();
         this.createReactionModal();
-        this.createSendingModal();
         this.checkRestrictedUsers();
         this.loadBlockedUsers();
     }
@@ -242,6 +236,9 @@ class GroupChat {
         this.userStreakTimers.clear();
         this.userRewards.clear();
         this.userActiveDurations.clear();
+        
+        // Clear active uploads
+        this.activeUploads.clear();
     }
 
     async loadBlockedUsers() {
@@ -404,7 +401,7 @@ class GroupChat {
         }
     }
 
-    async uploadMediaToCloudinary(file) {
+    async uploadMediaToCloudinary(file, uploadId, onProgress = null, onCancel = null) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', cloudinaryConfig.uploadPreset);
@@ -412,9 +409,15 @@ class GroupChat {
         const isVideo = file.type.startsWith('video/');
         formData.append('resource_type', isVideo ? 'video' : 'image');
         
-        // Create AbortController for cancellation
-        this.uploadCancelController = new AbortController();
-        const signal = this.uploadCancelController.signal;
+        // Store cancel controller
+        const controller = new AbortController();
+        
+        if (onCancel) {
+            onCancel(() => {
+                controller.abort();
+                this.activeUploads.delete(uploadId);
+            });
+        }
         
         try {
             const response = await fetch(
@@ -425,7 +428,7 @@ class GroupChat {
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'
                     },
-                    signal: signal
+                    signal: controller.signal
                 }
             );
             
@@ -438,29 +441,19 @@ class GroupChat {
                 throw new Error('Invalid response from Cloudinary');
             }
             
-            // Clear the controller after successful upload
-            this.uploadCancelController = null;
+            // Remove from active uploads
+            this.activeUploads.delete(uploadId);
             
             return data.secure_url;
         } catch (error) {
+            // Remove from active uploads
+            this.activeUploads.delete(uploadId);
+            
             if (error.name === 'AbortError') {
-                console.log('Upload cancelled by user');
                 throw new Error('Upload cancelled');
             }
-            console.error('Error uploading media to Cloudinary:', error);
             throw error;
         }
-    }
-
-    // NEW: Cancel current upload
-    cancelCurrentUpload() {
-        if (this.uploadCancelController) {
-            this.uploadCancelController.abort();
-            this.uploadCancelController = null;
-            this.hideSendingModal();
-            return true;
-        }
-        return false;
     }
 
     validateImageFile(file) {
@@ -821,7 +814,7 @@ class GroupChat {
         }
     }
 
-    async sendPrivateMediaMessage(toUserId, file, replyTo = null) {
+    async sendPrivateMediaMessage(toUserId, file, replyTo = null, onProgress = null, onCancel = null) {
         try {
             const isVideo = file.type.startsWith('video/');
             
@@ -831,13 +824,9 @@ class GroupChat {
                 this.validateImageFile(file);
             }
             
-            // Show sending modal
-            this.showSendingModal('private', file.name || (isVideo ? 'Video' : 'Image'));
+            const uploadId = 'upload_private_' + Date.now();
             
-            const mediaUrl = await this.uploadMediaToCloudinary(file);
-            
-            // Hide sending modal after successful upload
-            this.hideSendingModal();
+            const mediaUrl = await this.uploadMediaToCloudinary(file, uploadId, onProgress, onCancel);
             
             if (isVideo) {
                 await this.sendPrivateMessage(toUserId, null, null, mediaUrl, replyTo);
@@ -848,13 +837,7 @@ class GroupChat {
             return true;
         } catch (error) {
             console.error('Error sending private media message:', error);
-            this.hideSendingModal();
-            
-            // Only throw error if it wasn't a cancellation
-            if (error.message !== 'Upload cancelled') {
-                throw error;
-            }
-            return false;
+            throw error;
         }
     }
 
@@ -1632,10 +1615,8 @@ class GroupChat {
             
             let photoUrl = null;
             if (photoFile) {
-                // Show sending modal for group photo upload
-                this.showSendingModal('group_photo', 'Group photo');
-                photoUrl = await this.uploadMediaToCloudinary(photoFile);
-                this.hideSendingModal();
+                const uploadId = 'group_photo_' + Date.now();
+                photoUrl = await this.uploadMediaToCloudinary(photoFile, uploadId);
             }
             
             const group = {
@@ -1669,7 +1650,6 @@ class GroupChat {
             return { groupId: groupRef.id, inviteLink: inviteLink };
         } catch (error) {
             console.error('Error creating group:', error);
-            this.hideSendingModal();
             throw error;
         }
     }
@@ -2125,7 +2105,7 @@ class GroupChat {
         }
     }
 
-    async sendMediaMessage(groupId, file, replyTo = null) {
+    async sendMediaMessage(groupId, file, replyTo = null, onProgress = null, onCancel = null) {
         try {
             const isVideo = file.type.startsWith('video/');
             
@@ -2135,13 +2115,9 @@ class GroupChat {
                 this.validateImageFile(file);
             }
             
-            // Show sending modal
-            this.showSendingModal('group', file.name || (isVideo ? 'Video' : 'Image'));
+            const uploadId = 'upload_' + Date.now();
             
-            const mediaUrl = await this.uploadMediaToCloudinary(file);
-            
-            // Hide sending modal after successful upload
-            this.hideSendingModal();
+            const mediaUrl = await this.uploadMediaToCloudinary(file, uploadId, onProgress, onCancel);
             
             if (isVideo) {
                 await this.sendMessage(groupId, null, null, mediaUrl, replyTo);
@@ -2152,13 +2128,7 @@ class GroupChat {
             return true;
         } catch (error) {
             console.error('Error sending media message:', error);
-            this.hideSendingModal();
-            
-            // Only throw error if it wasn't a cancellation
-            if (error.message !== 'Upload cancelled') {
-                throw error;
-            }
-            return false;
+            throw error;
         }
     }
 
@@ -2375,60 +2345,11 @@ class GroupChat {
         `;
         
         document.body.appendChild(this.reactionModal);
-    }
-
-    // NEW: Create sending modal for media uploads
-    createSendingModal() {
-        const existingModal = document.getElementById('sendingModal');
-        if (existingModal) {
-            existingModal.remove();
-        }
         
-        this.sendingModal = document.createElement('div');
-        this.sendingModal.id = 'sendingModal';
-        this.sendingModal.className = 'sending-modal';
-        
-        this.sendingModal.innerHTML = `
-            <div class="sending-modal-content">
-                <div class="sending-header">
-                    <h3>Sending...</h3>
-                </div>
-                <div class="sending-body">
-                    <div class="sending-spinner">
-                        <svg class="feather" data-feather="loader">
-                            <circle cx="12" cy="12" r="10" />
-                        </svg>
-                    </div>
-                    <p class="sending-text" id="sendingText">Uploading file...</p>
-                    <p class="sending-subtext">Please wait while your file is being uploaded</p>
-                </div>
-                <div class="sending-footer">
-                    <button class="cancel-send-btn" id="cancelSendBtn">
-                        <svg class="feather" data-feather="x" style="width: 16px; height: 16px; margin-right: 8px;">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(this.sendingModal);
-        
-        // Add cancel button event listener
-        const cancelBtn = document.getElementById('cancelSendBtn');
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', () => {
-                this.cancelCurrentUpload();
-            });
-        }
-        
-        // Add modal styles
-        const modalStyles = document.createElement('style');
-        modalStyles.id = 'sending-modal-styles';
-        modalStyles.textContent = `
-            .sending-modal {
+        const reactionModalStyles = document.createElement('style');
+        reactionModalStyles.id = 'reaction-modal-styles';
+        reactionModalStyles.textContent = `
+            .reaction-modal {
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -2438,24 +2359,345 @@ class GroupChat {
                 display: none;
                 justify-content: center;
                 align-items: center;
-                z-index: 10000;
+                z-index: 9999;
             }
             
-            .sending-modal.active {
+            .reaction-modal.active {
                 display: flex;
             }
             
-            .sending-modal-content {
+            .reaction-modal-content {
                 background: white;
                 border-radius: 12px;
                 width: 90%;
-                max-width: 400px;
+                max-width: 500px;
+                max-height: 80vh;
                 overflow: hidden;
                 box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-                animation: modal-slide-up 0.3s ease;
             }
             
-            @keyframes modal-slide-up {
+            .reaction-header {
+                padding: 15px 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .reaction-header h3 {
+                margin: 0;
+                font-size: 18px;
+            }
+            
+            .close-reaction-modal {
+                background: none;
+                border: none;
+                color: white;
+                font-size: 28px;
+                cursor: pointer;
+                line-height: 1;
+                padding: 0;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: background 0.2s;
+            }
+            
+            .close-reaction-modal:hover {
+                background: rgba(255, 255, 255, 0.2);
+            }
+            
+            .emoji-grid {
+                padding: 20px;
+                max-height: 60vh;
+                overflow-y: auto;
+            }
+            
+            .emoji-row {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 10px;
+            }
+            
+            .emoji-item {
+                font-size: 24px;
+                cursor: pointer;
+                padding: 8px;
+                border-radius: 8px;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 40px;
+                min-height: 40px;
+            }
+            
+            .emoji-item:hover {
+                background: #f0f0f0;
+                transform: scale(1.2);
+            }
+            
+            .message-reactions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                margin-top: 6px;
+            }
+            
+            .reaction-bubble {
+                background: rgba(0, 0, 0, 0.05);
+                border-radius: 12px;
+                padding: 2px 8px;
+                font-size: 12px;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                cursor: pointer;
+                transition: background 0.2s;
+                border: 1px solid rgba(0, 0, 0, 0.1);
+            }
+            
+            .reaction-bubble:hover {
+                background: rgba(0, 0, 0, 0.1);
+            }
+            
+            .reaction-bubble.user-reacted {
+                background: rgba(29, 155, 240, 0.1);
+                border-color: rgba(29, 155, 240, 0.3);
+            }
+            
+            .reaction-emoji {
+                font-size: 14px;
+            }
+            
+            .reaction-count {
+                font-weight: 500;
+                color: #666;
+            }
+            
+            .reaction-bubble.user-reacted .reaction-count {
+                color: #1d9bf0;
+            }
+            
+            .swipe-reply-indicator {
+                position: fixed;
+                bottom: 80px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 25px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 14px;
+                font-weight: 500;
+                box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+                z-index: 1000;
+                opacity: 0;
+                transition: opacity 0.3s;
+            }
+            
+            .swipe-reply-indicator.show {
+                opacity: 1;
+            }
+            
+            .replying-to {
+                background: rgba(102, 126, 234, 0.1);
+                border-left: 3px solid #667eea;
+                padding: 6px 10px;
+                margin-bottom: 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            
+            .reply-label {
+                color: #667eea;
+                font-weight: 500;
+            }
+            
+            .reply-sender {
+                font-weight: 600;
+                color: #764ba2;
+            }
+            
+            .reply-separator {
+                color: #999;
+            }
+            
+            .reply-message {
+                color: #666;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                flex: 1;
+                min-width: 0;
+            }
+            
+            /* UPDATED: Typing indicator styles - Moved to top */
+            .typing-indicator {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+                color: white;
+                padding: 8px 15px;
+                font-size: 13px;
+                text-align: center;
+                z-index: 1000;
+                backdrop-filter: blur(10px);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                transition: transform 0.3s ease;
+                transform: translateY(-100%);
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            
+            .typing-indicator.show {
+                transform: translateY(0);
+            }
+            
+            .typing-dots {
+                display: inline-block;
+                margin-left: 5px;
+            }
+            
+            .typing-dots span {
+                display: inline-block;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background-color: white;
+                margin: 0 2px;
+                opacity: 0.6;
+                animation: typing-dots 1.5s infinite ease-in-out;
+            }
+            
+            .typing-dots span:nth-child(1) { animation-delay: 0s; }
+            .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+            .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+            
+            @keyframes typing-dots {
+                0%, 100% { opacity: 0.6; transform: scale(1); }
+                50% { opacity: 1; transform: scale(1.2); }
+            }
+            
+            /* UPDATED: Soft glass glowing message styles */
+            .glowing-message {
+                animation: soft-glow 3s ease-in-out infinite alternate;
+                position: relative;
+                backdrop-filter: blur(5px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                padding: 8px 12px;
+                margin: 2px 0;
+            }
+            
+            @keyframes soft-glow {
+                0% {
+                    box-shadow: 0 0 5px rgba(255, 255, 255, 0.3),
+                                0 0 10px rgba(77, 171, 247, 0.2),
+                                0 0 15px rgba(77, 171, 247, 0.1);
+                    background: rgba(255, 255, 255, 0.05);
+                }
+                100% {
+                    box-shadow: 0 0 10px rgba(255, 255, 255, 0.4),
+                                0 0 20px rgba(77, 171, 247, 0.3),
+                                0 0 30px rgba(77, 171, 247, 0.2);
+                    background: rgba(255, 255, 255, 0.08);
+                }
+            }
+            
+            /* Fire ring avatar styles */
+            .avatar-with-fire-ring {
+                position: relative;
+            }
+            
+            .fire-ring {
+                position: absolute;
+                top: -5px;
+                left: -5px;
+                right: -5px;
+                bottom: -5px;
+                border-radius: 50%;
+                background: linear-gradient(45deg, #ff6b00, #ff9500, #ffcc00);
+                animation: fire-ring 1.5s ease-in-out infinite alternate;
+                z-index: -1;
+            }
+            
+            @keyframes fire-ring {
+                from {
+                    box-shadow: 0 0 10px #ff6b00, 0 0 20px #ff9500, 0 0 30px #ffcc00;
+                    transform: scale(1);
+                }
+                to {
+                    box-shadow: 0 0 15px #ff6b00, 0 0 25px #ff9500, 0 0 35px #ffcc00;
+                    transform: scale(1.05);
+                }
+            }
+            
+            /* Reward tag styles */
+            .reward-tag {
+                display: inline-block;
+                background: linear-gradient(45deg, #ffd700, #ff9500);
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 10px;
+                font-weight: bold;
+                margin-left: 6px;
+                animation: reward-tag-pulse 2s infinite;
+                text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
+            }
+            
+            @keyframes reward-tag-pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+            
+            .system-message.reward-upgrade {
+                background: linear-gradient(45deg, rgba(255, 215, 0, 0.1), rgba(255, 149, 0, 0.1));
+                border-left: 3px solid #ff9500;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 8px;
+                text-align: center;
+                font-weight: bold;
+                animation: reward-message 3s ease-in-out;
+            }
+            
+            @keyframes reward-message {
+                0% { opacity: 0; transform: translateY(-10px); }
+                20% { opacity: 1; transform: translateY(0); }
+                80% { opacity: 1; transform: translateY(0); }
+                100% { opacity: 0; transform: translateY(-10px); }
+            }
+            
+            /* Upload modal styles */
+            .upload-modal {
+                position: fixed;
+                bottom: 80px;
+                right: 20px;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+                z-index: 1000;
+                width: 300px;
+                overflow: hidden;
+                animation: slideIn 0.3s ease;
+            }
+            
+            @keyframes slideIn {
                 from {
                     transform: translateY(20px);
                     opacity: 0;
@@ -2466,110 +2708,133 @@ class GroupChat {
                 }
             }
             
-            .sending-header {
-                padding: 15px 20px;
+            .upload-header {
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
-                text-align: center;
+                padding: 12px 15px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
             }
             
-            .sending-header h3 {
+            .upload-header h4 {
                 margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+            }
+            
+            .cancel-upload-btn {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                color: white;
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                font-size: 16px;
+                line-height: 1;
+            }
+            
+            .cancel-upload-btn:hover {
+                background: rgba(255, 255, 255, 0.3);
+            }
+            
+            .upload-content {
+                padding: 15px;
+            }
+            
+            .upload-info {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 15px;
+            }
+            
+            .upload-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: 8px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
                 font-size: 18px;
             }
             
-            .sending-body {
-                padding: 30px 20px;
-                text-align: center;
-            }
-            
-            .sending-spinner {
-                margin-bottom: 20px;
-            }
-            
-            .sending-spinner svg {
-                width: 48px;
-                height: 48px;
-                color: #667eea;
-                animation: spin 1s linear infinite;
-            }
-            
-            .sending-text {
-                font-size: 16px;
+            .upload-details h5 {
+                margin: 0 0 4px 0;
+                font-size: 14px;
                 font-weight: 600;
-                margin: 0 0 8px 0;
                 color: #333;
             }
             
-            .sending-subtext {
-                font-size: 14px;
-                color: #666;
+            .upload-details p {
                 margin: 0;
+                font-size: 12px;
+                color: #666;
             }
             
-            .sending-footer {
-                padding: 15px 20px;
-                border-top: 1px solid #eee;
-                text-align: center;
+            .upload-progress {
+                margin-top: 10px;
             }
             
-            .cancel-send-btn {
-                background: #ff6b6b;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 25px;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                transition: all 0.3s ease;
+            .progress-text {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 6px;
+                font-size: 12px;
+                color: #666;
             }
             
-            .cancel-send-btn:hover {
-                background: #ff5252;
-                transform: translateY(-2px);
+            .progress-bar {
+                height: 6px;
+                background: #f0f0f0;
+                border-radius: 3px;
+                overflow: hidden;
             }
             
-            .cancel-send-btn:active {
-                transform: translateY(0);
+            .progress-fill {
+                height: 100%;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 3px;
+                transition: width 0.3s ease;
+            }
+            
+            /* Ensure SVG icons display properly */
+            .feather {
+                display: inline-block;
+                vertical-align: middle;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                fill: none;
             }
         `;
         
-        if (!document.getElementById('sending-modal-styles')) {
-            document.head.appendChild(modalStyles);
-        }
-    }
-
-    // NEW: Show sending modal
-    showSendingModal(type, fileName) {
-        const modal = document.getElementById('sendingModal');
-        const sendingText = document.getElementById('sendingText');
+        document.head.appendChild(reactionModalStyles);
         
-        if (!modal || !sendingText) return;
+        this.reactionModal.querySelector('.close-reaction-modal').addEventListener('click', () => {
+            this.hideReactionModal();
+        });
         
-        let text = 'Uploading file...';
-        if (type === 'group') {
-            text = `Sending to group: ${fileName}`;
-        } else if (type === 'private') {
-            text = `Sending to chat: ${fileName}`;
-        } else if (type === 'group_photo') {
-            text = 'Uploading group photo...';
-        }
+        this.reactionModal.querySelectorAll('.emoji-item').forEach(emoji => {
+            emoji.addEventListener('click', () => {
+                const emojiChar = emoji.dataset.emoji;
+                this.addReactionToMessage(emojiChar);
+                this.hideReactionModal();
+            });
+        });
         
-        sendingText.textContent = text;
-        modal.classList.add('active');
-    }
-
-    // NEW: Hide sending modal
-    hideSendingModal() {
-        const modal = document.getElementById('sendingModal');
-        if (modal) {
-            modal.classList.remove('active');
-        }
-        this.uploadCancelController = null;
+        this.reactionModal.addEventListener('click', (e) => {
+            if (e.target === this.reactionModal) {
+                this.hideReactionModal();
+            }
+        });
     }
 
     showReactionModal(message) {
@@ -3156,14 +3421,13 @@ class GroupChat {
         });
         this.userStreakTimers.clear();
         
-        // Cancel any ongoing upload
-        if (this.uploadCancelController) {
-            this.uploadCancelController.abort();
-            this.uploadCancelController = null;
-        }
-        
-        // Hide sending modal
-        this.hideSendingModal();
+        // Cancel all active uploads
+        this.activeUploads.forEach((upload, uploadId) => {
+            if (upload.cancelFunction && typeof upload.cancelFunction === 'function') {
+                upload.cancelFunction();
+            }
+        });
+        this.activeUploads.clear();
     }
 }
 
@@ -3890,6 +4154,81 @@ function updateTypingIndicator(typingUsers) {
     typingIndicator.classList.add('show');
 }
 
+// NEW: Create upload modal
+function createUploadModal(uploadId, fileName, fileType, onCancel) {
+    const existingModal = document.getElementById(`upload-modal-${uploadId}`);
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = `upload-modal-${uploadId}`;
+    modal.className = 'upload-modal';
+    
+    const isImage = fileType.startsWith('image/');
+    
+    modal.innerHTML = `
+        <div class="upload-header">
+            <h4>Uploading ${isImage ? 'Image' : 'Video'}</h4>
+            <button class="cancel-upload-btn" id="cancel-upload-${uploadId}">×</button>
+        </div>
+        <div class="upload-content">
+            <div class="upload-info">
+                <div class="upload-icon">
+                    ${isImage ? '📷' : '🎬'}
+                </div>
+                <div class="upload-details">
+                    <h5>${fileName}</h5>
+                    <p>Uploading to chat...</p>
+                </div>
+            </div>
+            <div class="upload-progress">
+                <div class="progress-text">
+                    <span>Progress</span>
+                    <span id="progress-percent-${uploadId}">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill-${uploadId}" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Add cancel button handler
+    document.getElementById(`cancel-upload-${uploadId}`).addEventListener('click', () => {
+        if (onCancel && typeof onCancel === 'function') {
+            onCancel();
+        }
+        modal.remove();
+    });
+    
+    return modal;
+}
+
+// NEW: Update upload progress
+function updateUploadProgress(uploadId, progress) {
+    const progressFill = document.getElementById(`progress-fill-${uploadId}`);
+    const progressPercent = document.getElementById(`progress-percent-${uploadId}`);
+    
+    if (progressFill) {
+        progressFill.style.width = `${progress}%`;
+    }
+    
+    if (progressPercent) {
+        progressPercent.textContent = `${Math.round(progress)}%`;
+    }
+}
+
+// NEW: Remove upload modal
+function removeUploadModal(uploadId) {
+    const modal = document.getElementById(`upload-modal-${uploadId}`);
+    if (modal) {
+        modal.remove();
+    }
+}
+
 function initGroupPage() {
     const sidebar = document.getElementById('sidebar');
     const backBtn = document.getElementById('backBtn');
@@ -3926,6 +4265,7 @@ function initGroupPage() {
     let typingUnsubscribe = null;
     let typingTimeout = null;
     let lastTypingInputTime = 0;
+    let lastMessageIds = '';
     let renderedMessageIds = new Set(); // Track which messages have been rendered
     let processedMessageIds = new Set(); // Track which messages have been processed by listener
     
@@ -4093,7 +4433,41 @@ function initGroupPage() {
             const file = e.target.files[0];
             if (file) {
                 try {
-                    await groupChat.sendMediaMessage(groupId, file, groupChat.replyingToMessage?.id);
+                    const uploadId = 'upload_' + Date.now();
+                    
+                    // Create upload modal
+                    const modal = createUploadModal(uploadId, file.name, file.type, () => {
+                        // Cancel function will be called by the modal
+                    });
+                    
+                    // Send media with progress tracking
+                    await groupChat.sendMediaMessage(
+                        groupId, 
+                        file, 
+                        groupChat.replyingToMessage?.id,
+                        (progress) => {
+                            updateUploadProgress(uploadId, progress);
+                        },
+                        (cancelFunction) => {
+                            // Store cancel function in the modal's cancel button
+                            const cancelBtn = document.getElementById(`cancel-upload-${uploadId}`);
+                            if (cancelBtn) {
+                                const originalClick = cancelBtn.onclick;
+                                cancelBtn.onclick = () => {
+                                    if (cancelFunction && typeof cancelFunction === 'function') {
+                                        cancelFunction();
+                                    }
+                                    if (originalClick && typeof originalClick === 'function') {
+                                        originalClick();
+                                    }
+                                };
+                            }
+                        }
+                    );
+                    
+                    // Remove upload modal on completion
+                    removeUploadModal(uploadId);
+                    
                 } catch (error) {
                     console.error('Error sending media:', error);
                     if (error.message !== 'Upload cancelled') {
@@ -5942,6 +6316,7 @@ function initChatPage() {
     let reactionsCache = new Map();
     let isRendering = false;
     let renderQueue = [];
+    let lastMessageIds = '';
     let renderedMessageIds = new Set(); // Track which messages have been rendered
     let processedMessageIds = new Set(); // Track which messages have been processed by listener
     
@@ -6048,11 +6423,45 @@ function initChatPage() {
             const file = e.target.files[0];
             if (file) {
                 try {
-                    await groupChat.sendPrivateMediaMessage(partnerId, file, groupChat.replyingToMessage?.id);
+                    const uploadId = 'upload_private_' + Date.now();
+                    
+                    // Create upload modal
+                    const modal = createUploadModal(uploadId, file.name, file.type, () => {
+                        // Cancel function will be called by the modal
+                    });
+                    
+                    // Send media with progress tracking
+                    await groupChat.sendPrivateMediaMessage(
+                        partnerId, 
+                        file, 
+                        groupChat.replyingToMessage?.id,
+                        (progress) => {
+                            updateUploadProgress(uploadId, progress);
+                        },
+                        (cancelFunction) => {
+                            // Store cancel function in the modal's cancel button
+                            const cancelBtn = document.getElementById(`cancel-upload-${uploadId}`);
+                            if (cancelBtn) {
+                                const originalClick = cancelBtn.onclick;
+                                cancelBtn.onclick = () => {
+                                    if (cancelFunction && typeof cancelFunction === 'function') {
+                                        cancelFunction();
+                                    }
+                                    if (originalClick && typeof originalClick === 'function') {
+                                        originalClick();
+                                    }
+                                };
+                            }
+                        }
+                    );
+                    
+                    // Remove upload modal on completion
+                    removeUploadModal(uploadId);
+                    
                 } catch (error) {
                     console.error('Error sending media:', error);
                     if (error.message !== 'Upload cancelled') {
-                        alert('Failed to send media. Please try again.');
+                        alert(error.message || 'Failed to send media. Please try again.');
                     }
                 }
             }
