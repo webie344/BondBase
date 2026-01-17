@@ -2255,6 +2255,7 @@ body.account-page .account-container {
     overflow-y: auto;
     background-color: var(--bg-primary);
     width: 100%;
+    margin-bottom: 20px;
 }
 
 .message-loading {
@@ -2264,7 +2265,7 @@ body.account-page .account-container {
 }
 
 .message {
-    margin-bottom: 0; /* CHANGED FROM 15px to 0 */
+    margin-bottom: 10px; /* CHANGED FROM 15px to 0 */
     display: flex;
     flex-direction: column;
     max-width: 70%;
@@ -2351,6 +2352,7 @@ body.account-page .account-container {
     background-color: var(--bg-card);
     padding: 1rem;
     box-shadow: var(--shadow);
+    margin-top:30px;
 }
 
 .chat-input {
