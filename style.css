@@ -1,4 +1,4 @@
-/* style.css - COMPLETE FILE WITH DISCORD-STYLE FOR ALL CHATS */
+/* style.css - COMPLETE FILE WITH DISCORD-STYLE FOR ALL CHATS - FIXED VIDEO ALIGNMENT */
 :root {
     /*  – Dark, Leather, Steel */
     --primary: #b3004b; /* deep crimson */
@@ -60,6 +60,7 @@ body.discord-style #chatMessages {
     position: relative;
     animation: fadeInUp 0.3s ease;
 }
+
 /* ===== FLEXBOX SOLUTION FOR CHAT LAYOUT ===== */
 
 /* For all chat containers */
@@ -116,6 +117,7 @@ body.discord-style #chatMessages {
     position: static !important; /* Remove fixed positioning */
     bottom: auto !important;
 }
+
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -289,6 +291,176 @@ body.discord-style .message .message-text:hover {
 body.discord-style .message-sent .message-content p:hover,
 body.discord-style .message-sent .message-text:hover {
     background: rgba(179, 0, 75, 0.2) !important;
+}
+
+/* ===== FIXED VIDEO MESSAGE ALIGNMENT FOR DISCORD-STYLE ===== */
+
+/* Reset video message positioning completely for Discord-style */
+body.discord-style .video-message,
+body.discord-style .message-video {
+    display: block !important;
+    position: relative !important;
+    max-width: 280px !important;
+    min-width: 200px !important;
+    margin: 4px 0 4px 52px !important; /* 52px = avatar width + gap */
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    background: #000 !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Video element styling */
+body.discord-style .video-message video,
+body.discord-style .message-video video {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: 250px !important;
+    background: #000 !important;
+    border-radius: 8px !important;
+    object-fit: contain !important;
+}
+
+/* Sent video messages alignment - CORRECTED */
+body.discord-style .message-sent .video-message,
+body.discord-style .message-sent .message-video {
+    margin-left: auto !important;
+    margin-right: 52px !important;
+}
+
+/* Received video messages alignment */
+body.discord-style .message-received .video-message,
+body.discord-style .message-received .message-video {
+    margin-left: 52px !important;
+    margin-right: auto !important;
+}
+
+/* Remove any inherited backgrounds from parent containers */
+body.discord-style .message:has(.video-message),
+body.discord-style .message:has(.message-video) {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+}
+
+/* Video message metadata (timestamp, status) */
+body.discord-style .message:has(.video-message) .message-meta,
+body.discord-style .message:has(.message-video) .message-meta {
+    margin-left: 52px !important;
+    margin-top: 4px !important;
+    margin-bottom: 8px !important;
+    background: rgba(0, 0, 0, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    border: none !important;
+    border-radius: 20px !important;
+    padding: 4px 10px !important;
+    color: white !important;
+    font-size: 0.75rem !important;
+    display: inline-block !important;
+    position: relative !important;
+    z-index: 2 !important;
+    max-width: 80% !important;
+}
+
+/* Sent video metadata alignment - CORRECTED */
+body.discord-style .message-sent:has(.video-message) .message-meta,
+body.discord-style .message-sent:has(.message-video) .message-meta {
+    margin-left: auto !important;
+    margin-right: 52px !important;
+    background: rgba(179, 0, 75, 0.8) !important;
+}
+
+/* Image message consistency - make sure images use same layout */
+body.discord-style .message-image {
+    display: block !important;
+    position: relative !important;
+    max-width: 280px !important;
+    min-width: 200px !important;
+    margin: 4px 0 4px 52px !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.discord-style .message-image img {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: 250px !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    object-fit: contain !important;
+}
+
+/* Sent image alignment - CORRECTED */
+body.discord-style .message-sent .message-image {
+    margin-left: auto !important;
+    margin-right: 52px !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    body.discord-style .video-message,
+    body.discord-style .message-video,
+    body.discord-style .message-image {
+        margin-left: 48px !important;
+        max-width: 240px !important;
+        min-width: 180px !important;
+    }
+    
+    body.discord-style .message-sent .video-message,
+    body.discord-style .message-sent .message-video,
+    body.discord-style .message-sent .message-image {
+        margin-left: auto !important;
+        margin-right: 48px !important;
+    }
+    
+    body.discord-style .message:has(.video-message) .message-meta,
+    body.discord-style .message:has(.message-video) .message-meta,
+    body.discord-style .message:has(.message-image) .message-meta {
+        margin-left: 48px !important;
+    }
+    
+    body.discord-style .message-sent:has(.video-message) .message-meta,
+    body.discord-style .message-sent:has(.message-video) .message-meta,
+    body.discord-style .message-sent:has(.message-image) .message-meta {
+        margin-left: auto !important;
+        margin-right: 48px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    body.discord-style .video-message,
+    body.discord-style .message-video,
+    body.discord-style .message-image {
+        margin-left: 44px !important;
+        max-width: 200px !important;
+        min-width: 160px !important;
+    }
+    
+    body.discord-style .message-sent .video-message,
+    body.discord-style .message-sent .message-video,
+    body.discord-style .message-sent .message-image {
+        margin-left: auto !important;
+        margin-right: 44px !important;
+    }
+    
+    body.discord-style .message:has(.video-message) .message-meta,
+    body.discord-style .message:has(.message-video) .message-meta,
+    body.discord-style .message:has(.message-image) .message-meta {
+        margin-left: 44px !important;
+    }
+    
+    body.discord-style .message-sent:has(.video-message) .message-meta,
+    body.discord-style .message-sent:has(.message-video) .message-meta,
+    body.discord-style .message-sent:has(.message-image) .message-meta {
+        margin-left: auto !important;
+        margin-right: 44px !important;
+    }
 }
 
 /* System Messages */
@@ -556,8 +728,6 @@ body.discord-style #chatMessages::-webkit-scrollbar-thumb:hover {
     }
 }
 
-/* ===== REST OF YOUR ORIGINAL STYLES (KEPT AS IS) ===== */
-
 /* ===== SCROLLING FIXES ===== */
 /* Improve chat container scrolling */
 #chatMessages {
@@ -588,743 +758,41 @@ body.discord-style #chatMessages::-webkit-scrollbar-thumb:hover {
     animation: none;
 }
 
-/* JavaScript to detect scrolling */
-let scrollTimeout;
-messagesContainer.addEventListener('scroll', () => {
-    messagesContainer.classList.add('scrolling');
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(() => {
-        messagesContainer.classList.remove('scrolling');
-        // Re-enable transitions after scrolling stops
-        const messages = messagesContainer.querySelectorAll('.message');
-        messages.forEach(msg => {
-            msg.style.transition = 'transform 0.3s ease';
-        });
-    }, 150);
-});
-
-/* ===== FIX FOR VIDEO MESSAGE BACKGROUNDS ===== */
-
-/* Remove background from ALL message containers that contain videos */
-.message:has(.video-message),
-.message:has(.video-message) .message-content,
-.message:has(.video-message) > div {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
+/* Selection Color */
+::selection {
+    background-color: rgba(179, 0, 75, 0.3);
+    color: var(--text-primary);
 }
 
-/* =========================================== */
-/* REACTION PICKER STYLES - HIDDEN BY DEFAULT */
-/* =========================================== */
-
-/* Hide reaction picker on ALL pages by default */
-#reactionPicker {
-    display: none !important;
-    position: absolute;
-    background: var(--bg-card);
-    border-radius: 24px;
-    padding: 10px 15px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
-    border: 1px solid var(--border);
-    max-width: 250px;
-    flex-wrap: wrap;
-    gap: 8px;
+::-moz-selection {
+    background-color: rgba(179, 0, 75, 0.3);
+    color: var(--text-primary);
 }
 
-/* Reaction emojis styling (only when visible) */
-.reaction-emoji {
-    font-size: 20px;
-    cursor: pointer;
-    padding: 5px;
-    border-radius: 50%;
-    transition: background-color 0.2s;
+/* Focus Styles */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
 }
 
-.reaction-emoji:hover {
-    background-color: #f0f0f0;
-}
-
-/* Message reactions display */
-.message-reactions {
-    display: flex;
-    gap: 5px;
-    margin-top: 5px;
-    flex-wrap: wrap;
-}
-
-.reaction {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    padding: 2px 6px;
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border);
-}
-
-.reaction-count {
-    font-size: 10px;
-    color: var(--text-secondary);
-}
-
-/* =========================================== */
-/* CHAT PAGE OVERRIDES (will be in chat.html) */
-/* =========================================== */
-
-/* 
-NOTE: The bottom sheet styling for chat page should ONLY be in chat.html
-This ensures it only applies to the chat page
-*/
-
-/* Video message container - override ALL parent backgrounds */
-.video-message,
-.message .video-message,
-.message-sent .video-message,
-.message-received .video-message {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 8px 0 !important;
-    display: block !important;
-    position: relative !important;
-    max-width: 280px !important;
-    min-width: 200px !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-}
-
-/* Video element - force black/transparent background */
-.video-message video {
-    background: #000 !important;
-    background-color: #000 !important;
-    border-radius: 16px !important;
-    width: 100% !important;
-    height: auto !important;
-    max-height: 300px !important;
-    object-fit: contain !important;
-    display: block !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-    -webkit-background-clip: padding-box !important;
-    background-clip: padding-box !important;
-}
-
-/* Remove any pseudo-element backgrounds */
-.video-message::before,
-.video-message::after,
-.message:has(.video-message)::before,
-.message:has(.video-message)::after {
-    background: transparent !important;
-    content: none !important;
-}
-
-/* Sent video messages - additional overrides */
-.message-sent .video-message {
-    margin-left: auto !important;
-    margin-right: 0 !important;
-    background: transparent !important;
-}
-
-/* Received video messages - additional overrides */
-.message-received .video-message {
-    margin-right: auto !important;
-    margin-left: 0 !important;
-    background: transparent !important;
-}
-
-/* Remove ALL background inheritance from parent containers */
-.chat-messages .message:has(.video-message),
-#chatMessages .message:has(.video-message),
-.messages-list .message:has(.video-message) {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-/* Force remove background colors from any element inside video messages */
-.video-message * {
-    background: transparent !important;
-}
-
-/* Video controls - clean overlay */
-.video-message-controls {
-    position: absolute !important;
-    bottom: 10px !important;
-    right: 10px !important;
-    background: rgba(0, 0, 0, 0.7) !important;
-    backdrop-filter: blur(5px) !important;
-    border-radius: 20px !important;
-    padding: 5px 10px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 5px !important;
-    z-index: 2 !important;
-    border: none !important;
-}
-
-/* Remove any text/content backgrounds */
-.video-message + .message-time,
-.video-message + .message-meta {
-    background: rgba(0, 0, 0, 0.7) !important;
-    backdrop-filter: blur(10px) !important;
-    border: none !important;
-    border-radius: 20px !important;
-    padding: 4px 10px !important;
-    margin-top: -35px !important;
-    margin-left: 10px !important;
-    margin-bottom: 10px !important;
-    color: white !important;
-    font-size: 0.75rem !important;
-    display: inline-block !important;
-    position: relative !important;
-    z-index: 2 !important;
-}
-
-/* Sent message timestamp */
-.message-sent .video-message + .message-time {
-    background: rgba(179, 0, 75, 0.8) !important;
-    margin-left: auto !important;
-    margin-right: 10px !important;
-}
-
-/* Hover state */
-.video-message:hover video {
-    transform: scale(1.01) !important;
-    transition: transform 0.3s ease !important;
-}
-
-/* Remove any gradient or image backgrounds */
-.message:has(.video-message) {
-    background-image: none !important;
-    background: transparent !important;
-}
-
-/* ===== NUCLEAR OPTION - If above doesn't work ===== */
-/* Add this if video backgrounds still appear */
-
-/* Target the specific HTML structure from your app.js */
-.message[data-message-id] .video-message,
-.message[data-message-id*="video"] .video-message {
-    background: #000 !important; /* Force black background */
-    isolation: isolate !important; /* Create new stacking context */
-    position: relative !important;
-    z-index: 1 !important;
-}
-
-/* Force remove all inherited backgrounds with more specificity */
-#chatMessages > .message > .video-message,
-.chat-messages > .message > .video-message,
-div.message > div.video-message {
-    background: transparent !important;
-    background-color: transparent !important;
-}
-
-/* If there's a wrapper div around video */
-.message > div > .video-message,
-.message > .video-message {
-    all: unset !important; /* Reset all properties */
-    display: block !important;
-    background: #000 !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-    margin: 8px 0 !important;
-    max-width: 280px !important;
-    min-width: 200px !important;
-    position: relative !important;
-}
-
-/* Force video element background */
-.message .video-message video {
-    all: unset !important;
-    display: block !important;
-    width: 100% !important;
-    height: auto !important;
-    max-height: 400px !important;
-    background: #000 !important;
-    border-radius: 12px !important;
-    object-fit: contain !important;
-}
-
-/* DEBUG: Add outline to see what's being targeted */
-.video-message {
-    outline: 2px solid red !important; /* Remove this after debugging */
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .video-message,
-    .message .video-message {
-        max-width: 240px !important;
-        min-width: 180px !important;
+/* Heart pulse animation for like buttons */
+@keyframes heartPulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.3);
+    }
+    100% {
+        transform: scale(1);
     }
 }
 
-@media (max-width: 480px) {
-    .video-message,
-    .message .video-message {
-        max-width: 200px !important;
-        min-width: 160px !important;
-    }
-}
-
-/* ===== VIDEO MESSAGE SPECIFIC STYLES ===== */
-
-/* Video message container - remove background, borders, and bubble styling */
-.video-message {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-    padding: 0 !important;
-    margin: 8px 0 !important;
-    max-width: 280px !important;
-    min-width: 200px !important;
-    position: relative !important;
-    display: block !important;
-}
-
-/* Video element itself - full width, clean styling */
-.video-message video {
-    width: 100% !important;
-    height: auto !important;
-    max-height: 400px !important;
-    border-radius: 12px !important;
-    background: #000 !important; /* Black background for video player */
-    object-fit: contain !important;
-    display: block !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Remove any container backgrounds that might be inherited */
-.message .video-message {
-    background: transparent !important;
-    border: none !important;
-}
-
-/* Sent video messages specific styling */
-.message-sent .video-message {
-    margin-left: auto !important;
-    margin-right: 0 !important;
-}
-
-/* Received video messages specific styling */
-.message-received .video-message {
-    margin-right: auto !important;
-    margin-left: 0 !important;
-}
-
-/* Video message controls - clean overlay */
-.video-message-controls {
-    position: absolute !important;
-    bottom: 10px !important;
-    right: 10px !important;
-    background: rgba(0, 0, 0, 0.7) !important;
-    backdrop-filter: blur(5px) !important;
-    border-radius: 20px !important;
-    padding: 5px 10px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 5px !important;
-    z-index: 2 !important;
-    border: none !important;
-}
-
-.video-play-btn {
-    background: none !important;
-    border: none !important;
-    color: white !important;
-    cursor: pointer !important;
-    font-size: 14px !important;
-    padding: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 24px !important;
-    height: 24px !important;
-}
-
-.video-duration {
-    color: white !important;
-    font-size: 11px !important;
-    font-weight: 500 !important;
-    margin-left: 3px !important;
-}
-
-/* Remove any inherited message content styling for video messages */
-.message:has(.video-message) .message-content {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-}
-
-/* Video message metadata - clean overlay */
-.message:has(.video-message) .message-meta {
-    background: rgba(0, 0, 0, 0.7) !important;
-    backdrop-filter: blur(10px) !important;
-    border: none !important;
-    border-radius: 20px !important;
-    padding: 4px 10px !important;
-    margin-top: -35px !important;
-    margin-left: 10px !important;
-    margin-bottom: 10px !important;
-    color: white !important;
-    font-size: 0.75rem !important;
-    display: inline-block !important;
-    position: relative !important;
-    z-index: 2 !important;
-    max-width: 80% !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-}
-
-/* Sent video message metadata */
-.message-sent:has(.video-message) .message-meta {
-    margin-left: auto !important;
-    margin-right: 10px !important;
-    background: rgba(179, 0, 75, 0.8) !important;
-}
-
-/* Sending state for video messages */
-.video-message.sending {
-    opacity: 0.7 !important;
-    position: relative !important;
-}
-
-.video-message.sending::after {
-    content: '' !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    background: rgba(0, 0, 0, 0.5) !important;
-    border-radius: 12px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    color: white !important;
-    font-size: 12px !important;
-    z-index: 3 !important;
-}
-
-.video-message.sending::before {
-    content: '\f110' !important;
-    font-family: 'Font Awesome 6 Free' !important;
-    font-weight: 900 !important;
-    position: absolute !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    font-size: 24px !important;
-    color: white !important;
-    z-index: 4 !important;
-    animation: spin 1s linear infinite !important;
-}
-
-/* Hover effects */
-.video-message:hover video {
-    transform: scale(1.01) !important;
-    transition: transform 0.3s ease !important;
-}
-
-/* Responsive adjustments for video messages */
-@media (max-width: 768px) {
-    .video-message {
-        max-width: 240px !important;
-        min-width: 180px !important;
-    }
-    
-    .video-message video {
-        max-height: 300px !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .video-message {
-        max-width: 200px !important;
-        min-width: 160px !important;
-    }
-    
-    .video-message video {
-        max-height: 250px !important;
-    }
-}
-
-/* Remove any leftover bubble styling from parent containers */
-.chat-messages .message .video-message {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-/* Ensure video message doesn't inherit bubble colors */
-.message-sent .video-message,
-.message-received .video-message {
-    background: transparent !important;
-}
-
-/* Custom scrollbar for video elements */
-.video-message video::-webkit-media-controls-panel {
-    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)) !important;
-}
-
-.video-message video::-webkit-media-controls-play-button,
-.video-message video::-webkit-media-controls-volume-slider,
-.video-message video::-webkit-media-controls-mute-button {
-    filter: brightness(1.5) !important;
-}
-
-/* ===== PROFESSIONAL MEDIA MESSAGES ===== */
-
-/* Remove background from image and video message containers */
-.message-image,
-.message-video {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-    display: block !important;
-}
-
-/* Style for images within messages */
-.message-image img,
-.message-video video {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 12px !important;
-    display: block !important;
-    max-width: 100% !important;
-    height: auto !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-    object-fit: contain !important;
-}
-
-/* Remove bubble styling from media messages */
-.message-media .message-content {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-}
-
-/* Remove extra spacing around media */
-.message-media {
-    margin-bottom: 8px !important;
-    margin-top: 0 !important;
-    padding: 0 !important;
-}
-
-/* Keep text content in bubbles but media clean */
-.message:has(.message-image) .message-content:not(.message-meta),
-.message:has(.message-video) .message-content:not(.message-meta) {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-}
-
-/* Style for video thumbnails/previews */
-.video-thumbnail {
-    position: relative !important;
-    background: transparent !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-}
-
-.video-thumbnail::after {
-    content: '▶' !important;
-    position: absolute !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    background: rgba(0, 0, 0, 0.7) !important;
-    color: white !important;
-    width: 60px !important;
-    height: 60px !important;
-    border-radius: 50% !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 24px !important;
-    pointer-events: none !important;
-}
-
-/* Media message metadata (timestamp, status) */
-.message-media + .message-meta {
-    background: rgba(0, 0, 0, 0.7) !important;
-    backdrop-filter: blur(10px) !important;
-    border: none !important;
-    border-radius: 20px !important;
-    padding: 6px 12px !important;
-    margin-top: -35px !important;
-    margin-left: 10px !important;
-    margin-bottom: 10px !important;
-    color: white !important;
-    font-size: 0.8rem !important;
-    display: inline-block !important;
-    position: relative !important;
-    z-index: 2 !important;
-}
-
-/* Adjust positioning for sent media messages */
-.message-sent .message-media + .message-meta {
-    margin-left: auto !important;
-    margin-right: 10px !important;
-    background: rgba(179, 0, 75, 0.8) !important;
-}
-
-/* Remove any container backgrounds */
-.message-image-container,
-.message-video-container {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-/* Ensure proper aspect ratio for videos */
-.message-video video {
-    aspect-ratio: 16/9 !important;
-    background-color: #000 !important; /* Black background for videos only */
-}
-
-/* Hover effects for media */
-.message-image:hover img,
-.message-video:hover video {
-    transform: scale(1.01) !important;
-    transition: transform 0.3s ease !important;
-}
-
-/* Remove any unwanted borders from message containers */
-.chat-messages .message:has(.message-image),
-.chat-messages .message:has(.message-video) {
-    border: none !important;
-    background: transparent !important;
-}
-
-/* Clean download/expand buttons for media */
-.media-actions {
-    position: absolute !important;
-    bottom: 10px !important;
-    right: 10px !important;
-    background: rgba(0, 0, 0, 0.7) !important;
-    backdrop-filter: blur(10px) !important;
-    border-radius: 20px !important;
-    padding: 6px !important;
-    display: flex !important;
-    gap: 8px !important;
-    opacity: 0 !important;
-    transition: opacity 0.3s ease !important;
-}
-
-.message-media:hover .media-actions {
-    opacity: 1 !important;
-}
-
-.media-action-btn {
-    background: transparent !important;
-    border: none !important;
-    color: white !important;
-    width: 32px !important;
-    height: 32px !important;
-    border-radius: 50% !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    cursor: pointer !important;
-    font-size: 14px !important;
-}
-
-.media-action-btn:hover {
-    background: rgba(255, 255, 255, 0.2) !important;
-}
-
-/* Message grouping for media */
-.message-sent .message-media {
-    margin-left: auto !important;
-    margin-right: 0 !important;
-    max-width: 85% !important;
-}
-
-.message-received .message-media {
-    margin-right: auto !important;
-    margin-left: 0 !important;
-    max-width: 85% !important;
-}
-
-/* Remove any leftover bubble styling */
-.message-content:has(.message-image):not(.message-meta),
-.message-content:has(.message-video):not(.message-meta) {
-    border-radius: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: none !important;
-}
-
-/* Remove margins between same sender messages */
-.chat-messages .message {
-    margin-top: 0px !important;
-    margin-bottom: 0px !important;
-}
-
-/* Add to your existing CSS or create smooth.css */
-.virtual-scroll-wrapper {
-    position: relative;
-}
-
-/* Ensure containers have fixed height */
-#chatMessages {
-    height: calc(100vh - 200px); /* Adjust based on your layout */
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-#messagesList {
-    height: calc(100vh - 150px); /* Adjust based on your layout */
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-/* Performance optimizations */
-.message, .message-card {
-    transform: translateZ(0);
-    backface-visibility: hidden;
-    will-change: transform;
-}
-
-/* Smooth scrolling */
-#chatMessages, #messagesList {
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Add margin only when sender changes */
-.message-sent + .message-received,
-.message-received + .message-sent {
-    margin-top: 15px !important;
-}
-
-/* No margin between same sender messages */
-.message-sent + .message-sent,
-.message-received + .message-received {
-    margin-top: 0px !important;
+.like-btn:active {
+    animation: heartPulse 0.3s ease;
 }
 
 body {
@@ -2714,103 +2182,6 @@ body.account-page .account-container {
     font-size: 0.9rem;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .message {
-        max-width: 85%;
-    }
-    
-    .navbar-container {
-        padding: 0 1rem;
-    }
-    
-    .nav-menu {
-        position: fixed;
-        left: -100%;
-        top: 70px;
-        flex-direction: column;
-        background-color: rgba(0, 0, 0, 0.85);
-        backdrop-filter: blur(10px);
-        width: 100%;
-        text-align: center;
-        transition: var(--transition);
-        box-shadow: var(--shadow);
-        padding: 2rem 0;
-        gap: 0;
-        z-index: 999;
-    }
-    
-    .hero h1 {
-        font-size: 2rem;
-    }
-    
-    .hero p {
-        font-size: 1rem;
-    }
-    
-    .profile-view-container,
-    .account-content {
-        grid-template-columns: 1fr;
-    }
-    
-    .account-sidebar {
-        order: 2;
-    }
-    
-    .account-main {
-        order: 1;
-    }
-    
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-    
-    .main-profile-image {
-        height: 300px;
-    }
-    
-    .chat-container {
-        padding-top: 0;
-    }
-    
-    .chat-header {
-        top: 0;
-    }
-    
-    .chat-input-container {
-        padding: 10px 12px;
-    }
-}
-
-@media (max-width: 480px) {
-    .auth-form {
-        padding: 20px;
-        margin: 0 10px;
-    }
-
-    .profile-details {
-        padding: 20px;
-    }
-
-    .message {
-        max-width: 90%;
-    }
-    
-    .hero-buttons {
-        flex-direction: column;
-    }
-    
-    .profile-actions {
-        flex-direction: column;
-    }
-    
-    .action-btn {
-        width: 40px;
-        height: 40px;
-        font-size: 1rem;
-    }
-}
-
 /* Voice note recording indicator */
 .voice-recording-indicator {
     display: flex;
@@ -2954,41 +2325,101 @@ body.account-page .account-container {
     background: var(--text-secondary);
 }
 
-/* Selection Color */
-::selection {
-    background-color: rgba(179, 0, 75, 0.3);
-    color: var(--text-primary);
-}
-
-::-moz-selection {
-    background-color: rgba(179, 0, 75, 0.3);
-    color: var(--text-primary);
-}
-
-/* Focus Styles */
-button:focus,
-input:focus,
-select:focus,
-textarea:focus {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-}
-
-/* Heart pulse animation for like buttons */
-@keyframes heartPulse {
-    0% {
-        transform: scale(1);
+/* Responsive Design */
+@media (max-width: 768px) {
+    .message {
+        max-width: 85%;
     }
-    50% {
-        transform: scale(1.3);
+    
+    .navbar-container {
+        padding: 0 1rem;
     }
-    100% {
-        transform: scale(1);
+    
+    .nav-menu {
+        position: fixed;
+        left: -100%;
+        top: 70px;
+        flex-direction: column;
+        background-color: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(10px);
+        width: 100%;
+        text-align: center;
+        transition: var(--transition);
+        box-shadow: var(--shadow);
+        padding: 2rem 0;
+        gap: 0;
+        z-index: 999;
+    }
+    
+    .hero h1 {
+        font-size: 2rem;
+    }
+    
+    .hero p {
+        font-size: 1rem;
+    }
+    
+    .profile-view-container,
+    .account-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .account-sidebar {
+        order: 2;
+    }
+    
+    .account-main {
+        order: 1;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .main-profile-image {
+        height: 300px;
+    }
+    
+    .chat-container {
+        padding-top: 0;
+    }
+    
+    .chat-header {
+        top: 0;
+    }
+    
+    .chat-input-container {
+        padding: 10px 12px;
     }
 }
 
-.like-btn:active {
-    animation: heartPulse 0.3s ease;
+@media (max-width: 480px) {
+    .auth-form {
+        padding: 20px;
+        margin: 0 10px;
+    }
+
+    .profile-details {
+        padding: 20px;
+    }
+
+    .message {
+        max-width: 90%;
+    }
+    
+    .hero-buttons {
+        flex-direction: column;
+    }
+    
+    .profile-actions {
+        flex-direction: column;
+    }
+    
+    .action-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
 }
 
 /* Additional Photos Styles */

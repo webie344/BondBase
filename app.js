@@ -2764,7 +2764,7 @@ async function addReactionToMessage(emoji) {
     }
 }
 
-// Show reply preview
+// Show reply preview - FIXED: Show correct name when replying
 function showReplyPreview(message) {
     const replyPreview = document.getElementById('replyPreview');
     const replyPreviewName = document.querySelector('.reply-preview-name');
@@ -2774,7 +2774,17 @@ function showReplyPreview(message) {
     
     selectedMessageForReply = message.id;
     
-    const senderName = message.senderId === currentUser.uid ? 'You' : document.getElementById('chatPartnerName').textContent;
+    // FIX: Get correct sender name
+    let senderName = 'User';
+    if (message.senderId === currentUser.uid) {
+        senderName = 'Me'; // Changed from 'You' to 'Me' for current user's view
+    } else if (chatPartnerId) {
+        const partnerData = cache.get(`partner_${chatPartnerId}`);
+        if (partnerData && partnerData.name) {
+            senderName = partnerData.name; // Show partner's actual name
+        }
+    }
+    
     replyPreviewName.textContent = senderName;
     
     if (message.text) {
@@ -3594,7 +3604,7 @@ function createVideoPlayer(videoUrl, duration) {
     return container;
 }
 
-// UPDATED: Display message function with Discord-style layout
+// UPDATED: Display message function with Discord-style layout - FIXED: Show "Me" for current user and actual name for others
 function displayMessage(message, currentUserId) {
     const messagesContainer = document.getElementById('chatMessages');
     
@@ -3625,17 +3635,19 @@ function displayMessage(message, currentUserId) {
         }
     }
     
-    // Get sender name
-    let senderName = message.senderId === currentUserId ? 'You' : 'User';
+    // Get sender name - FIXED: Show "Me" for current user, actual name for others
+    let senderName = 'User'; // Default fallback
     if (message.senderId === currentUserId) {
+        senderName = 'Me'; // Changed from 'You' to 'Me' for current user's view
         const currentUserData = cache.get(`user_${currentUserId}`);
         if (currentUserData && currentUserData.name) {
-            senderName = currentUserData.name;
+            // Note: We keep "Me" instead of showing the user's name to themselves
+            // This matches your requirement to show "Me" instead of full name
         }
     } else if (chatPartnerId) {
         const partnerData = cache.get(`partner_${chatPartnerId}`);
         if (partnerData && partnerData.name) {
-            senderName = partnerData.name;
+            senderName = partnerData.name; // Show partner's actual name
         }
     }
     
@@ -3645,7 +3657,17 @@ function displayMessage(message, currentUserId) {
     if (message.replyTo) {
         const repliedMessage = getRepliedMessage(message.replyTo);
         if (repliedMessage) {
-            const repliedSenderName = repliedMessage.senderId === currentUserId ? 'You' : senderName;
+            // FIX: Get correct sender name for replied message
+            let repliedSenderName = 'User';
+            if (repliedMessage.senderId === currentUserId) {
+                repliedSenderName = 'Me';
+            } else if (chatPartnerId) {
+                const partnerData = cache.get(`partner_${chatPartnerId}`);
+                if (partnerData && partnerData.name) {
+                    repliedSenderName = partnerData.name;
+                }
+            }
+            
             let previewText = '';
             
             if (repliedMessage.text) {
