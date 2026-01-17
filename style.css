@@ -1,4 +1,4 @@
-/* style.css - SafeConnect BDSM Theme */
+/* style.css - COMPLETE FILE WITH DISCORD-STYLE FOR ALL CHATS */
 :root {
     /*  – Dark, Leather, Steel */
     --primary: #b3004b; /* deep crimson */
@@ -23,6 +23,7 @@
     --radius: 12px;
     --radius-lg: 16px;
     --transition: all 0.3s ease;
+    --sidebar-width: 280px;
 }
 
 * {
@@ -30,6 +31,478 @@
     padding: 0;
     box-sizing: border-box;
 }
+
+/* ===== DISCORD-STYLE MESSAGES (FOR BOTH GROUP AND REGULAR CHATS) ===== */
+
+/* DISCORD-STYLE FOR REGULAR CHAT (chat.html) */
+#chatMessages.discord-style,
+.chat-messages.discord-style {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: var(--bg-primary);
+    position: relative;
+}
+
+/* For regular chat pages - override existing styles */
+body.discord-style .chat-messages,
+body.discord-style #chatMessages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: var(--bg-primary);
+    position: relative;
+}
+
+/* Message Group Container (for grouping messages by same sender) */
+.message-group {
+    margin-bottom: 20px;
+    position: relative;
+    animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* For regular chats - transform existing .message to .message-group */
+body.discord-style .message {
+    margin-bottom: 20px !important;
+    position: relative;
+    animation: fadeInUp 0.3s ease;
+    max-width: 100% !important;
+    width: 100% !important;
+    display: block !important;
+}
+
+/* Remove old bubble styles in discord mode */
+body.discord-style .message-sent,
+body.discord-style .message-received {
+    max-width: 100% !important;
+    width: 100% !important;
+    display: block !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+/* Message Header (avatar + sender name + time) */
+.message-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 5px;
+}
+
+/* For regular chats - create message header */
+body.discord-style .message::before {
+    content: '';
+    display: table;
+    clear: both;
+}
+
+body.discord-style .message .message-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 5px;
+}
+
+.message-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+body.discord-style .message-sent .message-avatar,
+body.discord-style .message-received .message-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    display: block !important;
+}
+
+.message-sender {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+body.discord-style .message .message-sender {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.message-time {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-left: 8px;
+    font-weight: normal;
+}
+
+body.discord-style .message .message-time {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-left: 8px;
+    font-weight: normal;
+}
+
+/* Message Content Area */
+.message-content {
+    margin-left: 52px; /* Avatar width + gap */
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+body.discord-style .message .message-content {
+    margin-left: 52px !important; /* Avatar width + gap */
+    font-size: 0.95rem;
+    line-height: 1.4;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* Message Text Bubble */
+.message-text {
+    margin-bottom: 5px;
+    word-wrap: break-word;
+    padding: 8px 12px;
+    border-radius: 6px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: var(--text-primary);
+    background: transparent;
+    border: none;
+    max-width: 100%;
+    width: fit-content;
+}
+
+.message-text:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* For regular chats - style the message text */
+body.discord-style .message .message-content p,
+body.discord-style .message .message-text {
+    margin-bottom: 5px;
+    word-wrap: break-word;
+    padding: 8px 12px;
+    border-radius: 6px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 3px solid var(--border);
+    max-width: 100%;
+    width: fit-content;
+    display: inline-block;
+}
+
+body.discord-style .message-sent .message-content p,
+body.discord-style .message-sent .message-text {
+    background: rgba(179, 0, 75, 0.15) !important;
+    border-left: 3px solid var(--primary) !important;
+}
+
+body.discord-style .message-received .message-content p,
+body.discord-style .message-received .message-text {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-left: 3px solid var(--border) !important;
+}
+
+body.discord-style .message .message-content p:hover,
+body.discord-style .message .message-text:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.discord-style .message-sent .message-content p:hover,
+body.discord-style .message-sent .message-text:hover {
+    background: rgba(179, 0, 75, 0.2) !important;
+}
+
+/* System Messages */
+.system-message {
+    text-align: center;
+    color: var(--text-light);
+    font-style: italic;
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin: 4px 0;
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* Media Messages */
+.message-image,
+.message-video {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 5px;
+    background: transparent;
+}
+
+body.discord-style .message-image,
+body.discord-style .message-video {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 5px;
+    background: transparent;
+    display: block;
+}
+
+.message-image img,
+.message-video video {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    background: #000;
+}
+
+/* Reply Indicator */
+.reply-indicator {
+    background: rgba(114, 137, 218, 0.1);
+    border-left: 3px solid #7289da;
+    padding: 10px 12px;
+    margin: 0;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+    animation: slideDown 0.2s ease;
+    max-height: 44px;
+    overflow: hidden;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.reply-indicator-content {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 8px;
+    max-width: calc(100% - 40px);
+}
+
+.reply-sender {
+    font-weight: 600;
+    color: #7289da;
+    margin: 0 3px;
+    white-space: nowrap;
+}
+
+.cancel-reply {
+    background: none;
+    border: none;
+    color: #7289da;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
+    flex-shrink: 0;
+}
+
+.cancel-reply:hover {
+    background: rgba(114, 137, 218, 0.1);
+}
+
+/* Replying To Preview */
+.replying-to {
+    background: rgba(114, 137, 218, 0.08);
+    border-left: 3px solid #7289da;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    max-height: 32px;
+}
+
+.replying-to .reply-sender {
+    font-weight: 600;
+    color: #7289da;
+    font-size: 12px;
+    margin: 0 3px;
+    flex-shrink: 0;
+}
+
+/* Context Menu */
+.message-context-menu {
+    position: fixed;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    z-index: 9998;
+    display: none;
+    min-width: 160px;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Load More Button */
+.load-more-container {
+    text-align: center;
+    padding: 20px;
+    margin: 10px 0;
+    display: none;
+}
+
+.load-more-container.visible {
+    display: block;
+}
+
+.load-more-btn {
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.load-more-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* No Messages */
+.no-messages {
+    text-align: center;
+    color: var(--text-light);
+    padding: 40px 20px;
+    display: none;
+}
+
+/* Scrollbar for Discord Style */
+body.discord-style .chat-messages::-webkit-scrollbar,
+body.discord-style #chatMessages::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.discord-style .chat-messages::-webkit-scrollbar-track,
+body.discord-style #chatMessages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+body.discord-style .chat-messages::-webkit-scrollbar-thumb,
+body.discord-style #chatMessages::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+body.discord-style .chat-messages::-webkit-scrollbar-thumb:hover,
+body.discord-style #chatMessages::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+}
+
+/* Responsive for Discord Style */
+@media (max-width: 768px) {
+    body.discord-style .chat-messages,
+    body.discord-style #chatMessages {
+        padding: 15px;
+    }
+    
+    .message-avatar,
+    body.discord-style .message-sent .message-avatar,
+    body.discord-style .message-received .message-avatar {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .message-content,
+    body.discord-style .message .message-content {
+        margin-left: 48px !important;
+    }
+    
+    .message-sender,
+    body.discord-style .message .message-sender {
+        font-size: 0.9rem;
+    }
+    
+    .message-time,
+    body.discord-style .message .message-time {
+        font-size: 0.75rem;
+    }
+    
+    .message-text,
+    body.discord-style .message .message-content p,
+    body.discord-style .message .message-text {
+        padding: 6px 10px;
+        font-size: 0.9rem;
+    }
+    
+    .message-image,
+    .message-video,
+    body.discord-style .message-image,
+    body.discord-style .message-video {
+        max-width: 250px;
+        max-height: 250px;
+    }
+}
+
+/* ===== REST OF YOUR ORIGINAL STYLES (KEPT AS IS) ===== */
+
 /* ===== SCROLLING FIXES ===== */
 /* Improve chat container scrolling */
 #chatMessages {
@@ -74,8 +547,8 @@ messagesContainer.addEventListener('scroll', () => {
         });
     }, 150);
 });
-/* ===== FIX FOR VIDEO MESSA
-GE BACKGROUNDS ===== */
+
+/* ===== FIX FOR VIDEO MESSAGE BACKGROUNDS ===== */
 
 /* Remove background from ALL message containers that contain videos */
 .message:has(.video-message),
@@ -88,6 +561,7 @@ GE BACKGROUNDS ===== */
     margin: 0 !important;
     border-radius: 0 !important;
 }
+
 /* =========================================== */
 /* REACTION PICKER STYLES - HIDDEN BY DEFAULT */
 /* =========================================== */
@@ -153,6 +627,7 @@ GE BACKGROUNDS ===== */
 NOTE: The bottom sheet styling for chat page should ONLY be in chat.html
 This ensures it only applies to the chat page
 */
+
 /* Video message container - override ALL parent backgrounds */
 .video-message,
 .message .video-message,
@@ -344,6 +819,7 @@ div.message > div.video-message {
         min-width: 160px !important;
     }
 }
+
 /* ===== VIDEO MESSAGE SPECIFIC STYLES ===== */
 
 /* Video message container - remove background, borders, and bubble styling */
@@ -555,6 +1031,7 @@ div.message > div.video-message {
 .video-message video::-webkit-media-controls-mute-button {
     filter: brightness(1.5) !important;
 }
+
 /* ===== PROFESSIONAL MEDIA MESSAGES ===== */
 
 /* Remove background from image and video message containers */
@@ -745,11 +1222,13 @@ div.message > div.video-message {
     box-shadow: none !important;
     background: none !important;
 }
+
 /* Remove margins between same sender messages */
 .chat-messages .message {
     margin-top: 0px !important;
     margin-bottom: 0px !important;
 }
+
 /* Add to your existing CSS or create smooth.css */
 .virtual-scroll-wrapper {
     position: relative;
@@ -780,6 +1259,7 @@ div.message > div.video-message {
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
 }
+
 /* Add margin only when sender changes */
 .message-sent + .message-received,
 .message-received + .message-sent {
@@ -791,6 +1271,7 @@ div.message > div.video-message {
 .message-received + .message-received {
     margin-top: 0px !important;
 }
+
 body {
     font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     line-height: 1.6;
@@ -1705,7 +2186,7 @@ body.account-page .account-container {
     color: var(--text-primary);
 }
 
-/* Chat Page */
+/* ===== ORIGINAL CHAT STYLES (KEPT FOR BACKWARDS COMPATIBILITY) ===== */
 .chat-container {
     display: flex;
     flex-direction: column;
@@ -1723,7 +2204,6 @@ body.account-page .account-container {
     align-items: center;
     padding: 12px 16px;
     background-color: var(--bg-card);
-    /* REMOVED: border-bottom: 1px solid var(--border-color); */
     width: 100%;
     max-width: 800px;
     position: fixed;
@@ -1800,6 +2280,7 @@ body.account-page .account-container {
 .message-received + .message-received {
     margin-top: 0;
 }
+
 /* More bubblier message content */
 .message-content {
     padding: 14px 18px;
@@ -1869,7 +2350,6 @@ body.account-page .account-container {
     max-width: 800px;
     background-color: var(--bg-card);
     padding: 1rem;
-    /* REMOVED: border-top: 1px solid var(--border-color); */
     box-shadow: var(--shadow);
 }
 
@@ -2202,8 +2682,6 @@ body.account-page .account-container {
         gap: 0;
         z-index: 999;
     }
-    
-
     
     .hero h1 {
         font-size: 2rem;
@@ -2935,6 +3413,5 @@ textarea:focus {
 
 /* Focus outline for accessibility */
 *:focus {
-    
     outline-offset: 2px;
 }

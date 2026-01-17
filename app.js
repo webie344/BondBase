@@ -1,4 +1,4 @@
-//this my app.js help me fix some issues firstly for the chat page the message disappearing when I scroll fastly up and down so fix that when you enter the chat page only render the last 10 message between the user so when you still up to the left there should be a load more button that fetches another 15 if there is and so on until the message are rendered completely also in the messages page with the service worker when I go to the message page it first displays all the old messages that you started the app with like all the old messages list even if you have added new messages list especially when yoh have a long chat history it loads all the old messages until after like a minute before it  shows the newly organisesd  message properly and also add timestamps also I'm the chat page  sometimes when you send messages it doesn't display for the other user until they leave the chat page and go back to it://here's my app.js so you'll know how the profiles are stored:// Firebase configuration
+// Firebase configuration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -55,7 +55,7 @@ const EMOJI_REACTIONS = ['👍', '❤️', '🔥', '😘', '👎', '🤘', '💯
 class IndexedDBCache {
     constructor() {
         this.dbName = 'DatingAppDB';
-        this.dbVersion = 3;
+        this.dbVersion = 4;
         this.db = null;
     }
 
@@ -1403,7 +1403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         .reply-indicator {
             font-size: 12px;
-            color:white;
+            color: #5865F2;
             margin-bottom: 4px;
             display: flex;
             align-items: center;
@@ -1416,8 +1416,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         .reply-message-preview {
-            background: rgba(255, 255, 255, 0.1);
-            border-left: 2px solid var(--accent-color);
+            background: rgba(88, 101, 242, 0.1);
+            border-left: 2px solid #5865F2;
             padding: 6px 10px;
             margin-bottom: 6px;
             border-radius: 6px;
@@ -1969,6 +1969,204 @@ document.addEventListener('DOMContentLoaded', async () => {
         @keyframes recording-pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
+        }
+        
+        /* Discord-style message layout */
+        .message {
+            display: flex;
+            margin: 4px 0;
+            padding: 2px 20px;
+            transition: background-color 0.1s ease;
+            position: relative;
+        }
+        
+        .message:hover {
+            background-color: rgba(79, 84, 92, 0.16);
+        }
+        
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 12px;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        
+        .message-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .message-header {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 2px;
+        }
+        
+        .message-sender {
+            font-weight: 600;
+            color: #fff;
+            font-size: 16px;
+            margin-right: 8px;
+        }
+        
+        .message-time {
+            font-size: 12px;
+            color: #a3a6aa;
+            font-weight: 400;
+        }
+        
+        .message-body {
+            color: #dcddde;
+            font-size: 16px;
+            line-height: 1.375;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        
+        .message-body p {
+            margin: 0;
+        }
+        
+        .message.reply .message-body {
+            margin-top: 4px;
+        }
+        
+        .reply-indicator {
+            font-size: 12px;
+            color: #00aff4;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .reply-indicator i {
+            font-size: 10px;
+        }
+        
+        .reply-message-preview {
+            background: rgba(0, 175, 244, 0.1);
+            border-left: 2px solid #00aff4;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            font-size: 14px;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #b9bbbe;
+        }
+        
+        .message-image {
+            max-width: 400px;
+            max-height: 300px;
+            border-radius: 4px;
+            margin-top: 6px;
+            cursor: pointer;
+            object-fit: cover;
+        }
+        
+        .voice-message {
+            max-width: 300px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            background: #2f3136;
+            margin-top: 6px;
+        }
+        
+        .video-message {
+            max-width: 400px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        
+        .video-message video {
+            width: 100%;
+            height: auto;
+            max-height: 300px;
+            object-fit: cover;
+        }
+        
+        .message-reactions {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        
+        .reaction {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 2px 6px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+        
+        .reaction:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .reaction-count {
+            font-size: 11px;
+            color: #b9bbbe;
+        }
+        
+        .message.sending .message-time {
+            color: #72767d;
+            font-style: italic;
+        }
+        
+        .message.sending .message-body {
+            opacity: 0.7;
+        }
+        
+        .typing-indicator {
+            display: none;
+            padding: 0 20px;
+            margin: 4px 0;
+        }
+        
+        .typing-dots {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: #2f3136;
+            border-radius: 12px;
+            padding: 8px 12px;
+            width: fit-content;
+        }
+        
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #72767d;
+            border-radius: 50%;
+            animation: typing-bounce 1.4s infinite ease-in-out both;
+        }
+        
+        .typing-dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+        
+        .typing-dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+        
+        @keyframes typing-bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
         }
     `;
     document.head.appendChild(style);
@@ -3396,7 +3594,7 @@ function createVideoPlayer(videoUrl, duration) {
     return container;
 }
 
-// UPDATED: Display message function to handle image, voice, and video sending states with offline support
+// UPDATED: Display message function with Discord-style layout
 function displayMessage(message, currentUserId) {
     const messagesContainer = document.getElementById('chatMessages');
     
@@ -3410,16 +3608,44 @@ function displayMessage(message, currentUserId) {
     messageDiv.dataset.messageId = message.id;
     
     if (message.id && (message.id.startsWith('temp_') || message.status === 'sending')) {
-        messageDiv.style.opacity = '0.7';
         messageDiv.classList.add('sending');
+    }
+    
+    // Get avatar URL
+    let avatarUrl = 'images-default-profile.jpg';
+    if (message.senderId === currentUserId) {
+        const currentUserData = cache.get(`user_${currentUserId}`);
+        if (currentUserData && currentUserData.profileImage) {
+            avatarUrl = currentUserData.profileImage;
+        }
+    } else if (chatPartnerId) {
+        const partnerData = cache.get(`partner_${chatPartnerId}`);
+        if (partnerData && partnerData.profileImage) {
+            avatarUrl = partnerData.profileImage;
+        }
+    }
+    
+    // Get sender name
+    let senderName = message.senderId === currentUserId ? 'You' : 'User';
+    if (message.senderId === currentUserId) {
+        const currentUserData = cache.get(`user_${currentUserId}`);
+        if (currentUserData && currentUserData.name) {
+            senderName = currentUserData.name;
+        }
+    } else if (chatPartnerId) {
+        const partnerData = cache.get(`partner_${chatPartnerId}`);
+        if (partnerData && partnerData.name) {
+            senderName = partnerData.name;
+        }
     }
     
     let messageContent = '';
     
+    // Add reply indicator if this is a reply
     if (message.replyTo) {
         const repliedMessage = getRepliedMessage(message.replyTo);
         if (repliedMessage) {
-            const senderName = repliedMessage.senderId === currentUserId ? 'You' : document.getElementById('chatPartnerName').textContent;
+            const repliedSenderName = repliedMessage.senderId === currentUserId ? 'You' : senderName;
             let previewText = '';
             
             if (repliedMessage.text) {
@@ -3434,13 +3660,19 @@ function displayMessage(message, currentUserId) {
             
             messageContent += `
                 <div class="reply-indicator">
-                    <i class="fas fa-reply"></i> Replying to ${senderName}
+                    <i class="fas fa-reply"></i> Replying to ${repliedSenderName}
                 </div>
                 <div class="reply-message-preview">${previewText}</div>
             `;
         }
     }
     
+    // Add message content
+    if (message.text) {
+        messageContent += `<div class="message-body">${message.text}</div>`;
+    }
+    
+    // Add image if present
     if (message.imageUrl) {
         const imageContainer = document.createElement('div');
         imageContainer.style.position = 'relative';
@@ -3462,10 +3694,9 @@ function displayMessage(message, currentUserId) {
         
         imageContainer.appendChild(img);
         messageContent += imageContainer.outerHTML;
-    } else if (message.text) {
-        messageContent += `<p>${message.text}</p>`;
     }
     
+    // Add reactions if present
     if (message.reactions && Object.keys(message.reactions).length > 0) {
         messageContent += `<div class="message-reactions">`;
         for (const [emoji, users] of Object.entries(message.reactions)) {
@@ -3474,6 +3705,7 @@ function displayMessage(message, currentUserId) {
         messageContent += `</div>`;
     }
     
+    // Add timestamp
     let timestampText = '';
     if (message.id && message.id.startsWith('temp_') || message.status === 'sending') {
         timestampText = 'Sending...';
@@ -3484,13 +3716,22 @@ function displayMessage(message, currentUserId) {
         }
     }
     
-    messageContent += `<span class="message-time">${timestampText}</span>`;
+    // Create the complete message HTML with Discord-style layout
+    messageDiv.innerHTML = `
+        <img src="${avatarUrl}" alt="${senderName}" class="message-avatar">
+        <div class="message-content">
+            <div class="message-header">
+                <span class="message-sender">${senderName}</span>
+                <span class="message-time">${timestampText}</span>
+            </div>
+            ${messageContent}
+        </div>
+    `;
     
-    messageDiv.innerHTML = messageContent;
-    
+    // Add voice message if present
     if (message.audioUrl || (message.id && message.id.startsWith('temp_voice'))) {
         const voiceMessageDiv = document.createElement('div');
-        voiceMessageDiv.className = `voice-message ${message.senderId === currentUserId ? 'sent' : 'received'}`;
+        voiceMessageDiv.className = 'voice-message';
         
         if (message.id && message.id.startsWith('temp_voice') || message.status === 'sending') {
             voiceMessageDiv.classList.add('sending');
@@ -3503,13 +3744,13 @@ function displayMessage(message, currentUserId) {
         const audioPlayer = createAudioPlayer(message.audioUrl || '', message.duration || 0);
         voiceMessageDiv.appendChild(audioPlayer);
         
-        const timeSpan = document.createElement('span');
-        timeSpan.className = 'message-time';
-        timeSpan.textContent = timestampText;
-        
-        messageDiv.appendChild(voiceMessageDiv);
+        const messageContentDiv = messageDiv.querySelector('.message-content');
+        if (messageContentDiv) {
+            messageContentDiv.appendChild(voiceMessageDiv);
+        }
     }
     
+    // Add video message if present
     if (message.videoUrl || (message.id && message.id.startsWith('temp_video'))) {
         const videoPlayer = createVideoPlayer(message.videoUrl || '', message.duration || 0);
         
@@ -3521,7 +3762,10 @@ function displayMessage(message, currentUserId) {
             videoPlayer.appendChild(sendingOverlay);
         }
         
-        messageDiv.appendChild(videoPlayer);
+        const messageContentDiv = messageDiv.querySelector('.message-content');
+        if (messageContentDiv) {
+            messageContentDiv.appendChild(videoPlayer);
+        }
     }
     
     messagesContainer.appendChild(messageDiv);
@@ -3885,7 +4129,6 @@ function updateExistingMessage(existingElement, message, currentUserId) {
         const timeElement = existingElement.querySelector('.message-time');
         if (timeElement && timeElement.textContent === 'Sending...') {
             timeElement.textContent = formatTime(message.timestamp);
-            existingElement.style.opacity = '1';
             existingElement.classList.remove('sending');
             
             const sendingIndicator = existingElement.querySelector('.sending-indicator');
@@ -3932,11 +4175,9 @@ function updateMessageReactions(messageElement, message) {
         reactionsContainer = document.createElement('div');
         reactionsContainer.className = 'message-reactions';
         
-        const timeElement = messageElement.querySelector('.message-time');
-        if (timeElement) {
-            messageElement.insertBefore(reactionsContainer, timeElement);
-        } else {
-            messageElement.appendChild(reactionsContainer);
+        const messageContent = messageElement.querySelector('.message-content');
+        if (messageContent) {
+            messageContent.appendChild(reactionsContainer);
         }
     }
     
