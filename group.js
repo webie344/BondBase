@@ -174,6 +174,10 @@ class GroupChat {
         // NEW: Upload tracking
         this.activeUploads = new Map(); // uploadId -> { cancelFunction, progress, type }
         
+        // FIXED: Track processed messages to prevent duplication
+        this.processedMessageIds = new Set();
+        this.lastProcessedIds = new Set();
+        
         this.setupAuthListener();
         this.createReactionModal();
         this.checkRestrictedUsers();
@@ -239,6 +243,10 @@ class GroupChat {
         
         // Clear active uploads
         this.activeUploads.clear();
+        
+        // FIXED: Clear processed message tracking
+        this.processedMessageIds.clear();
+        this.lastProcessedIds.clear();
     }
 
     async loadBlockedUsers() {
@@ -883,7 +891,6 @@ class GroupChat {
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
             
             let isProcessing = false;
-            let lastProcessedIds = new Set();
             
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 if (isProcessing) return;
@@ -898,8 +905,9 @@ class GroupChat {
                         const messageId = doc.id;
                         currentIds.add(messageId);
                         
-                        // Only add if not already processed
-                        if (!lastProcessedIds.has(messageId)) {
+                        // FIXED: Use global processedMessageIds to track all processed messages
+                        if (!this.processedMessageIds.has(messageId)) {
+                            this.processedMessageIds.add(messageId);
                             messages.push({ 
                                 id: messageId, 
                                 ...data,
@@ -910,7 +918,6 @@ class GroupChat {
                     });
                     
                     if (messages.length > 0) {
-                        lastProcessedIds = new Set([...lastProcessedIds, ...currentIds]);
                         callback(messages);
                     }
                 } catch (error) {
@@ -1053,7 +1060,7 @@ class GroupChat {
             if (cached) return cached;
 
             const groupsRef = collection(db, 'groups');
-            const querySnapshot = await getDocs(groupsRef); // FIXED: Changed from getDocs(q) to getDocs(groupsRef)
+            const querySnapshot = await getDocs(groupsRef);
             
             const groupChats = [];
             
@@ -2179,7 +2186,6 @@ class GroupChat {
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
             
             let isProcessing = false;
-            let lastProcessedIds = new Set();
             
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 if (isProcessing) return;
@@ -2194,8 +2200,9 @@ class GroupChat {
                         const messageId = doc.id;
                         currentIds.add(messageId);
                         
-                        // Only add if not already processed
-                        if (!lastProcessedIds.has(messageId)) {
+                        // FIXED: Use global processedMessageIds to track all processed messages
+                        if (!this.processedMessageIds.has(messageId)) {
+                            this.processedMessageIds.add(messageId);
                             messages.push({ 
                                 id: messageId, 
                                 ...data,
@@ -2205,8 +2212,6 @@ class GroupChat {
                     });
                     
                     if (messages.length > 0) {
-                        lastProcessedIds = new Set([...lastProcessedIds, ...currentIds]);
-                        
                         const cacheKey = `messages_${groupId}_${messages.length}`;
                         this.setCachedItem(cacheKey, messages, this.cache.messages, 30000);
                         
@@ -4265,9 +4270,7 @@ function initGroupPage() {
     let typingUnsubscribe = null;
     let typingTimeout = null;
     let lastTypingInputTime = 0;
-    let lastMessageIds = '';
     let renderedMessageIds = new Set(); // Track which messages have been rendered
-    let processedMessageIds = new Set(); // Track which messages have been processed by listener
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -4281,6 +4284,9 @@ function initGroupPage() {
     
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
+    
+    // FIXED: Clear processed message tracking when entering a new group
+    groupChat.processedMessageIds.clear();
     
     // UPDATED: Create typing indicator at top
     typingIndicator = createTypingIndicator();
@@ -4522,9 +4528,8 @@ function initGroupPage() {
                 await loadInitialReactions();
                 // Clear rendered message IDs on initial load
                 renderedMessageIds.clear();
-                processedMessageIds.clear();
                 // Add initial messages to processed set
-                messages.forEach(msg => processedMessageIds.add(msg.id));
+                messages.forEach(msg => groupChat.processedMessageIds.add(msg.id));
                 queueRender();
                 isInitialLoad = false;
             }
@@ -4795,20 +4800,9 @@ function initGroupPage() {
         groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Received messages:', newMessages.length);
             
-            const uniqueMessages = [];
-            const seenIds = new Set();
-            
-            newMessages.forEach(msg => {
-                if (!seenIds.has(msg.id) && !processedMessageIds.has(msg.id)) {
-                    seenIds.add(msg.id);
-                    processedMessageIds.add(msg.id);
-                    uniqueMessages.push(msg);
-                }
-            });
-            
             // Merge with existing messages
             const existingIds = new Set(messages.map(m => m.id));
-            const newUniqueMessages = uniqueMessages.filter(msg => !existingIds.has(msg.id));
+            const newUniqueMessages = newMessages.filter(msg => !existingIds.has(msg.id));
             
             if (newUniqueMessages.length > 0) {
                 messages = [...messages, ...newUniqueMessages];
@@ -6316,9 +6310,7 @@ function initChatPage() {
     let reactionsCache = new Map();
     let isRendering = false;
     let renderQueue = [];
-    let lastMessageIds = '';
     let renderedMessageIds = new Set(); // Track which messages have been rendered
-    let processedMessageIds = new Set(); // Track which messages have been processed by listener
     
     if (!partnerId) {
         alert('No chat partner specified');
@@ -6338,6 +6330,9 @@ function initChatPage() {
     }
     
     groupChat.currentChatPartnerId = partnerId;
+    
+    // FIXED: Clear processed message tracking when entering a new private chat
+    groupChat.processedMessageIds.clear();
     
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
@@ -6530,9 +6525,8 @@ function initChatPage() {
             await loadInitialPrivateReactions();
             // Clear rendered message IDs on initial load
             renderedMessageIds.clear();
-            processedMessageIds.clear();
             // Add initial messages to processed set
-            messages.forEach(msg => processedMessageIds.add(msg.id));
+            messages.forEach(msg => groupChat.processedMessageIds.add(msg.id));
             queueRender();
             
             if (messagesContainer) {
@@ -6544,20 +6538,9 @@ function initChatPage() {
             
             if (!isListening) {
                 groupChat.listenToPrivateMessages(partnerId, (newMessages) => {
-                    const uniqueMessages = [];
-                    const seenIds = new Set();
-                    
-                    newMessages.forEach(msg => {
-                        if (!seenIds.has(msg.id) && !processedMessageIds.has(msg.id)) {
-                            seenIds.add(msg.id);
-                            processedMessageIds.add(msg.id);
-                            uniqueMessages.push(msg);
-                        }
-                    });
-                    
                     // Merge with existing messages
                     const existingIds = new Set(messages.map(m => m.id));
-                    const newUniqueMessages = uniqueMessages.filter(msg => !existingIds.has(msg.id));
+                    const newUniqueMessages = newMessages.filter(msg => !existingIds.has(msg.id));
                     
                     if (newUniqueMessages.length > 0) {
                         messages = [...messages, ...newUniqueMessages];
