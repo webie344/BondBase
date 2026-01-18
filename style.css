@@ -1991,11 +1991,9 @@ body.account-page .account-container {
 }
 .message.sent .message-content{
     
-    border-left:3px solid #8b0000;
+    border-left:2px solid #007AFF;
 }
-.message.received .message-content{
-    
-    border-left:3px solid #007AFF;
+
 }
 .message-sent + .message-received,
 .message-received + .message-sent {
