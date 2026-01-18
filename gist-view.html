@@ -4,26 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Anonymous Gist - View</title>
-    <meta name="description" content="View an anonymous gist shared by someone">
-    
-    <!-- Open Graph Meta Tags for Link Preview -->
-    <meta property="og:title" content="Anonymous Gist">
-    <meta property="og:description" content="Check out this anonymous gist!">
-    <meta property="og:image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous">
-    <meta property="og:url" content="">
-    <meta property="og:type" content="website">
-    
-    <!-- Twitter Card Meta Tags -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Anonymous Gist">
-    <meta name="twitter:description" content="Check out this anonymous gist!">
-    <meta name="twitter:image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous">
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -33,7 +13,7 @@
         }
         
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -86,21 +66,7 @@
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
         
-        .loading-state {
-            text-align: center;
-            padding: 60px 20px;
-        }
-        
-        .loading-spinner {
-            margin-bottom: 20px;
-        }
-        
-        .loading-state p {
-            color: #666;
-            font-size: 16px;
-        }
-        
-        .empty-state {
+        .loading-state, .empty-state {
             text-align: center;
             padding: 60px 20px;
         }
@@ -117,80 +83,6 @@
             font-size: 16px;
         }
         
-        .create-gist-btn {
-            background: #b3004b;
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        
-        .create-gist-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(179, 0, 75, 0.3);
-        }
-        
-        .gist-voice-note {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 15px;
-            margin-top: 15px;
-        }
-        
-        .voice-play-btn {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: #b3004b;
-            color: white;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            cursor: pointer;
-            transition: transform 0.3s;
-        }
-        
-        .voice-play-btn:hover {
-            transform: scale(1.1);
-        }
-        
-        .voice-waveform {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            flex: 1;
-        }
-        
-        .voice-duration {
-            font-size: 14px;
-            color: #666;
-            font-weight: 500;
-        }
-        
-        @keyframes waveform {
-            0%, 100% { transform: scaleY(0.3); }
-            50% { transform: scaleY(1); }
-        }
-        
-        .wave-bar {
-            width: 4px;
-            background: #b3004b;
-            border-radius: 2px;
-            height: 20px;
-        }
-        
         .view-app-btn {
             background: #b3004b;
             color: white;
@@ -203,20 +95,6 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        
-        .view-app-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(179, 0, 75, 0.3);
-        }
-        
-        .stat-item {
-            transition: transform 0.3s;
-        }
-        
-        .stat-item:hover {
-            transform: translateY(-5px);
         }
         
         .footer {
@@ -235,7 +113,7 @@
                 font-size: 24px;
             }
             
-            .create-gist-btn, .view-app-btn {
+            .view-app-btn {
                 padding: 12px 25px;
                 font-size: 14px;
             }
@@ -254,12 +132,21 @@
         
         <div class="gist-view-container" id="gistViewContainer">
             <!-- Gist will be loaded here -->
+            <div class="loading-state">
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                </div>
+                <p>Loading gist...</p>
+            </div>
         </div>
         
         <div class="footer">
             <p>Share anonymous gists with your friends!</p>
         </div>
     </div>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Import the gists.js file -->
     <script type="module" src="gists.js"></script>

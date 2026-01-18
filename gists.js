@@ -1,4 +1,4 @@
-// gists.js - COMPLETE UPDATED VERSION WITH LINK SHARING
+// gists.js - COMPLETE VERSION WITH SHARE PREVIEWS
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -10,6 +10,7 @@ import {
     orderBy, 
     limit, 
     startAfter,
+    where,
     serverTimestamp,
     doc,
     getDoc,
@@ -71,7 +72,7 @@ let currentlyPlayingButton = null;
 function getRandomAvatar() {
     const style = DICEBEAR_AVATARS[Math.floor(Math.random() * DICEBEAR_AVATARS.length)];
     const seed = Math.random().toString(36).substring(7);
-    return `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
+    return `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
 }
 
 // Generate share link for gist
@@ -89,11 +90,12 @@ async function generateGistLink(gistId) {
         // Generate a unique share ID if not exists
         let shareId = gistData.shareId;
         if (!shareId) {
-            shareId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            shareId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
             
             // Update gist with shareId
             await updateDoc(gistRef, {
-                shareId: shareId
+                shareId: shareId,
+                lastShared: serverTimestamp()
             });
             
             console.log('Generated share ID:', shareId);
@@ -101,7 +103,7 @@ async function generateGistLink(gistId) {
         
         // Create the shareable URL
         const baseUrl = window.location.origin;
-        const shareUrl = `${baseUrl}/gist-view.html?share=${shareId}`;
+        const shareUrl = `${baseUrl}/gist-preview.html?share=${shareId}`;
         
         return {
             url: shareUrl,
@@ -114,62 +116,78 @@ async function generateGistLink(gistId) {
     }
 }
 
-// Get gist by share ID
+// Get gist by share ID - FIXED VERSION
 async function getGistByShareId(shareId) {
     try {
-        // Query gists with this shareId
+        console.log('Looking for gist with shareId:', shareId);
+        
+        // First try to find by shareId
         const q = query(
             collection(db, 'gists'),
+            where('shareId', '==', shareId),
             limit(1)
         );
         
         const querySnapshot = await getDocs(q);
         
-        // Since Firestore doesn't support OR queries easily, we'll filter client-side
-        // For better performance, you might want to create a separate collection for share mappings
-        let gistData = null;
-        let gistId = null;
+        if (!querySnapshot.empty) {
+            const doc = querySnapshot.docs[0];
+            const gistData = doc.data();
+            console.log('Found gist by shareId:', doc.id);
+            return {
+                id: doc.id,
+                ...gistData
+            };
+        }
         
-        querySnapshot.forEach((doc) => {
+        // If not found by shareId, try if shareId is actually a gist ID
+        console.log('Not found by shareId, trying as gist ID:', shareId);
+        try {
+            const gistRef = doc(db, 'gists', shareId);
+            const gistSnap = await getDoc(gistRef);
+            
+            if (gistSnap.exists()) {
+                const gistData = gistSnap.data();
+                console.log('Found gist by ID:', shareId);
+                
+                // Generate share ID if not exists
+                if (!gistData.shareId) {
+                    const newShareId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+                    await updateDoc(gistRef, {
+                        shareId: newShareId,
+                        lastShared: serverTimestamp()
+                    });
+                    gistData.shareId = newShareId;
+                }
+                
+                return {
+                    id: shareId,
+                    ...gistData
+                };
+            }
+        } catch (idError) {
+            console.error('Error finding by ID:', idError);
+        }
+        
+        // If still not found, search all gists (fallback)
+        console.log('Searching all gists for shareId:', shareId);
+        const allGistsQuery = query(collection(db, 'gists'), limit(50));
+        const allGistsSnapshot = await getDocs(allGistsQuery);
+        
+        for (const doc of allGistsSnapshot.docs) {
             const data = doc.data();
             if (data.shareId === shareId) {
-                gistData = data;
-                gistId = doc.id;
-            }
-        });
-        
-        if (!gistData) {
-            // Try to find by gistId if shareId is actually a gistId
-            try {
-                const gistRef = doc(db, 'gists', shareId);
-                const gistSnap = await getDoc(gistRef);
-                
-                if (gistSnap.exists()) {
-                    gistData = gistSnap.data();
-                    gistId = shareId;
-                    
-                    // Generate share ID if not exists
-                    if (!gistData.shareId) {
-                        const newShareId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                        await updateDoc(gistRef, {
-                            shareId: newShareId
-                        });
-                        gistData.shareId = newShareId;
-                    }
-                }
-            } catch (error) {
-                console.error('Error finding gist by ID:', error);
+                console.log('Found in all gists search:', doc.id);
+                return {
+                    id: doc.id,
+                    ...data
+                };
             }
         }
         
-        if (!gistData) {
-            return null;
-        }
+        console.log('Gist not found with shareId:', shareId);
+        return null;
         
-        return {
-            id: gistId,
-            ...gistData
-        };
     } catch (error) {
         console.error('Error getting gist by share ID:', error);
         throw error;
@@ -191,6 +209,8 @@ document.addEventListener('DOMContentLoaded', function() {
             initCreateGistPage();
         } else if (currentPage === 'gist') {
             initGistPage();
+        } else if (currentPage === 'gist-preview') {
+            initGistPreviewPage();
         } else if (currentPage === 'gist-view') {
             initGistViewPage();
         }
@@ -241,7 +261,7 @@ function initCreateGistPage() {
         });
     }
 
-    // Voice record button - CHANGED: Don't hide text box
+    // Voice record button
     if (voiceRecordBtn) {
         voiceRecordBtn.addEventListener('click', async (e) => {
             e.preventDefault();
@@ -277,7 +297,6 @@ function initCreateGistPage() {
         bothImageInput.addEventListener('change', (e) => {
             if (e.target.files[0]) {
                 handleImageUpload(e.target.files[0]);
-                // Start voice recording after image selection
                 setTimeout(() => {
                     startVoiceRecording();
                 }, 100);
@@ -338,7 +357,6 @@ function handleImageUpload(file) {
         return;
     }
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
         showNotification('Image must be less than 10MB', 'warning');
         return;
@@ -371,7 +389,6 @@ function showAttachmentPreview(file) {
         </div>
     `;
 
-    // Remove attachment button
     document.getElementById('removeAttachmentBtn').addEventListener('click', () => {
         pendingImageFile = null;
         pendingAudioBlob = null;
@@ -382,19 +399,16 @@ function showAttachmentPreview(file) {
     });
 }
 
-// Voice recording functions - FIXED: Text box stays visible
 async function startVoiceRecording() {
     console.log('Starting voice recording...');
     
     try {
-        // Show voice indicator but DON'T hide text input
         const voiceIndicator = document.getElementById('voiceRecordingIndicator');
         
         if (voiceIndicator) {
             voiceIndicator.style.display = 'flex';
         }
         
-        // Get microphone access
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
@@ -411,7 +425,6 @@ async function startVoiceRecording() {
         
         console.log('Voice recording started');
         
-        // Stop recording after 30 seconds max
         setTimeout(() => {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 stopVoiceRecording();
@@ -422,7 +435,6 @@ async function startVoiceRecording() {
         console.error('Error starting recording:', error);
         showNotification('Could not access microphone. Please check permissions.', 'error');
         
-        // Reset UI on error
         const voiceIndicator = document.getElementById('voiceRecordingIndicator');
         
         if (voiceIndicator) {
@@ -451,11 +463,9 @@ function stopVoiceRecording() {
     clearInterval(recordingTimer);
     mediaRecorder.stop();
     
-    // Stop all tracks
     mediaRecorder.stream.getTracks().forEach(track => track.stop());
     
     mediaRecorder.onstop = async () => {
-        // Hide voice indicator
         const voiceIndicator = document.getElementById('voiceRecordingIndicator');
         
         if (voiceIndicator) {
@@ -467,7 +477,6 @@ function stopVoiceRecording() {
         
         console.log('Voice recorded:', { duration, size: audioBlob.size });
         
-        // Show voice preview modal
         showVoicePreview(audioBlob, duration);
         
         mediaRecorder = null;
@@ -488,7 +497,6 @@ function cancelVoiceRecording() {
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
     
-    // Hide voice indicator
     const voiceIndicator = document.getElementById('voiceRecordingIndicator');
     
     if (voiceIndicator) {
@@ -526,14 +534,12 @@ function showVoicePreview(audioBlob, duration) {
     const audio = new Audio(audioUrl);
     currentlyPlayingAudio = audio;
     
-    // Setup play/pause functionality with waveform
     playPreviewBtn.addEventListener('click', (e) => {
         e.preventDefault();
         if (audio.paused) {
             audio.play();
             playPreviewBtn.innerHTML = '<i class="fas fa-pause"></i>';
             
-            // Animate waveform
             const waveBars = previewWaveform.querySelectorAll('.wave-bar');
             waveBars.forEach((bar, index) => {
                 bar.style.animation = `waveform 1.2s ${index * 0.1}s infinite ease-in-out`;
@@ -542,7 +548,6 @@ function showVoicePreview(audioBlob, duration) {
             audio.pause();
             playPreviewBtn.innerHTML = '<i class="fas fa-play"></i>';
             
-            // Stop waveform animation
             const waveBars = previewWaveform.querySelectorAll('.wave-bar');
             waveBars.forEach(bar => {
                 bar.style.animation = 'none';
@@ -583,7 +588,6 @@ function showVoicePreview(audioBlob, duration) {
         
         pendingAudioBlob = audioBlob;
         
-        // Create a file from the blob
         const voiceFile = new File([audioBlob], `voice-note-${Date.now()}.mp3`, { 
             type: 'audio/mp3'
         });
@@ -597,7 +601,6 @@ function showVoicePreview(audioBlob, duration) {
     });
 }
 
-// FIXED: Update submit button logic
 function updateSubmitButton() {
     const submitBtn = document.getElementById('submitBtn');
     
@@ -605,7 +608,6 @@ function updateSubmitButton() {
     
     const hasMedia = pendingImageFile || pendingAudioBlob;
     
-    // Enable button if there's any media (voice or image)
     submitBtn.disabled = !hasMedia;
     
     console.log('Submit button:', { 
@@ -615,7 +617,6 @@ function updateSubmitButton() {
     });
 }
 
-// Upload to Cloudinary
 async function uploadAudioToCloudinary(audioBlob) {
     console.log('Uploading audio to Cloudinary...');
     
@@ -682,7 +683,6 @@ async function uploadImageToCloudinary(file) {
     }
 }
 
-// Submit gist function - FIXED: Handle both image and audio
 async function submitGist() {
     console.log('Submitting gist...');
     
@@ -694,7 +694,6 @@ async function submitGist() {
         return;
     }
     
-    // Disable submit button
     submitBtn.disabled = true;
     const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
@@ -704,7 +703,7 @@ async function submitGist() {
         let mediaUrl = null;
         let mediaType = null;
         let duration = null;
-        let secondMediaUrl = null; // For when we have both image and audio
+        let secondMediaUrl = null;
         
         console.log('Submitting:', { 
             content, 
@@ -713,21 +712,17 @@ async function submitGist() {
             mediaType: pendingMediaType 
         });
         
-        // Upload media if exists
         if (pendingImageFile || pendingAudioBlob) {
             showNotification('Uploading media...', 'info');
             
             if (pendingMediaType === 'both' && pendingImageFile && pendingAudioBlob) {
                 console.log('Uploading both image and audio');
-                // Upload image
                 const imageUrl = await uploadImageToCloudinary(pendingImageFile);
-                // Upload audio
                 const audioUrl = await uploadAudioToCloudinary(pendingAudioBlob);
                 
-                // Store both URLs - we'll use a custom format
-                mediaUrl = audioUrl; // Primary is audio
-                secondMediaUrl = imageUrl; // Secondary is image
-                mediaType = 'both'; // Special type for both
+                mediaUrl = audioUrl;
+                secondMediaUrl = imageUrl;
+                mediaType = 'both';
                 duration = Math.floor((Date.now() - recordingStartTime) / 1000);
                 
             } else if (pendingImageFile) {
@@ -745,19 +740,16 @@ async function submitGist() {
         
         console.log('Creating gist with:', { content, mediaUrl, mediaType, duration, secondMediaUrl });
         
-        // Create gist
         const gistId = await createGist(content, mediaUrl, mediaType, duration, secondMediaUrl);
         
         if (gistId) {
             showNotification('Gist posted successfully!', 'success');
             
-            // Clear form
             if (gistContent) gistContent.value = '';
             if (pendingImageFile) pendingImageFile = null;
             if (pendingAudioBlob) pendingAudioBlob = null;
             pendingMediaType = null;
             
-            // Reset UI
             resetMediaButtons();
             const attachmentsContainer = document.getElementById('attachmentsContainer');
             if (attachmentsContainer) {
@@ -765,11 +757,9 @@ async function submitGist() {
                 attachmentsContainer.innerHTML = '';
             }
             
-            // Reset character counter
             const charCount = document.getElementById('charCount');
             if (charCount) charCount.textContent = '0';
             
-            // Redirect after delay
             setTimeout(() => {
                 window.location.href = 'gist.html';
             }, 1500);
@@ -781,13 +771,11 @@ async function submitGist() {
         console.error('Error submitting gist:', error);
         showNotification('Failed to create gist: ' + error.message, 'error');
     } finally {
-        // Reset submit button
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
     }
 }
 
-// Create a new gist - UPDATED: Handle both media
 async function createGist(content, mediaUrl = null, mediaType = null, duration = null, secondMediaUrl = null) {
     if (!currentUser) {
         showNotification('Please login to create gists', 'error');
@@ -795,6 +783,8 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
     }
     
     try {
+        const shareId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+        
         const gistData = {
             content: content || '',
             mediaUrl: mediaUrl || null,
@@ -812,16 +802,16 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
             likedBy: [],
             highlightedBy: [],
             repostedBy: [],
-            repostedFrom: null, // For tracking reposted gists
-            originalPostId: null, // For reposted gists
-            containsVoiceNote: (mediaType === 'audio' || mediaType === 'both'), // NEW: Track if contains voice
-            shareId: null // Will be generated when shared
+            repostedFrom: null,
+            originalPostId: null,
+            containsVoiceNote: (mediaType === 'audio' || mediaType === 'both'),
+            shareId: shareId,
+            lastShared: null
         };
         
-        // Store second media URL if we have both
         if (mediaType === 'both' && secondMediaUrl) {
             gistData.secondMediaUrl = secondMediaUrl;
-            gistData.mediaType = 'both'; // Override to indicate both types
+            gistData.mediaType = 'both';
         }
         
         console.log('Saving gist to Firestore:', gistData);
@@ -836,7 +826,6 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
     }
 }
 
-// Initialize gist page
 function initGistPage() {
     console.log('Initializing gist page');
     
@@ -844,21 +833,18 @@ function initGistPage() {
     const loadMoreBtn = document.getElementById('loadMoreGists');
     const gistsContainer = document.getElementById('gistsContainer');
     
-    // Create Gist button
     if (createGistBtn) {
         createGistBtn.addEventListener('click', () => {
             window.location.href = 'create-gist.html';
         });
     }
     
-    // Load More button
     if (loadMoreBtn) {
         loadMoreBtn.addEventListener('click', () => {
             loadGists(lastVisibleGist, 10);
         });
     }
     
-    // Add long press detection for gists
     if (gistsContainer) {
         let pressTimer;
         let longPressTarget = null;
@@ -870,7 +856,7 @@ function initGistPage() {
                 pressTimer = setTimeout(() => {
                     showGistActionsModal(gistCard.dataset.gistId);
                     longPressTarget = null;
-                }, 800); // 800ms for long press
+                }, 800);
             }
         });
         
@@ -882,7 +868,6 @@ function initGistPage() {
             clearTimeout(pressTimer);
         });
         
-        // Touch events for mobile
         gistsContainer.addEventListener('touchstart', (e) => {
             const gistCard = e.target.closest('.gist-card');
             if (gistCard) {
@@ -903,13 +888,11 @@ function initGistPage() {
         });
     }
     
-    // Load initial gists
     loadGists();
     
     console.log('Gist page initialized');
 }
 
-// Load gists
 async function loadGists(lastVisible = null, limitCount = 10) {
     console.log('Loading gists...');
     
@@ -960,7 +943,6 @@ async function loadGists(lastVisible = null, limitCount = 10) {
         const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
         lastVisibleGist = lastDoc;
         
-        // Clear loading state if first load
         if (lastVisible === null) {
             gistsContainer.innerHTML = '';
         }
@@ -996,24 +978,20 @@ async function loadGists(lastVisible = null, limitCount = 10) {
     }
 }
 
-// Display a gist - UPDATED: Show repost icon, highlight icon, and comments
 function displayGist(gist) {
     const gistsContainer = document.getElementById('gistsContainer');
     if (!gistsContainer) return;
     
     const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
     const isReposted = gist.repostedFrom || gist.originalPostId;
-    // ORIGINAL STYLE: Wine red background for avatar container
     const avatarContainerStyle = isReposted ? 'style="border-color:#b3004b;background-color: #b3004b20;"' : '';
     const repostIcon = isReposted ? '<div class="repost-icon"><i class="fas fa-retweet"></i></div>' : '';
     
-    // Check if gist contains voice note
     const containsVoiceNote = gist.containsVoiceNote || gist.mediaType === 'audio' || gist.mediaType === 'both';
     
     let mediaContent = '';
     
     if (gist.mediaType === 'both' && gist.mediaUrl && gist.secondMediaUrl) {
-        // Show both image and audio
         const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
         mediaContent = `
             <div class="gist-media">
@@ -1111,7 +1089,6 @@ function displayGist(gist) {
         </div>
     `;
     
-    // Add event listeners
     const likeBtn = gistElement.querySelector('.like-btn');
     const commentBtn = gistElement.querySelector('.comment-btn');
     const highlightBtn = gistElement.querySelector('.highlight-btn');
@@ -1121,7 +1098,6 @@ function displayGist(gist) {
     
     if (likeBtn) {
         likeBtn.addEventListener('click', () => likeGist(gist.id, likeBtn));
-        // Check if current user already liked this gist
         if (currentUser && gist.likedBy && gist.likedBy.includes(currentUser.uid)) {
             likeBtn.classList.add('liked');
         }
@@ -1133,18 +1109,15 @@ function displayGist(gist) {
     
     if (highlightBtn) {
         highlightBtn.addEventListener('click', () => highlightGist(gist.id, highlightBtn));
-        // Check if current user already highlighted this gist
         if (currentUser && gist.highlightedBy && gist.highlightedBy.includes(currentUser.uid)) {
             highlightBtn.classList.add('highlighted');
         }
     }
     
     if (repostBtn) {
-        // Only add event listener if not a voice note
         if (!containsVoiceNote) {
             repostBtn.addEventListener('click', () => repostGist(gist.id, repostBtn));
         }
-        // Check if current user already reposted this gist
         if (currentUser && gist.repostedBy && gist.repostedBy.includes(currentUser.uid)) {
             repostBtn.classList.add('reposted');
         }
@@ -1164,34 +1137,313 @@ function displayGist(gist) {
     gistsContainer.appendChild(gistElement);
 }
 
-// Initialize gist view page
-function initGistViewPage() {
-    console.log('Initializing gist view page');
+function initGistPreviewPage() {
+    console.log('Initializing gist preview page');
     
-    // Get share ID from URL
     const urlParams = new URLSearchParams(window.location.search);
     const shareId = urlParams.get('share');
     
     if (!shareId) {
-        document.getElementById('gistViewContainer').innerHTML = `
+        window.location.href = 'gist.html';
+        return;
+    }
+    
+    setupPreviewMetaTags(shareId);
+    loadGistForPreview(shareId);
+}
+
+async function setupPreviewMetaTags(shareId) {
+    try {
+        const gist = await getGistByShareId(shareId);
+        
+        if (!gist) {
+            setDefaultMetaTags();
+            return;
+        }
+        
+        const title = gist.content ? `Anonymous Gist: ${gist.content.substring(0, 60)}...` : 'Anonymous Gist';
+        const description = gist.content ? gist.content.substring(0, 150) : 'Check out this anonymous gist!';
+        const image = gist.mediaType === 'image' && gist.mediaUrl ? gist.mediaUrl : 
+                      gist.mediaType === 'both' && gist.secondMediaUrl ? gist.secondMediaUrl : 
+                      gist.authorAvatar || getRandomAvatar();
+        
+        document.title = title;
+        
+        const metaTags = [
+            { property: 'og:title', content: title },
+            { property: 'og:description', content: description },
+            { property: 'og:image', content: image },
+            { property: 'og:url', content: window.location.href },
+            { property: 'og:type', content: 'website' },
+            { property: 'og:site_name', content: 'Anonymous Gists' },
+            { name: 'twitter:card', content: 'summary_large_image' },
+            { name: 'twitter:title', content: title },
+            { name: 'twitter:description', content: description },
+            { name: 'twitter:image', content: image }
+        ];
+        
+        metaTags.forEach(tag => {
+            let meta;
+            if (tag.property) {
+                meta = document.querySelector(`meta[property="${tag.property}"]`);
+                if (!meta) {
+                    meta = document.createElement('meta');
+                    meta.setAttribute('property', tag.property);
+                    document.head.appendChild(meta);
+                }
+                meta.setAttribute('content', tag.content);
+            } else if (tag.name) {
+                meta = document.querySelector(`meta[name="${tag.name}"]`);
+                if (!meta) {
+                    meta = document.createElement('meta');
+                    meta.setAttribute('name', tag.name);
+                    document.head.appendChild(meta);
+                }
+                meta.setAttribute('content', tag.content);
+            }
+        });
+        
+        console.log('Meta tags set for preview:', { title, description, image });
+        
+    } catch (error) {
+        console.error('Error setting meta tags:', error);
+        setDefaultMetaTags();
+    }
+}
+
+function setDefaultMetaTags() {
+    const defaultAvatar = getRandomAvatar();
+    document.title = 'Anonymous Gist';
+    
+    const metaTags = [
+        { property: 'og:title', content: 'Anonymous Gist' },
+        { property: 'og:description', content: 'Check out this anonymous gist!' },
+        { property: 'og:image', content: defaultAvatar },
+        { property: 'og:url', content: window.location.href },
+        { property: 'og:type', content: 'website' },
+        { name: 'twitter:card', content: 'summary_large_image' }
+    ];
+    
+    metaTags.forEach(tag => {
+        let meta = document.querySelector(`meta[property="${tag.property}"]`) || 
+                   document.querySelector(`meta[name="${tag.name}"]`);
+        if (!meta && tag.property) {
+            meta = document.createElement('meta');
+            meta.setAttribute('property', tag.property);
+            document.head.appendChild(meta);
+            meta.setAttribute('content', tag.content);
+        }
+    });
+}
+
+async function loadGistForPreview(shareId) {
+    const container = document.getElementById('gistPreviewContainer');
+    
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div class="loading-state">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+            </div>
+            <p>Loading gist preview...</p>
+        </div>
+    `;
+    
+    try {
+        const gist = await getGistByShareId(shareId);
+        
+        if (!gist) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle fa-3x"></i>
+                    <h3 class="empty-title">Gist Not Found</h3>
+                    <p class="empty-text">This gist has been deleted or the link is invalid.</p>
+                    <button class="view-app-btn" onclick="window.location.href='gist.html'">
+                        <i class="fas fa-home"></i> Go to Home
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        displayGistPreview(gist, container);
+        
+        setTimeout(() => {
+            if (!isCrawler()) {
+                window.location.href = `gist-view.html?share=${shareId}`;
+            }
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error loading gist:', error);
+        container.innerHTML = `
             <div class="empty-state">
-                <i class="fas fa-exclamation-circle fa-3x" style="margin-bottom: 15px; color: #dc3545;"></i>
-                <h3 class="empty-title">Invalid Link</h3>
-                <p class="empty-text">This gist link is invalid or expired.</p>
-                <button class="create-gist-btn" onclick="window.location.href='gist.html'">
+                <i class="fas fa-exclamation-triangle fa-3x"></i>
+                <h3 class="empty-title">Error Loading Gist</h3>
+                <p class="empty-text">Please try again later.</p>
+                <button class="view-app-btn" onclick="window.location.href='gist.html'">
                     <i class="fas fa-home"></i> Go to Home
                 </button>
             </div>
         `;
+    }
+}
+
+function isCrawler() {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const crawlers = [
+        'whatsapp', 'telegram', 'facebook', 'twitter', 'slack',
+        'discord', 'linkedin', 'pinterest', 'reddit', 'tumblr',
+        'googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider',
+        'yandexbot', 'sogou', 'exabot', 'facebot', 'ia_archiver'
+    ];
+    
+    return crawlers.some(crawler => userAgent.includes(crawler));
+}
+
+function displayGistPreview(gist, container) {
+    const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
+    const isReposted = gist.repostedFrom || gist.originalPostId;
+    
+    let mediaContent = '';
+    
+    if (gist.mediaType === 'both' && gist.mediaUrl && gist.secondMediaUrl) {
+        mediaContent = `
+            <div class="preview-media">
+                <img src="${gist.secondMediaUrl}" alt="Gist image" 
+                     style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 10px; margin-top: 15px;">
+                <div class="voice-indicator" style="display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 10px;">
+                    <i class="fas fa-microphone" style="color: #b3004b;"></i>
+                    <span>Voice message</span>
+                </div>
+            </div>
+        `;
+    } else if (gist.mediaType === 'image' && gist.mediaUrl) {
+        mediaContent = `
+            <div class="preview-media">
+                <img src="${gist.mediaUrl}" alt="Gist image" 
+                     style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 10px; margin-top: 15px;">
+            </div>
+        `;
+    } else if (gist.mediaType === 'audio' && gist.mediaUrl) {
+        mediaContent = `
+            <div class="preview-media">
+                <div class="voice-indicator" style="display: flex; align-items: center; gap: 10px; margin-top: 15px; padding: 15px; background: #f5f5f5; border-radius: 10px;">
+                    <i class="fas fa-microphone fa-2x" style="color: #b3004b;"></i>
+                    <div>
+                        <div style="font-weight: bold;">Voice Message</div>
+                        <div style="color: #666; font-size: 14px;">Click to listen</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    const previewHTML = `
+        <div class="gist-preview-card">
+            <div class="preview-header" style="display: flex; align-items: center; margin-bottom: 20px;">
+                <div style="position: relative; margin-right: 15px;">
+                    <img src="${gist.authorAvatar}" alt="Anonymous" 
+                         style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid #b3004b;">
+                    ${isReposted ? '<div style="position: absolute; top: -5px; right: -5px; background: #b3004b; color: white; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px;"><i class="fas fa-retweet"></i></div>' : ''}
+                </div>
+                <div>
+                    <div style="font-weight: bold; font-size: 18px; color: #333;">
+                        Anonymous${isReposted ? ' (Reposted)' : ''}
+                    </div>
+                    <div style="color: #666; font-size: 14px; margin-top: 5px;">
+                        ${timeAgo}
+                    </div>
+                </div>
+            </div>
+            
+            ${gist.content ? `
+                <div class="preview-content" style="font-size: 16px; line-height: 1.6; color: #333; margin-bottom: 20px;">
+                    ${escapeHtml(gist.content)}
+                </div>
+            ` : ''}
+            
+            ${mediaContent}
+            
+            <div class="preview-stats" style="display: flex; justify-content: space-around; margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
+                <div style="text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #b3004b;">
+                        ${gist.likes || 0}
+                    </div>
+                    <div style="font-size: 14px; color: #666; margin-top: 5px;">Likes</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #b3004b;">
+                        ${gist.comments || 0}
+                    </div>
+                    <div style="font-size: 14px; color: #666; margin-top: 5px;">Comments</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #b3004b;">
+                        ${gist.reposts || 0}
+                    </div>
+                    <div style="font-size: 14px; color: #666; margin-top: 5px;">Shares</div>
+                </div>
+            </div>
+            
+            <div class="preview-footer" style="text-align: center; margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
+                <div style="color: #b3004b; font-weight: bold; font-size: 18px; margin-bottom: 10px;">
+                    <i class="fas fa-file-alt"></i> Anonymous Gists
+                </div>
+                <div style="color: #666; font-size: 14px; margin-bottom: 20px;">
+                    Share anonymous thoughts with friends
+                </div>
+                <div style="font-size: 12px; color: #888;">
+                    Open in app to interact with this gist
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = previewHTML;
+    
+    if (!isCrawler()) {
+        const redirectNotice = document.createElement('div');
+        redirectNotice.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: #b3004b;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 14px;
+            z-index: 1000;
+            box-shadow: 0 5px 20px rgba(179, 0, 75, 0.3);
+        `;
+        redirectNotice.innerHTML = `
+            <div>Opening gist in app...</div>
+            <div style="font-size: 12px; opacity: 0.9; margin-top: 5px;">
+                <i class="fas fa-spinner fa-spin"></i> Redirecting in 2 seconds
+            </div>
+        `;
+        document.body.appendChild(redirectNotice);
+    }
+}
+
+function initGistViewPage() {
+    console.log('Initializing gist view page');
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const shareId = urlParams.get('share');
+    
+    if (!shareId) {
+        window.location.href = 'gist.html';
         return;
     }
     
-    // Load the gist
-    loadGistByShareId(shareId);
+    loadGistForView(shareId);
 }
 
-// Load gist by share ID
-async function loadGistByShareId(shareId) {
+async function loadGistForView(shareId) {
     const container = document.getElementById('gistViewContainer');
     
     if (!container) return;
@@ -1211,10 +1463,10 @@ async function loadGistByShareId(shareId) {
         if (!gist) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-exclamation-circle fa-3x" style="margin-bottom: 15px; color: #dc3545;"></i>
+                    <i class="fas fa-exclamation-circle fa-3x"></i>
                     <h3 class="empty-title">Gist Not Found</h3>
                     <p class="empty-text">This gist has been deleted or the link is invalid.</p>
-                    <button class="create-gist-btn" onclick="window.location.href='gist.html'">
+                    <button class="view-app-btn" onclick="window.location.href='gist.html'">
                         <i class="fas fa-home"></i> Go to Home
                     </button>
                 </div>
@@ -1222,21 +1474,16 @@ async function loadGistByShareId(shareId) {
             return;
         }
         
-        // Set meta tags for link preview
-        setMetaTagsForPreview(gist);
-        
-        // Display the gist
-        container.innerHTML = '';
         displayGistView(gist, container);
         
     } catch (error) {
         console.error('Error loading gist:', error);
         container.innerHTML = `
             <div class="empty-state">
-                <i class="fas fa-exclamation-triangle fa-3x" style="margin-bottom: 15px; color: #dc3545;"></i>
+                <i class="fas fa-exclamation-triangle fa-3x"></i>
                 <h3 class="empty-title">Error Loading Gist</h3>
                 <p class="empty-text">Please try again later.</p>
-                <button class="create-gist-btn" onclick="window.location.href='gist.html'">
+                <button class="view-app-btn" onclick="window.location.href='gist.html'">
                     <i class="fas fa-home"></i> Go to Home
                 </button>
             </div>
@@ -1244,46 +1491,9 @@ async function loadGistByShareId(shareId) {
     }
 }
 
-// Set meta tags for link preview
-function setMetaTagsForPreview(gist) {
-    const title = gist.content ? gist.content.substring(0, 100) : 'Anonymous Gist';
-    const description = gist.content ? gist.content.substring(0, 200) : 'Check out this anonymous gist!';
-    const image = gist.mediaType === 'image' && gist.mediaUrl ? gist.mediaUrl : 
-                  gist.mediaType === 'both' && gist.secondMediaUrl ? gist.secondMediaUrl : 
-                  gist.authorAvatar;
-    
-    // Set meta tags
-    document.title = `Anonymous Gist: ${title}`;
-    
-    // Create or update meta tags
-    const metaTags = [
-        { property: 'og:title', content: `Anonymous Gist: ${title}` },
-        { property: 'og:description', content: description },
-        { property: 'og:image', content: image },
-        { property: 'og:url', content: window.location.href },
-        { property: 'og:type', content: 'website' },
-        { property: 'twitter:card', content: 'summary_large_image' },
-        { property: 'twitter:title', content: `Anonymous Gist: ${title}` },
-        { property: 'twitter:description', content: description },
-        { property: 'twitter:image', content: image }
-    ];
-    
-    metaTags.forEach(tag => {
-        let meta = document.querySelector(`meta[property="${tag.property}"]`);
-        if (!meta) {
-            meta = document.createElement('meta');
-            meta.setAttribute('property', tag.property);
-            document.head.appendChild(meta);
-        }
-        meta.setAttribute('content', tag.content);
-    });
-}
-
-// Display gist in view page
 function displayGistView(gist, container) {
     const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
     const isReposted = gist.repostedFrom || gist.originalPostId;
-    const repostIcon = isReposted ? '<div class="repost-icon"><i class="fas fa-retweet"></i></div>' : '';
     
     let mediaContent = '';
     
@@ -1336,106 +1546,321 @@ function displayGistView(gist, container) {
         `;
     }
     
-    const gistElement = document.createElement('div');
-    gistElement.className = 'gist-card-view';
-    gistElement.style.cssText = `
-        max-width: 600px;
-        margin: 0 auto;
-        background: white;
-        border-radius: 20px;
-        padding: 25px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    `;
-    
-    gistElement.innerHTML = `
-        <div class="gist-header" style="display: flex; align-items: center; margin-bottom: 20px;">
-            <div class="gist-avatar-container" style="position: relative; margin-right: 15px;">
-                <img src="${gist.authorAvatar}" alt="Anonymous avatar" 
-                     style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid #b3004b;">
-                ${repostIcon}
-            </div>
-            <div class="gist-info">
-                <div class="gist-author" style="font-weight: bold; font-size: 18px; color: #333;">
-                    Anonymous${isReposted ? ' (Reposted)' : ''}
+    const viewHTML = `
+        <div class="gist-card-view">
+            <div class="gist-header" style="display: flex; align-items: center; margin-bottom: 20px;">
+                <div class="gist-avatar-container" style="position: relative; margin-right: 15px;">
+                    <img src="${gist.authorAvatar}" alt="Anonymous avatar" 
+                         style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid #b3004b;">
+                    ${isReposted ? '<div style="position: absolute; top: -5px; right: -5px; background: #b3004b; color: white; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px;"><i class="fas fa-retweet"></i></div>' : ''}
                 </div>
-                <div class="gist-time" style="color: #666; font-size: 14px; margin-top: 5px;">
-                    ${timeAgo}
+                <div class="gist-info">
+                    <div class="gist-author" style="font-weight: bold; font-size: 18px; color: #333;">
+                        Anonymous${isReposted ? ' (Reposted)' : ''}
+                    </div>
+                    <div class="gist-time" style="color: #666; font-size: 14px; margin-top: 5px;">
+                        ${timeAgo}
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="gist-content">
-            ${gist.content ? `
-                <div class="gist-text" style="font-size: 16px; line-height: 1.6; color: #333; margin-bottom: 20px;">
-                    ${escapeHtml(gist.content)}
+            
+            <div class="gist-content">
+                ${gist.content ? `
+                    <div class="gist-text" style="font-size: 16px; line-height: 1.6; color: #333; margin-bottom: 20px;">
+                        ${escapeHtml(gist.content)}
+                    </div>
+                ` : ''}
+                ${mediaContent}
+            </div>
+            
+            <div class="gist-stats" style="display: flex; justify-content: space-around; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                <div class="stat-item" style="text-align: center;">
+                    <div class="stat-count" style="font-size: 20px; font-weight: bold; color: #b3004b;">
+                        ${gist.likes || 0}
+                    </div>
+                    <div class="stat-label" style="font-size: 14px; color: #666; margin-top: 5px;">
+                        Likes
+                    </div>
                 </div>
-            ` : ''}
-            ${mediaContent}
-        </div>
-        
-        <div class="gist-stats" style="display: flex; justify-content: space-around; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-            <div class="stat-item" style="text-align: center;">
-                <div class="stat-count" style="font-size: 20px; font-weight: bold; color: #b3004b;">
-                    ${gist.likes || 0}
+                <div class="stat-item" style="text-align: center;">
+                    <div class="stat-count" style="font-size: 20px; font-weight: bold; color: #b3004b;">
+                        ${gist.comments || 0}
+                    </div>
+                    <div class="stat-label" style="font-size: 14px; color: #666; margin-top: 5px;">
+                        Comments
+                    </div>
                 </div>
-                <div class="stat-label" style="font-size: 14px; color: #666; margin-top: 5px;">
-                    Likes
+                <div class="stat-item" style="text-align: center;">
+                    <div class="stat-count" style="font-size: 20px; font-weight: bold; color: #b3004b;">
+                        ${gist.reposts || 0}
+                    </div>
+                    <div class="stat-label" style="font-size: 14px; color: #666; margin-top: 5px;">
+                        Shares
+                    </div>
                 </div>
             </div>
-            <div class="stat-item" style="text-align: center;">
-                <div class="stat-count" style="font-size: 20px; font-weight: bold; color: #b3004b;">
-                    ${gist.comments || 0}
-                </div>
-                <div class="stat-label" style="font-size: 14px; color: #666; margin-top: 5px;">
-                    Comments
-                </div>
+            
+            <div class="view-actions" style="margin-top: 30px; text-align: center;">
+                <button class="view-app-btn" onclick="window.location.href='gist.html'"
+                        style="background: #b3004b; color: white; border: none; padding: 12px 30px; 
+                               border-radius: 25px; font-size: 16px; cursor: pointer; font-weight: bold;">
+                    <i class="fas fa-rocket"></i> Open in App
+                </button>
+                <p style="color: #666; margin-top: 15px; font-size: 14px;">
+                    Share anonymous gists with your friends!
+                </p>
             </div>
-            <div class="stat-item" style="text-align: center;">
-                <div class="stat-count" style="font-size: 20px; font-weight: bold; color: #b3004b;">
-                    ${gist.reposts || 0}
-                </div>
-                <div class="stat-label" style="font-size: 14px; color: #666; margin-top: 5px;">
-                    Reposts
-                </div>
-            </div>
-        </div>
-        
-        <div class="view-actions" style="margin-top: 30px; text-align: center;">
-            <button class="view-app-btn" onclick="window.location.href='gist.html'"
-                    style="background: #b3004b; color: white; border: none; padding: 12px 30px; 
-                           border-radius: 25px; font-size: 16px; cursor: pointer; font-weight: bold;">
-                <i class="fas fa-rocket"></i> View in App
-            </button>
-            <p style="color: #666; margin-top: 15px; font-size: 14px;">
-                Share anonymous gists with your friends!
-            </p>
         </div>
     `;
     
-    // Add voice play functionality
-    const voicePlayBtn = gistElement.querySelector('.voice-play-btn');
+    container.innerHTML = viewHTML;
+    
+    const voicePlayBtn = container.querySelector('.voice-play-btn');
     if (voicePlayBtn && gist.mediaUrl && (gist.mediaType === 'audio' || gist.mediaType === 'both')) {
         voicePlayBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            playGistVoice(gist.mediaUrl, voicePlayBtn, gistElement.querySelector('.voice-waveform'));
+            playGistVoice(gist.mediaUrl, voicePlayBtn, container.querySelector('.voice-waveform'));
         });
     }
-    
-    container.appendChild(gistElement);
 }
 
-// Show gist actions modal on long press
-function showGistActionsModal(gistId) {
-    console.log('Showing actions for gist:', gistId);
+async function shareGist(gistId, button = null) {
+    try {
+        showNotification('Generating share link...', 'info');
+        
+        const shareInfo = await generateGistLink(gistId);
+        const shareUrl = shareInfo.url;
+        
+        console.log('Share URL:', shareUrl);
+        
+        const gistRef = doc(db, 'gists', gistId);
+        const gistSnap = await getDoc(gistRef);
+        
+        if (!gistSnap.exists()) {
+            throw new Error('Gist not found');
+        }
+        
+        const gistData = gistSnap.data();
+        const shareText = gistData.content ? 
+            `Check out this anonymous gist: "${gistData.content.substring(0, 100)}${gistData.content.length > 100 ? '...' : ''}"` : 
+            'Check out this anonymous gist!';
+        
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Anonymous Gist',
+                    text: shareText,
+                    url: shareUrl
+                });
+                showNotification('Shared successfully!', 'success');
+                return;
+            } catch (shareError) {
+                console.log('Web Share cancelled or failed:', shareError);
+            }
+        }
+        
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            showNotification('Link copied to clipboard!', 'success');
+            
+            showShareModal(shareUrl, gistId, shareText);
+            
+        } catch (clipboardError) {
+            console.error('Clipboard error:', clipboardError);
+            showShareModal(shareUrl, gistId, shareText);
+        }
+        
+    } catch (error) {
+        console.error('Error sharing gist:', error);
+        showNotification('Failed to share: ' + error.message, 'error');
+    }
+}
+
+function showShareModal(shareUrl, gistId, shareText) {
+    let modal = document.getElementById('shareModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'shareModal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px; border-radius: 20px;">
+                <div class="modal-header">
+                    <h3>Share Gist</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="share-url-container" style="margin-bottom: 20px;">
+                        <input type="text" id="shareUrlInput" readonly 
+                               style="width: 100%; padding: 12px; border: 1px solid #ddd; 
+                                      border-radius: 10px; font-size: 14px; margin-bottom: 10px;">
+                        <button id="copyUrlBtn" 
+                                style="width: 100%; padding: 12px; background: #b3004b; 
+                                       color: white; border: none; border-radius: 10px; 
+                                       cursor: pointer; font-size: 16px;">
+                            <i class="fas fa-copy"></i> Copy Link
+                        </button>
+                    </div>
+                    <div class="share-platforms" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <button class="platform-btn" data-platform="whatsapp">
+                            <i class="fab fa-whatsapp"></i> WhatsApp
+                        </button>
+                        <button class="platform-btn" data-platform="telegram">
+                            <i class="fab fa-telegram"></i> Telegram
+                        </button>
+                        <button class="platform-btn" data-platform="twitter">
+                            <i class="fab fa-twitter"></i> Twitter
+                        </button>
+                        <button class="platform-btn" data-platform="facebook">
+                            <i class="fab fa-facebook"></i> Facebook
+                        </button>
+                        <button class="platform-btn" data-platform="instagram">
+                            <i class="fab fa-instagram"></i> Instagram
+                        </button>
+                        <button class="platform-btn" data-platform="messenger">
+                            <i class="fab fa-facebook-messenger"></i> Messenger
+                        </button>
+                    </div>
+                    <button id="closeShareBtn" 
+                            style="width: 100%; padding: 12px; margin-top: 20px; 
+                                   background: #f5f5f5; color: #333; border: none; 
+                                   border-radius: 10px; cursor: pointer; font-size: 16px;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        const styles = document.createElement('style');
+        styles.textContent += `
+            #shareModal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 10002;
+            }
+            .platform-btn {
+                padding: 15px 10px;
+                border: 1px solid #ddd;
+                border-radius: 10px;
+                background: white;
+                color: #333;
+                cursor: pointer;
+                font-size: 12px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+                transition: all 0.3s;
+            }
+            .platform-btn:hover {
+                background: #f5f5f5;
+                transform: translateY(-2px);
+            }
+            .platform-btn i {
+                font-size: 20px;
+                margin-bottom: 5px;
+            }
+            .platform-btn[data-platform="whatsapp"] i { color: #25D366; }
+            .platform-btn[data-platform="telegram"] i { color: #0088cc; }
+            .platform-btn[data-platform="twitter"] i { color: #1DA1F2; }
+            .platform-btn[data-platform="facebook"] i { color: #1877F2; }
+            .platform-btn[data-platform="instagram"] i { color: #E4405F; }
+            .platform-btn[data-platform="messenger"] i { color: #006AFF; }
+        `;
+        document.head.appendChild(styles);
+    }
     
-    // First check if gist contains voice note
+    const urlInput = modal.querySelector('#shareUrlInput');
+    if (urlInput) {
+        urlInput.value = shareUrl;
+    }
+    
+    modal.style.display = 'flex';
+    
+    const closeBtn = modal.querySelector('.modal-close');
+    const closeShareBtn = modal.querySelector('#closeShareBtn');
+    const copyUrlBtn = modal.querySelector('#copyUrlBtn');
+    const platformBtns = modal.querySelectorAll('.platform-btn');
+    
+    const closeModal = () => {
+        modal.style.display = 'none';
+    };
+    
+    closeBtn.onclick = closeModal;
+    closeShareBtn.onclick = closeModal;
+    
+    copyUrlBtn.onclick = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            showNotification('Link copied to clipboard!', 'success');
+            closeModal();
+        } catch (error) {
+            console.error('Copy failed:', error);
+            showNotification('Failed to copy link', 'error');
+        }
+    };
+    
+    platformBtns.forEach(btn => {
+        btn.onclick = () => {
+            const platform = btn.dataset.platform;
+            shareToPlatform(shareUrl, platform, shareText);
+            closeModal();
+        };
+    });
+    
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
+}
+
+function shareToPlatform(url, platform, text = 'Check out this anonymous gist!') {
+    let shareUrl = '';
+    
+    switch (platform) {
+        case 'whatsapp':
+            shareUrl = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
+            break;
+        case 'telegram':
+            shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+            break;
+        case 'twitter':
+            shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+            break;
+        case 'facebook':
+            shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+            break;
+        case 'instagram':
+            showNotification('Copy the link and paste it in Instagram', 'info');
+            navigator.clipboard.writeText(url);
+            return;
+        case 'messenger':
+            shareUrl = `fb-messenger://share?link=${encodeURIComponent(url)}`;
+            break;
+        default:
+            shareUrl = url;
+    }
+    
+    if (shareUrl) {
+        window.open(shareUrl, '_blank', 'noopener,noreferrer');
+    }
+}
+
+function showGistActionsModal(gistId) {
     checkIfGistHasVoiceNote(gistId).then(hasVoiceNote => {
         if (hasVoiceNote) {
             showNotification('Cannot repost gists with voice notes', 'warning');
             return;
         }
         
-        // Create modal if it doesn't exist
         let modal = document.getElementById('gistActionsModal');
         if (!modal) {
             modal = document.createElement('div');
@@ -1462,7 +1887,6 @@ function showGistActionsModal(gistId) {
             `;
             document.body.appendChild(modal);
             
-            // Add styles
             const styles = document.createElement('style');
             styles.textContent = `
                 #gistActionsModal {
@@ -1532,10 +1956,8 @@ function showGistActionsModal(gistId) {
             document.head.appendChild(styles);
         }
         
-        // Show modal
         modal.style.display = 'flex';
         
-        // Set up event listeners
         const repostBtn = document.getElementById('repostActionBtn');
         const highlightBtn = document.getElementById('highlightActionBtn');
         const cancelBtn = document.getElementById('cancelActionBtn');
@@ -1561,7 +1983,6 @@ function showGistActionsModal(gistId) {
         cancelBtn.onclick = closeModal;
         closeBtn.onclick = closeModal;
         
-        // Close when clicking outside
         modal.onclick = (e) => {
             if (e.target === modal) {
                 closeModal();
@@ -1573,7 +1994,6 @@ function showGistActionsModal(gistId) {
     });
 }
 
-// Check if gist has voice note
 async function checkIfGistHasVoiceNote(gistId) {
     try {
         const gistRef = doc(db, 'gists', gistId);
@@ -1585,7 +2005,6 @@ async function checkIfGistHasVoiceNote(gistId) {
         
         const gistData = gistSnap.data();
         
-        // Check if gist contains voice note
         return gistData.containsVoiceNote || 
                gistData.mediaType === 'audio' || 
                gistData.mediaType === 'both' ||
@@ -1597,11 +2016,9 @@ async function checkIfGistHasVoiceNote(gistId) {
     }
 }
 
-// Open comments modal
 function openCommentsModal(gistId) {
     console.log('Opening comments for gist:', gistId);
     
-    // Create modal if it doesn't exist
     let modal = document.getElementById('commentsModal');
     if (!modal) {
         modal = document.createElement('div');
@@ -1630,7 +2047,6 @@ function openCommentsModal(gistId) {
         `;
         document.body.appendChild(modal);
         
-        // Add styles
         const styles = document.createElement('style');
         styles.textContent += `
             #commentsModal {
@@ -1688,14 +2104,11 @@ function openCommentsModal(gistId) {
         document.head.appendChild(styles);
     }
     
-    // Show modal
     modal.style.display = 'flex';
     modal.dataset.currentGist = gistId;
     
-    // Load comments
     loadComments(gistId);
     
-    // Set up event listeners
     const closeBtn = modal.querySelector('.modal-close');
     const commentForm = document.getElementById('commentForm');
     const commentInput = document.getElementById('commentInput');
@@ -1727,7 +2140,6 @@ function openCommentsModal(gistId) {
             commentInput.value = '';
             await loadComments(gistId);
             
-            // Update comment count on the gist
             const commentBtn = document.querySelector(`[data-gist-id="${gistId}"] .comment-btn .action-count`);
             if (commentBtn) {
                 const currentCount = parseInt(commentBtn.textContent) || 0;
@@ -1743,7 +2155,6 @@ function openCommentsModal(gistId) {
         }
     };
     
-    // Close when clicking outside
     modal.onclick = (e) => {
         if (e.target === modal) {
             closeModal();
@@ -1751,7 +2162,6 @@ function openCommentsModal(gistId) {
     };
 }
 
-// Load comments for a gist
 async function loadComments(gistId) {
     const modal = document.getElementById('commentsModal');
     if (!modal) return;
@@ -1762,7 +2172,6 @@ async function loadComments(gistId) {
     commentsList.innerHTML = '<div class="loading-comments">Loading comments...</div>';
     
     try {
-        // Get the gist document
         const gistRef = doc(db, 'gists', gistId);
         const gistSnap = await getDoc(gistRef);
         
@@ -1773,7 +2182,6 @@ async function loadComments(gistId) {
         
         const gistData = gistSnap.data();
         
-        // Get comments from the comments subcollection
         const commentsQuery = query(
             collection(db, 'gists', gistId, 'comments'),
             orderBy('timestamp', 'desc')
@@ -1809,14 +2217,12 @@ async function loadComments(gistId) {
     }
 }
 
-// Post a comment
 async function postComment(gistId, content) {
     if (!currentUser) {
         throw new Error('User not logged in');
     }
     
     try {
-        // Add comment to subcollection
         const commentData = {
             content: content,
             authorId: currentUser.uid,
@@ -1825,10 +2231,8 @@ async function postComment(gistId, content) {
             createdAt: new Date().toISOString()
         };
         
-        // Add comment to subcollection
         await addDoc(collection(db, 'gists', gistId, 'comments'), commentData);
         
-        // Update comment count on gist using transaction
         const gistRef = doc(db, 'gists', gistId);
         await runTransaction(db, async (transaction) => {
             const gistDoc = await transaction.get(gistRef);
@@ -1851,7 +2255,6 @@ async function postComment(gistId, content) {
     }
 }
 
-// Like a gist
 async function likeGist(gistId, button) {
     if (!currentUser) {
         showNotification('Please login to like gists', 'warning');
@@ -1872,14 +2275,12 @@ async function likeGist(gistId, button) {
             const isLiked = likedBy.includes(currentUser.uid);
             
             if (isLiked) {
-                // Unlike
                 transaction.update(gistRef, {
                     likes: (gistData.likes || 1) - 1,
                     likedBy: arrayRemove(currentUser.uid)
                 });
                 button.classList.remove('liked');
             } else {
-                // Like
                 transaction.update(gistRef, {
                     likes: (gistData.likes || 0) + 1,
                     likedBy: arrayUnion(currentUser.uid)
@@ -1902,7 +2303,6 @@ async function likeGist(gistId, button) {
     }
 }
 
-// Highlight a gist
 async function highlightGist(gistId, button) {
     if (!currentUser) {
         showNotification('Please login to highlight gists', 'warning');
@@ -1923,14 +2323,12 @@ async function highlightGist(gistId, button) {
             const isHighlighted = highlightedBy.includes(currentUser.uid);
             
             if (isHighlighted) {
-                // Unhighlight
                 transaction.update(gistRef, {
                     highlights: (gistData.highlights || 1) - 1,
                     highlightedBy: arrayRemove(currentUser.uid)
                 });
                 button.classList.remove('highlighted');
             } else {
-                // Highlight
                 transaction.update(gistRef, {
                     highlights: (gistData.highlights || 0) + 1,
                     highlightedBy: arrayUnion(currentUser.uid)
@@ -1953,7 +2351,6 @@ async function highlightGist(gistId, button) {
     }
 }
 
-// Repost a gist - UPDATED: Check for voice notes before reposting
 async function repostGist(gistId, button = null) {
     if (!currentUser) {
         showNotification('Please login to repost gists', 'warning');
@@ -1970,7 +2367,6 @@ async function repostGist(gistId, button = null) {
         
         const originalGist = gistSnap.data();
         
-        // Check if gist contains voice note
         const hasVoiceNote = originalGist.containsVoiceNote || 
                             originalGist.mediaType === 'audio' || 
                             originalGist.mediaType === 'both';
@@ -1988,10 +2384,8 @@ async function repostGist(gistId, button = null) {
             return;
         }
         
-        // Show loading
         showNotification('Reposting...', 'info');
         
-        // Create repost
         const repostData = {
             content: originalGist.content || '',
             mediaUrl: originalGist.mediaUrl || null,
@@ -2010,15 +2404,13 @@ async function repostGist(gistId, button = null) {
             likedBy: [],
             highlightedBy: [],
             repostedBy: [],
-            repostedFrom: originalGist.repostedFrom || gistId, // Track original if already a repost
-            originalPostId: originalGist.originalPostId || gistId, // Always track original
-            containsVoiceNote: false // Voice notes cannot be reposted
+            repostedFrom: originalGist.repostedFrom || gistId,
+            originalPostId: originalGist.originalPostId || gistId,
+            containsVoiceNote: false
         };
         
-        // Add repost
         const repostRef = await addDoc(collection(db, 'gists'), repostData);
         
-        // Update original gist repost count
         await runTransaction(db, async (transaction) => {
             const originalDoc = await transaction.get(gistRef);
             if (!originalDoc.exists()) {
@@ -2032,7 +2424,6 @@ async function repostGist(gistId, button = null) {
             });
         });
         
-        // Update button if provided
         if (button) {
             button.classList.add('reposted');
             const countSpan = button.querySelector('.action-count');
@@ -2044,11 +2435,10 @@ async function repostGist(gistId, button = null) {
         
         showNotification('Gist reposted!', 'success');
         
-        // Refresh gists to show the new repost
         setTimeout(() => {
             const gistsContainer = document.getElementById('gistsContainer');
             if (gistsContainer && gistsContainer.innerHTML) {
-                loadGists(null, 10); // Reload first 10 gists
+                loadGists(null, 10);
             }
         }, 1000);
         
@@ -2058,245 +2448,9 @@ async function repostGist(gistId, button = null) {
     }
 }
 
-// Share gist - UPDATED: Generate link first
-async function shareGist(gistId, button = null) {
-    try {
-        showNotification('Generating share link...', 'info');
-        
-        // Generate or get share link
-        const shareInfo = await generateGistLink(gistId);
-        const shareUrl = shareInfo.url;
-        
-        console.log('Share URL:', shareUrl);
-        
-        // Try Web Share API first
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: 'Anonymous Gist',
-                    text: 'Check out this anonymous gist!',
-                    url: shareUrl
-                });
-                showNotification('Shared successfully!', 'success');
-                return;
-            } catch (shareError) {
-                console.log('Web Share cancelled or failed:', shareError);
-                // Continue to clipboard fallback
-            }
-        }
-        
-        // Fallback: Copy to clipboard
-        try {
-            await navigator.clipboard.writeText(shareUrl);
-            showNotification('Link copied to clipboard!', 'success');
-            
-            // Show share modal with options
-            showShareModal(shareUrl, gistId);
-            
-        } catch (clipboardError) {
-            console.error('Clipboard error:', clipboardError);
-            // Fallback: Show modal with URL
-            showShareModal(shareUrl, gistId);
-        }
-        
-    } catch (error) {
-        console.error('Error sharing gist:', error);
-        showNotification('Failed to share: ' + error.message, 'error');
-    }
-}
-
-// Show share modal with options
-function showShareModal(shareUrl, gistId) {
-    // Create modal if it doesn't exist
-    let modal = document.getElementById('shareModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'shareModal';
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 400px; border-radius: 20px;">
-                <div class="modal-header">
-                    <h3>Share Gist</h3>
-                    <button class="modal-close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="share-url-container" style="margin-bottom: 20px;">
-                        <input type="text" id="shareUrlInput" readonly 
-                               style="width: 100%; padding: 12px; border: 1px solid #ddd; 
-                                      border-radius: 10px; font-size: 14px; margin-bottom: 10px;">
-                        <button id="copyUrlBtn" 
-                                style="width: 100%; padding: 12px; background: #b3004b; 
-                                       color: white; border: none; border-radius: 10px; 
-                                       cursor: pointer; font-size: 16px;">
-                            <i class="fas fa-copy"></i> Copy Link
-                        </button>
-                    </div>
-                    <div class="share-platforms" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                        <button class="platform-btn" data-platform="whatsapp">
-                            <i class="fab fa-whatsapp"></i> WhatsApp
-                        </button>
-                        <button class="platform-btn" data-platform="telegram">
-                            <i class="fab fa-telegram"></i> Telegram
-                        </button>
-                        <button class="platform-btn" data-platform="twitter">
-                            <i class="fab fa-twitter"></i> Twitter
-                        </button>
-                        <button class="platform-btn" data-platform="facebook">
-                            <i class="fab fa-facebook"></i> Facebook
-                        </button>
-                        <button class="platform-btn" data-platform="instagram">
-                            <i class="fab fa-instagram"></i> Instagram
-                        </button>
-                        <button class="platform-btn" data-platform="messenger">
-                            <i class="fab fa-facebook-messenger"></i> Messenger
-                        </button>
-                    </div>
-                    <button id="closeShareBtn" 
-                            style="width: 100%; padding: 12px; margin-top: 20px; 
-                                   background: #f5f5f5; color: #333; border: none; 
-                                   border-radius: 10px; cursor: pointer; font-size: 16px;">
-                        Close
-                    </button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        
-        // Add styles
-        const styles = document.createElement('style');
-        styles.textContent += `
-            #shareModal {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0, 0, 0, 0.5);
-                display: none;
-                justify-content: center;
-                align-items: center;
-                z-index: 10002;
-            }
-            .platform-btn {
-                padding: 15px 10px;
-                border: 1px solid #ddd;
-                border-radius: 10px;
-                background: white;
-                color: #333;
-                cursor: pointer;
-                font-size: 12px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 5px;
-                transition: all 0.3s;
-            }
-            .platform-btn:hover {
-                background: #f5f5f5;
-                transform: translateY(-2px);
-            }
-            .platform-btn i {
-                font-size: 20px;
-                margin-bottom: 5px;
-            }
-            .platform-btn[data-platform="whatsapp"] i { color: #25D366; }
-            .platform-btn[data-platform="telegram"] i { color: #0088cc; }
-            .platform-btn[data-platform="twitter"] i { color: #1DA1F2; }
-            .platform-btn[data-platform="facebook"] i { color: #1877F2; }
-            .platform-btn[data-platform="instagram"] i { color: #E4405F; }
-            .platform-btn[data-platform="messenger"] i { color: #006AFF; }
-        `;
-        document.head.appendChild(styles);
-    }
-    
-    // Set URL input value
-    const urlInput = modal.querySelector('#shareUrlInput');
-    if (urlInput) {
-        urlInput.value = shareUrl;
-    }
-    
-    // Show modal
-    modal.style.display = 'flex';
-    
-    // Set up event listeners
-    const closeBtn = modal.querySelector('.modal-close');
-    const closeShareBtn = modal.querySelector('#closeShareBtn');
-    const copyUrlBtn = modal.querySelector('#copyUrlBtn');
-    const platformBtns = modal.querySelectorAll('.platform-btn');
-    
-    const closeModal = () => {
-        modal.style.display = 'none';
-    };
-    
-    closeBtn.onclick = closeModal;
-    closeShareBtn.onclick = closeModal;
-    
-    copyUrlBtn.onclick = async () => {
-        try {
-            await navigator.clipboard.writeText(shareUrl);
-            showNotification('Link copied to clipboard!', 'success');
-            closeModal();
-        } catch (error) {
-            console.error('Copy failed:', error);
-            showNotification('Failed to copy link', 'error');
-        }
-    };
-    
-    // Platform sharing
-    platformBtns.forEach(btn => {
-        btn.onclick = () => {
-            const platform = btn.dataset.platform;
-            shareToPlatform(shareUrl, platform);
-            closeModal();
-        };
-    });
-    
-    // Close when clicking outside
-    modal.onclick = (e) => {
-        if (e.target === modal) {
-            closeModal();
-        }
-    };
-}
-
-// Share to specific platform
-function shareToPlatform(url, platform) {
-    const text = 'Check out this anonymous gist!';
-    let shareUrl = '';
-    
-    switch (platform) {
-        case 'whatsapp':
-            shareUrl = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
-            break;
-        case 'telegram':
-            shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
-            break;
-        case 'twitter':
-            shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-            break;
-        case 'facebook':
-            shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-            break;
-        case 'instagram':
-            // Instagram doesn't have a direct share URL, show message
-            showNotification('Copy the link and paste it in Instagram', 'info');
-            navigator.clipboard.writeText(url);
-            return;
-        case 'messenger':
-            shareUrl = `fb-messenger://share?link=${encodeURIComponent(url)}`;
-            break;
-    }
-    
-    if (shareUrl) {
-        window.open(shareUrl, '_blank', 'noopener,noreferrer');
-    }
-}
-
-// Play voice note - FIXED: Pause button works
 function playGistVoice(audioUrl, button, waveform) {
     if (!button || !audioUrl) return;
     
-    // Stop currently playing audio if any
     if (currentlyPlayingAudio && currentlyPlayingButton && currentlyPlayingButton !== button) {
         currentlyPlayingAudio.pause();
         currentlyPlayingButton.innerHTML = '<i class="fas fa-play"></i>';
@@ -2324,7 +2478,6 @@ function playGistVoice(audioUrl, button, waveform) {
         currentlyPlayingAudio = audio;
         currentlyPlayingButton = button;
         
-        // Animate waveform
         waveBars.forEach((bar, index) => {
             bar.style.animation = `waveform 1.2s ${index * 0.1}s infinite ease-in-out`;
         });
@@ -2332,7 +2485,6 @@ function playGistVoice(audioUrl, button, waveform) {
         audio.pause();
         button.innerHTML = '<i class="fas fa-play"></i>';
         
-        // Stop animation
         waveBars.forEach(bar => {
             bar.style.animation = 'none';
         });
@@ -2357,7 +2509,6 @@ function playGistVoice(audioUrl, button, waveform) {
     };
 }
 
-// Helper functions
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -2408,11 +2559,9 @@ function formatTime(timestamp) {
     }
 }
 
-// Notification function with better mobile support
 function showNotification(message, type = 'info') {
     console.log(`[${type.toUpperCase()}] ${message}`);
     
-    // Create simple notification
     const notification = document.createElement('div');
     notification.className = `gist-notification ${type}`;
     notification.style.cssText = `
@@ -2436,7 +2585,6 @@ function showNotification(message, type = 'info') {
         font-size: 14px;
     `;
     
-    // Add animation styles
     if (!document.getElementById('gist-notification-styles')) {
         const styles = document.createElement('style');
         styles.id = 'gist-notification-styles';
@@ -2506,13 +2654,11 @@ function showNotification(message, type = 'info') {
         </button>
     `;
     
-    // Remove any existing notifications
     const existingNotifications = document.querySelectorAll('.gist-notification');
     existingNotifications.forEach(n => n.remove());
     
     document.body.appendChild(notification);
     
-    // Auto remove after duration
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => {
@@ -2525,19 +2671,21 @@ function showNotification(message, type = 'info') {
     return notification;
 }
 
-// Batch generate share IDs for existing gists (optional)
 async function generateShareIdsForAllGists() {
     try {
+        showNotification('Generating share links for all gists...', 'info');
+        
         const querySnapshot = await getDocs(collection(db, 'gists'));
         
         const promises = [];
         querySnapshot.forEach((doc) => {
             const gistData = doc.data();
             if (!gistData.shareId) {
-                const shareId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                const shareId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
                 promises.push(
                     updateDoc(doc.ref, {
-                        shareId: shareId
+                        shareId: shareId,
+                        lastShared: serverTimestamp()
                     })
                 );
             }
@@ -2553,5 +2701,5 @@ async function generateShareIdsForAllGists() {
     }
 }
 
-// Optional: Run this once to generate share IDs for all existing gists
+// To generate share IDs for all existing gists, run this once:
 // generateShareIdsForAllGists();
