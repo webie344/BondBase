@@ -42,6 +42,7 @@
     padding: 20px;
     background: var(--bg-primary);
     position: relative;
+    
 }
 /* ===== FIXED VIDEO MESSAGE ALIGNMENT FOR DISCORD-STYLE ===== */
 
@@ -609,6 +610,7 @@ body.discord-style .message-sent .message-image {
     body.discord-style .message-sent .message-image {
         margin-left: auto !important;
         margin-right: 48px !important;
+        border-left:1px solid #8b0000!important;
     }
     
     body.discord-style .message:has(.video-message) .message-meta,
@@ -1985,8 +1987,16 @@ body.account-page .account-container {
     flex-direction: column;
     max-width: 70%;
     width: fit-content;
+    
 }
-
+.message.sent .message-content{
+    
+    border-left:3px solid #8b0000;
+}
+.message.received .message-content{
+    
+    border-left:3px solid #007AFF;
+}
 .message-sent + .message-received,
 .message-received + .message-sent {
     margin-top: 15px;
@@ -2006,7 +2016,7 @@ body.account-page .account-container {
     overflow-wrap: break-word;
     hyphens: auto;
     max-width: 100%;
-    line-height: 1.4;
+    line-height: 1;
 }
 
 /* ===== FIX: COLORED LEFT BORDERS FOR ALL MESSAGES ===== */
@@ -2014,12 +2024,12 @@ body.account-page .account-container {
 .message-sent .message-content {
     background-color: var(--primary) !important;
     color: white !important;
-    border-left: 4px solid #007AFF !important; /* Blue border for sent messages */
+    border-left: 4px solid #8b0000 !important; /* Blue border for sent messages */
     border-bottom-right-radius: 8px !important;
     box-shadow: 0 2px 8px rgba(179, 0, 75, 0.3) !important;
 }
 
-.message-received .message-content {
+.message-received {
     background-color: var(--bg-card) !important;
     color: var(--text-primary) !important;
     border-left: 4px solid #FF3B30 !important; /* Red border for received messages */
