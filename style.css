@@ -2009,20 +2009,109 @@ body.account-page .account-container {
     line-height: 1.4;
 }
 
+/* ===== FIX: COLORED LEFT BORDERS FOR ALL MESSAGES ===== */
+/* Regular chat style - override existing borders */
 .message-sent .message-content {
-    background-color: var(--primary);
-    color: white;
-    border-bottom-right-radius: 8px; /* More bubbly */
-    box-shadow: 0 2px 8px rgba(179, 0, 75, 0.3);
+    background-color: var(--primary) !important;
+    color: white !important;
+    border-left: 4px solid #007AFF !important; /* Blue border for sent messages */
+    border-bottom-right-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(179, 0, 75, 0.3) !important;
 }
 
 .message-received .message-content {
-    background-color: var(--bg-card);
-    color: var(--text-primary);
-    border-bottom-left-radius: 8px; /* More bubbly */
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--border);
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-left: 4px solid #FF3B30 !important; /* Red border for received messages */
+    border-bottom-left-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    border: 1px solid var(--border) !important;
 }
+
+/* Discord-style messages */
+body.discord-style .message-sent .message-text,
+body.discord-style .message-sent .message-content p {
+    border-left: 4px solid #007AFF !important; /* Blue border for sent messages */
+    background: rgba(0, 122, 255, 0.15) !important; /* Light blue background */
+}
+
+body.discord-style .message-received .message-text,
+body.discord-style .message-received .message-content p {
+    border-left: 4px solid #FF3B30 !important; /* Red border for received messages */
+    background: rgba(255, 59, 48, 0.1) !important; /* Light red background */
+}
+
+/* Adjust border radius to accommodate left border */
+.message-sent .message-content,
+.message-received .message-content {
+    border-radius: 12px !important; /* Slightly adjust radius */
+}
+
+body.discord-style .message-text,
+body.discord-style .message-content p {
+    border-radius: 6px !important;
+    border-left-width: 4px !important;
+}
+
+/* Media message borders (for videos/images) */
+.message-sent .message-image,
+.message-sent .message-video {
+    border-left: 4px solid #007AFF !important; /* Blue border for sent media */
+}
+
+.message-received .message-image,
+.message-received .message-video {
+    border-left: 4px solid #FF3B30 !important; /* Red border for received media */
+}
+
+/* Discord-style media borders */
+body.discord-style .message-sent .message-image,
+body.discord-style .message-sent .message-video {
+    border-left: 4px solid #007AFF !important;
+}
+
+body.discord-style .message-received .message-image,
+body.discord-style .message-received .message-video {
+    border-left: 4px solid #FF3B30 !important;
+}
+
+/* For the timestamp/status area */
+.message-sent .message-meta {
+    color: #007AFF !important; /* Blue text for sent timestamps */
+}
+
+.message-received .message-meta {
+    color: #FF3B30 !important; /* Red text for received timestamps */
+}
+
+/* Discord-style timestamp adjustments */
+body.discord-style .message-sent .message-meta {
+    background: rgba(0, 122, 255, 0.2) !important;
+    color: #007AFF !important;
+}
+
+body.discord-style .message-received .message-meta {
+    background: rgba(255, 59, 48, 0.2) !important;
+    color: #FF3B30 !important;
+}
+
+/* Add subtle transition for hover effects */
+.message-sent .message-content:hover {
+    background: rgba(0, 122, 255, 0.25) !important;
+}
+
+.message-received .message-content:hover {
+    background: rgba(255, 59, 48, 0.15) !important;
+}
+
+/* Remove old border styles if they exist */
+.message-sent .message-content,
+.message-received .message-content {
+    border: none !important; /* Remove any existing borders */
+    border-left: 4px solid !important; /* Only keep left border */
+}
+
+/* ===== END COLORED BORDERS ===== */
 
 .message-meta {
     display: flex;
@@ -2067,7 +2156,6 @@ body.account-page .account-container {
     background-color: var(--bg-card);
     padding: 1rem;
     box-shadow: var(--shadow);
-    margin-top:;
 }
 
 .chat-input {
@@ -2582,6 +2670,17 @@ body.account-page .account-container {
     
     .chat-input-container {
         padding: 10px 12px;
+    }
+    
+    /* Responsive adjustments for colored borders */
+    .message-sent .message-content,
+    .message-received .message-content {
+        border-left-width: 3px !important;
+    }
+    
+    body.discord-style .message-text,
+    body.discord-style .message-content p {
+        border-left-width: 3px !important;
     }
 }
 
