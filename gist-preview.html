@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Default meta tags (will be updated by JavaScript) -->
+    <!-- DEFAULT META TAGS - Will be updated by JavaScript -->
     <meta property="og:title" content="Anonymous Gist">
-    <meta property="og:description" content="Check out this anonymous gist!">
-    <meta property="og:image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4">
+    <meta property="og:description" content="Check out this anonymous gist shared with you!">
+    <meta property="og:image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50">
     <meta property="og:url" content="">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Anonymous Gists">
@@ -15,8 +15,11 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Anonymous Gist">
-    <meta name="twitter:description" content="Check out this anonymous gist!">
-    <meta name="twitter:image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4">
+    <meta name="twitter:description" content="Check out this anonymous gist shared with you!">
+    <meta name="twitter:image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50">
+    
+    <!-- Additional Meta Tags for Better Sharing -->
+    <meta name="description" content="Check out this anonymous gist shared with you!">
     
     <style>
         * {
@@ -48,9 +51,87 @@
             border: 1px solid rgba(179, 0, 75, 0.1);
         }
         
-        .loading-state, .empty-state {
+        .preview-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .preview-content {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .preview-media img {
+            width: 100%;
+            max-height: 300px;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-top: 15px;
+        }
+        
+        .voice-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            margin-top: 15px;
+        }
+        
+        .preview-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .preview-footer {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .loading-state {
             text-align: center;
             padding: 40px;
+        }
+        
+        .loading-spinner {
+            margin-bottom: 20px;
+            color: #b3004b;
+        }
+        
+        .loading-state p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .empty-state i {
+            color: #dc3545;
+            margin-bottom: 20px;
+        }
+        
+        .empty-title {
+            font-size: 22px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .empty-text {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
         }
         
         .view-app-btn {
@@ -66,14 +147,83 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        
+        .view-app-btn:hover {
+            background: #99003d;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(179, 0, 75, 0.3);
+        }
+        
+        .redirect-notice {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: #b3004b;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 14px;
+            z-index: 1000;
+            box-shadow: 0 5px 20px rgba(179, 0, 75, 0.3);
+            animation: slideUp 0.5s ease;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
         }
         
         @media (max-width: 480px) {
             .gist-preview-card {
                 padding: 20px;
             }
+            
+            .preview-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .preview-header > div:first-child {
+                margin-right: 0;
+                margin-bottom: 15px;
+            }
+        }
+        
+        /* Animation for loading spinner */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .fa-spinner {
+            animation: spin 1s linear infinite;
         }
     </style>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <title>Anonymous Gist Preview</title>
 </head>
 <body>
     <div class="preview-container">
@@ -81,17 +231,94 @@
             <!-- Gist preview will be loaded here -->
             <div class="loading-state">
                 <div class="loading-spinner">
-                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <i class="fas fa-spinner fa-spin fa-3x"></i>
                 </div>
                 <p>Loading gist preview...</p>
             </div>
         </div>
     </div>
     
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <!-- Import the gists.js file -->
     <script type="module" src="gists.js"></script>
+    
+    <script>
+        // Additional script to handle WhatsApp preview better
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM fully loaded for preview page');
+            
+            // Add a meta tag for viewport (important for WhatsApp)
+            const viewportMeta = document.createElement('meta');
+            viewportMeta.name = 'viewport';
+            viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            document.head.appendChild(viewportMeta);
+            
+            // Add favicon
+            const favicon = document.createElement('link');
+            favicon.rel = 'icon';
+            favicon.type = 'image/svg+xml';
+            favicon.href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22 fill=%22%23b3004b%22>📝</text></svg>';
+            document.head.appendChild(favicon);
+            
+            // Check if we're being viewed by a crawler (WhatsApp, Telegram, etc.)
+            function isSocialMediaCrawler() {
+                const userAgent = navigator.userAgent.toLowerCase();
+                return userAgent.includes('whatsapp') || 
+                       userAgent.includes('telegram') || 
+                       userAgent.includes('facebook') || 
+                       userAgent.includes('twitter') || 
+                       userAgent.includes('slack') || 
+                       userAgent.includes('discord');
+            }
+            
+            // If it's a crawler, we want to make sure meta tags are set
+            if (isSocialMediaCrawler()) {
+                console.log('Detected social media crawler:', navigator.userAgent);
+                
+                // Add a small delay to ensure meta tags are updated by JavaScript
+                setTimeout(() => {
+                    console.log('Meta tags should be updated by now');
+                    console.log('Page title:', document.title);
+                    console.log('OG Title:', document.querySelector('meta[property="og:title"]')?.content);
+                    console.log('OG Description:', document.querySelector('meta[property="og:description"]')?.content);
+                    console.log('OG Image:', document.querySelector('meta[property="og:image"]')?.content);
+                }, 1000);
+            }
+            
+            // Add redirect notice for regular users
+            setTimeout(() => {
+                if (!isSocialMediaCrawler()) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const shareId = urlParams.get('share');
+                    
+                    if (shareId) {
+                        const redirectNotice = document.createElement('div');
+                        redirectNotice.className = 'redirect-notice';
+                        redirectNotice.innerHTML = `
+                            <div style="font-weight: bold; margin-bottom: 5px;">Opening gist in app...</div>
+                            <div style="font-size: 12px; opacity: 0.9;">
+                                <i class="fas fa-spinner fa-spin"></i> Redirecting in 3 seconds
+                            </div>
+                        `;
+                        document.body.appendChild(redirectNotice);
+                        
+                        // Redirect after 3 seconds
+                        setTimeout(() => {
+                            redirectNotice.style.animation = 'fadeOut 0.5s ease';
+                            setTimeout(() => {
+                                window.location.href = `gist-view.html?share=${shareId}`;
+                            }, 500);
+                        }, 3000);
+                    }
+                }
+            }, 1000);
+        });
+        
+        // Handle page visibility for better crawler detection
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                console.log('Page became visible - might be crawler viewing');
+            }
+        });
+    </script>
 </body>
 </html>
