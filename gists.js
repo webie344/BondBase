@@ -1,4 +1,4 @@
-// gists.js - COMPLETE UPDATED VERSION - NO VOICE NOTE REPOSTING WITH ORIGINAL STYLE
+// gists.js - COMPLETE UPDATED VERSION WITH LINK SHARING
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -74,10 +74,114 @@ function getRandomAvatar() {
     return `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
 }
 
+// Generate share link for gist
+async function generateGistLink(gistId) {
+    try {
+        const gistRef = doc(db, 'gists', gistId);
+        const gistSnap = await getDoc(gistRef);
+        
+        if (!gistSnap.exists()) {
+            throw new Error('Gist not found');
+        }
+        
+        const gistData = gistSnap.data();
+        
+        // Generate a unique share ID if not exists
+        let shareId = gistData.shareId;
+        if (!shareId) {
+            shareId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            
+            // Update gist with shareId
+            await updateDoc(gistRef, {
+                shareId: shareId
+            });
+            
+            console.log('Generated share ID:', shareId);
+        }
+        
+        // Create the shareable URL
+        const baseUrl = window.location.origin;
+        const shareUrl = `${baseUrl}/gist-view.html?share=${shareId}`;
+        
+        return {
+            url: shareUrl,
+            shareId: shareId,
+            gistId: gistId
+        };
+    } catch (error) {
+        console.error('Error generating link:', error);
+        throw error;
+    }
+}
+
+// Get gist by share ID
+async function getGistByShareId(shareId) {
+    try {
+        // Query gists with this shareId
+        const q = query(
+            collection(db, 'gists'),
+            limit(1)
+        );
+        
+        const querySnapshot = await getDocs(q);
+        
+        // Since Firestore doesn't support OR queries easily, we'll filter client-side
+        // For better performance, you might want to create a separate collection for share mappings
+        let gistData = null;
+        let gistId = null;
+        
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.shareId === shareId) {
+                gistData = data;
+                gistId = doc.id;
+            }
+        });
+        
+        if (!gistData) {
+            // Try to find by gistId if shareId is actually a gistId
+            try {
+                const gistRef = doc(db, 'gists', shareId);
+                const gistSnap = await getDoc(gistRef);
+                
+                if (gistSnap.exists()) {
+                    gistData = gistSnap.data();
+                    gistId = shareId;
+                    
+                    // Generate share ID if not exists
+                    if (!gistData.shareId) {
+                        const newShareId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                        await updateDoc(gistRef, {
+                            shareId: newShareId
+                        });
+                        gistData.shareId = newShareId;
+                    }
+                }
+            } catch (error) {
+                console.error('Error finding gist by ID:', error);
+            }
+        }
+        
+        if (!gistData) {
+            return null;
+        }
+        
+        return {
+            id: gistId,
+            ...gistData
+        };
+    } catch (error) {
+        console.error('Error getting gist by share ID:', error);
+        throw error;
+    }
+}
+
 // Initialize on DOM content loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Check which page we're on
     const currentPage = window.location.pathname.split('/').pop().split('.')[0];
+    
+    console.log('Current page:', currentPage);
     
     // Listen for auth state changes
     onAuthStateChanged(auth, (user) => {
@@ -87,6 +191,8 @@ document.addEventListener('DOMContentLoaded', function() {
             initCreateGistPage();
         } else if (currentPage === 'gist') {
             initGistPage();
+        } else if (currentPage === 'gist-view') {
+            initGistViewPage();
         }
     });
 });
@@ -708,7 +814,8 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
             repostedBy: [],
             repostedFrom: null, // For tracking reposted gists
             originalPostId: null, // For reposted gists
-            containsVoiceNote: (mediaType === 'audio' || mediaType === 'both') // NEW: Track if contains voice
+            containsVoiceNote: (mediaType === 'audio' || mediaType === 'both'), // NEW: Track if contains voice
+            shareId: null // Will be generated when shared
         };
         
         // Store second media URL if we have both
@@ -1044,7 +1151,7 @@ function displayGist(gist) {
     }
     
     if (shareBtn) {
-        shareBtn.addEventListener('click', () => shareGist(gist.id));
+        shareBtn.addEventListener('click', () => shareGist(gist.id, shareBtn));
     }
     
     if (voicePlayBtn && gist.mediaUrl && (gist.mediaType === 'audio' || gist.mediaType === 'both')) {
@@ -1055,6 +1162,266 @@ function displayGist(gist) {
     }
     
     gistsContainer.appendChild(gistElement);
+}
+
+// Initialize gist view page
+function initGistViewPage() {
+    console.log('Initializing gist view page');
+    
+    // Get share ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const shareId = urlParams.get('share');
+    
+    if (!shareId) {
+        document.getElementById('gistViewContainer').innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-circle fa-3x" style="margin-bottom: 15px; color: #dc3545;"></i>
+                <h3 class="empty-title">Invalid Link</h3>
+                <p class="empty-text">This gist link is invalid or expired.</p>
+                <button class="create-gist-btn" onclick="window.location.href='gist.html'">
+                    <i class="fas fa-home"></i> Go to Home
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    // Load the gist
+    loadGistByShareId(shareId);
+}
+
+// Load gist by share ID
+async function loadGistByShareId(shareId) {
+    const container = document.getElementById('gistViewContainer');
+    
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div class="loading-state">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+            </div>
+            <p>Loading gist...</p>
+        </div>
+    `;
+    
+    try {
+        const gist = await getGistByShareId(shareId);
+        
+        if (!gist) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle fa-3x" style="margin-bottom: 15px; color: #dc3545;"></i>
+                    <h3 class="empty-title">Gist Not Found</h3>
+                    <p class="empty-text">This gist has been deleted or the link is invalid.</p>
+                    <button class="create-gist-btn" onclick="window.location.href='gist.html'">
+                        <i class="fas fa-home"></i> Go to Home
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        // Set meta tags for link preview
+        setMetaTagsForPreview(gist);
+        
+        // Display the gist
+        container.innerHTML = '';
+        displayGistView(gist, container);
+        
+    } catch (error) {
+        console.error('Error loading gist:', error);
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle fa-3x" style="margin-bottom: 15px; color: #dc3545;"></i>
+                <h3 class="empty-title">Error Loading Gist</h3>
+                <p class="empty-text">Please try again later.</p>
+                <button class="create-gist-btn" onclick="window.location.href='gist.html'">
+                    <i class="fas fa-home"></i> Go to Home
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Set meta tags for link preview
+function setMetaTagsForPreview(gist) {
+    const title = gist.content ? gist.content.substring(0, 100) : 'Anonymous Gist';
+    const description = gist.content ? gist.content.substring(0, 200) : 'Check out this anonymous gist!';
+    const image = gist.mediaType === 'image' && gist.mediaUrl ? gist.mediaUrl : 
+                  gist.mediaType === 'both' && gist.secondMediaUrl ? gist.secondMediaUrl : 
+                  gist.authorAvatar;
+    
+    // Set meta tags
+    document.title = `Anonymous Gist: ${title}`;
+    
+    // Create or update meta tags
+    const metaTags = [
+        { property: 'og:title', content: `Anonymous Gist: ${title}` },
+        { property: 'og:description', content: description },
+        { property: 'og:image', content: image },
+        { property: 'og:url', content: window.location.href },
+        { property: 'og:type', content: 'website' },
+        { property: 'twitter:card', content: 'summary_large_image' },
+        { property: 'twitter:title', content: `Anonymous Gist: ${title}` },
+        { property: 'twitter:description', content: description },
+        { property: 'twitter:image', content: image }
+    ];
+    
+    metaTags.forEach(tag => {
+        let meta = document.querySelector(`meta[property="${tag.property}"]`);
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.setAttribute('property', tag.property);
+            document.head.appendChild(meta);
+        }
+        meta.setAttribute('content', tag.content);
+    });
+}
+
+// Display gist in view page
+function displayGistView(gist, container) {
+    const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
+    const isReposted = gist.repostedFrom || gist.originalPostId;
+    const repostIcon = isReposted ? '<div class="repost-icon"><i class="fas fa-retweet"></i></div>' : '';
+    
+    let mediaContent = '';
+    
+    if (gist.mediaType === 'both' && gist.mediaUrl && gist.secondMediaUrl) {
+        const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
+        mediaContent = `
+            <div class="gist-media">
+                <img src="${gist.secondMediaUrl}" alt="Gist image" class="gist-image" 
+                     style="max-width: 100%; border-radius: 10px; margin-top: 15px;">
+                <div class="gist-voice-note" style="margin-top: 15px;">
+                    <button class="voice-play-btn" data-audio-url="${gist.mediaUrl}">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <div class="voice-waveform">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                    <span class="voice-duration">${duration}</span>
+                </div>
+            </div>
+        `;
+    } else if (gist.mediaType === 'image' && gist.mediaUrl) {
+        mediaContent = `
+            <div class="gist-media">
+                <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image" 
+                     style="max-width: 100%; border-radius: 10px; margin-top: 15px;">
+            </div>
+        `;
+    } else if (gist.mediaType === 'audio' && gist.mediaUrl) {
+        const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
+        mediaContent = `
+            <div class="gist-media">
+                <div class="gist-voice-note">
+                    <button class="voice-play-btn" data-audio-url="${gist.mediaUrl}">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <div class="voice-waveform">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                    <span class="voice-duration">${duration}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    const gistElement = document.createElement('div');
+    gistElement.className = 'gist-card-view';
+    gistElement.style.cssText = `
+        max-width: 600px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    `;
+    
+    gistElement.innerHTML = `
+        <div class="gist-header" style="display: flex; align-items: center; margin-bottom: 20px;">
+            <div class="gist-avatar-container" style="position: relative; margin-right: 15px;">
+                <img src="${gist.authorAvatar}" alt="Anonymous avatar" 
+                     style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid #b3004b;">
+                ${repostIcon}
+            </div>
+            <div class="gist-info">
+                <div class="gist-author" style="font-weight: bold; font-size: 18px; color: #333;">
+                    Anonymous${isReposted ? ' (Reposted)' : ''}
+                </div>
+                <div class="gist-time" style="color: #666; font-size: 14px; margin-top: 5px;">
+                    ${timeAgo}
+                </div>
+            </div>
+        </div>
+        
+        <div class="gist-content">
+            ${gist.content ? `
+                <div class="gist-text" style="font-size: 16px; line-height: 1.6; color: #333; margin-bottom: 20px;">
+                    ${escapeHtml(gist.content)}
+                </div>
+            ` : ''}
+            ${mediaContent}
+        </div>
+        
+        <div class="gist-stats" style="display: flex; justify-content: space-around; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <div class="stat-item" style="text-align: center;">
+                <div class="stat-count" style="font-size: 20px; font-weight: bold; color: #b3004b;">
+                    ${gist.likes || 0}
+                </div>
+                <div class="stat-label" style="font-size: 14px; color: #666; margin-top: 5px;">
+                    Likes
+                </div>
+            </div>
+            <div class="stat-item" style="text-align: center;">
+                <div class="stat-count" style="font-size: 20px; font-weight: bold; color: #b3004b;">
+                    ${gist.comments || 0}
+                </div>
+                <div class="stat-label" style="font-size: 14px; color: #666; margin-top: 5px;">
+                    Comments
+                </div>
+            </div>
+            <div class="stat-item" style="text-align: center;">
+                <div class="stat-count" style="font-size: 20px; font-weight: bold; color: #b3004b;">
+                    ${gist.reposts || 0}
+                </div>
+                <div class="stat-label" style="font-size: 14px; color: #666; margin-top: 5px;">
+                    Reposts
+                </div>
+            </div>
+        </div>
+        
+        <div class="view-actions" style="margin-top: 30px; text-align: center;">
+            <button class="view-app-btn" onclick="window.location.href='gist.html'"
+                    style="background: #b3004b; color: white; border: none; padding: 12px 30px; 
+                           border-radius: 25px; font-size: 16px; cursor: pointer; font-weight: bold;">
+                <i class="fas fa-rocket"></i> View in App
+            </button>
+            <p style="color: #666; margin-top: 15px; font-size: 14px;">
+                Share anonymous gists with your friends!
+            </p>
+        </div>
+    `;
+    
+    // Add voice play functionality
+    const voicePlayBtn = gistElement.querySelector('.voice-play-btn');
+    if (voicePlayBtn && gist.mediaUrl && (gist.mediaType === 'audio' || gist.mediaType === 'both')) {
+        voicePlayBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            playGistVoice(gist.mediaUrl, voicePlayBtn, gistElement.querySelector('.voice-waveform'));
+        });
+    }
+    
+    container.appendChild(gistElement);
 }
 
 // Show gist actions modal on long press
@@ -1691,21 +2058,237 @@ async function repostGist(gistId, button = null) {
     }
 }
 
-// Share gist
-function shareGist(gistId) {
-    const url = `${window.location.origin}/gist.html?id=${gistId}`;
-    if (navigator.share) {
-        navigator.share({
-            title: 'Anonymous Gist',
-            text: 'Check out this anonymous gist!',
-            url: url
-        }).catch(err => {
-            showNotification('Failed to share: ' + err.message, 'error');
-        });
-    } else {
-        navigator.clipboard.writeText(url)
-            .then(() => showNotification('Link copied to clipboard!', 'success'))
-            .catch(err => showNotification('Failed to copy link: ' + err.message, 'error'));
+// Share gist - UPDATED: Generate link first
+async function shareGist(gistId, button = null) {
+    try {
+        showNotification('Generating share link...', 'info');
+        
+        // Generate or get share link
+        const shareInfo = await generateGistLink(gistId);
+        const shareUrl = shareInfo.url;
+        
+        console.log('Share URL:', shareUrl);
+        
+        // Try Web Share API first
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Anonymous Gist',
+                    text: 'Check out this anonymous gist!',
+                    url: shareUrl
+                });
+                showNotification('Shared successfully!', 'success');
+                return;
+            } catch (shareError) {
+                console.log('Web Share cancelled or failed:', shareError);
+                // Continue to clipboard fallback
+            }
+        }
+        
+        // Fallback: Copy to clipboard
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            showNotification('Link copied to clipboard!', 'success');
+            
+            // Show share modal with options
+            showShareModal(shareUrl, gistId);
+            
+        } catch (clipboardError) {
+            console.error('Clipboard error:', clipboardError);
+            // Fallback: Show modal with URL
+            showShareModal(shareUrl, gistId);
+        }
+        
+    } catch (error) {
+        console.error('Error sharing gist:', error);
+        showNotification('Failed to share: ' + error.message, 'error');
+    }
+}
+
+// Show share modal with options
+function showShareModal(shareUrl, gistId) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('shareModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'shareModal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px; border-radius: 20px;">
+                <div class="modal-header">
+                    <h3>Share Gist</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="share-url-container" style="margin-bottom: 20px;">
+                        <input type="text" id="shareUrlInput" readonly 
+                               style="width: 100%; padding: 12px; border: 1px solid #ddd; 
+                                      border-radius: 10px; font-size: 14px; margin-bottom: 10px;">
+                        <button id="copyUrlBtn" 
+                                style="width: 100%; padding: 12px; background: #b3004b; 
+                                       color: white; border: none; border-radius: 10px; 
+                                       cursor: pointer; font-size: 16px;">
+                            <i class="fas fa-copy"></i> Copy Link
+                        </button>
+                    </div>
+                    <div class="share-platforms" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <button class="platform-btn" data-platform="whatsapp">
+                            <i class="fab fa-whatsapp"></i> WhatsApp
+                        </button>
+                        <button class="platform-btn" data-platform="telegram">
+                            <i class="fab fa-telegram"></i> Telegram
+                        </button>
+                        <button class="platform-btn" data-platform="twitter">
+                            <i class="fab fa-twitter"></i> Twitter
+                        </button>
+                        <button class="platform-btn" data-platform="facebook">
+                            <i class="fab fa-facebook"></i> Facebook
+                        </button>
+                        <button class="platform-btn" data-platform="instagram">
+                            <i class="fab fa-instagram"></i> Instagram
+                        </button>
+                        <button class="platform-btn" data-platform="messenger">
+                            <i class="fab fa-facebook-messenger"></i> Messenger
+                        </button>
+                    </div>
+                    <button id="closeShareBtn" 
+                            style="width: 100%; padding: 12px; margin-top: 20px; 
+                                   background: #f5f5f5; color: #333; border: none; 
+                                   border-radius: 10px; cursor: pointer; font-size: 16px;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Add styles
+        const styles = document.createElement('style');
+        styles.textContent += `
+            #shareModal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 10002;
+            }
+            .platform-btn {
+                padding: 15px 10px;
+                border: 1px solid #ddd;
+                border-radius: 10px;
+                background: white;
+                color: #333;
+                cursor: pointer;
+                font-size: 12px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+                transition: all 0.3s;
+            }
+            .platform-btn:hover {
+                background: #f5f5f5;
+                transform: translateY(-2px);
+            }
+            .platform-btn i {
+                font-size: 20px;
+                margin-bottom: 5px;
+            }
+            .platform-btn[data-platform="whatsapp"] i { color: #25D366; }
+            .platform-btn[data-platform="telegram"] i { color: #0088cc; }
+            .platform-btn[data-platform="twitter"] i { color: #1DA1F2; }
+            .platform-btn[data-platform="facebook"] i { color: #1877F2; }
+            .platform-btn[data-platform="instagram"] i { color: #E4405F; }
+            .platform-btn[data-platform="messenger"] i { color: #006AFF; }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    // Set URL input value
+    const urlInput = modal.querySelector('#shareUrlInput');
+    if (urlInput) {
+        urlInput.value = shareUrl;
+    }
+    
+    // Show modal
+    modal.style.display = 'flex';
+    
+    // Set up event listeners
+    const closeBtn = modal.querySelector('.modal-close');
+    const closeShareBtn = modal.querySelector('#closeShareBtn');
+    const copyUrlBtn = modal.querySelector('#copyUrlBtn');
+    const platformBtns = modal.querySelectorAll('.platform-btn');
+    
+    const closeModal = () => {
+        modal.style.display = 'none';
+    };
+    
+    closeBtn.onclick = closeModal;
+    closeShareBtn.onclick = closeModal;
+    
+    copyUrlBtn.onclick = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            showNotification('Link copied to clipboard!', 'success');
+            closeModal();
+        } catch (error) {
+            console.error('Copy failed:', error);
+            showNotification('Failed to copy link', 'error');
+        }
+    };
+    
+    // Platform sharing
+    platformBtns.forEach(btn => {
+        btn.onclick = () => {
+            const platform = btn.dataset.platform;
+            shareToPlatform(shareUrl, platform);
+            closeModal();
+        };
+    });
+    
+    // Close when clicking outside
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
+}
+
+// Share to specific platform
+function shareToPlatform(url, platform) {
+    const text = 'Check out this anonymous gist!';
+    let shareUrl = '';
+    
+    switch (platform) {
+        case 'whatsapp':
+            shareUrl = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
+            break;
+        case 'telegram':
+            shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+            break;
+        case 'twitter':
+            shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+            break;
+        case 'facebook':
+            shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+            break;
+        case 'instagram':
+            // Instagram doesn't have a direct share URL, show message
+            showNotification('Copy the link and paste it in Instagram', 'info');
+            navigator.clipboard.writeText(url);
+            return;
+        case 'messenger':
+            shareUrl = `fb-messenger://share?link=${encodeURIComponent(url)}`;
+            break;
+    }
+    
+    if (shareUrl) {
+        window.open(shareUrl, '_blank', 'noopener,noreferrer');
     }
 }
 
@@ -1941,3 +2524,34 @@ function showNotification(message, type = 'info') {
     
     return notification;
 }
+
+// Batch generate share IDs for existing gists (optional)
+async function generateShareIdsForAllGists() {
+    try {
+        const querySnapshot = await getDocs(collection(db, 'gists'));
+        
+        const promises = [];
+        querySnapshot.forEach((doc) => {
+            const gistData = doc.data();
+            if (!gistData.shareId) {
+                const shareId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                promises.push(
+                    updateDoc(doc.ref, {
+                        shareId: shareId
+                    })
+                );
+            }
+        });
+        
+        await Promise.all(promises);
+        console.log(`Generated share IDs for ${promises.length} gists`);
+        showNotification(`Generated share links for ${promises.length} gists`, 'success');
+        
+    } catch (error) {
+        console.error('Error generating share IDs:', error);
+        showNotification('Error generating share links', 'error');
+    }
+}
+
+// Optional: Run this once to generate share IDs for all existing gists
+// generateShareIdsForAllGists();
