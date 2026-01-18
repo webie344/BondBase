@@ -1382,14 +1382,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         .reply-preview-name {
             font-size: 12px;
             font-weight: bold;
-            color: black;
+            color: #8b0000;
             margin-bottom: 2px;
         }
 
         .reply-preview-cancel {
             background: none;
             border: none;
-            color: #888;
+            color: #8b0000;
             cursor: pointer;
             font-size: 16px;
             padding: 5px;
@@ -1398,7 +1398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         .reply-preview-cancel:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: #8b0000;
         }
 
         .reply-indicator {
@@ -1837,12 +1837,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         .reply-preview-name {
             font-size: 12px;
             font-weight: bold;
-            color: black;
+            color: #8b0000;
         }
         .reply-preview-cancel {
             background: none;
             border: none;
-            color: var(--text-light);
+            color: #8b0000;
             cursor: pointer;
             font-size: 16px;
             padding: 5px;
