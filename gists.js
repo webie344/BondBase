@@ -1,4 +1,4 @@
-// gists.js - COMPLETE VERSION WITH WHATSAPP PREVIEWS - FIXED VERSION
+// gists.js - COMPLETE VERSION WITH WHATSAPP PREVIEWS - FULLY FIXED
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -179,51 +179,36 @@ async function getGistByShareId(shareId) {
     }
 }
 
-// Create WhatsApp preview URL with gist data
+// Create WhatsApp preview URL with gist data - FIXED VERSION
 function createWhatsAppPreviewUrl(gistData, shareUrl) {
-    // For WhatsApp, we need to create a message with the gist content
+    // For WhatsApp, keep the text SIMPLE so WhatsApp uses the meta tags
     let text = '';
     
     if (gistData.content) {
-        text = `📝 *Anonymous Gist*\n\n"${gistData.content.substring(0, 200)}${gistData.content.length > 200 ? '...' : ''}"`;
+        // Keep it short and clean
+        text = `Check out this anonymous gist:\n\n"${gistData.content.substring(0, 100)}${gistData.content.length > 100 ? '...' : ''}"`;
     } else {
-        text = `📝 *Anonymous Gist*`;
+        text = `Check out this anonymous gist`;
     }
     
-    // Add media indicator if gist has image
-    if (gistData.mediaType === 'image' && gistData.mediaUrl) {
-        text += '\n\n🖼️ *Includes an image*';
-    } else if (gistData.mediaType === 'both' && gistData.secondMediaUrl) {
-        text += '\n\n🖼️ *Includes an image and voice note*';
-    } else if (gistData.mediaType === 'audio' && gistData.mediaUrl) {
-        text += '\n\n🎤 *Includes a voice note*';
-    }
-    
-    text += `\n\n👉 Open to view: ${shareUrl}`;
+    // DO NOT add "Includes an image" here - WhatsApp will use meta tags for that
+    text += `\n\n${shareUrl}`;
     
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
-// Create Telegram preview URL with gist data
+// Create Telegram preview URL with gist data - FIXED VERSION
 function createTelegramPreviewUrl(gistData, shareUrl) {
     let text = '';
     
     if (gistData.content) {
-        text = `📝 Anonymous Gist\n\n"${gistData.content.substring(0, 200)}${gistData.content.length > 200 ? '...' : ''}"`;
+        text = `Check out this anonymous gist:\n\n"${gistData.content.substring(0, 100)}${gistData.content.length > 100 ? '...' : ''}"`;
     } else {
-        text = `📝 Anonymous Gist`;
+        text = `Check out this anonymous gist`;
     }
     
-    // Add media indicator if gist has image
-    if (gistData.mediaType === 'image' && gistData.mediaUrl) {
-        text += '\n\n🖼️ Includes an image';
-    } else if (gistData.mediaType === 'both' && gistData.secondMediaUrl) {
-        text += '\n\n🖼️ Includes an image and voice note';
-    } else if (gistData.mediaType === 'audio' && gistData.mediaUrl) {
-        text += '\n\n🎤 Includes a voice note';
-    }
-    
-    text += `\n\n👉 Open to view: ${shareUrl}`;
+    // DO NOT add "Includes an image" here
+    text += `\n\n${shareUrl}`;
     
     return `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`;
 }
@@ -690,7 +675,7 @@ async function uploadImageToCloudinary(file) {
     formData.append('file', file);
     formData.append('upload_preset', cloudinaryConfig.uploadPreset);
     formData.append('resource_type', 'image');
-    formData.append('folder', 'gist-images'); // Add folder for better organization
+    formData.append('folder', 'gist-images');
     
     try {
         const response = await fetch(
@@ -1174,12 +1159,7 @@ function initGistPreviewPage() {
         return;
     }
     
-    // Check if meta tags were already updated by inline script
-    if (!document.getElementById('og-title').content.includes('Anonymous Gist:')) {
-        // Meta tags not updated yet, update them now
-        setupPreviewMetaTags(shareId);
-    }
-    
+    setupPreviewMetaTags(shareId);
     loadGistForPreview(shareId);
 }
 
@@ -1201,16 +1181,13 @@ async function setupPreviewMetaTags(shareId) {
             gist.content.substring(0, 200) : 
             'Check out this anonymous gist shared with you!';
         
-        // Get image URL
+        // Get image URL - THIS IS CRITICAL FOR WHATSAPP PREVIEW
         let imageUrl = null;
-        let isImage = false;
         
         if (gist.mediaType === 'image' && gist.mediaUrl) {
             imageUrl = gist.mediaUrl;
-            isImage = true;
         } else if (gist.mediaType === 'both' && gist.secondMediaUrl) {
             imageUrl = gist.secondMediaUrl;
-            isImage = true;
         } else {
             // Fallback to avatar
             imageUrl = gist.authorAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50';
@@ -1218,31 +1195,33 @@ async function setupPreviewMetaTags(shareId) {
         
         console.log('Setting meta tags with image URL:', imageUrl);
         
-        // Update meta tags
-        updateMetaTag('og:title', title);
-        updateMetaTag('og:description', description);
-        updateMetaTag('og:image', imageUrl);
-        updateMetaTag('og:url', window.location.href);
-        updateMetaTag('og:image:width', '1200');
-        updateMetaTag('og:image:height', '630');
-        updateMetaTag('og:image:type', isImage ? 'image/jpeg' : 'image/svg+xml');
-        
-        updateMetaTag('twitter:card', isImage ? 'summary_large_image' : 'summary');
-        updateMetaTag('twitter:title', title);
-        updateMetaTag('twitter:description', description);
-        updateMetaTag('twitter:image', imageUrl);
-        
-        updateMetaTag('description', description);
-        
-        // Update page title
+        // Update page title and meta tags
         document.title = title;
         
-        console.log('Meta tags updated for preview:', { 
-            title, 
-            description, 
-            imageUrl,
-            isImage 
-        });
+        // Remove existing meta tags first
+        const existingMetaTags = document.querySelectorAll('meta[property^="og:"], meta[name^="twitter:"], meta[name="description"]');
+        existingMetaTags.forEach(tag => tag.remove());
+        
+        // Create new meta tags
+        createMetaTag('og:title', title);
+        createMetaTag('og:description', description);
+        createMetaTag('og:image', imageUrl);
+        createMetaTag('og:url', window.location.href);
+        createMetaTag('og:type', 'website');
+        createMetaTag('og:site_name', 'Anonymous Gists');
+        createMetaTag('og:image:width', '1200');
+        createMetaTag('og:image:height', '630');
+        
+        // Twitter Card tags
+        createMetaTag('twitter:card', 'summary_large_image');
+        createMetaTag('twitter:title', title);
+        createMetaTag('twitter:description', description);
+        createMetaTag('twitter:image', imageUrl);
+        
+        // Additional meta tags
+        createMetaTag('description', description);
+        
+        console.log('Meta tags updated for WhatsApp/Telegram preview');
         
     } catch (error) {
         console.error('Error setting meta tags:', error);
@@ -1250,44 +1229,44 @@ async function setupPreviewMetaTags(shareId) {
     }
 }
 
-function updateMetaTag(property, content) {
-    let meta = document.querySelector(`meta[property="${property}"]`) || 
-               document.querySelector(`meta[name="${property}"]`);
+function createMetaTag(property, content) {
+    const meta = document.createElement('meta');
     
-    if (!meta) {
-        meta = document.createElement('meta');
-        if (property.startsWith('og:')) {
-            meta.setAttribute('property', property);
-        } else if (property.startsWith('twitter:')) {
-            meta.setAttribute('name', property);
-        } else {
-            meta.setAttribute('name', property);
-        }
-        document.head.appendChild(meta);
+    if (property.startsWith('og:')) {
+        meta.setAttribute('property', property);
+    } else if (property.startsWith('twitter:')) {
+        meta.setAttribute('name', property);
+    } else {
+        meta.setAttribute('name', property);
     }
+    
     meta.setAttribute('content', content);
+    document.head.appendChild(meta);
 }
 
 function setDefaultMetaTags() {
     const defaultAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50';
     document.title = 'Anonymous Gist';
     
-    updateMetaTag('og:title', 'Anonymous Gist');
-    updateMetaTag('og:description', 'Check out this anonymous gist shared with you!');
-    updateMetaTag('og:image', defaultAvatar);
-    updateMetaTag('og:url', window.location.href);
-    updateMetaTag('og:type', 'website');
-    updateMetaTag('og:site_name', 'Anonymous Gists');
-    updateMetaTag('og:image:width', '1200');
-    updateMetaTag('og:image:height', '630');
-    updateMetaTag('og:image:type', 'image/svg+xml');
+    // Remove existing first
+    const existingMetaTags = document.querySelectorAll('meta[property^="og:"], meta[name^="twitter:"], meta[name="description"]');
+    existingMetaTags.forEach(tag => tag.remove());
     
-    updateMetaTag('twitter:card', 'summary');
-    updateMetaTag('twitter:title', 'Anonymous Gist');
-    updateMetaTag('twitter:description', 'Check out this anonymous gist shared with you!');
-    updateMetaTag('twitter:image', defaultAvatar);
+    createMetaTag('og:title', 'Anonymous Gist');
+    createMetaTag('og:description', 'Check out this anonymous gist shared with you!');
+    createMetaTag('og:image', defaultAvatar);
+    createMetaTag('og:url', window.location.href);
+    createMetaTag('og:type', 'website');
+    createMetaTag('og:site_name', 'Anonymous Gists');
+    createMetaTag('og:image:width', '1200');
+    createMetaTag('og:image:height', '630');
     
-    updateMetaTag('description', 'Check out this anonymous gist shared with you!');
+    createMetaTag('twitter:card', 'summary_large_image');
+    createMetaTag('twitter:title', 'Anonymous Gist');
+    createMetaTag('twitter:description', 'Check out this anonymous gist shared with you!');
+    createMetaTag('twitter:image', defaultAvatar);
+    
+    createMetaTag('description', 'Check out this anonymous gist shared with you!');
 }
 
 async function loadGistForPreview(shareId) {
@@ -1727,24 +1706,15 @@ async function shareGist(gistId, button = null) {
         
         const gistData = gistSnap.data();
         
-        // Create better share text that includes image indication
+        // Create SIMPLE share text - DON'T mention "Includes an image"
         let shareText = '';
         if (gistData.content) {
-            shareText = `📝 *Anonymous Gist*\n\n"${gistData.content.substring(0, 100)}${gistData.content.length > 100 ? '...' : ''}"`;
+            shareText = `Check out this anonymous gist:\n\n"${gistData.content.substring(0, 100)}${gistData.content.length > 100 ? '...' : ''}"`;
         } else {
-            shareText = `📝 *Anonymous Gist*`;
+            shareText = `Check out this anonymous gist`;
         }
         
-        // Add media indicator
-        if (gistData.mediaType === 'image' && gistData.mediaUrl) {
-            shareText += '\n\n🖼️ *Includes an image*';
-        } else if (gistData.mediaType === 'both' && gistData.secondMediaUrl) {
-            shareText += '\n\n🖼️ *Includes an image and voice note*';
-        } else if (gistData.mediaType === 'audio' && gistData.mediaUrl) {
-            shareText += '\n\n🎤 *Includes a voice note*';
-        }
-        
-        shareText += `\n\n👉 Open to view: ${shareUrl}`;
+        shareText += `\n\n${shareUrl}`;
         
         // Try Web Share API first
         if (navigator.share) {
@@ -2716,6 +2686,3 @@ async function generateShareIdsForAllGists() {
         showNotification('Error generating share links', 'error');
     }
 }
-
-// To generate share IDs for all existing gists, run this once in browser console:
-// generateShareIdsForAllGists()
