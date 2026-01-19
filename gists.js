@@ -1,4 +1,4 @@
-// gists.js - COMPLETE VERSION WITH WHATSAPP PREVIEWS - FIXED IMAGE PREVIEWS
+// gists.js - COMPLETE VERSION WITH WHATSAPP PREVIEWS - FIXED VERSION
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -1174,8 +1174,12 @@ function initGistPreviewPage() {
         return;
     }
     
-    // Set up meta tags immediately for crawlers
-    setupPreviewMetaTags(shareId);
+    // Check if meta tags were already updated by inline script
+    if (!document.getElementById('og-title').content.includes('Anonymous Gist:')) {
+        // Meta tags not updated yet, update them now
+        setupPreviewMetaTags(shareId);
+    }
+    
     loadGistForPreview(shareId);
 }
 
@@ -1189,10 +1193,15 @@ async function setupPreviewMetaTags(shareId) {
         }
         
         // Create dynamic title and description
-        const title = gist.content ? `Anonymous Gist: ${gist.content.substring(0, 60)}...` : 'Anonymous Gist';
-        const description = gist.content ? gist.content.substring(0, 200) : 'Check out this anonymous gist shared with you!';
+        const title = gist.content ? 
+            `Anonymous Gist: ${gist.content.substring(0, 60)}...` : 
+            'Anonymous Gist';
         
-        // Get the actual image URL for the preview
+        const description = gist.content ? 
+            gist.content.substring(0, 200) : 
+            'Check out this anonymous gist shared with you!';
+        
+        // Get image URL
         let imageUrl = null;
         let isImage = false;
         
@@ -1203,41 +1212,30 @@ async function setupPreviewMetaTags(shareId) {
             imageUrl = gist.secondMediaUrl;
             isImage = true;
         } else {
-            // Fallback to avatar if no image
-            imageUrl = gist.authorAvatar || getRandomAvatar();
+            // Fallback to avatar
+            imageUrl = gist.authorAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50';
         }
         
         console.log('Setting meta tags with image URL:', imageUrl);
         
-        // Update page title and meta tags
+        // Update meta tags
+        updateMetaTag('og:title', title);
+        updateMetaTag('og:description', description);
+        updateMetaTag('og:image', imageUrl);
+        updateMetaTag('og:url', window.location.href);
+        updateMetaTag('og:image:width', '1200');
+        updateMetaTag('og:image:height', '630');
+        updateMetaTag('og:image:type', isImage ? 'image/jpeg' : 'image/svg+xml');
+        
+        updateMetaTag('twitter:card', isImage ? 'summary_large_image' : 'summary');
+        updateMetaTag('twitter:title', title);
+        updateMetaTag('twitter:description', description);
+        updateMetaTag('twitter:image', imageUrl);
+        
+        updateMetaTag('description', description);
+        
+        // Update page title
         document.title = title;
-        
-        // Remove existing meta tags
-        removeExistingMetaTags();
-        
-        // Create new meta tags dynamically
-        createMetaTag('og:title', title);
-        createMetaTag('og:description', description);
-        createMetaTag('og:image', imageUrl);
-        createMetaTag('og:url', window.location.href);
-        createMetaTag('og:type', 'website');
-        createMetaTag('og:site_name', 'Anonymous Gists');
-        
-        // For WhatsApp/Facebook
-        createMetaTag('og:image:width', '1200');
-        createMetaTag('og:image:height', '630');
-        if (isImage) {
-            createMetaTag('og:image:type', 'image/jpeg');
-        }
-        
-        // Twitter Card tags
-        createMetaTag('twitter:card', isImage ? 'summary_large_image' : 'summary');
-        createMetaTag('twitter:title', title);
-        createMetaTag('twitter:description', description);
-        createMetaTag('twitter:image', imageUrl);
-        
-        // Additional meta tags for better sharing
-        createMetaTag('description', description);
         
         console.log('Meta tags updated for preview:', { 
             title, 
@@ -1252,48 +1250,44 @@ async function setupPreviewMetaTags(shareId) {
     }
 }
 
-function removeExistingMetaTags() {
-    // Remove existing og and twitter meta tags
-    const metaTags = document.querySelectorAll('meta[property^="og:"], meta[name^="twitter:"], meta[name="description"]');
-    metaTags.forEach(tag => {
-        if (tag.parentNode) {
-            tag.parentNode.removeChild(tag);
+function updateMetaTag(property, content) {
+    let meta = document.querySelector(`meta[property="${property}"]`) || 
+               document.querySelector(`meta[name="${property}"]`);
+    
+    if (!meta) {
+        meta = document.createElement('meta');
+        if (property.startsWith('og:')) {
+            meta.setAttribute('property', property);
+        } else if (property.startsWith('twitter:')) {
+            meta.setAttribute('name', property);
+        } else {
+            meta.setAttribute('name', property);
         }
-    });
-}
-
-function createMetaTag(property, content) {
-    const meta = document.createElement('meta');
-    
-    if (property.startsWith('og:')) {
-        meta.setAttribute('property', property);
-    } else if (property.startsWith('twitter:')) {
-        meta.setAttribute('name', property);
-    } else {
-        meta.setAttribute('name', property);
+        document.head.appendChild(meta);
     }
-    
     meta.setAttribute('content', content);
-    document.head.appendChild(meta);
 }
 
 function setDefaultMetaTags() {
-    const defaultAvatar = getRandomAvatar();
+    const defaultAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50';
     document.title = 'Anonymous Gist';
     
-    removeExistingMetaTags();
+    updateMetaTag('og:title', 'Anonymous Gist');
+    updateMetaTag('og:description', 'Check out this anonymous gist shared with you!');
+    updateMetaTag('og:image', defaultAvatar);
+    updateMetaTag('og:url', window.location.href);
+    updateMetaTag('og:type', 'website');
+    updateMetaTag('og:site_name', 'Anonymous Gists');
+    updateMetaTag('og:image:width', '1200');
+    updateMetaTag('og:image:height', '630');
+    updateMetaTag('og:image:type', 'image/svg+xml');
     
-    createMetaTag('og:title', 'Anonymous Gist');
-    createMetaTag('og:description', 'Check out this anonymous gist shared with you!');
-    createMetaTag('og:image', defaultAvatar);
-    createMetaTag('og:url', window.location.href);
-    createMetaTag('og:type', 'website');
-    createMetaTag('og:site_name', 'Anonymous Gists');
-    createMetaTag('twitter:card', 'summary');
-    createMetaTag('twitter:title', 'Anonymous Gist');
-    createMetaTag('twitter:description', 'Check out this anonymous gist shared with you!');
-    createMetaTag('twitter:image', defaultAvatar);
-    createMetaTag('description', 'Check out this anonymous gist shared with you!');
+    updateMetaTag('twitter:card', 'summary');
+    updateMetaTag('twitter:title', 'Anonymous Gist');
+    updateMetaTag('twitter:description', 'Check out this anonymous gist shared with you!');
+    updateMetaTag('twitter:image', defaultAvatar);
+    
+    updateMetaTag('description', 'Check out this anonymous gist shared with you!');
 }
 
 async function loadGistForPreview(shareId) {
@@ -1329,6 +1323,13 @@ async function loadGistForPreview(shareId) {
         
         // Update view count
         await updateViewCount(gist.id);
+        
+        // Cache gist data for future crawler visits
+        try {
+            localStorage.setItem(`gist_${shareId}`, JSON.stringify(gist));
+        } catch (e) {
+            console.log('Could not cache gist data:', e);
+        }
         
         // Display the gist preview
         displayGistPreview(gist, container);

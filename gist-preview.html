@@ -4,22 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- DEFAULT META TAGS - Will be updated by JavaScript -->
-    <meta property="og:title" content="Anonymous Gist">
-    <meta property="og:description" content="Check out this anonymous gist shared with you!">
-    <meta property="og:image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50">
-    <meta property="og:url" content="">
+    <!-- DYNAMIC META TAGS - Will be updated by JavaScript IMMEDIATELY -->
+    <!-- These are just placeholders that will be replaced -->
+    <meta property="og:title" id="og-title" content="Anonymous Gist">
+    <meta property="og:description" id="og-description" content="Check out this anonymous gist shared with you!">
+    <meta property="og:image" id="og-image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50">
+    <meta property="og:url" id="og-url" content="">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Anonymous Gists">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" id="og-image-type" content="image/svg+xml">
     
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Anonymous Gist">
-    <meta name="twitter:description" content="Check out this anonymous gist shared with you!">
-    <meta name="twitter:image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50">
+    <meta name="twitter:card" id="twitter-card" content="summary_large_image">
+    <meta name="twitter:title" id="twitter-title" content="Anonymous Gist">
+    <meta name="twitter:description" id="twitter-description" content="Check out this anonymous gist shared with you!">
+    <meta name="twitter:image" id="twitter-image" content="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50">
     
     <!-- Additional Meta Tags for Better Sharing -->
-    <meta name="description" content="Check out this anonymous gist shared with you!">
+    <meta name="description" id="description" content="Check out this anonymous gist shared with you!">
     
     <style>
         * {
@@ -218,14 +222,29 @@
         .fa-spinner {
             animation: spin 1s linear infinite;
         }
+        
+        /* Hidden image for crawlers */
+        .hidden-for-crawlers {
+            position: absolute;
+            width: 0;
+            height: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
     </style>
     
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <title>Anonymous Gist Preview</title>
+    <title id="page-title">Anonymous Gist Preview</title>
 </head>
 <body>
+    <!-- HIDDEN CONTENT FOR CRAWLERS - This loads immediately -->
+    <div id="crawler-content" class="hidden-for-crawlers" aria-hidden="true">
+        <!-- Content will be populated by JavaScript immediately -->
+    </div>
+    
+    <!-- VISIBLE CONTENT FOR USERS -->
     <div class="preview-container">
         <div id="gistPreviewContainer">
             <!-- Gist preview will be loaded here -->
@@ -238,19 +257,190 @@
         </div>
     </div>
     
-    <!-- Import the gists.js file -->
-    <script type="module" src="gists.js"></script>
-    
+    <!-- Inline JavaScript to update meta tags IMMEDIATELY -->
     <script>
-        // Additional script to handle WhatsApp preview better
-        window.addEventListener('DOMContentLoaded', function() {
+        // Function to update meta tags immediately
+        function updateMetaTagsImmediately(gistData) {
+            console.log('Updating meta tags immediately with:', gistData);
+            
+            // Create dynamic title and description
+            const title = gistData.content ? 
+                `Anonymous Gist: ${gistData.content.substring(0, 60)}...` : 
+                'Anonymous Gist';
+            
+            const description = gistData.content ? 
+                gistData.content.substring(0, 200) : 
+                'Check out this anonymous gist shared with you!';
+            
+            // Get image URL
+            let imageUrl = null;
+            let isImage = false;
+            
+            if (gistData.mediaType === 'image' && gistData.mediaUrl) {
+                imageUrl = gistData.mediaUrl;
+                isImage = true;
+            } else if (gistData.mediaType === 'both' && gistData.secondMediaUrl) {
+                imageUrl = gistData.secondMediaUrl;
+                isImage = true;
+            } else {
+                // Fallback to avatar
+                imageUrl = gistData.authorAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous&backgroundColor=b6e3f4&radius=50';
+            }
+            
+            console.log('Setting image URL for meta tags:', imageUrl);
+            
+            // Update meta tags
+            document.getElementById('page-title').textContent = title;
+            document.getElementById('og-title').content = title;
+            document.getElementById('og-description').content = description;
+            document.getElementById('og-image').content = imageUrl;
+            document.getElementById('og-url').content = window.location.href;
+            document.getElementById('og-image-type').content = isImage ? 'image/jpeg' : 'image/svg+xml';
+            
+            document.getElementById('twitter-title').content = title;
+            document.getElementById('twitter-description').content = description;
+            document.getElementById('twitter-image').content = imageUrl;
+            document.getElementById('twitter-card').content = isImage ? 'summary_large_image' : 'summary';
+            
+            document.getElementById('description').content = description;
+            
+            // Also add hidden content for crawlers that don't parse meta tags well
+            const crawlerContent = document.getElementById('crawler-content');
+            if (crawlerContent && isImage) {
+                crawlerContent.innerHTML = `
+                    <h1>${title}</h1>
+                    <p>${description}</p>
+                    <img src="${imageUrl}" alt="Gist image" style="max-width: 100%;">
+                `;
+            }
+            
+            console.log('Meta tags updated successfully!');
+        }
+        
+        // Function to fetch gist data immediately
+        async function fetchGistDataImmediately() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const shareId = urlParams.get('share');
+            
+            if (!shareId) {
+                console.log('No share ID found in URL');
+                return;
+            }
+            
+            console.log('Fetching gist data for shareId:', shareId);
+            
+            try {
+                // Create a simple fetch to get gist data
+                // Note: This requires CORS to be enabled on your Firebase
+                const response = await fetch(
+                    `https://firestore.googleapis.com/v1/projects/dating-connect/databases/(default)/documents/gists?where=shareId%3D%22${shareId}%22&pageSize=1`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    }
+                );
+                
+                if (!response.ok) {
+                    console.error('Failed to fetch gist data');
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (data.documents && data.documents.length > 0) {
+                    const gistDoc = data.documents[0];
+                    const gistData = {};
+                    
+                    // Parse Firestore document fields
+                    if (gistDoc.fields) {
+                        Object.keys(gistDoc.fields).forEach(field => {
+                            const fieldValue = gistDoc.fields[field];
+                            
+                            // Handle different Firestore value types
+                            if (fieldValue.stringValue) {
+                                gistData[field] = fieldValue.stringValue;
+                            } else if (fieldValue.integerValue) {
+                                gistData[field] = parseInt(fieldValue.integerValue);
+                            } else if (fieldValue.doubleValue) {
+                                gistData[field] = parseFloat(fieldValue.doubleValue);
+                            } else if (fieldValue.booleanValue) {
+                                gistData[field] = fieldValue.booleanValue;
+                            } else if (fieldValue.timestampValue) {
+                                gistData[field] = new Date(fieldValue.timestampValue);
+                            } else if (fieldValue.mapValue) {
+                                // Handle nested objects
+                                gistData[field] = fieldValue.mapValue.fields || {};
+                            }
+                        });
+                    }
+                    
+                    console.log('Fetched gist data:', gistData);
+                    
+                    // Update meta tags immediately
+                    updateMetaTagsImmediately(gistData);
+                    
+                } else {
+                    console.log('No gist found with shareId:', shareId);
+                }
+                
+            } catch (error) {
+                console.error('Error fetching gist data:', error);
+                
+                // Fallback: Try to get from localStorage if previously viewed
+                try {
+                    const cachedGist = localStorage.getItem(`gist_${shareId}`);
+                    if (cachedGist) {
+                        const gistData = JSON.parse(cachedGist);
+                        console.log('Using cached gist data:', gistData);
+                        updateMetaTagsImmediately(gistData);
+                    }
+                } catch (cacheError) {
+                    console.error('Cache error:', cacheError);
+                }
+            }
+        }
+        
+        // Check if we're being viewed by a crawler
+        function isSocialMediaCrawler() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            return userAgent.includes('whatsapp') || 
+                   userAgent.includes('telegram') || 
+                   userAgent.includes('facebook') || 
+                   userAgent.includes('twitter') || 
+                   userAgent.includes('slack') || 
+                   userAgent.includes('discord') ||
+                   userAgent.includes('linkedin') ||
+                   userAgent.includes('pinterest');
+        }
+        
+        // Run immediately when page loads
+        document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM fully loaded for preview page');
             
-            // Add a meta tag for viewport (important for WhatsApp)
-            const viewportMeta = document.createElement('meta');
-            viewportMeta.name = 'viewport';
-            viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-            document.head.appendChild(viewportMeta);
+            // Check URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const shareId = urlParams.get('share');
+            
+            if (shareId) {
+                console.log('Share ID found:', shareId);
+                
+                // If it's a crawler, try to fetch data immediately
+                if (isSocialMediaCrawler()) {
+                    console.log('Detected social media crawler:', navigator.userAgent);
+                    
+                    // Try to fetch gist data immediately (before JavaScript loads)
+                    fetchGistDataImmediately();
+                    
+                    // Also add a timeout to try again
+                    setTimeout(fetchGistDataImmediately, 500);
+                    setTimeout(fetchGistDataImmediately, 1000);
+                }
+                
+                // Store the shareId for the main script
+                window.previewShareId = shareId;
+            }
             
             // Add favicon
             const favicon = document.createElement('link');
@@ -259,56 +449,26 @@
             favicon.href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22 fill=%22%23b3004b%22>📝</text></svg>';
             document.head.appendChild(favicon);
             
-            // Check if we're being viewed by a crawler (WhatsApp, Telegram, etc.)
-            function isSocialMediaCrawler() {
-                const userAgent = navigator.userAgent.toLowerCase();
-                return userAgent.includes('whatsapp') || 
-                       userAgent.includes('telegram') || 
-                       userAgent.includes('facebook') || 
-                       userAgent.includes('twitter') || 
-                       userAgent.includes('slack') || 
-                       userAgent.includes('discord');
-            }
-            
-            // If it's a crawler, we want to make sure meta tags are set
-            if (isSocialMediaCrawler()) {
-                console.log('Detected social media crawler:', navigator.userAgent);
-                
-                // Add a small delay to ensure meta tags are updated by JavaScript
-                setTimeout(() => {
-                    console.log('Meta tags should be updated by now');
-                    console.log('Page title:', document.title);
-                    console.log('OG Title:', document.querySelector('meta[property="og:title"]')?.content);
-                    console.log('OG Description:', document.querySelector('meta[property="og:description"]')?.content);
-                    console.log('OG Image:', document.querySelector('meta[property="og:image"]')?.content);
-                }, 1000);
-            }
-            
-            // Add redirect notice for regular users
+            // Add redirect notice for regular users (non-crawlers)
             setTimeout(() => {
-                if (!isSocialMediaCrawler()) {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const shareId = urlParams.get('share');
+                if (!isSocialMediaCrawler() && shareId) {
+                    const redirectNotice = document.createElement('div');
+                    redirectNotice.className = 'redirect-notice';
+                    redirectNotice.innerHTML = `
+                        <div style="font-weight: bold; margin-bottom: 5px;">Opening gist in app...</div>
+                        <div style="font-size: 12px; opacity: 0.9;">
+                            <i class="fas fa-spinner fa-spin"></i> Redirecting in 3 seconds
+                        </div>
+                    `;
+                    document.body.appendChild(redirectNotice);
                     
-                    if (shareId) {
-                        const redirectNotice = document.createElement('div');
-                        redirectNotice.className = 'redirect-notice';
-                        redirectNotice.innerHTML = `
-                            <div style="font-weight: bold; margin-bottom: 5px;">Opening gist in app...</div>
-                            <div style="font-size: 12px; opacity: 0.9;">
-                                <i class="fas fa-spinner fa-spin"></i> Redirecting in 3 seconds
-                            </div>
-                        `;
-                        document.body.appendChild(redirectNotice);
-                        
-                        // Redirect after 3 seconds
+                    // Redirect after 3 seconds
+                    setTimeout(() => {
+                        redirectNotice.style.animation = 'fadeOut 0.5s ease';
                         setTimeout(() => {
-                            redirectNotice.style.animation = 'fadeOut 0.5s ease';
-                            setTimeout(() => {
-                                window.location.href = `gist-view.html?share=${shareId}`;
-                            }, 500);
-                        }, 3000);
-                    }
+                            window.location.href = `gist-view.html?share=${shareId}`;
+                        }, 500);
+                    }, 3000);
                 }
             }, 1000);
         });
@@ -317,8 +477,17 @@
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'visible') {
                 console.log('Page became visible - might be crawler viewing');
+                // Try to update meta tags again
+                const urlParams = new URLSearchParams(window.location.search);
+                const shareId = urlParams.get('share');
+                if (shareId && isSocialMediaCrawler()) {
+                    fetchGistDataImmediately();
+                }
             }
         });
     </script>
+    
+    <!-- Import the main gists.js file -->
+    <script type="module" src="gists.js"></script>
 </body>
 </html>
