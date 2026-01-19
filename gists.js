@@ -1,4 +1,4 @@
-// gists.js - COMPLETE VERSION WITH WHATSAPP PREVIEWS
+// gists.js - COMPLETE VERSION WITH WHATSAPP PREVIEWS - FIXED VERSION
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -182,18 +182,48 @@ async function getGistByShareId(shareId) {
 // Create WhatsApp preview URL with gist data
 function createWhatsAppPreviewUrl(gistData, shareUrl) {
     // For WhatsApp, we need to create a message with the gist content
-    const text = gistData.content ? 
-        `📝 *Anonymous Gist*\n\n${gistData.content.substring(0, 200)}${gistData.content.length > 200 ? '...' : ''}\n\n👉 ${shareUrl}` :
-        `📝 *Anonymous Gist*\n\nCheck out this anonymous gist!\n\n👉 ${shareUrl}`;
+    let text = '';
+    
+    if (gistData.content) {
+        text = `📝 *Anonymous Gist*\n\n"${gistData.content.substring(0, 200)}${gistData.content.length > 200 ? '...' : ''}"`;
+    } else {
+        text = `📝 *Anonymous Gist*`;
+    }
+    
+    // Add media indicator if gist has image
+    if (gistData.mediaType === 'image' && gistData.mediaUrl) {
+        text += '\n\n🖼️ *Includes an image*';
+    } else if (gistData.mediaType === 'both' && gistData.secondMediaUrl) {
+        text += '\n\n🖼️ *Includes an image and voice note*';
+    } else if (gistData.mediaType === 'audio' && gistData.mediaUrl) {
+        text += '\n\n🎤 *Includes a voice note*';
+    }
+    
+    text += `\n\n👉 Open to view: ${shareUrl}`;
     
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
 // Create Telegram preview URL with gist data
 function createTelegramPreviewUrl(gistData, shareUrl) {
-    const text = gistData.content ? 
-        `📝 Anonymous Gist\n\n${gistData.content.substring(0, 200)}${gistData.content.length > 200 ? '...' : ''}` :
-        '📝 Anonymous Gist\n\nCheck out this anonymous gist!';
+    let text = '';
+    
+    if (gistData.content) {
+        text = `📝 Anonymous Gist\n\n"${gistData.content.substring(0, 200)}${gistData.content.length > 200 ? '...' : ''}"`;
+    } else {
+        text = `📝 Anonymous Gist`;
+    }
+    
+    // Add media indicator if gist has image
+    if (gistData.mediaType === 'image' && gistData.mediaUrl) {
+        text += '\n\n🖼️ Includes an image';
+    } else if (gistData.mediaType === 'both' && gistData.secondMediaUrl) {
+        text += '\n\n🖼️ Includes an image and voice note';
+    } else if (gistData.mediaType === 'audio' && gistData.mediaUrl) {
+        text += '\n\n🎤 Includes a voice note';
+    }
+    
+    text += `\n\n👉 Open to view: ${shareUrl}`;
     
     return `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`;
 }
@@ -607,12 +637,15 @@ function showVoicePreview(audioBlob, duration) {
 
 function updateSubmitButton() {
     const submitBtn = document.getElementById('submitBtn');
+    const gistContent = document.getElementById('gistContent');
     
     if (!submitBtn) return;
     
     const hasMedia = pendingImageFile || pendingAudioBlob;
+    const hasText = gistContent && gistContent.value.trim().length > 0;
     
-    submitBtn.disabled = !hasMedia;
+    // Enable button if there's either text OR media (or both)
+    submitBtn.disabled = !(hasText || hasMedia);
 }
 
 async function uploadAudioToCloudinary(audioBlob) {
@@ -1158,9 +1191,12 @@ async function setupPreviewMetaTags(shareId) {
         const description = gist.content ? gist.content.substring(0, 200) : 'Check out this anonymous gist shared with you!';
         
         // Use gist image if available, otherwise use avatar
+        // IMPORTANT: For WhatsApp/Telegram previews, we need to use the image if available
         const image = gist.mediaType === 'image' && gist.mediaUrl ? gist.mediaUrl : 
                       gist.mediaType === 'both' && gist.secondMediaUrl ? gist.secondMediaUrl : 
                       gist.authorAvatar || getRandomAvatar();
+        
+        console.log('Setting meta tags with image:', image);
         
         // Update page title and meta tags
         document.title = title;
@@ -1169,6 +1205,9 @@ async function setupPreviewMetaTags(shareId) {
         updateMetaTag('og:title', title);
         updateMetaTag('og:description', description);
         updateMetaTag('og:image', image);
+        updateMetaTag('og:image:width', '1200');
+        updateMetaTag('og:image:height', '630');
+        updateMetaTag('og:image:type', gist.mediaType === 'image' || gist.mediaType === 'both' ? 'image/jpeg' : 'image/svg+xml');
         updateMetaTag('og:url', window.location.href);
         updateMetaTag('og:type', 'website');
         updateMetaTag('og:site_name', 'Anonymous Gists');
@@ -1178,6 +1217,7 @@ async function setupPreviewMetaTags(shareId) {
         updateMetaTag('twitter:title', title);
         updateMetaTag('twitter:description', description);
         updateMetaTag('twitter:image', image);
+        updateMetaTag('twitter:url', window.location.href);
         
         console.log('Meta tags updated for preview:', { title, description, image });
         
@@ -1195,6 +1235,8 @@ function updateMetaTag(property, content) {
         meta = document.createElement('meta');
         if (property.startsWith('og:')) {
             meta.setAttribute('property', property);
+        } else if (property.startsWith('twitter:')) {
+            meta.setAttribute('name', property);
         } else {
             meta.setAttribute('name', property);
         }
@@ -1210,9 +1252,15 @@ function setDefaultMetaTags() {
     updateMetaTag('og:title', 'Anonymous Gist');
     updateMetaTag('og:description', 'Check out this anonymous gist shared with you!');
     updateMetaTag('og:image', defaultAvatar);
+    updateMetaTag('og:image:width', '1200');
+    updateMetaTag('og:image:height', '630');
+    updateMetaTag('og:image:type', 'image/svg+xml');
     updateMetaTag('og:url', window.location.href);
     updateMetaTag('og:type', 'website');
     updateMetaTag('twitter:card', 'summary_large_image');
+    updateMetaTag('twitter:title', 'Anonymous Gist');
+    updateMetaTag('twitter:description', 'Check out this anonymous gist shared with you!');
+    updateMetaTag('twitter:image', defaultAvatar);
 }
 
 async function loadGistForPreview(shareId) {
@@ -1310,23 +1358,23 @@ function displayGistPreview(gist, container) {
     const isReposted = gist.repostedFrom || gist.originalPostId;
     
     let mediaContent = '';
+    let hasImage = false;
     
-    if (gist.mediaType === 'both' && gist.mediaUrl && gist.secondMediaUrl) {
+    // Check if gist has an image
+    if ((gist.mediaType === 'image' && gist.mediaUrl) || 
+        (gist.mediaType === 'both' && gist.secondMediaUrl)) {
+        hasImage = true;
+        const imageUrl = gist.mediaType === 'both' ? gist.secondMediaUrl : gist.mediaUrl;
         mediaContent = `
             <div class="preview-media">
-                <img src="${gist.secondMediaUrl}" alt="Gist image" 
-                     style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 10px; margin-top: 15px;">
-                <div class="voice-indicator" style="display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 10px;">
-                    <i class="fas fa-microphone" style="color: #b3004b;"></i>
-                    <span>Voice message included</span>
-                </div>
-            </div>
-        `;
-    } else if (gist.mediaType === 'image' && gist.mediaUrl) {
-        mediaContent = `
-            <div class="preview-media">
-                <img src="${gist.mediaUrl}" alt="Gist image" 
-                     style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 10px; margin-top: 15px;">
+                <img src="${imageUrl}" alt="Gist image" 
+                     style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 10px; margin-top: 15px;">
+                ${gist.mediaType === 'both' ? `
+                    <div class="voice-indicator" style="display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 10px;">
+                        <i class="fas fa-microphone" style="color: #b3004b;"></i>
+                        <span>Voice message included</span>
+                    </div>
+                ` : ''}
             </div>
         `;
     } else if (gist.mediaType === 'audio' && gist.mediaUrl) {
@@ -1397,9 +1445,11 @@ function displayGistPreview(gist, container) {
                 <div style="color: #666; font-size: 14px; margin-bottom: 20px;">
                     Share anonymous thoughts with friends
                 </div>
-                <div style="font-size: 12px; color: #888;">
-                    Opening in app...
-                </div>
+                ${!isCrawler() ? `
+                    <div style="font-size: 12px; color: #888;">
+                        Opening in app...
+                    </div>
+                ` : ''}
             </div>
         </div>
     `;
@@ -1644,9 +1694,25 @@ async function shareGist(gistId, button = null) {
         }
         
         const gistData = gistSnap.data();
-        const shareText = gistData.content ? 
-            `📝 *Anonymous Gist*\n\n"${gistData.content.substring(0, 100)}${gistData.content.length > 100 ? '...' : ''}"\n\n👉 Open to view: ${shareUrl}` : 
-            `📝 *Anonymous Gist*\n\nCheck out this anonymous gist!\n\n👉 Open to view: ${shareUrl}`;
+        
+        // Create better share text that includes image indication
+        let shareText = '';
+        if (gistData.content) {
+            shareText = `📝 *Anonymous Gist*\n\n"${gistData.content.substring(0, 100)}${gistData.content.length > 100 ? '...' : ''}"`;
+        } else {
+            shareText = `📝 *Anonymous Gist*`;
+        }
+        
+        // Add media indicator
+        if (gistData.mediaType === 'image' && gistData.mediaUrl) {
+            shareText += '\n\n🖼️ *Includes an image*';
+        } else if (gistData.mediaType === 'both' && gistData.secondMediaUrl) {
+            shareText += '\n\n🖼️ *Includes an image and voice note*';
+        } else if (gistData.mediaType === 'audio' && gistData.mediaUrl) {
+            shareText += '\n\n🎤 *Includes a voice note*';
+        }
+        
+        shareText += `\n\n👉 Open to view: ${shareUrl}`;
         
         // Try Web Share API first
         if (navigator.share) {
@@ -1697,6 +1763,16 @@ function showShareModal(shareUrl, gistId, gistData, shareText) {
                         ${gistData.content ? `
                             <div style="font-size: 14px; color: #333; margin: 10px 0;">
                                 ${gistData.content.substring(0, 80)}${gistData.content.length > 80 ? '...' : ''}
+                            </div>
+                        ` : ''}
+                        ${(gistData.mediaType === 'image' || gistData.mediaType === 'both') ? `
+                            <div style="font-size: 12px; color: #b3004b; margin-top: 5px;">
+                                <i class="fas fa-image"></i> Contains image
+                            </div>
+                        ` : ''}
+                        ${(gistData.mediaType === 'audio' || gistData.mediaType === 'both') ? `
+                            <div style="font-size: 12px; color: #b3004b; margin-top: 5px;">
+                                <i class="fas fa-microphone"></i> Contains voice note
                             </div>
                         ` : ''}
                     </div>
