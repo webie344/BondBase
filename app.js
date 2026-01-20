@@ -5560,7 +5560,7 @@ function displayProfileData(profileData) {
     }
     
     document.getElementById('viewProfileBio').textContent = profileData.bio || 'No bio available';
-    document.getElementById('viewLikeCount').textContent = profileData.likes || 0;
+    
     
     const interestsContainer = document.getElementById('interestsContainer');
     interestsContainer.innerHTML = '';
