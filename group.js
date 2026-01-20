@@ -1,8 +1,7 @@
 // group.js - Complete Group Chat System with Cloudinary Media Support & Invite Links
-// UPDATED: Removed temporary messages, fixed message duplication issues
-// UPDATED: Added cancel button for uploads, removed prepare.html redirection
-// UPDATED: Fixed all event listener issues to prevent duplication
-// FIXED: Entire page rerender on message send and q is not defined error
+// UPDATED: Fixed message duplication issues completely
+// UPDATED: Added cancel button for uploads
+// FIXED: Entire page rerender on message send
 // FIXED: Double message display and unsub errors
 
 import { 
@@ -157,7 +156,7 @@ class GroupChat {
         this.isSwiping = false;
         this.swipeThreshold = 50;
         
-        this.lastDisplayedMessages = new Set();
+        this.displayedMessageIds = new Map(); // NEW: Track displayed messages per group/chat
         this.messageRenderQueue = [];
         this.isRendering = false;
         
@@ -173,10 +172,6 @@ class GroupChat {
         
         // NEW: Upload tracking
         this.activeUploads = new Map(); // uploadId -> { cancelFunction, progress, type }
-        
-        // FIXED: Track processed messages to prevent duplication
-        this.processedMessageIds = new Set();
-        this.lastProcessedIds = new Set();
         
         this.setupAuthListener();
         this.createReactionModal();
@@ -208,6 +203,13 @@ class GroupChat {
         this.cache.groupMembers.delete(groupId);
         this.cache.joinedGroups.delete(groupId);
         this.cache.messageReactions.delete(groupId);
+        this.displayedMessageIds.delete(groupId); // NEW: Clear displayed messages for this group
+    }
+
+    clearPrivateChatCache(chatId) {
+        this.displayedMessageIds.delete(chatId); // NEW: Clear displayed messages for this chat
+        this.cache.unreadCounts.clear();
+        this.cache.privateChats.clear();
     }
 
     clearAllCache() {
@@ -230,7 +232,7 @@ class GroupChat {
             allGroups: new Map(),
             messages: new Map()
         };
-        this.lastDisplayedMessages.clear();
+        this.displayedMessageIds.clear(); // NEW: Clear all displayed messages
         this.messageRenderQueue = [];
         
         // NEW: Clear typing and reward data
@@ -243,10 +245,6 @@ class GroupChat {
         
         // Clear active uploads
         this.activeUploads.clear();
-        
-        // FIXED: Clear processed message tracking
-        this.processedMessageIds.clear();
-        this.lastProcessedIds.clear();
     }
 
     async loadBlockedUsers() {
@@ -890,46 +888,39 @@ class GroupChat {
             const messagesRef = collection(db, 'private_chats', chatId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
             
-            let isProcessing = false;
+            // Initialize displayed messages for this chat if not exists
+            if (!this.displayedMessageIds.has(chatId)) {
+                this.displayedMessageIds.set(chatId, new Set());
+            }
             
             const unsubscribe = onSnapshot(q, (snapshot) => {
-                if (isProcessing) return;
-                isProcessing = true;
+                const newMessages = [];
                 
-                try {
-                    const messages = [];
-                    const currentIds = new Set();
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const messageId = doc.id;
                     
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        const messageId = doc.id;
-                        currentIds.add(messageId);
-                        
-                        // FIXED: Use global processedMessageIds to track all processed messages
-                        if (!this.processedMessageIds.has(messageId)) {
-                            this.processedMessageIds.add(messageId);
-                            messages.push({ 
-                                id: messageId, 
-                                ...data,
-                                chatType: 'private',
-                                timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
-                            });
-                        }
-                    });
-                    
-                    if (messages.length > 0) {
-                        callback(messages);
+                    // Check if we've already displayed this message
+                    const displayedMessages = this.displayedMessageIds.get(chatId);
+                    if (!displayedMessages || !displayedMessages.has(messageId)) {
+                        newMessages.push({ 
+                            id: messageId, 
+                            ...data,
+                            chatType: 'private',
+                            timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
+                        });
                     }
-                } catch (error) {
-                    console.error('Error processing private messages:', error);
-                } finally {
-                    setTimeout(() => {
-                        isProcessing = false;
-                    }, 100);
+                });
+                
+                if (newMessages.length > 0) {
+                    // Add new message IDs to displayed set
+                    const displayedMessages = this.displayedMessageIds.get(chatId);
+                    newMessages.forEach(msg => displayedMessages.add(msg.id));
+                    
+                    callback(newMessages);
                 }
             }, (error) => {
                 console.error('Error in private messages listener:', error);
-                isProcessing = false;
             });
             
             this.unsubscribePrivateMessages = unsubscribe;
@@ -2185,48 +2176,41 @@ class GroupChat {
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
             
-            let isProcessing = false;
+            // Initialize displayed messages for this group if not exists
+            if (!this.displayedMessageIds.has(groupId)) {
+                this.displayedMessageIds.set(groupId, new Set());
+            }
             
             const unsubscribe = onSnapshot(q, (snapshot) => {
-                if (isProcessing) return;
-                isProcessing = true;
+                const newMessages = [];
                 
-                try {
-                    const messages = [];
-                    const currentIds = new Set();
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const messageId = doc.id;
                     
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        const messageId = doc.id;
-                        currentIds.add(messageId);
-                        
-                        // FIXED: Use global processedMessageIds to track all processed messages
-                        if (!this.processedMessageIds.has(messageId)) {
-                            this.processedMessageIds.add(messageId);
-                            messages.push({ 
-                                id: messageId, 
-                                ...data,
-                                timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
-                            });
-                        }
-                    });
-                    
-                    if (messages.length > 0) {
-                        const cacheKey = `messages_${groupId}_${messages.length}`;
-                        this.setCachedItem(cacheKey, messages, this.cache.messages, 30000);
-                        
-                        callback(messages);
+                    // Check if we've already displayed this message
+                    const displayedMessages = this.displayedMessageIds.get(groupId);
+                    if (!displayedMessages || !displayedMessages.has(messageId)) {
+                        newMessages.push({ 
+                            id: messageId, 
+                            ...data,
+                            timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
+                        });
                     }
-                } catch (error) {
-                    console.error('Error processing messages:', error);
-                } finally {
-                    setTimeout(() => {
-                        isProcessing = false;
-                    }, 100);
+                });
+                
+                if (newMessages.length > 0) {
+                    // Add new message IDs to displayed set
+                    const displayedMessages = this.displayedMessageIds.get(groupId);
+                    newMessages.forEach(msg => displayedMessages.add(msg.id));
+                    
+                    const cacheKey = `messages_${groupId}_${newMessages.length}`;
+                    this.setCachedItem(cacheKey, newMessages, this.cache.messages, 30000);
+                    
+                    callback(newMessages);
                 }
             }, (error) => {
                 console.error('Error in messages listener:', error);
-                isProcessing = false;
             });
             
             this.unsubscribeMessages = unsubscribe;
@@ -4270,7 +4254,6 @@ function initGroupPage() {
     let typingUnsubscribe = null;
     let typingTimeout = null;
     let lastTypingInputTime = 0;
-    let renderedMessageIds = new Set(); // Track which messages have been rendered
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -4284,9 +4267,6 @@ function initGroupPage() {
     
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
-    
-    // FIXED: Clear processed message tracking when entering a new group
-    groupChat.processedMessageIds.clear();
     
     // UPDATED: Create typing indicator at top
     typingIndicator = createTypingIndicator();
@@ -4526,10 +4506,6 @@ function initGroupPage() {
             if (isInitialLoad) {
                 messages = await groupChat.getMessages(groupId);
                 await loadInitialReactions();
-                // Clear rendered message IDs on initial load
-                renderedMessageIds.clear();
-                // Add initial messages to processed set
-                messages.forEach(msg => groupChat.processedMessageIds.add(msg.id));
                 queueRender();
                 isInitialLoad = false;
             }
@@ -4925,7 +4901,6 @@ function initGroupPage() {
         if (messages.length === 0) {
             if (noMessages) noMessages.style.display = 'block';
             messagesContainer.innerHTML = '';
-            renderedMessageIds.clear();
             return;
         }
         
@@ -4933,26 +4908,16 @@ function initGroupPage() {
         
         window.currentMessages = messages;
         
-        // Only update if there are new messages that haven't been rendered
-        const newMessages = messages.filter(msg => !renderedMessageIds.has(msg.id));
+        // Clear container and render all messages
+        messagesContainer.innerHTML = '';
         
-        if (newMessages.length === 0) {
-            return; // No new messages to render
-        }
-        
-        // Track which messages we've rendered
-        newMessages.forEach(msg => renderedMessageIds.add(msg.id));
-        
-        // Use DocumentFragment for efficient DOM updates
-        const fragment = document.createDocumentFragment();
-        
-        // Group new messages by sender and time
+        // Group messages by sender and time
         const groupedMessages = [];
         let currentGroup = null;
         
-        newMessages.forEach((message, index) => {
+        messages.forEach((message, index) => {
             const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-            const prevMessage = index > 0 ? messages.find(m => m.id === messages[index - 1]?.id) : null;
+            const prevMessage = index > 0 ? messages[index - 1] : null;
             const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
             
             const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
@@ -5099,11 +5064,8 @@ function initGroupPage() {
                 </div>
             `;
             
-            fragment.appendChild(groupDiv);
+            messagesContainer.appendChild(groupDiv);
         });
-        
-        // Append new messages to the container (don't clear existing ones)
-        messagesContainer.appendChild(fragment);
         
         document.querySelectorAll('.message-avatar').forEach(avatar => {
             avatar.addEventListener('click', (e) => {
@@ -6310,7 +6272,6 @@ function initChatPage() {
     let reactionsCache = new Map();
     let isRendering = false;
     let renderQueue = [];
-    let renderedMessageIds = new Set(); // Track which messages have been rendered
     
     if (!partnerId) {
         alert('No chat partner specified');
@@ -6330,9 +6291,6 @@ function initChatPage() {
     }
     
     groupChat.currentChatPartnerId = partnerId;
-    
-    // FIXED: Clear processed message tracking when entering a new private chat
-    groupChat.processedMessageIds.clear();
     
     backBtn.addEventListener('click', () => {
         groupChat.cleanup();
@@ -6523,10 +6481,6 @@ function initChatPage() {
             
             messages = await groupChat.getPrivateMessages(partnerId);
             await loadInitialPrivateReactions();
-            // Clear rendered message IDs on initial load
-            renderedMessageIds.clear();
-            // Add initial messages to processed set
-            messages.forEach(msg => groupChat.processedMessageIds.add(msg.id));
             queueRender();
             
             if (messagesContainer) {
@@ -6574,7 +6528,6 @@ function initChatPage() {
         if (messages.length === 0) {
             if (noMessages) noMessages.style.display = 'block';
             messagesContainer.innerHTML = '';
-            renderedMessageIds.clear();
             return;
         }
         
@@ -6582,26 +6535,16 @@ function initChatPage() {
         
         window.currentMessages = messages;
         
-        // Only update if there are new messages that haven't been rendered
-        const newMessages = messages.filter(msg => !renderedMessageIds.has(msg.id));
+        // Clear container and render all messages
+        messagesContainer.innerHTML = '';
         
-        if (newMessages.length === 0) {
-            return; // No new messages to render
-        }
-        
-        // Track which messages we've rendered
-        newMessages.forEach(msg => renderedMessageIds.add(msg.id));
-        
-        // Use DocumentFragment for efficient DOM updates
-        const fragment = document.createDocumentFragment();
-        
-        // Group new messages by sender and time
+        // Group messages by sender and time
         const groupedMessages = [];
         let currentGroup = null;
         
-        newMessages.forEach((message, index) => {
+        messages.forEach((message, index) => {
             const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-            const prevMessage = index > 0 ? messages.find(m => m.id === messages[index - 1]?.id) : null;
+            const prevMessage = index > 0 ? messages[index - 1] : null;
             const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
             
             const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
@@ -6744,11 +6687,8 @@ function initChatPage() {
                 </div>
             `;
             
-            fragment.appendChild(groupDiv);
+            messagesContainer.appendChild(groupDiv);
         });
-        
-        // Append new messages to the container (don't clear existing ones)
-        messagesContainer.appendChild(fragment);
         
         document.querySelectorAll('.message-avatar').forEach(avatar => {
             avatar.addEventListener('click', (e) => {
