@@ -105,6 +105,7 @@ class GroupChat {
         this.unsubscribePrivateMessages = null;
         this.unsubscribeAuth = null;
         this.unsubscribePrivateChats = null;
+        this.unsubscribeTyping = null;
         
         this.cache = {
             userProfile: null,
@@ -156,6 +157,10 @@ class GroupChat {
         this.isRendering = false;
         
         this.blockedUsers = new Map();
+        
+        // Track all active listeners for cleanup
+        this.activeListeners = new Map();
+        this.reactionUnsubscribers = new Map();
         
         // NEW: Typing indicators and reward tracking
         this.typingUsers = new Map(); // groupId -> Map(userId -> typingTimeout)
@@ -1476,6 +1481,7 @@ class GroupChat {
             } else {
                 this.firebaseUser = null;
                 this.currentUser = null;
+                this.cleanup();
                 this.clearAllCache();
                 console.log('User logged out');
                 
@@ -1960,9 +1966,19 @@ class GroupChat {
     // NEW: Listen to typing indicators
     listenToTyping(groupId, callback) {
         try {
+            // Unsubscribe from existing typing listener if any
+            if (this.unsubscribeTyping && typeof this.unsubscribeTyping === 'function') {
+                try {
+                    this.unsubscribeTyping();
+                } catch (err) {
+                    console.log('Error unsubscribing from typing:', err);
+                }
+                this.unsubscribeTyping = null;
+            }
+            
             const typingRef = collection(db, 'groups', groupId, 'typing');
             
-            return onSnapshot(typingRef, (snapshot) => {
+            const unsubscribe = onSnapshot(typingRef, (snapshot) => {
                 const typingUsers = [];
                 const now = Date.now();
                 
@@ -1986,6 +2002,9 @@ class GroupChat {
                 
                 callback(typingUsers);
             });
+            
+            this.unsubscribeTyping = unsubscribe;
+            return unsubscribe;
         } catch (error) {
             console.error('Error listening to typing indicators:', error);
             return () => {};
@@ -3342,8 +3361,8 @@ class GroupChat {
             await signOut(auth);
             this.firebaseUser = null;
             this.currentUser = null;
-            this.clearAllCache();
             this.cleanup();
+            this.clearAllCache();
             
             window.location.href = 'login.html';
         } catch (error) {
@@ -3352,49 +3371,58 @@ class GroupChat {
     }
 
     cleanup() {
-        if (this.unsubscribeMessages && typeof this.unsubscribeMessages === 'function') {
-            try {
-                this.unsubscribeMessages();
-            } catch (err) {
-                console.log('Error unsubscribing from messages:', err);
+        console.log('Cleaning up group chat...');
+        
+        // Clean up all Firebase listeners
+        const listeners = [
+            'unsubscribeMessages',
+            'unsubscribeMembers', 
+            'unsubscribePrivateMessages',
+            'unsubscribePrivateChats',
+            'unsubscribeAuth',
+            'unsubscribeTyping'
+        ];
+        
+        listeners.forEach(listenerName => {
+            if (this[listenerName] && typeof this[listenerName] === 'function') {
+                try {
+                    this[listenerName]();
+                    console.log(`Unsubscribed from ${listenerName}`);
+                } catch (err) {
+                    console.log(`Error unsubscribing from ${listenerName}:`, err);
+                }
+                this[listenerName] = null;
             }
-            this.unsubscribeMessages = null;
+        });
+        
+        // Clean up all reaction listeners
+        if (this.reactionUnsubscribers) {
+            this.reactionUnsubscribers.forEach((unsub, messageId) => {
+                if (typeof unsub === 'function') {
+                    try {
+                        unsub();
+                        console.log(`Unsubscribed from reaction listener for message ${messageId}`);
+                    } catch (err) {
+                        console.log(`Error unsubscribing from reaction listener for message ${messageId}:`, err);
+                    }
+                }
+            });
+            this.reactionUnsubscribers.clear();
         }
         
-        if (this.unsubscribeMembers && typeof this.unsubscribeMembers === 'function') {
-            try {
-                this.unsubscribeMembers();
-            } catch (err) {
-                console.log('Error unsubscribing from members:', err);
-            }
-            this.unsubscribeMembers = null;
-        }
-        
-        if (this.unsubscribePrivateMessages && typeof this.unsubscribePrivateMessages === 'function') {
-            try {
-                this.unsubscribePrivateMessages();
-            } catch (err) {
-                console.log('Error unsubscribing from private messages:', err);
-            }
-            this.unsubscribePrivateMessages = null;
-        }
-        
-        if (this.unsubscribePrivateChats && typeof this.unsubscribePrivateChats === 'function') {
-            try {
-                this.unsubscribePrivateChats();
-            } catch (err) {
-                console.log('Error unsubscribing from private chats:', err);
-            }
-            this.unsubscribePrivateChats = null;
-        }
-        
-        if (this.unsubscribeAuth && typeof this.unsubscribeAuth === 'function') {
-            try {
-                this.unsubscribeAuth();
-            } catch (err) {
-                console.log('Error unsubscribing from auth:', err);
-            }
-            this.unsubscribeAuth = null;
+        // Clean up all active listeners
+        if (this.activeListeners) {
+            this.activeListeners.forEach((unsub, listenerId) => {
+                if (typeof unsub === 'function') {
+                    try {
+                        unsub();
+                        console.log(`Unsubscribed from active listener ${listenerId}`);
+                    } catch (err) {
+                        console.log(`Error unsubscribing from active listener ${listenerId}:`, err);
+                    }
+                }
+            });
+            this.activeListeners.clear();
         }
         
         this.areListenersSetup = false;
@@ -3405,6 +3433,7 @@ class GroupChat {
         this.typingUsers.forEach((userTyping, groupId) => {
             userTyping.forEach((timeout, userId) => {
                 clearTimeout(timeout);
+                console.log(`Cleared typing timeout for user ${userId} in group ${groupId}`);
             });
         });
         this.typingUsers.clear();
@@ -3419,9 +3448,17 @@ class GroupChat {
         this.activeUploads.forEach((upload, uploadId) => {
             if (upload.cancelFunction && typeof upload.cancelFunction === 'function') {
                 upload.cancelFunction();
+                console.log(`Cancelled upload ${uploadId}`);
             }
         });
         this.activeUploads.clear();
+        
+        // Clear current state
+        this.currentGroupId = null;
+        this.currentChatPartnerId = null;
+        this.replyingToMessage = null;
+        
+        console.log('Group chat cleanup complete');
     }
 }
 
@@ -3555,6 +3592,35 @@ function removeUploadModal(uploadId) {
 
 // Initialize group chat page
 function initGroupPage() {
+    console.log('Initializing group page...');
+    
+    // Clear any existing event listeners
+    const originalAddEventListener = EventTarget.prototype.addEventListener;
+    const addedListeners = new Map();
+    
+    EventTarget.prototype.addEventListener = function(type, listener, options) {
+        if (!addedListeners.has(this)) {
+            addedListeners.set(this, new Map());
+        }
+        if (!addedListeners.get(this).has(type)) {
+            addedListeners.get(this).set(type, []);
+        }
+        addedListeners.get(this).get(type).push(listener);
+        return originalAddEventListener.call(this, type, listener, options);
+    };
+    
+    // Function to remove all event listeners
+    function removeAllEventListeners() {
+        addedListeners.forEach((typeMap, target) => {
+            typeMap.forEach((listeners, type) => {
+                listeners.forEach(listener => {
+                    target.removeEventListener(type, listener);
+                });
+            });
+        });
+        addedListeners.clear();
+    }
+    
     const sidebar = document.getElementById('sidebar');
     const backBtn = document.getElementById('backBtn');
     const sidebarToggle = document.getElementById('sidebarToggle');
@@ -3628,8 +3694,13 @@ function initGroupPage() {
     })();
     
     backBtn.addEventListener('click', () => {
+        console.log('Back button clicked, cleaning up...');
+        
+        // Clean up group chat
         groupChat.cleanup();
-        reactionUnsubscribers.forEach(unsub => {
+        
+        // Clean up reaction listeners
+        reactionUnsubscribers.forEach((unsub, messageId) => {
             if (typeof unsub === 'function') {
                 try {
                     unsub();
@@ -3648,10 +3719,14 @@ function initGroupPage() {
             clearTimeout(typingTimeout);
         }
         
+        // Remove all event listeners
+        removeAllEventListeners();
+        
         removeSidebarOverlay();
         window.location.href = 'groups.html';
     });
     
+    // Clone and replace sidebar toggle to ensure clean event listeners
     if (sidebarToggle) {
         const newToggle = sidebarToggle.cloneNode(true);
         sidebarToggle.parentNode.replaceChild(newToggle, sidebarToggle);
@@ -3676,7 +3751,13 @@ function initGroupPage() {
     }
     
     if (infoBtn) {
-        infoBtn.addEventListener('click', (e) => {
+        // Clone and replace info button
+        const newInfoBtn = infoBtn.cloneNode(true);
+        infoBtn.parentNode.replaceChild(newInfoBtn, infoBtn);
+        
+        const freshInfoBtn = document.getElementById('infoBtn');
+        
+        freshInfoBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
             
@@ -3739,7 +3820,12 @@ function initGroupPage() {
         }
     });
     
-    emojiBtn.addEventListener('click', () => {
+    // Clone and replace emoji button
+    const newEmojiBtn = emojiBtn.cloneNode(true);
+    emojiBtn.parentNode.replaceChild(newEmojiBtn, emojiBtn);
+    const freshEmojiBtn = document.getElementById('emojiBtn');
+    
+    freshEmojiBtn.addEventListener('click', () => {
         const emojis = ['😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '❤️', '🔥', '✨'];
         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
         
@@ -3748,7 +3834,12 @@ function initGroupPage() {
         messageInput.dispatchEvent(new Event('input'));
     });
     
-    attachmentBtn.addEventListener('click', () => {
+    // Clone and replace attachment button
+    const newAttachmentBtn = attachmentBtn.cloneNode(true);
+    attachmentBtn.parentNode.replaceChild(newAttachmentBtn, attachmentBtn);
+    const freshAttachmentBtn = document.getElementById('attachmentBtn');
+    
+    freshAttachmentBtn.addEventListener('click', () => {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.accept = 'image/*,video/*';
@@ -3999,14 +4090,19 @@ function initGroupPage() {
                 document.head.appendChild(styles);
             }
             
-            copyBtn.addEventListener('click', async () => {
+            // Clone and replace copy button to ensure clean event listeners
+            const originalCopyBtn = copyBtn.cloneNode(true);
+            copyBtn.parentNode.replaceChild(originalCopyBtn, copyBtn);
+            const freshCopyBtn = document.getElementById('copyInviteBtn');
+            
+            freshCopyBtn.addEventListener('click', async () => {
                 let isCopying = false;
                 
                 if (isCopying) return;
                 
                 isCopying = true;
-                copyBtn.disabled = true;
-                copyBtn.innerHTML = '<svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; margin-right: 8px;"><circle cx="12" cy="12" r="10" /></svg> Getting link...';
+                freshCopyBtn.disabled = true;
+                freshCopyBtn.innerHTML = '<svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; margin-right: 8px;"><circle cx="12" cy="12" r="10" /></svg> Getting link...';
                 statusDiv.textContent = '';
                 statusDiv.className = 'invite-link-status';
                 
@@ -4015,18 +4111,18 @@ function initGroupPage() {
                     
                     await navigator.clipboard.writeText(inviteLink);
                     
-                    copyBtn.innerHTML = '<svg class="feather" data-feather="check" style="margin-right: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Link Copied!';
-                    copyBtn.classList.add('copied');
+                    freshCopyBtn.innerHTML = '<svg class="feather" data-feather="check" style="margin-right: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Link Copied!';
+                    freshCopyBtn.classList.add('copied');
                     
                     statusDiv.textContent = 'Invite link copied to clipboard!';
                     statusDiv.classList.add('success');
                     
-                    copyBtn.title = `Link: ${inviteLink}`;
+                    freshCopyBtn.title = `Link: ${inviteLink}`;
                     
                     setTimeout(() => {
-                        copyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
-                        copyBtn.classList.remove('copied');
-                        copyBtn.disabled = false;
+                        freshCopyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
+                        freshCopyBtn.classList.remove('copied');
+                        freshCopyBtn.disabled = false;
                         statusDiv.textContent = 'Share this link to invite others';
                         statusDiv.className = 'invite-link-status';
                         isCopying = false;
@@ -4035,14 +4131,14 @@ function initGroupPage() {
                 } catch (error) {
                     console.error('Error copying invite link:', error);
                     
-                    copyBtn.innerHTML = '<svg class="feather" data-feather="alert-triangle" style="margin-right: 8px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Error';
-                    copyBtn.disabled = false;
+                    freshCopyBtn.innerHTML = '<svg class="feather" data-feather="alert-triangle" style="margin-right: 8px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Error';
+                    freshCopyBtn.disabled = false;
                     
                     statusDiv.textContent = 'Failed to copy link. Please try again.';
                     statusDiv.classList.add('error');
                     
                     setTimeout(() => {
-                        copyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
+                        freshCopyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
                         statusDiv.textContent = '';
                         statusDiv.className = 'invite-link-status';
                         isCopying = false;
@@ -4053,11 +4149,11 @@ function initGroupPage() {
             document.addEventListener('keydown', (e) => {
                 if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'L') {
                     e.preventDefault();
-                    copyBtn.click();
+                    freshCopyBtn.click();
                 }
             });
             
-            copyBtn.title = 'Click to copy invite link (Ctrl+Shift+L)';
+            freshCopyBtn.title = 'Click to copy invite link (Ctrl+Shift+L)';
         }
     }
     
@@ -4096,10 +4192,15 @@ function initGroupPage() {
     }
     
     function setupListeners() {
+        console.log('Setting up listeners for group:', groupId);
+        
         // Clear any existing listeners first
         if (groupChat.areListenersSetup) {
+            console.log('Cleaning up existing listeners...');
             groupChat.cleanup();
-            reactionUnsubscribers.forEach(unsub => {
+            
+            // Clean up reaction listeners
+            reactionUnsubscribers.forEach((unsub, messageId) => {
                 if (typeof unsub === 'function') {
                     try {
                         unsub();
@@ -4116,8 +4217,11 @@ function initGroupPage() {
             typingUnsubscribe();
         }
         
+        // Clear processed message IDs to avoid duplicates
+        processedMessageIds.clear();
+        
         // Set up new listeners
-        groupChat.listenToMessages(groupId, (newMessages) => {
+        const messagesUnsubscribe = groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Received messages:', newMessages.length);
             
             const uniqueMessages = [];
@@ -4136,13 +4240,17 @@ function initGroupPage() {
             const newUniqueMessages = uniqueMessages.filter(msg => !existingIds.has(msg.id));
             
             if (newUniqueMessages.length > 0) {
+                console.log('Adding new messages:', newUniqueMessages.length);
                 messages = [...messages, ...newUniqueMessages];
                 setupReactionListeners();
                 queueRender();
             }
         });
         
-        groupChat.listenToMembers(groupId, (newMembers) => {
+        groupChat.activeListeners.set('messages', messagesUnsubscribe);
+        
+        const membersUnsubscribe = groupChat.listenToMembers(groupId, (newMembers) => {
+            console.log('Received members update:', newMembers.length);
             members = newMembers;
             updateMembersList();
             
@@ -4154,22 +4262,31 @@ function initGroupPage() {
             }
         });
         
+        groupChat.activeListeners.set('members', membersUnsubscribe);
+        
         // UPDATED: Set up typing indicator listener
         typingUnsubscribe = groupChat.listenToTyping(groupId, (typingUsers) => {
             updateTypingIndicator(typingUsers);
         });
         
+        groupChat.activeListeners.set('typing', typingUnsubscribe);
+        
         const activeInterval = setInterval(() => {
             groupChat.updateLastActive(groupId);
         }, 60000);
+        
+        groupChat.activeListeners.set('activeInterval', () => clearInterval(activeInterval));
         
         window.addEventListener('focus', () => {
             groupChat.updateLastActive(groupId);
         });
         
         window.addEventListener('beforeunload', () => {
+            console.log('Page unloading, cleaning up...');
             clearInterval(activeInterval);
-            reactionUnsubscribers.forEach(unsub => {
+            
+            // Clean up reaction listeners
+            reactionUnsubscribers.forEach((unsub, messageId) => {
                 if (typeof unsub === 'function') {
                     try {
                         unsub();
@@ -4192,6 +4309,7 @@ function initGroupPage() {
         });
         
         groupChat.areListenersSetup = true;
+        console.log('Listeners setup complete');
     }
     
     function updateMembersList() {
@@ -4611,8 +4729,13 @@ function initGroupPage() {
     }
     
     window.addEventListener('beforeunload', () => {
+        console.log('Page unloading, performing cleanup...');
+        
+        // Clean up group chat
         groupChat.cleanup();
-        reactionUnsubscribers.forEach(unsub => {
+        
+        // Clean up reaction listeners
+        reactionUnsubscribers.forEach((unsub, messageId) => {
             if (typeof unsub === 'function') {
                 try {
                     unsub();
@@ -4630,6 +4753,9 @@ function initGroupPage() {
         if (typingTimeout) {
             clearTimeout(typingTimeout);
         }
+        
+        // Remove all event listeners
+        removeAllEventListeners();
         
         removeSidebarOverlay();
     });
@@ -4678,12 +4804,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if we're on group.html
     const currentPage = window.location.pathname.split('/').pop().split('.')[0];
     if (currentPage === 'group') {
+        console.log('Group page detected, waiting for auth...');
+        
         document.addEventListener('groupAuthReady', () => {
+            console.log('Group auth ready, initializing page...');
             initGroupPage();
         });
         
         setTimeout(() => {
             if (groupChat.firebaseUser) {
+                console.log('Firebase user already authenticated, triggering auth ready...');
                 document.dispatchEvent(new CustomEvent('groupAuthReady'));
             }
         }, 500);
@@ -4695,4 +4825,3 @@ window.groupChat = groupChat;
 window.groupLogout = function() {
     groupChat.logout();
 };
-
