@@ -17,7 +17,8 @@ import {
     addDoc,
     onSnapshot,
     orderBy,
-    serverTimestamp
+    serverTimestamp,
+    writeBatch
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -41,11 +42,12 @@ let unsubscribeNotifications = null;
 let checkIntervals = [];
 let dismissedNotifications = new Set();
 let viewedPosts = new Set();
+let unreadCount = 0;
+let lastNotificationTime = 0;
+let notificationShown = false;
 
 // Initialize notification system
 function initNotificationSystem() {
-    
-    
     // Load dismissed notifications and viewed posts
     loadDismissedNotifications();
     
@@ -62,7 +64,11 @@ function initNotificationSystem() {
             // If on notification page, load notifications
             if (window.location.pathname.includes('notification.html')) {
                 loadNotificationsForPage();
+                setupMarkAllReadButton();
             }
+            
+            // Setup dropdown notifications if notification bell exists
+            setupDropdownNotifications();
         } else {
             console.log('User not authenticated');
             currentUser = null;
@@ -75,6 +81,687 @@ function initNotificationSystem() {
             }
         }
     });
+}
+
+// Setup dropdown notification functionality
+function setupDropdownNotifications() {
+    const notificationBells = document.querySelectorAll('.notification-bell, .notification-icon, [data-notification-dropdown]');
+    
+    notificationBells.forEach(bell => {
+        bell.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            toggleDropdownNotifications();
+        });
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('notification-dropdown');
+        if (dropdown && !dropdown.contains(e.target)) {
+            const bells = document.querySelectorAll('.notification-bell, .notification-icon, [data-notification-dropdown]');
+            let isBell = false;
+            bells.forEach(bell => {
+                if (bell.contains(e.target)) isBell = true;
+            });
+            if (!isBell) {
+                dropdown.style.display = 'none';
+            }
+        }
+    });
+}
+
+// Toggle dropdown notifications
+async function toggleDropdownNotifications() {
+    let dropdown = document.getElementById('notification-dropdown');
+    
+    if (!dropdown) {
+        dropdown = createDropdownElement();
+        document.body.appendChild(dropdown);
+    }
+    
+    if (dropdown.style.display === 'block') {
+        dropdown.style.display = 'none';
+    } else {
+        dropdown.style.display = 'block';
+        await loadDropdownNotifications();
+    }
+}
+
+// Create dropdown element
+function createDropdownElement() {
+    const dropdown = document.createElement('div');
+    dropdown.id = 'notification-dropdown';
+    dropdown.className = 'notification-dropdown';
+    dropdown.innerHTML = `
+        <div class="dropdown-header">
+            <h3>Notifications</h3>
+            <button class="mark-all-read-btn" title="Mark all as read">
+                <i class="fas fa-check-double"></i> Mark all
+            </button>
+        </div>
+        <div class="dropdown-content" id="dropdown-notifications">
+            <div class="loading-notifications">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Loading notifications...</span>
+            </div>
+        </div>
+        <div class="dropdown-footer">
+            <a href="notification.html" class="view-all-btn">View all notifications</a>
+        </div>
+    `;
+    
+    // Add styles if not already added
+    if (!document.getElementById('notification-dropdown-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'notification-dropdown-styles';
+        styles.textContent = `
+            .notification-dropdown {
+                position: fixed;
+                top: 70px;
+                right: 20px;
+                width: 400px;
+                max-height: 500px;
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                box-shadow: var(--shadow-lg);
+                z-index: 10000;
+                display: none;
+                overflow: hidden;
+                font-family: 'Inter', sans-serif;
+            }
+            
+            .dropdown-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px 20px;
+                border-bottom: 1px solid var(--border-color);
+                background: var(--bg-primary);
+            }
+            
+            .dropdown-header h3 {
+                margin: 0;
+                font-size: 16px;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+            
+            .mark-all-read-btn {
+                background: var(--primary);
+                color: var(--text-primary);
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 12px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                transition: all 0.2s ease;
+            }
+            
+            .mark-all-read-btn:hover {
+                background: var(--primary-dark);
+                transform: translateY(-1px);
+            }
+            
+            .dropdown-content {
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            
+            .dropdown-notification-item {
+                padding: 15px 20px;
+                border-bottom: 1px solid var(--border-color);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            
+            .dropdown-notification-item:hover {
+                background: var(--bg-hover);
+            }
+            
+            .dropdown-notification-item.unread {
+                background: rgba(179, 0, 75, 0.05);
+            }
+            
+            .dropdown-notification-icon {
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                font-size: 14px;
+            }
+            
+            .dropdown-notification-content {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .dropdown-notification-title {
+                font-weight: 500;
+                font-size: 14px;
+                color: var(--text-primary);
+                margin-bottom: 2px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .dropdown-notification-text {
+                font-size: 13px;
+                color: var(--text-secondary);
+                line-height: 1.3;
+                margin-bottom: 4px;
+            }
+            
+            .dropdown-notification-time {
+                font-size: 11px;
+                color: var(--text-light);
+            }
+            
+            .unread-indicator {
+                width: 8px;
+                height: 8px;
+                background: var(--primary);
+                border-radius: 50%;
+                margin-left: 5px;
+            }
+            
+            .dropdown-footer {
+                padding: 15px 20px;
+                text-align: center;
+                border-top: 1px solid var(--border-color);
+                background: var(--bg-primary);
+            }
+            
+            .view-all-btn {
+                color: var(--primary);
+                text-decoration: none;
+                font-size: 14px;
+                font-weight: 500;
+                display: block;
+                padding: 8px;
+                border-radius: 6px;
+                transition: all 0.2s ease;
+            }
+            
+            .view-all-btn:hover {
+                background: rgba(179, 0, 75, 0.1);
+            }
+            
+            .loading-notifications {
+                padding: 30px;
+                text-align: center;
+                color: var(--text-secondary);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .empty-notifications {
+                padding: 40px 20px;
+                text-align: center;
+                color: var(--text-secondary);
+            }
+            
+            .empty-notifications i {
+                font-size: 48px;
+                margin-bottom: 15px;
+                color: var(--border-color);
+            }
+            
+            @media (max-width: 768px) {
+                .notification-dropdown {
+                    width: calc(100% - 40px);
+                    right: 10px;
+                    left: 10px;
+                }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    // Add event listeners
+    dropdown.querySelector('.mark-all-read-btn').addEventListener('click', markAllNotificationsAsRead);
+    
+    return dropdown;
+}
+
+// Load notifications for dropdown
+async function loadDropdownNotifications() {
+    if (!currentUser) return;
+    
+    const dropdownContent = document.getElementById('dropdown-notifications');
+    if (!dropdownContent) return;
+    
+    try {
+        const notificationsQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', currentUser.uid)
+        );
+        
+        const notificationsSnap = await getDocs(notificationsQuery);
+        
+        if (notificationsSnap.empty) {
+            dropdownContent.innerHTML = `
+                <div class="empty-notifications">
+                    <i class="fas fa-bell-slash"></i>
+                    <p>No notifications yet</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Sort by timestamp
+        const sortedNotifications = notificationsSnap.docs.sort((a, b) => {
+            const timeA = a.data().timestamp?.toDate?.() || new Date(0);
+            const timeB = b.data().timestamp?.toDate?.() || new Date(0);
+            return timeB - timeA;
+        }).slice(0, 10); // Show only 10 most recent
+        
+        let html = '';
+        
+        sortedNotifications.forEach(doc => {
+            const notification = doc.data();
+            const timeAgo = formatTime(notification.timestamp);
+            const iconClass = getNotificationIcon(notification.type);
+            const unreadClass = notification.read ? '' : 'unread';
+            
+            html += `
+                <div class="dropdown-notification-item ${unreadClass}" data-id="${doc.id}">
+                    <div class="dropdown-notification-icon ${notification.type}">
+                        <i class="${iconClass}"></i>
+                    </div>
+                    <div class="dropdown-notification-content">
+                        <div class="dropdown-notification-title">
+                            ${notification.title}
+                            ${!notification.read ? '<span class="unread-indicator"></span>' : ''}
+                        </div>
+                        <div class="dropdown-notification-text">${notification.message}</div>
+                        <div class="dropdown-notification-time">${timeAgo}</div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        dropdownContent.innerHTML = html;
+        
+        // Add click handlers
+        document.querySelectorAll('.dropdown-notification-item').forEach(item => {
+            item.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const notificationId = item.dataset.id;
+                await handleNotificationClick(notificationId);
+                
+                // Close dropdown
+                const dropdown = document.getElementById('notification-dropdown');
+                if (dropdown) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        });
+        
+    } catch (error) {
+        console.error('Error loading dropdown notifications:', error);
+        dropdownContent.innerHTML = `
+            <div class="empty-notifications">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>Error loading notifications</p>
+            </div>
+        `;
+    }
+}
+
+// Handle notification click
+async function handleNotificationClick(notificationId) {
+    // Mark as read
+    await markNotificationAsRead(notificationId);
+    
+    // Get notification data to determine where to navigate
+    try {
+        const notificationDoc = await getDoc(doc(db, 'notifications', notificationId));
+        if (notificationDoc.exists()) {
+            const notification = notificationDoc.data();
+            
+            // Navigate based on notification type
+            if (notification.type === 'message' && notification.senderId) {
+                window.location.href = `chat.html?id=${notification.senderId}`;
+            } else if (notification.type === 'group_message' && notification.groupId) {
+                // UPDATED: Changed from prepare.html to group.html
+                window.location.href = `group.html?id=${notification.groupId}`;
+            } else if (notification.type === 'group_invite' && notification.groupId) {
+                // UPDATED: Changed from prepare.html to group.html
+                window.location.href = `group.html?id=${notification.groupId}`;
+            } else if (notification.type === 'post' && notification.senderId) {
+                window.location.href = 'posts.html';
+                // Mark post as viewed
+                viewedPosts.add(notification.relatedId);
+                saveViewedPosts();
+                dismissedNotifications.add(`post_${notification.relatedId}`);
+                saveDismissedNotifications();
+            } else if (notification.senderId) {
+                window.location.href = `profile.html?id=${notification.senderId}`;
+            } else {
+                window.location.href = 'notification.html';
+            }
+        }
+    } catch (error) {
+        console.error('Error getting notification:', error);
+        window.location.href = 'notification.html';
+    }
+}
+
+// Setup mark all read button for notification page
+function setupMarkAllReadButton() {
+    const markAllReadBtn = document.getElementById('markAllReadBtn');
+    if (!markAllReadBtn) {
+        // Create button if it doesn't exist
+        const header = document.querySelector('.notifications-header');
+        if (header) {
+            const button = document.createElement('button');
+            button.id = 'markAllReadBtn';
+            button.className = 'mark-all-read-page-btn';
+            button.innerHTML = '<i class="fas fa-check-double"></i> Mark All as Read';
+            header.appendChild(button);
+            
+            // Add styles
+            if (!document.getElementById('mark-all-read-styles')) {
+                const styles = document.createElement('style');
+                styles.id = 'mark-all-read-styles';
+                styles.textContent = `
+                    .mark-all-read-page-btn {
+                        background: var(--primary);
+                        color: var(--text-primary);
+                        border: none;
+                        border-radius: 8px;
+                        padding: 10px 20px;
+                        font-size: 14px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        transition: all 0.2s ease;
+                    }
+                    
+                    .mark-all-read-page-btn:hover {
+                        background: var(--primary-dark);
+                        transform: translateY(-2px);
+                        box-shadow: var(--shadow-md);
+                    }
+                    
+                    .notifications-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 20px;
+                    }
+                `;
+                document.head.appendChild(styles);
+            }
+            
+            button.addEventListener('click', markAllNotificationsAsRead);
+        }
+    } else {
+        markAllReadBtn.addEventListener('click', markAllNotificationsAsRead);
+    }
+}
+
+// Mark all notifications as read
+async function markAllNotificationsAsRead() {
+    if (!currentUser) return;
+    
+    try {
+        const notificationsQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', currentUser.uid),
+            where('read', '==', false)
+        );
+        
+        const notificationsSnap = await getDocs(notificationsQuery);
+        const batch = writeBatch(db);
+        
+        notificationsSnap.docs.forEach(doc => {
+            batch.update(doc.ref, {
+                read: true,
+                readAt: serverTimestamp()
+            });
+        });
+        
+        await batch.commit();
+        
+        // Update UI
+        document.querySelectorAll('.notification-item.unread').forEach(item => {
+            item.classList.remove('unread');
+            const unreadDot = item.querySelector('.unread-dot');
+            if (unreadDot) unreadDot.remove();
+            const markReadBtn = item.querySelector('.mark-read-btn');
+            if (markReadBtn) markReadBtn.remove();
+        });
+        
+        // Update dropdown if open
+        const dropdown = document.getElementById('notification-dropdown');
+        if (dropdown && dropdown.style.display === 'block') {
+            await loadDropdownNotifications();
+        }
+        
+        updateNotificationBadge(0);
+        
+        // Close any open notification popup
+        const popup = document.querySelector('.notification-popup');
+        if (popup) {
+            popup.remove();
+        }
+        
+    } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+    }
+}
+
+// Show notification popup (ONLY ONE popup with mark button)
+function showNotificationPopup() {
+    // Don't show if already showing or on notification page
+    if (notificationShown || window.location.pathname.includes('notification.html')) {
+        return;
+    }
+    
+    // Don't show if no unread notifications
+    if (unreadCount === 0) {
+        return;
+    }
+    
+    // Remove any existing popup
+    const existingPopup = document.querySelector('.notification-popup');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+    
+    const popup = document.createElement('div');
+    popup.className = 'notification-popup';
+    popup.innerHTML = `
+        <div class="popup-content">
+            <div class="popup-icon">
+                <i class="fas fa-bell"></i>
+            </div>
+            <div class="popup-text">
+                <div class="popup-title">You have new notifications</div>
+                <div class="popup-message">${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}</div>
+            </div>
+            <button class="popup-mark-btn">
+                <i class="fas fa-check"></i> Mark
+            </button>
+            <button class="popup-close">&times;</button>
+        </div>
+    `;
+    
+    // Add styles if not already added
+    if (!document.getElementById('notification-popup-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'notification-popup-styles';
+        styles.textContent = `
+            .notification-popup {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+                border-radius: 12px;
+                box-shadow: var(--shadow-lg);
+                z-index: 10001;
+                animation: slideInRight 0.4s ease forwards;
+                color: white;
+                font-family: 'Inter', sans-serif;
+                overflow: hidden;
+                min-width: 300px;
+            }
+            
+            .popup-content {
+                display: flex;
+                align-items: center;
+                padding: 15px;
+                gap: 12px;
+            }
+            
+            .popup-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 18px;
+                background: rgba(255, 255, 255, 0.2);
+                flex-shrink: 0;
+            }
+            
+            .popup-text {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .popup-title {
+                font-weight: 600;
+                font-size: 14px;
+                margin-bottom: 2px;
+            }
+            
+            .popup-message {
+                font-size: 13px;
+                opacity: 0.9;
+            }
+            
+            .popup-mark-btn {
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 12px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                transition: all 0.2s ease;
+                flex-shrink: 0;
+            }
+            
+            .popup-mark-btn:hover {
+                background: rgba(255, 255, 255, 0.3);
+                transform: translateY(-1px);
+            }
+            
+            .popup-close {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 50%;
+                font-size: 16px;
+                cursor: pointer;
+                color: white;
+                padding: 0;
+                width: 28px;
+                height: 28px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                transition: all 0.2s ease;
+            }
+            
+            .popup-close:hover {
+                background: rgba(255, 255, 255, 0.3);
+            }
+            
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+            
+            .notification-popup.hiding {
+                animation: slideOutRight 0.3s ease forwards;
+            }
+            
+            @media (max-width: 768px) {
+                .notification-popup {
+                    left: 20px;
+                    right: 20px;
+                    min-width: auto;
+                }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    document.body.appendChild(popup);
+    notificationShown = true;
+    
+    // Auto-dismiss after 5 seconds
+    const autoDismiss = setTimeout(() => {
+        hideNotificationPopup(popup);
+    }, 5000);
+    
+    // Mark button
+    popup.querySelector('.popup-mark-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        markAllNotificationsAsRead();
+        hideNotificationPopup(popup);
+    });
+    
+    // Close button
+    popup.querySelector('.popup-close').addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideNotificationPopup(popup);
+    });
+    
+    // Click to go to notifications
+    popup.addEventListener('click', (e) => {
+        if (!e.target.closest('.popup-mark-btn') && !e.target.closest('.popup-close')) {
+            window.location.href = 'notification.html';
+            hideNotificationPopup(popup);
+        }
+    });
+    
+    function hideNotificationPopup(popupElement) {
+        popupElement.classList.add('hiding');
+        setTimeout(() => {
+            if (popupElement.parentNode) {
+                popupElement.parentNode.removeChild(popupElement);
+            }
+            notificationShown = false;
+        }, 300);
+        clearTimeout(autoDismiss);
+    }
 }
 
 // Load dismissed notifications from localStorage
@@ -116,7 +803,7 @@ function saveDismissedNotifications() {
 function saveViewedPosts() {
     if (!currentUser) return;
     try {
-        localStorage.setItem(`viewedPosts_${currentUser.uid}`, JSON.stringify([...viewedPosts]));
+        localStorage.setItem(`viewedPosts_${currentUser.uid}`, JSON.stringify(Array.from(viewedPosts)));
     } catch (error) {
         console.error('Error saving viewed posts:', error);
     }
@@ -127,7 +814,6 @@ async function loadNotificationsForPage() {
     if (!currentUser) return;
 
     try {
-        // SIMPLE QUERY - No composite index needed
         const notificationsQuery = query(
             collection(db, 'notifications'),
             where('userId', '==', currentUser.uid)
@@ -238,7 +924,7 @@ function addNotificationActionListeners() {
     document.querySelectorAll('.notification-item').forEach(item => {
         item.addEventListener('click', () => {
             const notificationId = item.dataset.id;
-            markNotificationAsRead(notificationId);
+            handleNotificationClick(notificationId);
         });
     });
 }
@@ -439,6 +1125,7 @@ async function createGroupMessageNotification(groupId, groupName, message, messa
             title: `New Message in ${groupName}`,
             message: `${senderName}: ${messageText}`,
             senderId: message.senderId,
+            senderName: senderName,
             relatedId: messageId,
             groupId: groupId,
             groupName: groupName,
@@ -560,7 +1247,6 @@ async function checkForNewMessages() {
     if (!currentUser) return;
 
     try {
-        // SIMPLE QUERY - No composite index needed
         const threadsQuery = query(
             collection(db, 'conversations'),
             where('participants', 'array-contains', currentUser.uid)
@@ -611,6 +1297,7 @@ async function createMessageNotification(messageId, partnerId, message) {
             title: 'New Message',
             message: `${senderData.name || 'Someone'} ${messageText}`,
             senderId: partnerId,
+            senderName: senderData.name || 'Someone',
             relatedId: messageId,
             userId: currentUser.uid,
             timestamp: serverTimestamp(),
@@ -627,7 +1314,6 @@ async function checkForNewLikes() {
     if (!currentUser) return;
 
     try {
-        // SIMPLE QUERY - No composite index needed
         const likesQuery = collection(db, 'users', currentUser.uid, 'likes');
         const likesSnap = await getDocs(likesQuery);
 
@@ -656,6 +1342,7 @@ async function createLikeNotification(likeId, likerId) {
             title: 'New Like',
             message: `${likerData.name || 'Someone'} liked your profile`,
             senderId: likerId,
+            senderName: likerData.name || 'Someone',
             relatedId: likeId,
             userId: currentUser.uid,
             timestamp: serverTimestamp(),
@@ -672,7 +1359,6 @@ async function checkForNewPosts() {
     if (!currentUser) return;
 
     try {
-        // SIMPLE QUERY - No composite index needed
         const postsQuery = collection(db, 'posts');
         const postsSnap = await getDocs(postsQuery);
 
@@ -721,6 +1407,7 @@ async function createPostNotification(postId, post) {
             title: 'New Post',
             message: `${authorData.name || 'Someone'} ${postText}`,
             senderId: post.userId,
+            senderName: authorData.name || 'Someone',
             relatedId: postId,
             userId: currentUser.uid,
             timestamp: serverTimestamp(),
@@ -732,10 +1419,9 @@ async function createPostNotification(postId, post) {
     }
 }
 
-// Check if notification already exists (updated for group notifications)
+// Check if notification already exists
 async function checkExistingNotification(type, relatedId, senderId = null) {
     try {
-        // SIMPLE QUERY - No composite index needed
         const notificationsQuery = query(
             collection(db, 'notifications'),
             where('userId', '==', currentUser.uid)
@@ -756,7 +1442,7 @@ async function checkExistingNotification(type, relatedId, senderId = null) {
     }
 }
 
-// Setup notification listener (existing function)
+// Setup notification listener (UPDATED - Shows only ONE popup)
 function setupNotificationListener() {
     if (!currentUser) return;
 
@@ -765,7 +1451,6 @@ function setupNotificationListener() {
     }
 
     try {
-        // SIMPLE QUERY - Only filter by userId, no composite index
         const notificationsQuery = query(
             collection(db, 'notifications'),
             where('userId', '==', currentUser.uid)
@@ -782,10 +1467,10 @@ function setupNotificationListener() {
             const sortedNotifications = allNotifications.sort((a, b) => {
                 const timeA = a.timestamp?.toDate?.() || new Date(0);
                 const timeB = b.timestamp?.toDate?.() || new Date(0);
-                return timeB - timeA; // Descending order
+                return timeB - timeA;
             });
             
-            const unreadCount = unreadNotifications.length;
+            unreadCount = unreadNotifications.length;
             
             updateNotificationBadge(unreadCount);
             localStorage.setItem(`notification_count_${currentUser.uid}`, unreadCount);
@@ -798,13 +1483,24 @@ function setupNotificationListener() {
                 })));
             }
             
-            // Show toast for new notifications
+            // Update dropdown if open
+            const dropdown = document.getElementById('notification-dropdown');
+            if (dropdown && dropdown.style.display === 'block') {
+                loadDropdownNotifications();
+            }
+            
+            // UPDATED: Show only ONE popup for new notifications, not individual ones
             if (!window.location.pathname.includes('notification.html')) {
                 snapshot.docChanges().forEach(change => {
                     if (change.type === 'added') {
                         const notification = change.doc.data();
                         if (!notification.read) {
-                            showRealTimeToast(notification);
+                            // Check if we should show popup (not too frequently)
+                            const now = Date.now();
+                            if (now - lastNotificationTime > 5000) { // At least 5 seconds between popups
+                                showNotificationPopup();
+                                lastNotificationTime = now;
+                            }
                         }
                     }
                 });
@@ -822,12 +1518,14 @@ function setupNotificationListener() {
     }
 }
 
-// Update notification badge (existing function)
+// Update notification badge
 function updateNotificationBadge(count) {
     if (count === undefined) {
         count = localStorage.getItem(`notification_count_${currentUser ? currentUser.uid : 'anonymous'}`) || 0;
         count = parseInt(count);
     }
+
+    unreadCount = count;
 
     const badges = document.querySelectorAll('.notification-badge');
     badges.forEach(badge => {
@@ -840,275 +1538,7 @@ function updateNotificationBadge(count) {
     });
 }
 
-// Show real-time toast notification (updated for group notifications)
-function showRealTimeToast(notification) {
-    const toast = document.createElement('div');
-    toast.className = `notification-toast ${notification.type}`;
-    toast.innerHTML = `
-        <div class="toast-icon">
-            <i class="${getNotificationIcon(notification.type)}"></i>
-        </div>
-        <div class="toast-content">
-            <div class="toast-title">${notification.title}</div>
-            <div class="toast-message">${notification.message}</div>
-        </div>
-        <button class="toast-close">&times;</button>
-        <div class="swipe-indicator">
-            <i class="fas fa-chevron-up"></i>
-        </div>
-    `;
-
-    if (!document.getElementById('notification-toast-styles')) {
-        const styles = document.createElement('style');
-        styles.id = 'notification-toast-styles';
-        styles.textContent = `
-            .notification-toast {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                background: var(--bg-card);
-                padding: 15px 20px;
-                border-bottom: 1px solid var(--border-color);
-                z-index: 10001;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                cursor: pointer;
-                font-family: 'Inter', sans-serif;
-                transform: translateY(-100%);
-                animation: slideInTop 0.4s ease forwards;
-                box-shadow: var(--shadow-lg);
-                transition: transform 0.3s ease;
-                border-left: 4px solid;
-            }
-            .notification-toast.message {
-                border-left-color: var(--primary);
-                background: linear-gradient(135deg, var(--bg-card), rgba(179, 0, 75, 0.1));
-            }
-            .notification-toast.like {
-                border-left-color: var(--secondary);
-                background: linear-gradient(135deg, var(--bg-card), rgba(139, 0, 0, 0.1));
-            }
-            .notification-toast.post {
-                border-left-color: var(--accent);
-                background: linear-gradient(135deg, var(--bg-card), rgba(68, 68, 68, 0.1));
-            }
-            .notification-toast.group_message {
-                border-left-color: #4CAF50;
-                background: linear-gradient(135deg, var(--bg-card), rgba(76, 175, 80, 0.1));
-            }
-            .notification-toast.group_invite {
-                border-left-color: #2196F3;
-                background: linear-gradient(135deg, var(--bg-card), rgba(33, 150, 243, 0.1));
-            }
-            .toast-icon {
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 16px;
-                flex-shrink: 0;
-            }
-            .notification-toast.message .toast-icon {
-                background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-                color: var(--text-primary);
-            }
-            .notification-toast.like .toast-icon {
-                background: linear-gradient(135deg, var(--secondary), #5a0000);
-                color: var(--text-primary);
-            }
-            .notification-toast.post .toast-icon {
-                background: linear-gradient(135deg, var(--accent), #2a2a2a);
-                color: var(--text-primary);
-            }
-            .notification-toast.group_message .toast-icon {
-                background: linear-gradient(135deg, #4CAF50, #2E7D32);
-                color: white;
-            }
-            .notification-toast.group_invite .toast-icon {
-                background: linear-gradient(135deg, #2196F3, #0D47A1);
-                color: white;
-            }
-            .toast-content {
-                flex: 1;
-                min-width: 0;
-            }
-            .toast-title {
-                font-weight: 600;
-                margin-bottom: 4px;
-                color: var(--text-primary);
-                font-size: 14px;
-            }
-            .toast-message {
-                color: var(--text-secondary);
-                font-size: 13px;
-                line-height: 1.3;
-            }
-            .toast-close {
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid var(--border-color);
-                border-radius: 50%;
-                font-size: 16px;
-                cursor: pointer;
-                color: var(--text-secondary);
-                padding: 0;
-                width: 28px;
-                height: 28px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-                transition: all 0.2s ease;
-            }
-            .toast-close:hover {
-                background: var(--primary);
-                color: var(--text-primary);
-                border-color: var(--primary);
-            }
-            .swipe-indicator {
-                position: absolute;
-                bottom: 5px;
-                left: 50%;
-                transform: translateX(-50%);
-                color: var(--text-light);
-                font-size: 12px;
-                opacity: 0.6;
-                animation: bounce 2s infinite;
-            }
-            @keyframes slideInTop {
-                from { transform: translateY(-100%); }
-                to { transform: translateY(0); }
-            }
-            @keyframes slideOutTop {
-                from { transform: translateY(0); }
-                to { transform: translateY(-100%); }
-            }
-            @keyframes bounce {
-                0%, 20%, 50%, 80%, 100% {
-                    transform: translateX(-50%) translateY(0);
-                }
-                40% {
-                    transform: translateX(-50%) translateY(-3px);
-                }
-                60% {
-                    transform: translateX(-50%) translateY(-2px);
-                }
-            }
-            .notification-toast.swiping {
-                transition: transform 0.1s ease;
-            }
-            .notification-toast.dismissing {
-                animation: slideOutTop 0.3s ease forwards;
-            }
-        `;
-        document.head.appendChild(styles);
-    }
-
-    document.body.appendChild(toast);
-
-    // Auto-dismiss after 5 seconds
-    const autoDismiss = setTimeout(() => {
-        dismissToast(toast);
-    }, 5000);
-
-    // Touch/Mouse events for swipe dismissal
-    let startY = 0;
-    let currentY = 0;
-    let isSwiping = false;
-
-    function handleTouchStart(e) {
-        startY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
-        isSwiping = true;
-        toast.classList.add('swiping');
-        clearTimeout(autoDismiss);
-    }
-
-    function handleTouchMove(e) {
-        if (!isSwiping) return;
-        
-        currentY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
-        const diffY = startY - currentY;
-        
-        if (diffY > 0) { // Only allow swiping up
-            const translateY = Math.max(-100, -diffY);
-            toast.style.transform = `translateY(${translateY}px)`;
-        }
-    }
-
-    function handleTouchEnd() {
-        if (!isSwiping) return;
-        
-        isSwiping = false;
-        toast.classList.remove('swiping');
-        
-        const diffY = startY - currentY;
-        const swipeThreshold = 50;
-        
-        if (diffY > swipeThreshold) {
-            dismissToast(toast);
-        } else {
-            // Return to original position
-            toast.style.transform = 'translateY(0)';
-            // Restart auto-dismiss
-            setTimeout(() => dismissToast(toast), 4000);
-        }
-    }
-
-    // Add event listeners for both touch and mouse
-    toast.addEventListener('touchstart', handleTouchStart, { passive: true });
-    toast.addEventListener('touchmove', handleTouchMove, { passive: true });
-    toast.addEventListener('touchend', handleTouchEnd);
-    
-    toast.addEventListener('mousedown', handleTouchStart);
-    toast.addEventListener('mousemove', handleTouchMove);
-    toast.addEventListener('mouseup', handleTouchEnd);
-    toast.addEventListener('mouseleave', handleTouchEnd);
-
-    // Close button
-    toast.querySelector('.toast-close').addEventListener('click', (e) => {
-        e.stopPropagation();
-        dismissToast(toast);
-    });
-
-    // Click to navigate (updated for group notifications)
-    toast.addEventListener('click', (e) => {
-        if (!isSwiping) {
-            if (notification.type === 'message' && notification.senderId) {
-                window.location.href = `chat.html?id=${notification.senderId}`;
-            } else if (notification.type === 'group_message' && notification.groupId) {
-                window.location.href = `prepare.html?id=${notification.groupId}`;
-            } else if (notification.type === 'group_invite' && notification.groupId) {
-                window.location.href = `prepare.html?id=${notification.groupId}`;
-            } else if (notification.type === 'post' && notification.senderId) {
-                window.location.href = 'posts.html';
-                // Mark post as viewed when clicking notification
-                viewedPosts.add(notification.relatedId);
-                saveViewedPosts();
-                dismissedNotifications.add(`post_${notification.relatedId}`);
-                saveDismissedNotifications();
-            } else if (notification.senderId) {
-                window.location.href = `profile.html?id=${notification.senderId}`;
-            } else {
-                window.location.href = 'notification.html';
-            }
-            dismissToast(toast);
-        }
-    });
-
-    function dismissToast(toastElement) {
-        toastElement.classList.add('dismissing');
-        setTimeout(() => {
-            if (toastElement.parentNode) {
-                toastElement.parentNode.removeChild(toastElement);
-            }
-        }, 300);
-    }
-}
-
-// Get notification icon (updated for group notifications)
+// Get notification icon
 function getNotificationIcon(type) {
     switch (type) {
         case 'message': return 'fas fa-comment-alt';
@@ -1122,7 +1552,7 @@ function getNotificationIcon(type) {
     }
 }
 
-// Format time (existing function)
+// Format time
 function formatTime(timestamp) {
     if (!timestamp) return '';
     
@@ -1154,7 +1584,7 @@ function formatTime(timestamp) {
     return date.toLocaleDateString();
 }
 
-// Clean up listeners (existing function)
+// Clean up listeners
 function cleanupListeners() {
     if (unsubscribeNotifications) unsubscribeNotifications();
     checkIntervals.forEach(interval => clearInterval(interval));
@@ -1168,7 +1598,7 @@ if (document.readyState === 'loading') {
     initNotificationSystem();
 }
 
-// Export functions for external use (updated)
+// Export functions for external use
 window.NotificationSystem = {
     init: initNotificationSystem,
     updateBadge: updateNotificationBadge,
@@ -1181,7 +1611,6 @@ window.NotificationSystem = {
         dismissedNotifications.add(`post_${postId}`);
         saveDismissedNotifications();
     },
-    // New group notification functions
     createGroupNotification: async (type, title, message, groupId, groupName, relatedId = null) => {
         if (!currentUser) return;
         
@@ -1200,5 +1629,7 @@ window.NotificationSystem = {
         } catch (error) {
             console.error('Error creating group notification:', error);
         }
-    }
+    },
+    showDropdown: toggleDropdownNotifications,
+    markAllRead: markAllNotificationsAsRead
 };
