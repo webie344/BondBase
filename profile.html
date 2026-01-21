@@ -52,6 +52,8 @@
             color: var(--text-primary);
             line-height: 1.5;
             overflow-x: hidden;
+            padding: 0;
+            margin: 0;
         }
 
         /* Icon Styling - Consistent with mingle.html */
@@ -170,902 +172,904 @@
             flex-direction: column;
             cursor: pointer;
         }
-/* Gamer Profile Badge */
-.gamer-profile-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    border: 1px solid rgba(179, 0, 75, 0.3);
-    margin-left: 1rem;
-    animation: pulse 2s infinite;
-}
-
-.gamer-profile-badge .feather {
-    width: 14px;
-    height: 14px;
-    stroke: currentColor;
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-/* Gamer Profile Section */
-.gamer-profile-section {
-    margin: 1rem 0;
-    padding: 1.5rem;
-    background: linear-gradient(145deg, #1a1a1a 0%, #222222 100%);
-    border-radius: var(--radius);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: var(--shadow-lg);
-    animation: fadeIn 0.5s ease;
-    max-width: 100%;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.gamer-profile-section h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.gamer-profile-section h3 .feather {
-    color: var(--primary-light);
-    width: 18px;
-    height: 18px;
-}
-
-.gamer-basic-info {
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: var(--radius);
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    border: 1px solid var(--border);
-}
-
-.gamer-info-row {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 0.75rem;
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-}
-
-.gamer-info-row .feather {
-    width: 16px;
-    height: 16px;
-    stroke: var(--primary-light);
-    flex-shrink: 0;
-}
-
-.gamer-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.gamer-stat-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: var(--radius);
-    padding: 1rem;
-    text-align: center;
-    border: 1px solid var(--border);
-    transition: all 0.3s ease;
-}
-
-.gamer-stat-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--primary);
-    box-shadow: var(--shadow);
-}
-
-.gamer-stat-card .stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--primary-light);
-    margin-bottom: 0.5rem;
-}
-
-.gamer-stat-card .stat-label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.gamer-screenshot-container {
-    margin-top: 1.5rem;
-    display: none;
-}
-
-.gamer-screenshot-container h4 {
-    margin-bottom: 1rem;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.gamer-screenshot-container .feather {
-    width: 16px;
-    height: 16px;
-    stroke: var(--primary-light);
-}
-
-.gamer-screenshot {
-    width: 100%;
-    max-width: 300px;
-    border-radius: var(--radius);
-    border: 2px solid var(--border);
-    cursor: pointer;
-    transition: transform 0.3s ease;
-}
-
-.gamer-screenshot:hover {
-    transform: scale(1.02);
-    box-shadow: var(--shadow-lg);
-}
-
-.view-gamer-profile-btn {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: white;
-    border: none;
-    padding: 1rem 2rem;
-    border-radius: var(--radius);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-top: 1.5rem;
-    text-decoration: none;
-    animation: pulse 2s infinite;
-}
-
-.view-gamer-profile-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(179, 0, 75, 0.4);
-    background: linear-gradient(135deg, var(--primary-light), var(--primary));
-}
-
-.view-gamer-profile-btn .feather {
-    width: 16px;
-    height: 16px;
-    stroke: currentColor;
-}
-
-/* Social Links */
-.social-links-section {
-    margin: 2rem 0;
-    padding: 1.5rem 0;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-}
-
-.social-links-title {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    color: var(--text-light);
-    font-size: 0.9rem;
-    margin-bottom: 1rem;
-}
-
-.social-links-title .feather {
-    width: 16px;
-    height: 16px;
-    stroke: var(--primary);
-}
-
-.profile-social-links {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-}
-
-.social-profile-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
-    font-size: 1.25rem;
-    transition: all 0.3s ease;
-    background: rgba(255, 255, 255, 0.05);
-    border: 2px solid transparent;
-    color: var(--text-secondary);
-}
-
-.social-profile-icon .feather {
-    width: 20px;
-    height: 20px;
-    stroke: currentColor;
-}
-
-.social-profile-icon:hover {
-    transform: translateY(-3px);
-    border-color: currentColor;
-    box-shadow: var(--shadow-lg);
-}
-
-.social-profile-icon.facebook { color: #1877F2; }
-.social-profile-icon.instagram { color: #E4405F; }
-.social-profile-icon.snapchat { color: #FFFC00; }
-.social-profile-icon.tiktok { color: #ffffff; }
-.social-profile-icon.twitter { color: #1DA1F2; }
-
-/* Profile Stats */
-
-.stat-item:hover {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.stat-item .feather {
-    width: 24px;
-    height: 24px;
-    stroke: var(--primary-light);
-    margin-bottom: 0.5rem;
-    display: block;
-    margin: 0 auto 0.5rem;
-}
-
-.stat-item .stat-number {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--primary-light);
-    display: block;
-    margin-bottom: 0.25rem;
-}
-
-.stat-item .stat-label {
-    font-size: 0.8rem;
-    color: var(--text-light);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* Profile Bio & Interests */
-.profile-bio, .profile-interests {
-    margin-bottom: 2rem;
-}
-
-.profile-bio h3, .profile-interests h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-}
-
-.profile-bio p {
-    color: var(--text-secondary);
-    line-height: 1.6;
-}
-
-.interests-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.interest-tag {
-    background-color: rgba(179, 0, 75, 0.2);
-    color: var(--primary-light);
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    border: 1px solid rgba(179, 0, 75, 0.3);
-}
-
-/* NEW: User Videos Grid Section - TikTok Style */
-.user-videos-section {
-    margin: 3rem 0;
-    padding: 2rem 0;
-    border-top: 2px solid var(--border);
-    border-bottom: 2px solid var(--border);
-}
-
-.user-videos-section h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.user-videos-section h2 .feather {
-    width: 20px;
-    height: 20px;
-    stroke: var(--primary-light);
-}
-
-.user-videos-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
-    margin-top: 1.5rem;
-}
-
-.profile-video-card {
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    transition: all 0.3s ease;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    position: relative;
-}
-
-.profile-video-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--primary);
-}
-
-.profile-video-thumbnail {
-    position: relative;
-    width: 100%;
-    height: 400px;
-    overflow: hidden;
-    background: #000;
-}
-
-.profile-video-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.profile-video-card:hover .profile-video-image {
-    transform: scale(1.05);
-}
-
-.profile-video-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 1rem;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.profile-video-card:hover .profile-video-overlay {
-    opacity: 1;
-}
-
-.profile-video-stats {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: white;
-    font-size: 0.85rem;
-    font-weight: 500;
-}
-
-.video-stat {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 0.25rem 0.5rem;
-    border-radius: 12px;
-    backdrop-filter: blur(4px);
-}
-
-.video-stat .feather {
-    width: 12px;
-    height: 12px;
-    stroke: white;
-}
-
-.profile-video-play {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.profile-video-play .feather {
-    width: 40px;
-    height: 40px;
-    stroke: white;
-    background: rgba(179, 0, 75, 0.8);
-    padding: 8px;
-    border-radius: 50%;
-    border: 3px solid white;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-}
-
-.profile-video-info {
-    padding: 1rem;
-}
-
-.profile-video-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.profile-video-time {
-    font-size: 0.8rem;
-    color: var(--text-light);
-}
-
-.videos-loading, .videos-error, .no-videos {
-    text-align: center;
-    padding: 3rem 2rem;
-    color: var(--text-light);
-    font-size: 1rem;
-}
-
-.videos-loading .feather, .videos-error .feather, .no-videos .feather {
-    width: 32px;
-    height: 32px;
-    margin-bottom: 1rem;
-    color: var(--primary-light);
-    display: block;
-    margin: 0 auto 1rem;
-}
-
-.videos-error .feather {
-    stroke: var(--secondary);
-}
-
-/* Profile Actions */
-.profile-actions {
-    display: flex;
-    gap: 1rem;
-    margin: 2rem 0;
-}
-
-.btn-secondary {
-    flex: 1;
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: var(--radius);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-}
-
-.btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-primary);
-}
-
-.btn-secondary:hover, .btn-primary:hover, .btn-like:hover {
-    box-shadow: var(--shadow);
-}
-
-.btn-secondary .feather {
-    width: 16px;
-    height: 16px;
-    stroke: currentColor;
-}
-
-/* Profile Posts */
-.profile-posts-section {
-    margin-top: 3rem;
-    padding-top: 2rem;
-    border-top: 2px solid var(--border);
-}
-
-.profile-posts-section h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.profile-posts-section h2 .feather {
-    width: 20px;
-    height: 20px;
-    stroke: var(--primary-light);
-}
-
-.profile-posts-container {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.profile-post-item {
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    padding: 1.5rem;
-    box-shadow: var(--shadow);
-    transition: transform 0.2s ease;
-    border: 1px solid var(--border);
-}
-
-.profile-post-item:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-}
-
-.post-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.post-author-avatar {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid var(--primary);
-}
-
-.post-author-info h4 {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.25rem;
-}
-
-.post-time {
-    color: var(--text-light);
-    font-size: 0.8rem;
-}
-
-.post-caption {
-    color: var(--text-secondary);
-    line-height: 1.6;
-    margin-bottom: 1rem;
-}
-
-.post-image {
-    width: 100%;
-    max-height: 400px;
-    border-radius: var(--radius);
-    object-fit: cover;
-    margin-bottom: 1rem;
-}
-
-.post-actions {
-    display: flex;
-    gap: 1rem;
-    border-top: 1px solid var(--border);
-    padding-top: 1rem;
-}
-
-.post-action {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: none;
-    border: none;
-    color: var(--text-light);
-    cursor: pointer;
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius);
-    transition: all 0.2s ease;
-    font-size: 0.9rem;
-}
-
-.post-action:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text-primary);
-}
-
-.post-action.liked {
-    color: var(--primary-light);
-}
-
-.post-action .feather {
-    width: 16px;
-    height: 16px;
-    stroke: currentColor;
-}
-
-/* Comments Section */
-.comments-section {
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border);
-}
-
-.add-comment {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-}
-
-.comment-input {
-    flex: 1;
-    padding: 0.25rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    font-size: 0.3rem;
-    outline: none;
-    transition: border-color 0.2s ease;
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text-primary);
-}
-
-.comment-input:focus {
-    border-color: var(--primary);
-}
-
-.send-comment-btn {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 20px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.send-comment-btn:hover {
-    background: var(--primary-dark);
-}
-
-.send-comment-btn .feather {
-    width: 14px;
-    height: 14px;
-    stroke: currentColor;
-}
-
-.comment-item {
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.comment-item:last-child {
-    border-bottom: none;
-}
-
-.comment-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
-}
-
-.comment-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 1px solid var(--border);
-}
-
-.comment-info {
-    flex: 1;
-}
-
-.comment-info strong {
-    font-size: 0.9rem;
-    color: var(--text-primary);
-}
-
-.comment-time {
-    font-size: 0.75rem;
-    color: var(--text-light);
-}
-
-.comment-text {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    line-height: 1.5;
-    margin-left: 2.75rem;
-}
-
-/* Utility Classes */
-.loading, .error, .no-posts, .no-comments {
-    text-align: center;
-    padding: 2rem;
-    color: var(--text-light);
-    font-size: 1rem;
-}
-
-.no-posts-message {
-    text-align: center;
-    padding: 3rem 2rem;
-    color: var(--text-light);
-    font-size: 1rem;
-    font-style: italic;
-}
-
-/* BANNER STYLES */
-.creative-profile-banner {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: white;
-    padding: 1.5rem;
-    border-radius: var(--radius);
-    margin: 1.5rem 0;
-    text-align: center;
-    box-shadow: var(--shadow);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .profile-view-container {
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
-    }
-
-    .profile-header {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        gap: 1rem;
-    }
-
-    .profile-username-row {
-        justify-content: center;
-    }
-
-    .profile-stats-row {
-        justify-content: center;
-        gap: 1.5rem;
-    }
-
-    .connection-btn-container {
-        justify-content: center;
-    }
-
-    .profile-details {
-        order: 2;
-    }
-
-    .profile-stats {
-        grid-template-columns: 1fr;
-    }
-
-    .profile-actions {
-        flex-direction: column;
-    }
-
-    .nav-menu {
-        position: fixed;
-        left: -100%;
-        top: 70px;
-        flex-direction: column;
-        background-color: rgba(0, 0, 0, 0.9);
-        backdrop-filter: blur(10px);
-        width: 100%;
-        text-align: center;
-        transition: 0.3s;
-        box-shadow: var(--shadow);
-        padding: 2rem 0;
-        gap: 0;
-    }
-
-    .nav-menu.active {
-        left: 0;
-    }
-
-    .nav-item {
-        margin: 0.75rem 0;
-    }
-
-    .nav-toggle {
-        display: flex;
-    }
-
-    .gamer-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    /* Responsive video grid */
-    .user-videos-grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 0.75rem;
-    }
-
-    .profile-video-thumbnail {
-        height: 300px;
-    }
-}
-
-@media (max-width: 480px) {
-    .profile-view-container {
-        padding: 0 1rem;
-    }
-
-    .profile-details {
-        padding: 1.5rem;
-    }
-
-    .profile-avatar {
-        width: 100px;
-        height: 100px;
-    }
-
-    .profile-stats-row {
-        gap: 1rem;
-    }
-
-    .profile-stat-number {
-        font-size: 1.1rem;
-    }
-
-    .profile-stat-label {
-        font-size: 0.75rem;
-    }
-
-    .connection-btn-container {
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .gamer-stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    /* Mobile video grid */
-    .user-videos-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-        gap: 0.5rem;
-    }
-
-    .profile-video-thumbnail {
-        height: 250px;
-    }
-
-    .profile-video-stats {
-        font-size: 0.75rem;
-    }
-
-    .profile-video-play .feather {
-        width: 32px;
-        height: 32px;
-        padding: 6px;
-    }
-}
+
+        /* Gamer Profile Badge */
+        .gamer-profile-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            border: 1px solid rgba(179, 0, 75, 0.3);
+            margin-left: 1rem;
+            animation: pulse 2s infinite;
+        }
+
+        .gamer-profile-badge .feather {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Gamer Profile Section */
+        .gamer-profile-section {
+            margin: 1rem 0;
+            padding: 1.5rem;
+            background: linear-gradient(145deg, #1a1a1a 0%, #222222 100%);
+            border-radius: var(--radius);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: var(--shadow-lg);
+            animation: fadeIn 0.5s ease;
+            max-width: 100%;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .gamer-profile-section h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .gamer-profile-section h3 .feather {
+            color: var(--primary-light);
+            width: 18px;
+            height: 18px;
+        }
+
+        .gamer-basic-info {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .gamer-info-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .gamer-info-row .feather {
+            width: 16px;
+            height: 16px;
+            stroke: var(--primary-light);
+            flex-shrink: 0;
+        }
+
+        .gamer-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .gamer-stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius);
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .gamer-stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+
+        .gamer-stat-card .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            margin-bottom: 0.5rem;
+        }
+
+        .gamer-stat-card .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .gamer-screenshot-container {
+            margin-top: 1.5rem;
+            display: none;
+        }
+
+        .gamer-screenshot-container h4 {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .gamer-screenshot-container .feather {
+            width: 16px;
+            height: 16px;
+            stroke: var(--primary-light);
+        }
+
+        .gamer-screenshot {
+            width: 100%;
+            max-width: 300px;
+            border-radius: var(--radius);
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .gamer-screenshot:hover {
+            transform: scale(1.02);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .view-gamer-profile-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            text-decoration: none;
+            animation: pulse 2s infinite;
+        }
+
+        .view-gamer-profile-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(179, 0, 75, 0.4);
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+        }
+
+        .view-gamer-profile-btn .feather {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+        }
+
+        /* Social Links */
+        .social-links-section {
+            margin: 2rem 0;
+            padding: 1.5rem 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .social-links-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .social-links-title .feather {
+            width: 16px;
+            height: 16px;
+            stroke: var(--primary);
+        }
+
+        .profile-social-links {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+        }
+
+        .social-profile-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            font-size: 1.25rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid transparent;
+            color: var(--text-secondary);
+        }
+
+        .social-profile-icon .feather {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+        }
+
+        .social-profile-icon:hover {
+            transform: translateY(-3px);
+            border-color: currentColor;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .social-profile-icon.facebook { color: #1877F2; }
+        .social-profile-icon.instagram { color: #E4405F; }
+        .social-profile-icon.snapchat { color: #FFFC00; }
+        .social-profile-icon.tiktok { color: #ffffff; }
+        .social-profile-icon.twitter { color: #1DA1F2; }
+
+        /* Profile Stats */
+
+        .stat-item:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .stat-item .feather {
+            width: 24px;
+            height: 24px;
+            stroke: var(--primary-light);
+            margin-bottom: 0.5rem;
+            display: block;
+            margin: 0 auto 0.5rem;
+        }
+
+        .stat-item .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-item .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Profile Bio & Interests */
+        .profile-bio, .profile-interests {
+            margin-bottom: 2rem;
+        }
+
+        .profile-bio h3, .profile-interests h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .profile-bio p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .interests-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .interest-tag {
+            background-color: rgba(179, 0, 75, 0.2);
+            color: var(--primary-light);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1px solid rgba(179, 0, 75, 0.3);
+        }
+
+        /* NEW: User Videos Grid Section - TikTok Style */
+        .user-videos-section {
+            margin: 3rem 0;
+            padding: 2rem 0;
+            border-top: 2px solid var(--border);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .user-videos-section h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .user-videos-section h2 .feather {
+            width: 20px;
+            height: 20px;
+            stroke: var(--primary-light);
+        }
+
+        .user-videos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .profile-video-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .profile-video-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary);
+        }
+
+        .profile-video-thumbnail {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .profile-video-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .profile-video-card:hover .profile-video-image {
+            transform: scale(1.05);
+        }
+
+        .profile-video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .profile-video-card:hover .profile-video-overlay {
+            opacity: 1;
+        }
+
+        .profile-video-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .video-stat {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        .video-stat .feather {
+            width: 12px;
+            height: 12px;
+            stroke: white;
+        }
+
+        .profile-video-play {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .profile-video-play .feather {
+            width: 40px;
+            height: 40px;
+            stroke: white;
+            background: rgba(179, 0, 75, 0.8);
+            padding: 8px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .profile-video-info {
+            padding: 1rem;
+        }
+
+        .profile-video-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .profile-video-time {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .videos-loading, .videos-error, .no-videos {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-light);
+            font-size: 1rem;
+        }
+
+        .videos-loading .feather, .videos-error .feather, .no-videos .feather {
+            width: 32px;
+            height: 32px;
+            margin-bottom: 1rem;
+            color: var(--primary-light);
+            display: block;
+            margin: 0 auto 1rem;
+        }
+
+        .videos-error .feather {
+            stroke: var(--secondary);
+        }
+
+        /* Profile Actions */
+        .profile-actions {
+            display: flex;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .btn-secondary {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover, .btn-primary:hover, .btn-like:hover {
+            box-shadow: var(--shadow);
+        }
+
+        .btn-secondary .feather {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+        }
+
+        /* Profile Posts */
+        .profile-posts-section {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 2px solid var(--border);
+        }
+
+        .profile-posts-section h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .profile-posts-section h2 .feather {
+            width: 20px;
+            height: 20px;
+            stroke: var(--primary-light);
+        }
+
+        .profile-posts-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .profile-post-item {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease;
+            border: 1px solid var(--border);
+        }
+
+        .profile-post-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .post-author-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary);
+        }
+
+        .post-author-info h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .post-time {
+            color: var(--text-light);
+            font-size: 0.8rem;
+        }
+
+        .post-caption {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .post-image {
+            width: 100%;
+            max-height: 400px;
+            border-radius: var(--radius);
+            object-fit: cover;
+            margin-bottom: 1rem;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 1rem;
+            border-top: 1px solid var(--border);
+            padding-top: 1rem;
+        }
+
+        .post-action {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .post-action:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .post-action.liked {
+            color: var(--primary-light);
+        }
+
+        .post-action .feather {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+        }
+
+        /* Comments Section */
+        .comments-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .add-comment {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .comment-input {
+            flex: 1;
+            padding: 0.25rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.3rem;
+            outline: none;
+            transition: border-color 0.2s ease;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .comment-input:focus {
+            border-color: var(--primary);
+        }
+
+        .send-comment-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .send-comment-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        .send-comment-btn .feather {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+        }
+
+        .comment-item {
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .comment-item:last-child {
+            border-bottom: none;
+        }
+
+        .comment-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .comment-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid var(--border);
+        }
+
+        .comment-info {
+            flex: 1;
+        }
+
+        .comment-info strong {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .comment-time {
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .comment-text {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-left: 2.75rem;
+        }
+
+        /* Utility Classes */
+        .loading, .error, .no-posts, .no-comments {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-light);
+            font-size: 1rem;
+        }
+
+        .no-posts-message {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-light);
+            font-size: 1rem;
+            font-style: italic;
+        }
+
+        /* BANNER STYLES */
+        .creative-profile-banner {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            margin: 1.5rem 0;
+            text-align: center;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .profile-view-container {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .profile-header {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                gap: 1rem;
+            }
+
+            .profile-username-row {
+                justify-content: center;
+            }
+
+            .profile-stats-row {
+                justify-content: center;
+                gap: 1.5rem;
+            }
+
+            .connection-btn-container {
+                justify-content: center;
+            }
+
+            .profile-details {
+                order: 2;
+            }
+
+            .profile-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .profile-actions {
+                flex-direction: column;
+            }
+
+            .nav-menu {
+                position: fixed;
+                left: -100%;
+                top: 70px;
+                flex-direction: column;
+                background-color: rgba(0, 0, 0, 0.9);
+                backdrop-filter: blur(10px);
+                width: 100%;
+                text-align: center;
+                transition: 0.3s;
+                box-shadow: var(--shadow);
+                padding: 2rem 0;
+                gap: 0;
+            }
+
+            .nav-menu.active {
+                left: 0;
+            }
+
+            .nav-item {
+                margin: 0.75rem 0;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .gamer-stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            /* Responsive video grid */
+            .user-videos-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 0.75rem;
+            }
+
+            .profile-video-thumbnail {
+                height: 300px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .profile-view-container {
+                padding: 0 1rem;
+            }
+
+            .profile-details {
+                padding: 1.5rem;
+            }
+
+            .profile-avatar {
+                width: 100px;
+                height: 100px;
+            }
+
+            .profile-stats-row {
+                gap: 1rem;
+            }
+
+            .profile-stat-number {
+                font-size: 1.1rem;
+            }
+
+            .profile-stat-label {
+                font-size: 0.75rem;
+            }
+
+            .connection-btn-container {
+                flex-direction: row;
+                align-items: center;
+            }
+
+            .gamer-stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Mobile video grid */
+            .user-videos-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: 0.5rem;
+            }
+
+            .profile-video-thumbnail {
+                height: 250px;
+            }
+
+            .profile-video-stats {
+                font-size: 0.75rem;
+            }
+
+            .profile-video-play .feather {
+                width: 32px;
+                height: 32px;
+                padding: 6px;
+            }
+        }
+        
         .bar {
             width: 25px;
             height: 3px;
@@ -1077,9 +1081,9 @@
 
         /* ===== TIKTOK/INSTAGRAM STYLE PROFILE STRUCTURE ===== */
         .profile-container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 2rem auto;
-            padding: 0 1rem;
+            padding: 0 2rem;
         }
 
         /* Profile Header */
@@ -1087,7 +1091,7 @@
             display: flex;
             gap: 2rem;
             margin-bottom: 2rem;
-            padding: 0 1rem;
+            padding: 0;
         }
 
         /* Profile Photo - Rounded like TikTok */
@@ -1201,12 +1205,6 @@
             font-size: 0.8rem;
             border: 1px solid rgba(179, 0, 75, 0.3);
             animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
         }
 
         /* Profile Actions Row */
@@ -1395,11 +1393,6 @@
             display: none;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
         .gamer-profile-section h3 {
             font-size: 1.25rem;
             font-weight: 600;
@@ -1481,7 +1474,7 @@
             display: flex;
             border-bottom: 1px solid var(--border);
             margin-bottom: 2rem;
-            padding: 0 1rem;
+            padding: 0;
         }
 
         .profile-tab {
@@ -1513,7 +1506,7 @@
         /* Content Sections */
         .content-section {
             display: none;
-            padding: 0 1rem;
+            padding: 0;
         }
 
         .content-section.active {
@@ -1751,8 +1744,56 @@
             display: none;
         }
 
+        /* NEW: Followers count styling */
+        .followers-count {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-left: 10px;
+        }
+        
+        .followers-count .feather {
+            width: 14px;
+            height: 14px;
+            stroke: var(--primary-light);
+        }
+        
+        /* Make the first stat (followers) more prominent */
+        .profile-stat:first-child .stat-number {
+            color: var(--primary-light);
+            font-weight: 700;
+        }
+        
+        /* Update follow button states */
+        .btn-follow {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-follow:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .btn-message {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-message:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
+            .profile-container {
+                padding: 0 1.5rem;
+                margin: 1.5rem auto;
+            }
+            
             .profile-header {
                 flex-direction: column;
                 gap: 1.5rem;
@@ -1816,6 +1857,11 @@
         }
 
         @media (max-width: 480px) {
+            .profile-container {
+                padding: 0 1rem;
+                margin: 1rem auto;
+            }
+            
             .posts-grid {
                 grid-template-columns: 1fr;
             }
@@ -1956,8 +2002,14 @@
                             </span>
                         </h1>
                         <div class="profile-display-name">
-                            <span id="viewProfileAge">Sexual Health Educator</span>,
-                            <span id="viewProfileLocation">New York</span>
+                            <span id="viewProfileAge">Loading...</span>,
+                            <span id="viewProfileLocation">Loading...</span>
+                            <span class="online-status" style="margin-left: 10px;">
+                                <svg class="feather" data-feather="circle" fill="#ff0000">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                </svg>
+                                Offline
+                            </span>
                         </div>
                     </div>
                     <button class="btn-more">
@@ -1971,51 +2023,42 @@
 
                 <div class="profile-actions-row">
                     <button class="profile-action-btn btn-follow" id="likeProfileBtn">
-                        <svg class="feather" data-feather="handshake">
-                            <path d="M11 17h2a2 2 0 1 0 0-4h-3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2"></path>
-                            <path d="M5.937 11H5a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h1"></path>
-                            <path d="M14 4h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1"></path>
-                            <path d="M10 11V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5"></path>
-                            <path d="M15 11h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1"></path>
-                            <path d="M10 20v-5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5"></path>
-                        </svg>
-                        Connect
+                        <svg class="feather" data-feather="user-plus"></svg>
+                        Follow
                     </button>
                     <button class="profile-action-btn btn-message" id="messageProfileBtn">
-                        <svg class="feather" data-feather="message-circle">
-                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-                        </svg>
-                        Ask Question
-                    </button>
-                    <button class="profile-action-btn" id="backToMingle">
-                        <svg class="feather" data-feather="arrow-left">
-                            <line x1="19" y1="12" x2="5" y2="12"></line>
-                            <polyline points="12 19 5 12 12 5"></polyline>
-                        </svg>
-                        Back
+                        <svg class="feather" data-feather="message-circle"></svg>
+                        Message
                     </button>
                 </div>
 
                 <div class="profile-stats-row">
                     <div class="profile-stat">
-                        <span class="stat-number" id="">0</span>
-                        <span class="stat-label">Connections</span>
+                        <span class="stat-number" id="followersCount">0</span>
+                        <span class="stat-label">Followers</span>
                     </div>
                     <div class="profile-stat">
-                        <span class="stat-number" id="viewWorkshopCount">12</span>
+                        <span class="stat-number" id="viewWorkshopCount">0</span>
                         <span class="stat-label">Workshops</span>
                     </div>
                     <div class="profile-stat">
-                        <span class="stat-number" id="viewCertCount">3</span>
+                        <span class="stat-number" id="viewCertCount">0</span>
                         <span class="stat-label">Certifications</span>
                     </div>
                     <div class="profile-stat">
-                        <span class="stat-number">20</span>
+                        <span class="stat-number">0</span>
                         <span class="stat-label">Posts</span>
                     </div>
                 </div>
-
-                 
+                
+                <!-- Profile Bio & Info -->
+                <div class="profile-bio-section">
+                    <div class="profile-bio-text" id="viewProfileBio">Loading...</div>
+                    <div class="profile-meta">
+                        <span id="viewProfileEmail">Loading...</span>
+                    </div>
+                </div>
+                
             <!-- Gamer Profile Section -->
             <div class="gamer-profile-section" id="gamerProfileSection" style="display: none;">
                 <h3>
@@ -2083,7 +2126,7 @@
                         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                     </svg>
-                    <span class="stat-number" id="viewWorkshopCount">12</span>
+                    <span class="stat-number" id="viewWorkshopCount2">0</span>
                     <span class="stat-label">Workshops</span>
                 </div>
                 <div class="stat-item">
@@ -2091,30 +2134,25 @@
                         <circle cx="12" cy="8" r="7"></circle>
                         <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
                     </svg>
-                    <span class="stat-number" id="viewCertCount">3</span>
+                    <span class="stat-number" id="viewCertCount2">0</span>
                     <span class="stat-label">Certifications</span>
                 </div>
             </div>
             
             <div class="profile-bio">
                 <h3>About</h3>
-                <p id="viewProfileBio">Loading...</p>
+                <p id="viewProfileBio2">Loading...</p>
             </div>
             
             <div class="profile-interests">
-                <h3>Specializations</h3>
+                <h3>Interests</h3>
                 <div class="interests-container" id="interestsContainer">
-                    <span class="interest-tag">Consent Education</span>
-                    <span class="interest-tag">BDSM Safety</span>
-                    <span class="interest-tag">Relationship Communication</span>
-                    <span class="interest-tag">Sexual Health</span>
+                    <!-- Interests will be loaded dynamically -->
                 </div>
             </div>
             
             <!-- BANNER DISPLAYS HERE -->
             <div class="creative-profile-banner" id="profileBanner" style="display: none;"></div>
-
-
 
             <!-- NEW: User Videos Section - TikTok Style Grid -->
             <div class="user-videos-section" id="userVideosSection">
@@ -2144,10 +2182,14 @@
                 </div>
             </div>
         </div>
+    </div>
 
-    <!-- All existing script tags - kept exactly as they were -->
+    <!-- Replace the old gamers.js import with this new one -->
+    <script type="module" src="gamers.js"></script>
+    
+    <!-- Keep your other script imports -->
     <script type="module" src="app.js"></script>
-    <script type="module" src="event.js"></script>
+    <script type="module" src="even.js"></script>
     <script type="module" src="call.js"></script>
     <script type="module" src="notification.js"></script>
     <script type="module" src="additional.js"></script>
@@ -2165,7 +2207,7 @@
                 feather.replace();
             }
 
-            // Tab Switching Functionality
+            // Tab Switching Functionality (if you have tabs)
             const tabs = document.querySelectorAll('.profile-tab');
             const sections = document.querySelectorAll('.content-section');
 
@@ -2200,30 +2242,6 @@
                     }
                 });
             });
-
-            // Follow/Unfollow button functionality
-            const followBtn = document.getElementById('likeProfileBtn');
-            if (followBtn) {
-                followBtn.addEventListener('click', function() {
-                    const isFollowing = this.textContent.includes('Following');
-                    
-                    if (isFollowing) {
-                        this.innerHTML = '<svg class="feather" data-feather="handshake"></svg> Connect';
-                        this.classList.remove('btn-message');
-                        this.classList.add('btn-follow');
-                    } else {
-                        this.innerHTML = '<svg class="feather" data-feather="user-check"></svg> Following';
-                        this.classList.remove('btn-follow');
-                        this.classList.add('btn-message');
-                    }
-                    
-                    if (typeof feather !== 'undefined') {
-                        feather.replace();
-                    }
-                });
-            }
-
-
         });
     </script>
 </body>

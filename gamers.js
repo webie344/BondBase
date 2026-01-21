@@ -1,4 +1,4 @@
-// gamers.js - Clan = Followers System (No Modal)
+// gamers.js - Complete with Profile Page Integration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -44,12 +44,28 @@ let currentUser = null;
 let allProfiles = [];
 let currentFilter = 'all';
 
-// Initialize when DOM is loaded
+// Check if we're on profile page or gamers directory
+const isProfilePage = window.location.pathname.includes('profile.html');
+const isGamersPage = window.location.pathname.includes('gamers.html') || 
+                     window.location.pathname.includes('mingle.html');
+
+// Initialize based on page
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Initializing gamers directory...');
-    initGamersDirectory();
+    console.log('Initializing... Current page:', window.location.pathname);
+    
+    if (isGamersPage) {
+        initGamersDirectory();
+    } else if (isProfilePage) {
+        initProfilePage();
+    } else {
+        // For other pages, just initialize auth
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+        });
+    }
 });
 
+// ==================== GAMERS DIRECTORY FUNCTIONALITY ====================
 async function initGamersDirectory() {
     try {
         // Initialize Feather Icons
@@ -445,7 +461,7 @@ function createProfileItem(profile) {
         }
     });
     
-    // Follow/Unfollow button event - NO MODAL, just toggle
+    // Follow/Unfollow button event
     const clanBtn = div.querySelector('.add-clan-btn');
     if (clanBtn) {
         clanBtn.addEventListener('click', async (e) => {
@@ -513,8 +529,424 @@ function createProfileItem(profile) {
     return div;
 }
 
+// ==================== PROFILE PAGE FUNCTIONALITY ====================
+async function initProfilePage() {
+    try {
+        // Initialize Feather Icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+        
+        // Get profile ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const profileId = urlParams.get('id');
+        
+        if (!profileId) {
+            console.error('No profile ID in URL');
+            showError('Profile not found', false);
+            return;
+        }
+        
+        console.log('Loading profile:', profileId);
+        
+        // Set up auth state listener
+        onAuthStateChanged(auth, async (user) => {
+            console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+            currentUser = user;
+            
+            // Load profile data
+            await loadProfileData(profileId);
+            setupProfileEventListeners(profileId);
+        }, (error) => {
+            console.error('Auth error:', error);
+            loadProfileData(profileId);
+            setupProfileEventListeners(profileId);
+        });
+        
+    } catch (error) {
+        console.error('Error initializing profile page:', error);
+        showError('Failed to load profile. Please refresh.', true);
+    }
+}
+
+async function loadProfileData(profileId) {
+    try {
+        if (!db) {
+            console.error('Firestore not initialized');
+            showError('Database service unavailable', false);
+            return;
+        }
+        
+        // Load user profile data
+        const userRef = doc(db, 'users', profileId);
+        const userSnap = await getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+            showError('Profile not found', false);
+            return;
+        }
+        
+        const userData = userSnap.data();
+        
+        // Update profile header
+        updateProfileHeader(profileId, userData);
+        
+        // Update profile info
+        updateProfileInfo(profileId, userData);
+        
+        // Update followers count
+        await updateFollowersCount(profileId);
+        
+        // Check if current user is following this profile
+        await updateFollowButton(profileId);
+        
+        // Load gamer profile if exists
+        await loadGamerProfile(profileId);
+        
+    } catch (error) {
+        console.error('Error loading profile data:', error);
+        showError(`Failed to load profile: ${error.message}`, true);
+    }
+}
+
+function updateProfileHeader(profileId, userData) {
+    // Update profile name
+    const profileNameElement = document.getElementById('viewProfileName');
+    if (profileNameElement) {
+        profileNameElement.textContent = userData.name || 'User';
+    }
+    
+    // Update profile age and location
+    const profileAgeElement = document.getElementById('viewProfileAge');
+    const profileLocationElement = document.getElementById('viewProfileLocation');
+    
+    if (profileAgeElement) {
+        profileAgeElement.textContent = userData.age ? `${userData.age} yrs` : 'No age specified';
+    }
+    
+    if (profileLocationElement) {
+        profileLocationElement.textContent = userData.location || 'Location unknown';
+    }
+    
+    // Update profile image
+    const profileImageElement = document.getElementById('mainProfileImage');
+    if (profileImageElement && userData.profileImage) {
+        profileImageElement.src = userData.profileImage;
+    }
+    
+    // Update profile bio
+    const profileBioElement = document.getElementById('viewProfileBio');
+    if (profileBioElement) {
+        profileBioElement.textContent = userData.bio || 'No bio available';
+    }
+    
+    // Also update the second bio element
+    const profileBioElement2 = document.getElementById('viewProfileBio2');
+    if (profileBioElement2) {
+        profileBioElement2.textContent = userData.bio || 'No bio available';
+    }
+    
+    // Update online status
+    updateOnlineStatus(profileId);
+}
+
+function updateProfileInfo(profileId, userData) {
+    // Update email
+    const emailElement = document.getElementById('viewProfileEmail');
+    if (emailElement) {
+        emailElement.textContent = userData.email || 'No email';
+    }
+    
+    // Update workshop count
+    const workshopCountElement = document.getElementById('viewWorkshopCount');
+    const workshopCountElement2 = document.getElementById('viewWorkshopCount2');
+    if (workshopCountElement) {
+        workshopCountElement.textContent = userData.workshops || 0;
+    }
+    if (workshopCountElement2) {
+        workshopCountElement2.textContent = userData.workshops || 0;
+    }
+    
+    // Update certification count
+    const certCountElement = document.getElementById('viewCertCount');
+    const certCountElement2 = document.getElementById('viewCertCount2');
+    if (certCountElement) {
+        certCountElement.textContent = userData.certifications || 0;
+    }
+    if (certCountElement2) {
+        certCountElement2.textContent = userData.certifications || 0;
+    }
+    
+    // Update interests
+    const interestsContainer = document.getElementById('interestsContainer');
+    if (interestsContainer && userData.interests && Array.isArray(userData.interests)) {
+        interestsContainer.innerHTML = '';
+        userData.interests.forEach(interest => {
+            const interestTag = document.createElement('span');
+            interestTag.className = 'interest-tag';
+            interestTag.textContent = interest;
+            interestsContainer.appendChild(interestTag);
+        });
+    }
+}
+
+async function updateOnlineStatus(profileId) {
+    try {
+        const statusRef = doc(db, 'status', profileId);
+        const statusSnap = await getDoc(statusRef);
+        
+        const onlineBadge = document.querySelector('.online-status-badge');
+        const onlineStatusElement = document.querySelector('.online-status');
+        
+        if (statusSnap.exists() && statusSnap.data().state === 'online') {
+            if (onlineBadge) onlineBadge.style.backgroundColor = '#00ff00';
+            if (onlineStatusElement) {
+                onlineStatusElement.innerHTML = `
+                    <svg class="feather" data-feather="circle" fill="#00ff00">
+                        <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                    Online
+                `;
+            }
+        } else {
+            if (onlineBadge) onlineBadge.style.backgroundColor = '#ff0000';
+            if (onlineStatusElement) {
+                onlineStatusElement.innerHTML = `
+                    <svg class="feather" data-feather="circle" fill="#ff0000">
+                        <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                    Offline
+                `;
+            }
+        }
+        
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    } catch (error) {
+        console.log('Could not get status for user:', profileId);
+    }
+}
+
+async function updateFollowersCount(profileId) {
+    try {
+        const count = await getFollowersCount(profileId);
+        
+        // Update followers count in profile stats
+        const followersStat = document.getElementById('followersCount');
+        if (followersStat) {
+            followersStat.textContent = count;
+        }
+        
+    } catch (error) {
+        console.error('Error updating followers count:', error);
+    }
+}
+
+async function updateFollowButton(profileId) {
+    const followBtn = document.getElementById('likeProfileBtn');
+    if (!followBtn) return;
+    
+    if (!currentUser) {
+        // User not logged in
+        followBtn.innerHTML = '<svg class="feather" data-feather="log-in"></svg> Login to Follow';
+        followBtn.classList.remove('btn-message');
+        followBtn.classList.add('btn-follow');
+        return;
+    }
+    
+    // Check if user is viewing their own profile
+    if (currentUser.uid === profileId) {
+        followBtn.style.display = 'none';
+        return;
+    }
+    
+    // Check if following
+    const isFollowing = await checkIfFollowing(profileId, currentUser.uid);
+    
+    if (isFollowing) {
+        followBtn.innerHTML = '<svg class="feather" data-feather="user-check"></svg> Following';
+        followBtn.classList.remove('btn-follow');
+        followBtn.classList.add('btn-message');
+        followBtn.dataset.following = 'true';
+    } else {
+        followBtn.innerHTML = '<svg class="feather" data-feather="user-plus"></svg> Follow';
+        followBtn.classList.remove('btn-message');
+        followBtn.classList.add('btn-follow');
+        followBtn.dataset.following = 'false';
+    }
+    
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+}
+
+async function loadGamerProfile(profileId) {
+    try {
+        const gamerProfileRef = collection(db, 'users', profileId, 'gamerProfile');
+        const gamerProfileSnap = await getDocs(gamerProfileRef);
+        
+        if (!gamerProfileSnap.empty) {
+            const gamerProfile = gamerProfileSnap.docs[0].data();
+            
+            // Show gamer badge
+            const gamerBadge = document.getElementById('gamerBadge');
+            if (gamerBadge) {
+                gamerBadge.style.display = 'inline-flex';
+            }
+            
+            // Show gamer profile section
+            const gamerSection = document.getElementById('gamerProfileSection');
+            if (gamerSection) {
+                gamerSection.style.display = 'block';
+                
+                // Populate gamer info
+                const gamerBasicInfo = document.getElementById('gamerBasicInfo');
+                if (gamerBasicInfo) {
+                    gamerBasicInfo.innerHTML = `
+                        <div class="gamer-info-row">
+                            <svg class="feather" data-feather="user">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            <span>Gamer Tag: <strong>${gamerProfile.gamerTag || 'Not set'}</strong></span>
+                        </div>
+                        <div class="gamer-info-row">
+                            <svg class="feather" data-feather="gamepad">
+                                <line x1="6" y1="12" x2="10" y2="12"></line>
+                                <line x1="8" y1="10" x2="8" y2="14"></line>
+                                <line x1="15" y1="13" x2="15.01" y2="13"></line>
+                                <line x1="18" y1="11" x2="18.01" y2="11"></line>
+                                <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                            </svg>
+                            <span>Primary Game: <strong>${gamerProfile.primaryGame || 'Not specified'}</strong></span>
+                        </div>
+                        <div class="gamer-info-row">
+                            <svg class="feather" data-feather="star">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                            <span>Rank: <strong>${gamerProfile.rank || 'Not ranked'}</strong></span>
+                        </div>
+                        <div class="gamer-info-row">
+                            <svg class="feather" data-feather="trending-up">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                            </svg>
+                            <span>Level: <strong>${gamerProfile.level || '1'}</strong></span>
+                        </div>
+                    `;
+                }
+                
+                // Populate gamer stats
+                const gamerStatsGrid = document.getElementById('gamerStatsGrid');
+                if (gamerStatsGrid) {
+                    gamerStatsGrid.innerHTML = `
+                        <div class="gamer-stat-card">
+                            <div class="stat-value">${gamerProfile.wins || 0}</div>
+                            <div class="stat-label">Wins</div>
+                        </div>
+                        <div class="gamer-stat-card">
+                            <div class="stat-value">${gamerProfile.losses || 0}</div>
+                            <div class="stat-label">Losses</div>
+                        </div>
+                        <div class="gamer-stat-card">
+                            <div class="stat-value">${gamerProfile.kdRatio || '0.0'}</div>
+                            <div class="stat-label">K/D Ratio</div>
+                        </div>
+                        <div class="gamer-stat-card">
+                            <div class="stat-value">${gamerProfile.playHours || 0}</div>
+                            <div class="stat-label">Hours Played</div>
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    } catch (error) {
+        console.log('No gamer profile found or error loading:', error);
+    }
+}
+
+function setupProfileEventListeners(profileId) {
+    const followBtn = document.getElementById('likeProfileBtn');
+    if (followBtn) {
+        followBtn.addEventListener('click', async () => {
+            if (!currentUser) {
+                showNotification('Please log in to follow users', 'warning');
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Don't allow following yourself
+            if (currentUser.uid === profileId) {
+                showNotification('You cannot follow yourself', 'info');
+                return;
+            }
+            
+            const isCurrentlyFollowing = followBtn.dataset.following === 'true';
+            
+            try {
+                if (isCurrentlyFollowing) {
+                    // Unfollow
+                    await unfollowUser(profileId);
+                    followBtn.dataset.following = 'false';
+                    followBtn.innerHTML = '<svg class="feather" data-feather="user-plus"></svg> Follow';
+                    followBtn.classList.remove('btn-message');
+                    followBtn.classList.add('btn-follow');
+                    
+                    // Update followers count
+                    await updateFollowersCount(profileId);
+                    
+                    showNotification(`Unfollowed user`, 'info');
+                } else {
+                    // Follow
+                    await followUser(profileId);
+                    followBtn.dataset.following = 'true';
+                    followBtn.innerHTML = '<svg class="feather" data-feather="user-check"></svg> Following';
+                    followBtn.classList.remove('btn-follow');
+                    followBtn.classList.add('btn-message');
+                    
+                    // Update followers count
+                    await updateFollowersCount(profileId);
+                    
+                    showNotification(`Now following user`, 'success');
+                }
+                
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+            } catch (error) {
+                console.error('Error toggling follow:', error);
+                showNotification('Failed to update follow status', 'error');
+            }
+        });
+    }
+    
+    // Message button
+    const messageBtn = document.getElementById('messageProfileBtn');
+    if (messageBtn) {
+        messageBtn.addEventListener('click', () => {
+            if (!currentUser) {
+                showNotification('Please log in to send messages', 'warning');
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Redirect to messages page with this user
+            window.location.href = `messages.html?user=${profileId}`;
+        });
+    }
+}
+
+// ==================== CORE FOLLOW/UNFOLLOW FUNCTIONS ====================
 async function followUser(targetUserId) {
     try {
+        if (!currentUser) {
+            throw new Error('User not logged in');
+        }
+        
         // Add current user to target user's followers
         const targetUserRef = doc(db, 'users', targetUserId);
         await updateDoc(targetUserRef, {
@@ -529,7 +961,7 @@ async function followUser(targetUserId) {
             updatedAt: serverTimestamp()
         });
         
-        // Also increase likes count (optional)
+        // Also increase likes count
         await updateDoc(targetUserRef, {
             likes: arrayUnion(currentUser.uid)
         });
@@ -542,6 +974,10 @@ async function followUser(targetUserId) {
 
 async function unfollowUser(targetUserId) {
     try {
+        if (!currentUser) {
+            throw new Error('User not logged in');
+        }
+        
         // Remove current user from target user's followers
         const targetUserRef = doc(db, 'users', targetUserId);
         await updateDoc(targetUserRef, {
@@ -556,7 +992,7 @@ async function unfollowUser(targetUserId) {
             updatedAt: serverTimestamp()
         });
         
-        // Also remove like (optional)
+        // Also remove like
         await updateDoc(targetUserRef, {
             likes: arrayRemove(currentUser.uid)
         });
@@ -567,20 +1003,7 @@ async function unfollowUser(targetUserId) {
     }
 }
 
-function createLoadingProfileItem() {
-    const div = document.createElement('div');
-    div.className = 'gamer-item loading';
-    div.innerHTML = `
-        <div class="loading-avatar"></div>
-        <div class="loading-info">
-            <div class="loading-line" style="width: 60%"></div>
-            <div class="loading-line short"></div>
-            <div class="loading-line medium"></div>
-        </div>
-    `;
-    return div;
-}
-
+// ==================== UTILITY FUNCTIONS ====================
 function setupEventListeners() {
     console.log('Setting up event listeners...');
     
@@ -648,19 +1071,21 @@ function displayFilteredProfiles(filteredProfiles) {
     }
 }
 
-// Utility Functions
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
+function createLoadingProfileItem() {
+    const div = document.createElement('div');
+    div.className = 'gamer-item loading';
+    div.innerHTML = `
+        <div class="loading-avatar"></div>
+        <div class="loading-info">
+            <div class="loading-line" style="width: 60%"></div>
+            <div class="loading-line short"></div>
+            <div class="loading-line medium"></div>
+        </div>
+    `;
+    return div;
 }
 
+// ==================== NOTIFICATION & ERROR FUNCTIONS ====================
 function showNotification(message, type = 'info') {
     // Remove existing notifications
     const existingNotifications = document.querySelectorAll('.custom-notification');
@@ -725,16 +1150,18 @@ function getNotificationIcon(icon) {
 }
 
 function showError(message, showRefresh = true) {
-    const gamersListElement = document.getElementById('gamersList');
-    if (gamersListElement) {
-        gamersListElement.innerHTML = `
+    const targetElement = isProfilePage ? document.querySelector('.profile-container') : 
+                         document.getElementById('gamersList');
+    
+    if (targetElement) {
+        targetElement.innerHTML = `
             <div class="empty-state">
                 <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="12" y1="8" x2="12" y2="12"></line>
                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                <h3 class="empty-title">Error Loading Profiles</h3>
+                <h3 class="empty-title">Error Loading</h3>
                 <p>${message}</p>
                 ${showRefresh ? `
                     <div style="margin-top: 15px; display: flex; gap: 10px;">
@@ -767,6 +1194,18 @@ function showError(message, showRefresh = true) {
     }
 }
 
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 // Add animation styles
 if (!document.getElementById('notification-styles')) {
     const style = document.createElement('style');
@@ -792,4 +1231,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('gamers.js loaded successfully');
+console.log('gamers.js loaded successfully - Profile integration ready');
