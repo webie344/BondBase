@@ -1,5 +1,3 @@
-
-
 // Firebase configuration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
@@ -486,7 +484,7 @@ async function preloadMingleData() {
     if (cachedProfiles && cachedProfiles.length > 0) {
         profiles = cachedProfiles;
         if (profiles.length > 0) {
-            showProfile(0);
+            displayProfilesGrid();
         }
     }
 }
@@ -1204,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         .offline-indicator {
-            position: fixed;
+            position: ;
             top: 0;
             left: 0;
             right: 0;
@@ -1213,7 +1211,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             text-align: center;
             padding: 10px;
             z-index: 10001;
-            font-size: 14px;
+            font-size: 5px;
             display: none;
         }
         
@@ -1310,20 +1308,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         .video-message {
-            max-width: 300px;
+            max-width: 280px;
             border-radius: 12px;
             overflow: hidden;
             position: relative;
             background: #000;
-            margin: 5px 0;
+            margin: 2px 0;
+           min-width:180px;
         }
 
         .video-message video {
-            width: 100%;
+            width: 260px;
             height: auto;
             max-height: 400px;
             border-radius: 12px;
             object-fit: cover;
+          min-width:260px;
         }
 
         .video-message-controls {
@@ -1612,6 +1612,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             border-radius: 12px;
             object-fit: cover;
             transition: opacity 0.3s ease;
+         min-width: 180px;
+        min-width: 180px;
         }
 
         .message-image.sending {
@@ -1667,7 +1669,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         @media (max-width: 768px) {
             .video-message {
-                max-width: 300px;
+                max-width: 500px;
             }
             
             .video-message video {
@@ -1682,16 +1684,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         @media (max-width: 480px) {
             .video-message {
-                max-width: 300px;
+                max-width: 260px;
             }
             
             .video-message video {
                 max-height: 300px;
+              min-width:200px;
             }
             
             .message-image {
                 max-width: 200px;
-                max-height: 250px;
+                max-height: 300px;
             }
         }
 
@@ -1756,8 +1759,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         .online-status {
             bottom: 10px;
             right: 10px;
-            width: 9px;
-            height: 9px;
+            width: 3px;
+            height: 3px;
             border-radius: 50%;
             border: 2px solid white;
         }
@@ -1971,6 +1974,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         @keyframes recording-pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
+        }
+
+       .profile-grid-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+
+        .profile-grid-status.online {
+            background-color: #00FF00;
+        }
+
+        .profile-grid-status.offline {
+            background-color: #9E9E9E;
+        }
+
+        .no-profiles-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 16px;
+        }
+
+
         }
     `;
     document.head.appendChild(style);
@@ -4397,69 +4429,25 @@ function initAdminPage() {
     }
 }
 
-// UPDATED: Mingle page with preloading
+// UPDATED: Mingle page with grid layout
 function initMinglePage() {
-    const dislikeBtn = document.getElementById('dislikeBtn');
-    const likeBtn = document.getElementById('likeBtn');
-    const viewProfileBtn = document.getElementById('viewProfileBtn');
-    const chatBtn = document.getElementById('chatBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const dashboardBtn = document.getElementById('dashboardBtn');
+    const mingleGrid = document.getElementById('mingleGrid');
+
+    // Create grid container if it doesn't exist
+    if (!mingleGrid) {
+        const mainContent = document.querySelector('main') || document.querySelector('.container');
+        if (mainContent) {
+            const gridContainer = document.createElement('div');
+            gridContainer.id = 'mingleGrid';
+            gridContainer.className = 'mingle-grid';
+            mainContent.innerHTML = '';
+            mainContent.appendChild(gridContainer);
+        }
+    }
 
     loadProfiles();
-
-    if (dislikeBtn) {
-        eventManager.addListener(dislikeBtn, 'click', () => {
-            showNextProfile();
-        });
-    }
-
-    if (likeBtn) {
-        eventManager.addListener(likeBtn, 'click', async () => {
-            const currentProfile = profiles[currentProfileIndex];
-            if (currentProfile) {
-                try {
-                    await addDoc(collection(db, 'users', currentUser.uid, 'liked'), {
-                        userId: currentProfile.id,
-                        timestamp: serverTimestamp()
-                    });
-                    
-                    const profileRef = doc(db, 'users', currentProfile.id);
-                    const profileSnap = await getDoc(profileRef);
-                    
-                    if (profileSnap.exists()) {
-                        const currentLikes = profileSnap.data().likes || 0;
-                        await updateDoc(profileRef, {
-                            likes: currentLikes + 50
-                        });
-                    }
-                    
-                    showNextProfile();
-                } catch (error) {
-                    logError(error, 'liking profile');
-                    showNotification('Error liking profile. Please try again.', 'error');
-                }
-            }
-        });
-    }
-
-    if (viewProfileBtn) {
-        eventManager.addListener(viewProfileBtn, 'click', () => {
-            const currentProfile = profiles[currentProfileIndex];
-            if (currentProfile) {
-                window.location.href = `profile.html?id=${currentProfile.id}`;
-            }
-        });
-    }
-
-    if (chatBtn) {
-        eventManager.addListener(chatBtn, 'click', () => {
-            const currentProfile = profiles[currentProfileIndex];
-            if (currentProfile) {
-                window.location.href = `chat.html?id=${currentProfile.id}`;
-            }
-        });
-    }
 
     if (logoutBtn) {
         eventManager.addListener(logoutBtn, 'click', handleLogout);
@@ -4469,6 +4457,179 @@ function initMinglePage() {
         eventManager.addListener(dashboardBtn, 'click', () => {
             window.location.href = 'dashboard.html';
         });
+    }
+}
+
+// UPDATED: Load profiles with grid display
+async function loadProfiles(forceRefresh = false) {
+    if (!forceRefresh) {
+        const cachedProfiles = await cache.getProfiles();
+        if (cachedProfiles && cachedProfiles.length > 0) {
+            profiles = cachedProfiles;
+            shuffleProfiles();
+            if (profiles.length > 0) {
+                displayProfilesGrid();
+            } else {
+                showNoProfilesMessage();
+            }
+        }
+    }
+
+    try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('__name__', '!=', currentUser.uid));
+        const querySnapshot = await getDocs(q);
+        
+        profiles = [];
+        querySnapshot.forEach(doc => {
+            profiles.push({ id: doc.id, ...doc.data() });
+        });
+        
+        shuffleProfiles();
+        
+        cache.set('mingle_profiles', profiles, 'short');
+        await cache.setProfiles(profiles);
+        
+        if (profiles.length > 0) {
+            displayProfilesGrid();
+        } else {
+            showNoProfilesMessage();
+        }
+    } catch (error) {
+        logError(error, 'loading profiles');
+        if (profiles.length === 0) {
+            showNoProfilesMessage();
+        }
+    }
+}
+
+// NEW: Display profiles in grid format
+// NEW: Display profiles in grid format
+function displayProfilesGrid() {
+    const mingleGrid = document.getElementById('mingleGrid');
+    if (!mingleGrid) return;
+    
+    mingleGrid.innerHTML = '';
+    
+    if (profiles.length === 0) {
+        mingleGrid.innerHTML = '<div class="no-profiles-message">No profiles found. Check back later for new profiles.</div>';
+        return;
+    }
+    
+    profiles.forEach(profile => {
+        const profileCard = document.createElement('div');
+        profileCard.className = 'profile-grid-card';
+        
+        let ageLocation = '';
+        if (profile.age) ageLocation += `${profile.age}`;
+        if (profile.location) ageLocation += ageLocation ? ` • ${profile.location}` : profile.location;
+        
+        profileCard.innerHTML = `
+            <img src="${profile.profileImage || 'images-default-profile.jpg'}" 
+                 alt="${profile.name || 'Profile'}" 
+                 class="profile-grid-image">
+            <div class="profile-grid-status" id="grid-status-${profile.id}"></div>
+            <div class="profile-grid-content">
+                <h3 class="profile-grid-name">${profile.name || 'Unknown'}</h3>
+                <p class="profile-grid-details">${ageLocation}</p>
+                <p class="profile-grid-bio">${profile.bio || 'No bio available'}</p>
+                <div class="profile-grid-actions">
+                    <div class="profile-grid-likes">
+                        <i class="fas fa-heart"></i>
+                        <span>${profile.likes || 0}</span>
+                    </div>
+                    <button class="profile-grid-like-btn" data-profile-id="${profile.id}">
+                        <i class="fas fa-heart"></i> Like
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Add click event to profile image to navigate to profile page
+        const profileImage = profileCard.querySelector('.profile-grid-image');
+        profileImage.style.cursor = 'pointer';
+        eventManager.addListener(profileImage, 'click', () => {
+            window.location.href = `profile.html?id=${profile.id}`;
+        });
+        
+        // Add like button functionality
+        const likeBtn = profileCard.querySelector('.profile-grid-like-btn');
+        eventManager.addListener(likeBtn, 'click', async (e) => {
+            e.stopPropagation();
+            await handleGridLike(profile.id, likeBtn);
+        });
+        
+        mingleGrid.appendChild(profileCard);
+        
+        // Setup online status for this profile
+        setupOnlineStatusListener(profile.id, `grid-status-${profile.id}`);
+    });
+}
+
+
+// NEW: Handle like in grid view
+async function handleGridLike(profileId, likeButton) {
+    if (!currentUser) {
+        showNotification('Please log in to like profiles', 'error');
+        return;
+    }
+
+    try {
+        const likedRef = collection(db, 'users', currentUser.uid, 'liked');
+        const likedQuery = query(likedRef, where('userId', '==', profileId));
+        const likedSnap = await getDocs(likedQuery);
+        
+        if (!likedSnap.empty) {
+            showNotification('You already liked this profile!', 'info');
+            return;
+        }
+
+        await addDoc(collection(db, 'users', currentUser.uid, 'liked'), {
+            userId: profileId,
+            timestamp: serverTimestamp(),
+            likedAt: new Date().toISOString()
+        });
+        
+        const profileRef = doc(db, 'users', profileId);
+        const profileSnap = await getDoc(profileRef);
+        
+        if (profileSnap.exists()) {
+            const currentLikes = profileSnap.data().likes || 0;
+            await updateDoc(profileRef, {
+                likes: currentLikes + 1,
+                updatedAt: serverTimestamp()
+            });
+            
+            // Update the like count display
+            const likesElement = likeButton.parentElement.querySelector('.profile-grid-likes span');
+            if (likesElement) {
+                likesElement.textContent = currentLikes + 1;
+            }
+        }
+        
+        likeButton.innerHTML = '<i class="fas fa-heart"></i> Liked';
+        likeButton.classList.add('liked');
+        likeButton.disabled = true;
+        
+        showNotification('Profile liked successfully!', 'success');
+        
+    } catch (error) {
+        logError(error, 'liking profile from grid');
+        showNotification('Error liking profile. Please try again.', 'error');
+    }
+}
+
+function shuffleProfiles() {
+    for (let i = profiles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [profiles[i], profiles[j]] = [profiles[j], profiles[i]];
+    }
+}
+
+function showNoProfilesMessage() {
+    const mingleGrid = document.getElementById('mingleGrid');
+    if (mingleGrid) {
+        mingleGrid.innerHTML = '<div class="no-profiles-message">No profiles found. Check back later for new profiles.</div>';
     }
 }
 
@@ -5150,104 +5311,6 @@ function updateAccountPage(userData) {
     }
 }
 
-// UPDATED: Load profiles with IndexedDB caching
-async function loadProfiles(forceRefresh = false) {
-    if (!forceRefresh) {
-        const cachedProfiles = await cache.getProfiles();
-        if (cachedProfiles && cachedProfiles.length > 0) {
-            profiles = cachedProfiles;
-            shuffleProfiles();
-            if (profiles.length > 0) {
-                showProfile(0);
-            } else {
-                showNoProfilesMessage();
-            }
-        }
-    }
-
-    try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('__name__', '!=', currentUser.uid));
-        const querySnapshot = await getDocs(q);
-        
-        profiles = [];
-        querySnapshot.forEach(doc => {
-            profiles.push({ id: doc.id, ...doc.data() });
-        });
-        
-        shuffleProfiles();
-        
-        cache.set('mingle_profiles', profiles, 'short');
-        await cache.setProfiles(profiles);
-        
-        if (profiles.length > 0) {
-            showProfile(0);
-        } else {
-            showNoProfilesMessage();
-        }
-    } catch (error) {
-        logError(error, 'loading profiles');
-        if (profiles.length === 0) {
-            showNoProfilesMessage();
-        }
-    }
-}
-
-function shuffleProfiles() {
-    for (let i = profiles.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [profiles[i], profiles[j]] = [profiles[j], profiles[i]];
-    }
-}
-
-function showNoProfilesMessage() {
-    document.getElementById('currentProfileImage').src = 'images/default-profile.jpg';
-    document.getElementById('profileName').textContent = 'No profiles found';
-    document.getElementById('profileAgeLocation').textContent = '';
-    document.getElementById('profileBio').textContent = 'Check back later for new profiles';
-}
-
-function showProfile(index) {
-    if (index >= 0 && index < profiles.length) {
-        currentProfileIndex = index;
-        const profile = profiles[index];
-        
-        document.getElementById('currentProfileImage').src = profile.profileImage || 'images-default-profile.jpg';
-        document.getElementById('profileName').textContent = profile.name || 'Unknown';
-        
-        let ageLocation = '';
-        if (profile.age) ageLocation += `${profile.age} • `;
-        if (profile.location) ageLocation += profile.location;
-        document.getElementById('profileAgeLocation').textContent = ageLocation;
-        
-        document.getElementById('profileBio').textContent = profile.bio || 'No bio available';
-        document.getElementById('likeCount').textContent = profile.likes || 0;
-        
-        updateProfileOnlineStatus(profile.id);
-    }
-}
-
-function updateProfileOnlineStatus(userId) {
-    const statusRef = doc(db, 'status', userId);
-    
-    onSnapshot(statusRef, (doc) => {
-        const status = doc.data()?.state || 'offline';
-        const statusIndicator = document.getElementById('profileStatusIndicator');
-        
-        if (statusIndicator) {
-            statusIndicator.className = `online-status ${status}`;
-        }
-    });
-}
-
-function showNextProfile() {
-    if (currentProfileIndex < profiles.length - 1) {
-        showProfile(currentProfileIndex + 1);
-    } else {
-        showNoProfilesMessage();
-    }
-}
-
 // UPDATED: Load profile data with caching
 async function loadProfileData(profileId) {
     const cachedProfile = cache.get(`profile_${profileId}`);
@@ -5298,8 +5361,7 @@ function displayProfileData(profileData) {
         document.getElementById('viewProfileLocation').textContent = '';
     }
     
-    document.getElementById('viewProfileBio').textContent = profileData.bio || 'No bio available';
-    document.getElementById('viewLikeCount').textContent = profileData.likes || 0;
+    
     
     const interestsContainer = document.getElementById('interestsContainer');
     interestsContainer.innerHTML = '';
