@@ -551,8 +551,8 @@ function createProfileItem(profile) {
                 return;
             }
             
-            // Redirect to chat page with this user's ID
-            window.location.href = `chat.html?userId=${profile.id}`;
+            // Redirect to chat page with this user's ID - FIXED: Use ?id= not ?userId=
+            window.location.href = `chat.html?id=${profile.id}`;
         });
     }
     
@@ -970,8 +970,8 @@ function setupProfileEventListeners(profileId) {
                 return;
             }
             
-            // Redirect to chat page with this user's ID
-            window.location.href = `chat.html?userId=${profileId}`;
+            // Redirect to chat page with this user's ID - FIXED: Use ?id= not ?userId=
+            window.location.href = `chat.html?id=${profileId}`;
         });
     }
 }
