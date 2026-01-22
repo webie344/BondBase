@@ -2613,7 +2613,7 @@ function setupMessageLongPress() {
     messagesContainer.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const messageElement = e.target.closest('.message');
-        if (messageElement) { // REMOVED: && messageElement.classList.contains('received')
+        if (messageElement) {
             const messageId = messageElement.dataset.messageId;
             if (messageId) {
                 showReactionPicker(messageId, e.clientX, e.clientY);
@@ -2623,7 +2623,7 @@ function setupMessageLongPress() {
     
     messagesContainer.addEventListener('touchstart', (e) => {
         const messageElement = e.target.closest('.message');
-        if (messageElement) { // REMOVED: && messageElement.classList.contains('received')
+        if (messageElement) {
             const messageId = messageElement.dataset.messageId;
             if (messageId) {
                 longPressTimer = setTimeout(() => {
@@ -2666,7 +2666,7 @@ function setupMessageSwipe() {
         }
         
         const messageElement = e.target.closest('.message');
-        if (messageElement) { // REMOVED: && messageElement.classList.contains('received')
+        if (messageElement) {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
             currentElement = messageElement;
@@ -3395,6 +3395,53 @@ function createVideoPlayer(videoUrl, duration) {
     return container;
 }
 
+// FIXED: Enhanced getRepliedMessage function to find replied messages from multiple sources
+function getRepliedMessage(messageId) {
+    // Try multiple cache sources
+    const cacheKey = `messages_${currentUser.uid}_${chatPartnerId}`;
+    const cachedMessages = cache.get(cacheKey) || [];
+    
+    let repliedMessage = cachedMessages.find(m => m.id === messageId);
+    
+    // If not found in cache, try to find it from currently displayed messages
+    if (!repliedMessage) {
+        const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (messageElement) {
+            // Extract basic information from DOM
+            repliedMessage = {
+                id: messageId,
+                senderId: messageElement.classList.contains('sent') ? currentUser.uid : chatPartnerId
+            };
+            
+            // Try to extract text content
+            const textElement = messageElement.querySelector('p');
+            if (textElement) {
+                repliedMessage.text = textElement.textContent;
+            }
+            
+            // Try to extract image
+            const imgElement = messageElement.querySelector('.message-image');
+            if (imgElement) {
+                repliedMessage.imageUrl = imgElement.src;
+            }
+            
+            // Try to extract audio
+            const voiceElement = messageElement.querySelector('.voice-message');
+            if (voiceElement) {
+                repliedMessage.audioUrl = 'audio';
+            }
+            
+            // Try to extract video
+            const videoElement = messageElement.querySelector('.video-message');
+            if (videoElement) {
+                repliedMessage.videoUrl = 'video';
+            }
+        }
+    }
+    
+    return repliedMessage;
+}
+
 // FIXED: Display message function to properly handle replies and show them correctly
 function displayMessage(message, currentUserId) {
     const messagesContainer = document.getElementById('chatMessages');
@@ -3423,7 +3470,7 @@ function displayMessage(message, currentUserId) {
             let previewText = '';
             
             if (repliedMessage.text) {
-                previewText = repliedMessage.text;
+                previewText = repliedMessage.text.length > 50 ? repliedMessage.text.substring(0, 50) + '...' : repliedMessage.text;
             } else if (repliedMessage.imageUrl) {
                 previewText = '📷 Photo';
             } else if (repliedMessage.audioUrl) {
@@ -3790,7 +3837,7 @@ function updateMessagesDisplay(newMessages, currentUserId) {
     }
 }
 
-// FIXED: Add message function with proper reply data structure
+// FIXED: Enhanced addMessage function to store replied message preview
 async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDuration = null, videoUrl = null, videoDuration = null) {
     if (!text && !imageUrl && !audioUrl && !videoUrl) return;
     
@@ -3811,6 +3858,25 @@ async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDu
         // FIXED: Add replyTo field if replying to a message
         if (selectedMessageForReply) {
             messageData.replyTo = selectedMessageForReply;
+            
+            // Also store the replied message preview in the message
+            const repliedMessage = getRepliedMessage(selectedMessageForReply);
+            if (repliedMessage) {
+                let previewContent = '';
+                if (repliedMessage.text) {
+                    previewContent = repliedMessage.text;
+                } else if (repliedMessage.imageUrl) {
+                    previewContent = 'Image';
+                } else if (repliedMessage.audioUrl) {
+                    previewContent = 'Voice message';
+                } else if (repliedMessage.videoUrl) {
+                    previewContent = 'Video message';
+                }
+                messageData.replyPreview = {
+                    senderId: repliedMessage.senderId,
+                    content: previewContent.substring(0, 100) // Limit preview length
+                };
+            }
         }
         
         const tempMessageId = 'temp_' + Date.now();
@@ -3819,6 +3885,27 @@ async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDu
             ...messageData,
             timestamp: new Date().toISOString()
         };
+        
+        // Add replyPreview to temp message as well
+        if (selectedMessageForReply && !tempMessage.replyPreview) {
+            const repliedMessage = getRepliedMessage(selectedMessageForReply);
+            if (repliedMessage) {
+                let previewContent = '';
+                if (repliedMessage.text) {
+                    previewContent = repliedMessage.text;
+                } else if (repliedMessage.imageUrl) {
+                    previewContent = 'Image';
+                } else if (repliedMessage.audioUrl) {
+                    previewContent = 'Voice message';
+                } else if (repliedMessage.videoUrl) {
+                    previewContent = 'Video message';
+                }
+                tempMessage.replyPreview = {
+                    senderId: repliedMessage.senderId,
+                    content: previewContent.substring(0, 100)
+                };
+            }
+        }
         
         window.lastTempMessageId = tempMessageId;
         
@@ -3980,11 +4067,6 @@ function displayCachedMessages(messages) {
     setTimeout(() => {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }, 100);
-}
-
-function getRepliedMessage(messageId) {
-    const cachedMessages = cache.get(`messages_${currentUser.uid}_${chatPartnerId}`) || [];
-    return cachedMessages.find(m => m.id === messageId);
 }
 
 // UPDATED: Page Initialization Functions with preloading
@@ -4877,8 +4959,8 @@ function initChatPage() {
         loadChatMessages(currentUser.uid, chatPartnerId);
         
         setupTypingIndicator();
-        setupMessageLongPress(); // REMOVED restrictions
-        setupMessageSwipe(); // REMOVED restrictions
+        setupMessageLongPress();
+        setupMessageSwipe();
     } else {
         showNotification('No chat selected', 'error');
         setTimeout(() => {
