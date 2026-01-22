@@ -5267,10 +5267,6 @@ async function loadProfileData(profileId) {
             const likedQuery = query(likedRef, where('userId', '==', profileId));
             const likedSnap = await getDocs(likedQuery);
             
-            if (!likedSnap.empty) {
-                document.getElementById('likeProfileBtn').innerHTML = '<i class="fas fa-heart"></i> Liked';
-                document.getElementById('likeProfileBtn').classList.add('liked');
-            }
             
             setupOnlineStatusListener(profileId);
         } else {
@@ -5297,8 +5293,7 @@ function displayProfileData(profileData) {
         document.getElementById('viewProfileLocation').textContent = '';
     }
     
-    document.getElementById('viewProfileBio').textContent = profileData.bio || 'No bio available';
-    document.getElementById('viewLikeCount').textContent = profileData.likes || 0;
+    
     
     const interestsContainer = document.getElementById('interestsContainer');
     interestsContainer.innerHTML = '';
