@@ -7,7 +7,7 @@
     <!-- Add these in your head tag -->
      
     <link rel="stylesheet" href="style.css">
-       <link rel="stylesheet" href="scro-fix.css">
+       <link rel="stylesheet" href="scrol-fix.css">
     <link rel="stylesheet" href="chat.css">
     
     
@@ -31,7 +31,13 @@
         background-color: var(--bg-primary);
         color: var(--text-primary);
     }
-    
+    .chat-container {
+    background-image: url('darkwallpaper.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed; /* Optional: makes it stay fixed while scrolling */
+}
     .game-icon-btn{
         font-size: 3px;
         background: rgba(255, 255, 255, 0.05);
@@ -396,7 +402,7 @@
         z-index: 100;
         padding: 8px 0;
         display: none;
-        border: 1px solid var(--border);
+          border: 1px solid var(--border);
     }
     
     .context-menu-item {
@@ -748,9 +754,9 @@
     </div>
     
     <!-- Load all your existing scripts exactly as before -->
-    <script type="module" src="chat.js"></script>
+
     <script type="module" src="app.js"></script>
-    
+        <script type="module" src="chat.js"></script>
     <script src="fix.js"></script>
     <script src="fli.js"></script>
     <script src="smoot.js"></script>
