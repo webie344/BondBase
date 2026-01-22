@@ -451,12 +451,19 @@ function createProfileItem(profile) {
                 `}
                 ${buttonText}
             </button>
+            <button class="message-gamer-btn" data-profile-id="${profile.id}" title="Message ${profile.name}">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </button>
         </div>
     `;
     
     // Click event for profile navigation
     div.addEventListener('click', (e) => {
-        if (!e.target.closest('.add-clan-btn') && !e.target.closest('.clan-section')) {
+        if (!e.target.closest('.add-clan-btn') && 
+            !e.target.closest('.clan-section') &&
+            !e.target.closest('.message-gamer-btn')) {
             window.location.href = `profile.html?id=${profile.id}`;
         }
     });
@@ -523,6 +530,29 @@ function createProfileItem(profile) {
                 console.error('Error toggling follow:', error);
                 showNotification('Failed to update follow status', 'error');
             }
+        });
+    }
+    
+    // Message button event
+    const messageBtn = div.querySelector('.message-gamer-btn');
+    if (messageBtn) {
+        messageBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            if (!currentUser) {
+                showNotification('Please log in to send messages', 'warning');
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Don't allow messaging yourself
+            if (currentUser.uid === profile.id) {
+                showNotification('You cannot message yourself', 'info');
+                return;
+            }
+            
+            // Redirect to chat page with this user's ID
+            window.location.href = `chat.html?userId=${profile.id}`;
         });
     }
     
@@ -934,8 +964,14 @@ function setupProfileEventListeners(profileId) {
                 return;
             }
             
-            // Redirect to messages page with this user
-            window.location.href = `messages.html?user=${profileId}`;
+            // Don't allow messaging yourself
+            if (currentUser.uid === profileId) {
+                showNotification('You cannot message yourself', 'info');
+                return;
+            }
+            
+            // Redirect to chat page with this user's ID
+            window.location.href = `chat.html?userId=${profileId}`;
         });
     }
 }

@@ -65,7 +65,243 @@
             stroke-linejoin: round;
             fill: none;
         }
+/* Add this to your CSS file, likely in styles.css or a dedicated styles file */
 
+/* Message button styling for gamers directory */
+.message-gamer-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.message-gamer-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
+}
+
+.message-gamer-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.message-gamer-btn .feather {
+    width: 16px;
+    height: 16px;
+    stroke: white;
+    stroke-width: 2;
+}
+
+/* Tooltip for message button */
+.message-gamer-btn::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 1000;
+    margin-bottom: 8px;
+}
+
+.message-gamer-btn:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Update the gamer-actions container to accommodate the new button */
+.gamer-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    z-index: 2;
+}
+
+/* Update existing clan-section styling if needed */
+.clan-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+}
+
+.clan-count {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-light);
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+}
+
+.clan-count .feather {
+    width: 12px;
+    height: 12px;
+    stroke: var(--text-light);
+}
+
+/* Update the button row in gamer-actions */
+.gamer-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+/* For larger screens, you might want a row layout */
+@media (min-width: 768px) {
+    .gamer-actions {
+        flex-direction: row;
+        gap: 12px;
+    }
+    
+    .message-gamer-btn {
+        margin-left: 0;
+    }
+}
+
+/* Update existing .add-clan-btn styling to work better with new button */
+.add-clan-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(255, 42, 109, 0.2);
+}
+
+.add-clan-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 42, 109, 0.3);
+}
+
+.add-clan-btn.added {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.add-clan-btn.added:hover {
+    background: var(--bg-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.add-clan-btn .feather {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+}
+
+/* Loading state adjustments */
+.gamer-item.loading .message-gamer-btn,
+.gamer-item.loading .add-clan-btn {
+    background: var(--bg-secondary);
+    cursor: default;
+}
+
+/* Animation for the message button */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(102, 126, 234, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+    }
+}
+
+/* Add pulse animation for new/unread messages indicator */
+.message-gamer-btn.has-unread {
+    animation: pulse 2s infinite;
+    position: relative;
+}
+
+.message-gamer-btn.has-unread::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: #ff2a6d;
+    border-radius: 50%;
+    border: 2px solid white;
+    z-index: 1;
+}
+
+/* For dark mode support */
+@media (prefers-color-scheme: dark) {
+    .message-gamer-btn {
+        background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
+    }
+    
+    .message-gamer-btn:hover {
+        background: linear-gradient(135deg, #4a5fc7 0%, #5a307f 100%);
+    }
+    
+    .message-gamer-btn::after {
+        background: rgba(255, 255, 255, 0.9);
+        color: #333;
+    }
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 480px) {
+    .gamer-actions {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .message-gamer-btn {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .message-gamer-btn .feather {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .add-clan-btn {
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+}
         /* Top Navigation */
         .top-nav {
             background: rgba(255, 255, 255, 0.06);
