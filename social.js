@@ -1,4 +1,4 @@
-// social.js - Complete independent social features module for dating site WITH PAGINATION
+// social.js - Complete independent social features module for dating site WITH PAGINATION AND FOLLOWERS INTEGRATION
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -20,6 +20,7 @@ import {
     limit,
     startAfter,
     arrayUnion,
+    arrayRemove,
     increment
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -85,6 +86,9 @@ class SocialManager {
         this.isLoading = false;
         this.hasMorePosts = true;
         this.postsPerPage = 10;
+        this.currentFilter = 'all'; // 'all', 'following', 'top'
+        this.allPosts = []; // Store all posts for client-side filtering
+        this.followingStatus = {}; // Store following status for users
         this.init();
     }
 
@@ -128,6 +132,23 @@ class SocialManager {
             // Load More button
             if (e.target.id === 'loadMorePosts' || e.target.closest('#loadMorePosts')) {
                 this.loadMorePosts();
+            }
+            // Filter buttons for posts page
+            if (e.target.classList.contains('posts-filter-btn') || e.target.closest('.posts-filter-btn')) {
+                const btn = e.target.classList.contains('posts-filter-btn') ? e.target : e.target.closest('.posts-filter-btn');
+                const filter = btn.dataset.filter;
+                this.changePostsFilter(filter);
+            }
+            // Follow buttons
+            if (e.target.classList.contains('follow-btn-post') || e.target.closest('.follow-btn-post')) {
+                const btn = e.target.classList.contains('follow-btn-post') ? e.target : e.target.closest('.follow-btn-post');
+                const userId = btn.dataset.userId;
+                const isFollowing = btn.dataset.following === 'true';
+                
+                if (userId && userId !== this.currentUser?.uid) {
+                    e.stopPropagation();
+                    this.handlePostFollow(userId, btn, isFollowing);
+                }
             }
         });
     }
@@ -173,12 +194,512 @@ class SocialManager {
         }
     }
 
-    // NEW: Setup comments page
+    // ==================== POSTS PAGE WITH FILTERS ====================
+    setupPostsPage() {
+        // Add filter buttons if they don't exist
+        this.addFilterButtons();
+        
+        // Load initial posts
+        this.loadAllPosts();
+        this.markAllPostsAsViewed();
+    }
+
+    addFilterButtons() {
+        const postsContainer = document.getElementById('postsContainer');
+        if (!postsContainer) return;
+        
+        // Check if filter buttons already exist
+        if (document.getElementById('postsFilterButtons')) return;
+        
+        const filterContainer = document.createElement('div');
+        filterContainer.id = 'postsFilterButtons';
+        filterContainer.className = 'posts-filter-buttons';
+        filterContainer.innerHTML = `
+            <button class="posts-filter-btn active" data-filter="all">
+                <i class="fas fa-globe"></i> All Posts
+            </button>
+            <button class="posts-filter-btn" data-filter="top">
+                <i class="fas fa-fire"></i> Top Posts
+            </button>
+            <button class="posts-filter-btn" data-filter="following">
+                <i class="fas fa-user-friends"></i> Following
+            </button>
+        `;
+        
+        // Insert before posts container
+        postsContainer.parentNode.insertBefore(filterContainer, postsContainer);
+        
+        // Add styles
+        if (!document.getElementById('filterStyles')) {
+            const style = document.createElement('style');
+            style.id = 'filterStyles';
+            style.textContent = `
+                .posts-filter-buttons {
+                    display: flex;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                    padding: 10px;
+                    background: var(--bg-secondary);
+                    border-radius: 10px;
+                    justify-content: center;
+                    flex-wrap: wrap;
+                }
+                .posts-filter-btn {
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    color: var(--text-primary);
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: all 0.3s;
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                }
+                .posts-filter-btn:hover {
+                    background: var(--hover);
+                }
+                .posts-filter-btn.active {
+                    background: var(--primary);
+                    color: white;
+                    border-color: var(--primary);
+                }
+                .posts-filter-btn i {
+                    font-size: 12px;
+                }
+                .follow-btn-post {
+                    background: var(--primary);
+                    color: white;
+                    border: none;
+                    padding: 4px 12px;
+                    border-radius: 15px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    transition: all 0.3s;
+                    margin-left: auto;
+                }
+                .follow-btn-post:hover {
+                    opacity: 0.9;
+                }
+                .follow-btn-post.following {
+                    background: var(--success);
+                }
+                .post-author-info {
+                    flex: 1;
+                    min-width: 0;
+                }
+                .post-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    changePostsFilter(filter) {
+        // Update active button
+        document.querySelectorAll('.posts-filter-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        const activeBtn = document.querySelector(`.posts-filter-btn[data-filter="${filter}"]`);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+        }
+        
+        // Update current filter
+        this.currentFilter = filter;
+        
+        // Reset pagination
+        this.lastVisiblePost = null;
+        this.hasMorePosts = true;
+        
+        // Clear container
+        const container = document.getElementById('postsContainer');
+        if (container) {
+            container.innerHTML = '';
+            
+            // Add loading skeletons
+            for (let i = 0; i < 3; i++) {
+                container.appendChild(this.createLoadingPostItem());
+            }
+        }
+        
+        // Load posts with new filter
+        this.loadAllPosts();
+    }
+
+    // UPDATED: Load posts with pagination and client-side filtering
+    async loadAllPosts(lastVisible = null) {
+        const container = document.getElementById('postsContainer');
+        const loadMoreBtn = document.getElementById('loadMorePosts');
+        
+        if (!container || this.isLoading) return;
+        
+        this.isLoading = true;
+        
+        try {
+            let postsQuery;
+            
+            if (lastVisible) {
+                postsQuery = query(
+                    collection(db, 'posts'), 
+                    orderBy('createdAt', 'desc'),
+                    startAfter(lastVisible),
+                    limit(this.postsPerPage)
+                );
+            } else {
+                postsQuery = query(
+                    collection(db, 'posts'), 
+                    orderBy('createdAt', 'desc'),
+                    limit(this.postsPerPage)
+                );
+            }
+            
+            const postsSnap = await getDocs(postsQuery);
+            
+            // Remove loading skeletons on first load
+            if (lastVisible === null) {
+                const loadingItems = container.querySelectorAll('.post-item.loading');
+                loadingItems.forEach(item => item.remove());
+            }
+            
+            if (postsSnap.empty) {
+                if (lastVisible === null) {
+                    container.innerHTML = '<div class="no-posts">No posts yet. Be the first to post!</div>';
+                }
+                this.hasMorePosts = false;
+                if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+                return;
+            }
+            
+            // Store the last document for pagination
+            const lastDoc = postsSnap.docs[postsSnap.docs.length - 1];
+            this.lastVisiblePost = lastDoc;
+            
+            // Check if we have more posts
+            this.hasMorePosts = postsSnap.size >= this.postsPerPage;
+            
+            const allPosts = [];
+            postsSnap.forEach(doc => {
+                const postData = doc.data();
+                allPosts.push({ id: doc.id, ...postData });
+            });
+            
+            // Apply client-side filtering
+            let filteredPosts = allPosts;
+            
+            if (this.currentFilter === 'top') {
+                // Sort by likes (descending)
+                filteredPosts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+            } else if (this.currentFilter === 'following') {
+                if (!this.currentUser) {
+                    filteredPosts = [];
+                } else {
+                    // Get following users
+                    const followingUsers = await this.getFollowingUsers();
+                    if (followingUsers.length === 0) {
+                        filteredPosts = [];
+                    } else {
+                        filteredPosts = allPosts.filter(post => 
+                            followingUsers.includes(post.userId)
+                        );
+                    }
+                }
+            }
+            
+            // Display filtered posts
+            await this.displayPosts(filteredPosts, lastVisible !== null);
+            
+            // Show/hide load more button
+            if (loadMoreBtn) {
+                if (this.hasMorePosts) {
+                    loadMoreBtn.style.display = 'block';
+                    loadMoreBtn.disabled = false;
+                    loadMoreBtn.innerHTML = '<i class="fas fa-plus"></i> Load More';
+                } else {
+                    loadMoreBtn.style.display = 'none';
+                }
+            }
+            
+            // Show message if no posts in current filter
+            if (filteredPosts.length === 0 && lastVisible === null) {
+                let message = '';
+                switch(this.currentFilter) {
+                    case 'following':
+                        if (!this.currentUser) {
+                            message = 'Please log in to see posts from users you follow';
+                        } else {
+                            message = `
+                                <div class="no-posts-message">
+                                    <i class="fas fa-user-friends" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                                    <h3>No Posts from Followed Users</h3>
+                                    <p>You're not following anyone yet. Follow users to see their posts here!</p>
+                                    <a href="mingle.html" class="btn-primary">
+                                        <i class="fas fa-users"></i> Find Users to Follow
+                                    </a>
+                                </div>
+                            `;
+                        }
+                        break;
+                    case 'top':
+                        message = 'No posts with likes yet';
+                        break;
+                    default:
+                        message = 'No posts yet. Be the first to post!';
+                }
+                container.innerHTML = message;
+            }
+            
+        } catch (error) {
+            console.error('Error loading posts:', error);
+            if (lastVisible === null) {
+                container.innerHTML = '<div class="error">Error loading posts</div>';
+            }
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    // ==================== FOLLOWERS FUNCTIONALITY ====================
+    async getFollowingUsers() {
+        try {
+            if (!this.currentUser) return [];
+            
+            const userRef = doc(db, 'users', this.currentUser.uid);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                return userData.following || [];
+            }
+            return [];
+        } catch (error) {
+            console.error('Error getting following users:', error);
+            return [];
+        }
+    }
+
+    async followUser(targetUserId) {
+        try {
+            if (!this.currentUser) {
+                throw new Error('User not logged in');
+            }
+            
+            // Add current user to target user's followers
+            const targetUserRef = doc(db, 'users', targetUserId);
+            await updateDoc(targetUserRef, {
+                followers: arrayUnion(this.currentUser.uid),
+                updatedAt: serverTimestamp()
+            });
+            
+            // Add target user to current user's following
+            const currentUserRef = doc(db, 'users', this.currentUser.uid);
+            await updateDoc(currentUserRef, {
+                following: arrayUnion(targetUserId),
+                updatedAt: serverTimestamp()
+            });
+            
+            // Also increase likes count
+            await updateDoc(targetUserRef, {
+                likes: arrayUnion(this.currentUser.uid)
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('Error following user:', error);
+            throw error;
+        }
+    }
+
+    async unfollowUser(targetUserId) {
+        try {
+            if (!this.currentUser) {
+                throw new Error('User not logged in');
+            }
+            
+            // Remove current user from target user's followers
+            const targetUserRef = doc(db, 'users', targetUserId);
+            await updateDoc(targetUserRef, {
+                followers: arrayRemove(this.currentUser.uid),
+                updatedAt: serverTimestamp()
+            });
+            
+            // Remove target user from current user's following
+            const currentUserRef = doc(db, 'users', this.currentUser.uid);
+            await updateDoc(currentUserRef, {
+                following: arrayRemove(targetUserId),
+                updatedAt: serverTimestamp()
+            });
+            
+            // Also remove like
+            await updateDoc(targetUserRef, {
+                likes: arrayRemove(this.currentUser.uid)
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('Error unfollowing user:', error);
+            throw error;
+        }
+    }
+
+    async checkIfFollowing(targetUserId) {
+        try {
+            if (!this.currentUser) return false;
+            
+            // Check if current user is in target user's followers list
+            const targetUserRef = doc(db, 'users', targetUserId);
+            const targetUserSnap = await getDoc(targetUserRef);
+            
+            if (targetUserSnap.exists()) {
+                const targetUserData = targetUserSnap.data();
+                
+                if (targetUserData.followers && Array.isArray(targetUserData.followers)) {
+                    return targetUserData.followers.includes(this.currentUser.uid);
+                }
+            }
+            return false;
+        } catch (error) {
+            console.error('Error checking following status:', error);
+            return false;
+        }
+    }
+
+    async handlePostFollow(userId, button, isCurrentlyFollowing) {
+        if (!this.currentUser) {
+            alert('Please log in to follow users');
+            window.location.href = 'login.html';
+            return;
+        }
+
+        // Don't allow following yourself
+        if (userId === this.currentUser.uid) {
+            return;
+        }
+
+        try {
+            if (isCurrentlyFollowing) {
+                // Unfollow
+                await this.unfollowUser(userId);
+                button.innerHTML = '<i class="fas fa-user-plus"></i> Follow';
+                button.classList.remove('following');
+                button.dataset.following = 'false';
+                this.showNotification('Unfollowed user', 'info');
+            } else {
+                // Follow
+                await this.followUser(userId);
+                button.innerHTML = '<i class="fas fa-user-check"></i> Following';
+                button.classList.add('following');
+                button.dataset.following = 'true';
+                this.showNotification('Now following user', 'success');
+            }
+        } catch (error) {
+            console.error('Error toggling follow:', error);
+            this.showNotification('Failed to update follow status', 'error');
+        }
+    }
+
+    // NEW: Load more posts function
+    async loadMorePosts() {
+        if (!this.lastVisiblePost || !this.hasMorePosts || this.isLoading) return;
+        
+        const loadMoreBtn = document.getElementById('loadMorePosts');
+        if (loadMoreBtn) {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        }
+        
+        await this.loadAllPosts(this.lastVisiblePost);
+    }
+
+    createLoadingPostItem() {
+        const div = document.createElement('div');
+        div.className = 'post-item loading';
+        div.innerHTML = `
+            <div class="loading-avatar"></div>
+            <div class="loading-content">
+                <div class="loading-line" style="width: 30%"></div>
+                <div class="loading-line" style="width: 50%"></div>
+                <div class="loading-line" style="width: 70%"></div>
+            </div>
+        `;
+        return div;
+    }
+
+    showNotification(message, type = 'info') {
+        // Remove existing notifications
+        const existingNotifications = document.querySelectorAll('.custom-notification');
+        existingNotifications.forEach(notification => notification.remove());
+        
+        const notification = document.createElement('div');
+        notification.className = `custom-notification ${type}`;
+        
+        const bgColor = type === 'error' ? '#dc2626' : 
+                       type === 'success' ? '#16a34a' : 
+                       type === 'warning' ? '#f59e0b' : '#3b82f6';
+        
+        notification.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: ${bgColor};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 400px;
+            backdrop-filter: blur(10px);
+            font-family: 'Inter', sans-serif;
+        `;
+        
+        const icon = type === 'error' ? 'alert-circle' : 
+                    type === 'success' ? 'check-circle' : 
+                    type === 'warning' ? 'alert-triangle' : 'info';
+        
+        notification.innerHTML = `
+            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+                ${this.getNotificationIcon(icon)}
+            </svg>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+
+    getNotificationIcon(icon) {
+        switch(icon) {
+            case 'alert-circle':
+                return '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
+            case 'check-circle':
+                return '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>';
+            case 'alert-triangle':
+                return '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>';
+            default:
+                return '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>';
+        }
+    }
+
+    // ==================== COMMENTS PAGE FUNCTIONALITY ====================
     setupCommentsPage() {
         this.loadSinglePostWithComments();
     }
 
-    // NEW: Load single post with comments
     async loadSinglePostWithComments() {
         const urlParams = new URLSearchParams(window.location.search);
         const postId = urlParams.get('postId');
@@ -240,7 +761,6 @@ class SocialManager {
         }
     }
 
-    // NEW: Display single post in comments page
     displaySinglePost(post, user) {
         const container = document.getElementById('commentsContainer');
         if (!container) return;
@@ -275,14 +795,6 @@ class SocialManager {
                     <div class="post-author-info">
                         <h4>${user.name || 'Unknown User'}</h4>
                         <span class="post-time">${this.formatTime(post.createdAt)}</span>
-                    </div>
-                    <div class="post-user-actions">
-                        <button class="btn-chat" data-user-id="${post.userId}">
-                            <i class="fas fa-comment"></i> Chat
-                        </button>
-                        <button class="btn-view-profile" data-user-id="${post.userId}">
-                            <i class="fas fa-user"></i> Profile
-                        </button>
                     </div>
                 </div>
                 
@@ -320,8 +832,6 @@ class SocialManager {
         const likeBtn = container.querySelector('.like-btn');
         const sendCommentBtn = container.querySelector('#sendCommentBtn');
         const commentInput = container.querySelector('#commentInput');
-        const chatBtn = container.querySelector('.btn-chat');
-        const profileBtn = container.querySelector('.btn-view-profile');
 
         if (likeBtn) {
             likeBtn.addEventListener('click', () => this.handleLike(post.id, likeBtn));
@@ -338,27 +848,9 @@ class SocialManager {
                 }
             });
         }
-
-        if (chatBtn) {
-            chatBtn.addEventListener('click', () => {
-                if (post.userId && post.userId !== this.currentUser.uid) {
-                    window.location.href = `chat.html?id=${post.userId}`;
-                } else if (post.userId === this.currentUser.uid) {
-                    alert("You can't chat with yourself!");
-                }
-            });
-        }
-
-        if (profileBtn) {
-            profileBtn.addEventListener('click', () => {
-                if (post.userId) {
-                    window.location.href = `profile.html?id=${post.userId}`;
-                }
-            });
-        }
     }
 
-    // NEW: Load comments for comments page
+    // Load comments for comments page
     async loadCommentsForPage(postId) {
         const commentsList = document.getElementById('commentsList');
         if (!commentsList) return;
@@ -397,104 +889,6 @@ class SocialManager {
         }
     }
 
-    // UPDATED: Load posts with pagination
-    setupPostsPage() {
-        this.loadAllPosts();
-        this.markAllPostsAsViewed();
-    }
-
-    // UPDATED: Load posts with pagination
-    async loadAllPosts(lastVisible = null) {
-        const container = document.getElementById('postsContainer');
-        const loadMoreBtn = document.getElementById('loadMorePosts');
-        
-        if (!container || this.isLoading) return;
-        
-        this.isLoading = true;
-        
-        try {
-            let postsQuery;
-            if (lastVisible) {
-                postsQuery = query(
-                    collection(db, 'posts'), 
-                    orderBy('createdAt', 'desc'),
-                    startAfter(lastVisible),
-                    limit(this.postsPerPage)
-                );
-            } else {
-                postsQuery = query(
-                    collection(db, 'posts'), 
-                    orderBy('createdAt', 'desc'),
-                    limit(this.postsPerPage)
-                );
-            }
-            
-            const postsSnap = await getDocs(postsQuery);
-            
-            // Remove loading skeletons on first load
-            if (lastVisible === null) {
-                const loadingItems = container.querySelectorAll('.post-item.loading');
-                loadingItems.forEach(item => item.remove());
-            }
-            
-            if (postsSnap.empty) {
-                if (lastVisible === null) {
-                    container.innerHTML = '<div class="no-posts">No posts yet. Be the first to post!</div>';
-                }
-                this.hasMorePosts = false;
-                if (loadMoreBtn) loadMoreBtn.style.display = 'none';
-                return;
-            }
-            
-            // Store the last document for pagination
-            const lastDoc = postsSnap.docs[postsSnap.docs.length - 1];
-            this.lastVisiblePost = lastDoc;
-            
-            // Check if we have more posts
-            this.hasMorePosts = postsSnap.size >= this.postsPerPage;
-            
-            const allPosts = [];
-            postsSnap.forEach(doc => {
-                const postData = doc.data();
-                allPosts.push({ id: doc.id, ...postData });
-            });
-            
-            await this.displayPosts(allPosts, lastVisible !== null);
-            
-            // Show/hide load more button
-            if (loadMoreBtn) {
-                if (this.hasMorePosts) {
-                    loadMoreBtn.style.display = 'block';
-                    loadMoreBtn.disabled = false;
-                    loadMoreBtn.innerHTML = '<i class="fas fa-plus"></i> Load More';
-                } else {
-                    loadMoreBtn.style.display = 'none';
-                }
-            }
-            
-        } catch (error) {
-            console.error('Error loading posts:', error);
-            if (lastVisible === null) {
-                container.innerHTML = '<div class="error">Error loading posts</div>';
-            }
-        } finally {
-            this.isLoading = false;
-        }
-    }
-
-    // NEW: Load more posts function
-    async loadMorePosts() {
-        if (!this.lastVisiblePost || !this.hasMorePosts || this.isLoading) return;
-        
-        const loadMoreBtn = document.getElementById('loadMorePosts');
-        if (loadMoreBtn) {
-            loadMoreBtn.disabled = true;
-            loadMoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-        }
-        
-        await this.loadAllPosts(this.lastVisiblePost);
-    }
-
     async displayPosts(posts, append = false) {
         const container = document.getElementById('postsContainer');
         if (!container) return;
@@ -510,7 +904,7 @@ class SocialManager {
 
         for (const post of posts) {
             const user = usersData[post.userId] || {};
-            const postElement = this.createPostElement(post, user, post.id);
+            const postElement = await this.createPostElement(post, user, post.id); // Changed to async
             container.appendChild(postElement);
         }
     }
@@ -533,14 +927,20 @@ class SocialManager {
         return usersData;
     }
 
-    // UPDATED: Create post element WITHOUT "View all comments" link
-    createPostElement(post, user, postId) {
+    // UPDATED: Create post element WITH follow button next to username
+    async createPostElement(post, user, postId) {
         const postDiv = document.createElement('div');
         postDiv.className = 'post-item';
         
         const userId = user.id || post.userId;
         const userName = user.name || 'Unknown User';
         const userProfileImage = user.profileImage || 'images/default-profile.jpg';
+        
+        // Check if current user is following this post's author
+        let isFollowing = false;
+        if (this.currentUser && userId !== this.currentUser.uid) {
+            isFollowing = await this.checkIfFollowing(userId);
+        }
         
         // Build post content HTML
         let postContentHTML = '';
@@ -564,6 +964,16 @@ class SocialManager {
         
         const isLiked = this.likedPosts.has(postId);
         
+        // Follow button (only show if not current user's post)
+        const followButton = (this.currentUser && userId !== this.currentUser.uid) ? `
+            <button class="follow-btn-post ${isFollowing ? 'following' : ''}" 
+                    data-user-id="${userId}" 
+                    data-following="${isFollowing}">
+                <i class="fas ${isFollowing ? 'fa-user-check' : 'fa-user-plus'}"></i> 
+                ${isFollowing ? 'Following' : 'Follow'}
+            </button>
+        ` : '';
+        
         postDiv.innerHTML = `
             <div class="post-header">
                 <img src="${userProfileImage}" 
@@ -572,14 +982,7 @@ class SocialManager {
                     <h4>${userName}</h4>
                     <span class="post-time">${this.formatTime(post.createdAt)}</span>
                 </div>
-                <div class="post-user-actions">
-                    <button class="btn-chat" data-user-id="${userId}">
-                        <i class="fas fa-comment"></i> Chat
-                    </button>
-                    <button class="btn-view-profile" data-user-id="${userId}">
-                        <i class="fas fa-user"></i> Profile
-                    </button>
-                </div>
+                ${followButton}
             </div>
             
             <div class="post-content">
@@ -612,8 +1015,7 @@ class SocialManager {
         const commentBtn = postDiv.querySelector('.comment-btn');
         const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
         const commentInput = postDiv.querySelector('.comment-input');
-        const chatBtn = postDiv.querySelector('.btn-chat');
-        const profileBtn = postDiv.querySelector('.btn-view-profile');
+        const followBtn = postDiv.querySelector('.follow-btn-post');
 
         if (likeBtn) {
             likeBtn.addEventListener('click', () => this.handleLike(postId, likeBtn));
@@ -636,22 +1038,9 @@ class SocialManager {
             });
         }
 
-        if (chatBtn) {
-            chatBtn.addEventListener('click', () => {
-                if (userId && userId !== this.currentUser.uid) {
-                    window.location.href = `chat.html?id=${userId}`;
-                } else if (userId === this.currentUser.uid) {
-                    alert("You can't chat with yourself!");
-                }
-            });
-        }
-
-        if (profileBtn) {
-            profileBtn.addEventListener('click', () => {
-                if (userId) {
-                    window.location.href = `profile.html?id=${userId}`;
-                }
-            });
+        if (followBtn) {
+            // Event listener is already handled in setupGlobalEventListeners
+            followBtn.addEventListener('click', (e) => e.stopPropagation());
         }
 
         // Mark post as viewed when displayed
@@ -867,11 +1256,7 @@ class SocialManager {
         }
     }
 
-    // ==============================================
-    // MISSING FUNCTIONS THAT WERE CAUSING ERRORS
-    // ==============================================
-
-    // Update new posts count (was missing)
+    // Update new posts count
     async updateNewPostsCount() {
         if (!this.currentUser) return;
 
@@ -898,7 +1283,7 @@ class SocialManager {
         }
     }
 
-    // Display new posts count (was missing)
+    // Display new posts count
     displayNewPostsCount(count) {
         // Find or create indicator
         let indicator = document.getElementById('newPostsIndicator');
@@ -1809,38 +2194,6 @@ class SocialManager {
             this.showNotification('Error deleting post. Please try again.', 'error');
             this.resetDeleteModal();
         }
-    }
-
-    showNotification(message, type = 'info') {
-        const existingNotification = document.getElementById('postDeleteNotification');
-        if (existingNotification) {
-            existingNotification.remove();
-        }
-
-        const notification = document.createElement('div');
-        notification.id = 'postDeleteNotification';
-        notification.className = `notification ${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-                <span>${message}</span>
-            </div>
-        `;
-
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 100);
-
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 300);
-        }, 3000);
     }
 
     loadViewedPosts() {
