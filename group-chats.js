@@ -173,8 +173,8 @@ class GroupChat {
         // NEW: Upload tracking
         this.activeUploads = new Map(); // uploadId -> { cancelFunction, progress, type }
         
-        // FIX: Track processed messages across sessions
-        this.processedMessageIds = new Set();
+        // FIX: Track processed messages PER GROUP to prevent duplicates on reconnection
+        this.processedMessageIdsByGroup = new Map();
         
         this.setupAuthListener();
         this.createReactionModal();
@@ -206,6 +206,11 @@ class GroupChat {
         this.cache.groupMembers.delete(groupId);
         this.cache.joinedGroups.delete(groupId);
         this.cache.messageReactions.delete(groupId);
+        
+        // Also clear processed messages for this group
+        if (this.processedMessageIdsByGroup) {
+            this.processedMessageIdsByGroup.delete(`processed_${groupId}`);
+        }
     }
 
     clearAllCache() {
@@ -231,8 +236,10 @@ class GroupChat {
         this.lastDisplayedMessages.clear();
         this.messageRenderQueue = [];
         
-        // Clear processed messages
-        this.processedMessageIds.clear();
+        // Clear processed messages for all groups
+        if (this.processedMessageIdsByGroup) {
+            this.processedMessageIdsByGroup.clear();
+        }
         
         // NEW: Clear typing and reward data
         this.typingUsers.clear();
@@ -2194,88 +2201,73 @@ class GroupChat {
                 this.unsubscribeMessages = null;
             }
             
-        const messagesRef = collection(db, 'groups', groupId, 'messages');
-        const q = query(messagesRef, orderBy('timestamp', 'asc'));
-        
-        let isProcessing = false;
-        let isInitialLoad = true;
-        let lastProcessedIds = new Set();
-        
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            if (isProcessing) return;
-            isProcessing = true;
+            // Create a unique key for this group's processed messages
+            const groupProcessedKey = `processed_${groupId}`;
             
-            try {
-                const messages = [];
-                const currentIds = new Set();
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const messageId = doc.id;
-                    currentIds.add(messageId);
+            // Initialize or get existing processed message IDs for this group
+            if (!this.processedMessageIdsByGroup.has(groupProcessedKey)) {
+                this.processedMessageIdsByGroup.set(groupProcessedKey, new Set());
+            }
+            
+            const groupProcessedIds = this.processedMessageIdsByGroup.get(groupProcessedKey);
+            
+            const messagesRef = collection(db, 'groups', groupId, 'messages');
+            const q = query(messagesRef, orderBy('timestamp', 'asc'));
+            
+            let hasReceivedInitialData = false;
+            let unsubscribe = null;
+            
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                try {
+                    const messages = [];
+                    const newMessageIds = [];
                     
-                    // On initial load, add all messages
-                    if (isInitialLoad) {
-                        messages.push({ 
-                            id: messageId, 
-                            ...data,
-                            timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
-                        });
-                    } else {
-                        // After initial load, only add NEW messages
-                        if (!lastProcessedIds.has(messageId) && !this.processedMessageIds.has(messageId)) {
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const messageId = doc.id;
+                        
+                        // Check if we've already processed this message ID for this group
+                        if (!groupProcessedIds.has(messageId)) {
                             messages.push({ 
                                 id: messageId, 
                                 ...data,
                                 timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
                             });
+                            newMessageIds.push(messageId);
                         }
-                    }
-                });
-                
-                if (messages.length > 0) {
-                    if (isInitialLoad) {
-                        console.log('Initial load:', messages.length, 'messages');
-                        isInitialLoad = false;
-                    } else {
-                        console.log('New messages received:', messages.length);
-                    }
-                    
-                    // Mark messages as processed
-                    messages.forEach(msg => {
-                        lastProcessedIds.add(msg.id);
-                        this.processedMessageIds.add(msg.id);
                     });
                     
-                    // Update cache
-                    const cacheKey = `messages_${groupId}_${messages.length}`;
-                    this.setCachedItem(cacheKey, messages, this.cache.messages, 30000);
-                    
-                    callback(messages);
+                    if (messages.length > 0) {
+                        // Mark these messages as processed for this group
+                        newMessageIds.forEach(id => groupProcessedIds.add(id));
+                        
+                        if (!hasReceivedInitialData) {
+                            console.log('Initial/Reconnection load:', messages.length, 'messages');
+                            hasReceivedInitialData = true;
+                        } else {
+                            console.log('New messages received:', messages.length);
+                        }
+                        
+                        callback(messages);
+                    }
+                } catch (error) {
+                    console.error('Error processing messages:', error);
                 }
-            } catch (error) {
-                console.error('Error processing messages:', error);
-            } finally {
-                setTimeout(() => {
-                    isProcessing = false;
-                }, 100);
-            }
-        }, (error) => {
-            console.error('Error in messages listener:', error);
-            isProcessing = false;
-        });
-        
-        this.unsubscribeMessages = unsubscribe;
-        
-        return unsubscribe;
-    } catch (error) {
-        console.error('Error listening to messages:', error);
-        // Return a dummy unsubscribe function to prevent errors
-        return () => {
-            console.log('Dummy unsubscribe for messages called');
-        };
+            }, (error) => {
+                console.error('Error in messages listener:', error);
+            });
+            
+            this.unsubscribeMessages = unsubscribe;
+            
+            return unsubscribe;
+        } catch (error) {
+            console.error('Error listening to messages:', error);
+            // Return a dummy unsubscribe function to prevent errors
+            return () => {
+                console.log('Dummy unsubscribe for messages called');
+            };
+        }
     }
-}
 
     listenToMembers(groupId, callback) {
         try {
@@ -3457,8 +3449,10 @@ class GroupChat {
         this.sentMessageIds.clear();
         this.pendingMessages.clear();
         
-        // Clear processed messages
-        this.processedMessageIds.clear();
+        // Clear processed messages for all groups
+        if (this.processedMessageIdsByGroup) {
+            this.processedMessageIdsByGroup.clear();
+        }
         
         // NEW: Clear typing timeouts
         this.typingUsers.forEach((userTyping, groupId) => {
@@ -3704,9 +3698,11 @@ function initGroupPage() {
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
     
-    // Clear the global processedMessageIds for this group
-    // This ensures we don't carry over processed IDs from previous sessions
-    groupChat.processedMessageIds.clear();
+    // Clear the processedMessageIds for this group when page loads
+    const groupProcessedKey = `processed_${groupId}`;
+    if (groupChat.processedMessageIdsByGroup && groupChat.processedMessageIdsByGroup.has(groupProcessedKey)) {
+        groupChat.processedMessageIdsByGroup.get(groupProcessedKey).clear();
+    }
     
     // UPDATED: Create typing indicator at top
     typingIndicator = createTypingIndicator();
@@ -3978,7 +3974,12 @@ function initGroupPage() {
                 messages.forEach(msg => {
                     renderedMessageIds.add(msg.id);
                     pageProcessedMessageIds.add(msg.id);
-                    groupChat.processedMessageIds.add(msg.id);
+                    // Also add to group's processed messages
+                    const groupProcessedKey = `processed_${groupId}`;
+                    if (!groupChat.processedMessageIdsByGroup.has(groupProcessedKey)) {
+                        groupChat.processedMessageIdsByGroup.set(groupProcessedKey, new Set());
+                    }
+                    groupChat.processedMessageIdsByGroup.get(groupProcessedKey).add(msg.id);
                 });
                 queueRender();
                 isInitialLoad = false;
@@ -4254,9 +4255,10 @@ function initGroupPage() {
         // UPDATED: Clear typing listener
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             typingUnsubscribe();
+            typingUnsubscribe = null;
         }
         
-        // Clear processed message IDs to avoid duplicates
+        // Clear processed message IDs for this page to avoid duplicates
         pageProcessedMessageIds.clear();
         
         // Set up new listeners
