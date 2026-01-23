@@ -98,7 +98,7 @@ class ChatThemeManager {
         return this.currentTheme;
     }
 
-    // Get all available themes with BDSM aesthetic previews
+    // Get all available themes
     getAvailableThemes() {
         return [
             { 
@@ -110,8 +110,8 @@ class ChatThemeManager {
             { 
                 id: 'dark-steel', 
                 name: 'Dark Steel', 
-                preview: 'linear-gradient(135deg, rgba(179, 0, 75, 0.9) 0%, rgba(139, 0, 0, 0.7) 100%)',
-                messagePreview: 'linear-gradient(135deg, rgba(179, 0, 75, 0.9) 0%, rgba(122, 0, 52, 0.8) 100%)'
+                preview: 'linear-gradient(135deg, #2c3e50 0%, #1a1a2e 100%)',
+                messagePreview: 'linear-gradient(135deg, #4A6572 0%, #344955 100%)'
             },
             { 
                 id: 'leather-dark', 
@@ -136,6 +136,44 @@ class ChatThemeManager {
                 name: 'Deep Violet', 
                 preview: 'linear-gradient(135deg, rgba(179, 0, 75, 0.9) 0%, rgba(76, 29, 149, 0.7) 100%)',
                 messagePreview: 'linear-gradient(135deg, rgba(179, 0, 75, 0.9) 0%, rgba(122, 0, 52, 0.8) 100%)'
+            },
+            // New Light Themes
+            { 
+                id: 'sunlight-bliss', 
+                name: 'Sunlight Bliss', 
+                preview: 'linear-gradient(135deg, #FFD166 0%, #FFB347 100%)',
+                messagePreview: 'linear-gradient(135deg, #FFD166 0%, #FFB347 100%)'
+            },
+            { 
+                id: 'ocean-breeze', 
+                name: 'Ocean Breeze', 
+                preview: 'linear-gradient(135deg, #64B5F6 0%, #2196F3 100%)',
+                messagePreview: 'linear-gradient(135deg, #64B5F6 0%, #2196F3 100%)'
+            },
+            { 
+                id: 'lavender-dream', 
+                name: 'Lavender Dream', 
+                preview: 'linear-gradient(135deg, #BA68C8 0%, #9575CD 100%)',
+                messagePreview: 'linear-gradient(135deg, #BA68C8 0%, #9575CD 100%)'
+            },
+            // New Dark Themes
+            { 
+                id: 'midnight-sapphire', 
+                name: 'Midnight Sapphire', 
+                preview: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%)',
+                messagePreview: 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)'
+            },
+            { 
+                id: 'forest-deep', 
+                name: 'Forest Deep', 
+                preview: 'linear-gradient(135deg, #065F46 0%, #064E3B 100%)',
+                messagePreview: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+            },
+            { 
+                id: 'amber-glow', 
+                name: 'Amber Glow', 
+                preview: 'linear-gradient(135deg, #B45309 0%, #92400E 100%)',
+                messagePreview: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
             }
         ];
     }
