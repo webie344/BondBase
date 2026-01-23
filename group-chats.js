@@ -176,10 +176,26 @@ class GroupChat {
         // FIX: Track processed messages PER GROUP to prevent duplicates on reconnection
         this.processedMessageIdsByGroup = new Map();
         
+        // FIX: Track offline status
+        this.isOnline = navigator.onLine;
+        this.setupNetworkListener();
+        
         this.setupAuthListener();
         this.createReactionModal();
         this.checkRestrictedUsers();
         this.loadBlockedUsers();
+    }
+
+    setupNetworkListener() {
+        window.addEventListener('online', () => {
+            this.isOnline = true;
+            console.log('Network: Online');
+        });
+        
+        window.addEventListener('offline', () => {
+            this.isOnline = false;
+            console.log('Network: Offline');
+        });
     }
 
     getCachedItem(cacheKey, cacheMap) {
@@ -414,6 +430,11 @@ class GroupChat {
     }
 
     async uploadMediaToCloudinary(file, uploadId, onProgress = null, onCancel = null) {
+        // FIX: Check if offline before starting upload
+        if (!this.isOnline) {
+            throw new Error('You are offline. Please check your network connection.');
+        }
+        
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', cloudinaryConfig.uploadPreset);
@@ -469,7 +490,7 @@ class GroupChat {
     }
 
     validateImageFile(file) {
-        const maxSize = 10 * 1024 * 1024;
+        const maxSize = 10 * 1024 * 1000;
         if (file.size > maxSize) {
             throw new Error('Image file must be less than 10MB');
         }
@@ -483,7 +504,7 @@ class GroupChat {
     }
 
     validateVideoFile(file) {
-        const maxSize = 50 * 1024 * 1024;
+        const maxSize = 50 * 1024 * 1000;
         if (file.size > maxSize) {
             throw new Error('Video file must be less than 50MB');
         }
@@ -2026,6 +2047,11 @@ class GroupChat {
 
     async sendMessage(groupId, text = null, imageUrl = null, videoUrl = null, replyTo = null) {
         try {
+            // FIX: Check if offline before sending
+            if (!this.isOnline) {
+                throw new Error('You are offline. Please check your network connection and try again.');
+            }
+            
             if (!this.firebaseUser || !this.currentUser) {
                 throw new Error('You must be logged in to send messages');
             }
@@ -2189,6 +2215,7 @@ class GroupChat {
         }
     }
 
+    // FIXED: listenToMessages method - properly track processed messages
     listenToMessages(groupId, callback) {
         try {
             // First, unsubscribe from any existing listener
@@ -2204,7 +2231,7 @@ class GroupChat {
             // Create a unique key for this group's processed messages
             const groupProcessedKey = `processed_${groupId}`;
             
-            // Initialize or get existing processed message IDs for this group
+            // Initialize processed message IDs for this group if not exists
             if (!this.processedMessageIdsByGroup.has(groupProcessedKey)) {
                 this.processedMessageIdsByGroup.set(groupProcessedKey, new Set());
             }
@@ -2214,10 +2241,10 @@ class GroupChat {
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
             
-            let hasReceivedInitialData = false;
-            let unsubscribe = null;
+            // Track if this is the first snapshot
+            let isFirstSnapshot = true;
             
-            unsubscribe = onSnapshot(q, (snapshot) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
                 try {
                     const messages = [];
                     const newMessageIds = [];
@@ -2226,7 +2253,7 @@ class GroupChat {
                         const data = doc.data();
                         const messageId = doc.id;
                         
-                        // Check if we've already processed this message ID for this group
+                        // Check if we've already processed this message ID
                         if (!groupProcessedIds.has(messageId)) {
                             messages.push({ 
                                 id: messageId, 
@@ -2238,12 +2265,12 @@ class GroupChat {
                     });
                     
                     if (messages.length > 0) {
-                        // Mark these messages as processed for this group
+                        // Mark these messages as processed
                         newMessageIds.forEach(id => groupProcessedIds.add(id));
                         
-                        if (!hasReceivedInitialData) {
-                            console.log('Initial/Reconnection load:', messages.length, 'messages');
-                            hasReceivedInitialData = true;
+                        if (isFirstSnapshot) {
+                            console.log('Initial load:', messages.length, 'messages');
+                            isFirstSnapshot = false;
                         } else {
                             console.log('New messages received:', messages.length);
                         }
@@ -2255,6 +2282,8 @@ class GroupChat {
                 }
             }, (error) => {
                 console.error('Error in messages listener:', error);
+                // When listener errors (like network disconnect), don't clear processed IDs
+                // This prevents duplicates when reconnecting
             });
             
             this.unsubscribeMessages = unsubscribe;
@@ -2846,6 +2875,82 @@ class GroupChat {
                 stroke-linecap: round;
                 stroke-linejoin: round;
                 fill: none;
+            }
+            
+            /* Copy invite link styles */
+            .invite-link-container {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 12px;
+                padding: 15px;
+                margin: 15px 0;
+                text-align: center;
+            }
+            
+            .copy-invite-btn {
+                background: white;
+                color: #667eea;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 25px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                width: 100%;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            }
+            
+            .copy-invite-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            }
+            
+            .copy-invite-btn:active {
+                transform: translateY(0);
+            }
+            
+            .copy-invite-btn:disabled {
+                opacity: 0.7;
+                cursor: not-allowed;
+                transform: none !important;
+            }
+            
+            .copy-invite-btn.copied {
+                background: #4CAF50;
+                color: white;
+            }
+            
+            .copy-invite-btn.copied svg {
+                animation: bounce 0.5s ease;
+            }
+            
+            .invite-link-status {
+                margin-top: 10px;
+                font-size: 12px;
+                color: rgba(255, 255, 255, 0.9);
+                min-height: 18px;
+            }
+            
+            .invite-link-status.success {
+                color: #4CAF50;
+            }
+            
+            .invite-link-status.error {
+                color: #ff6b6b;
+            }
+            
+            @keyframes bounce {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-5px); }
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
             }
         `;
         
@@ -3959,6 +4064,7 @@ function initGroupPage() {
                 });
             }
             
+            // ADDED: Create copy invite link button for admin
             addInviteLinkButton();
             
             members = await groupChat.getGroupMembers(groupId);
@@ -3991,30 +4097,7 @@ function initGroupPage() {
         }
     }
     
-    async function loadInitialReactions() {
-        for (const message of messages) {
-            const reactions = await groupChat.getMessageReactions(groupId, message.id);
-            reactionsCache.set(message.id, reactions);
-        }
-    }
-    
-    function queueRender() {
-        if (!isRendering) {
-            isRendering = true;
-            requestAnimationFrame(() => {
-                displayMessages();
-                isRendering = false;
-                
-                if (renderQueue.length > 0) {
-                    renderQueue = [];
-                    queueRender();
-                }
-            });
-        } else {
-            renderQueue.push(true);
-        }
-    }
-    
+    // ADDED: Function to add copy invite link button for admin
     function addInviteLinkButton() {
         if (!groupData || groupData.createdBy !== groupChat.firebaseUser.uid) {
             return;
@@ -4046,88 +4129,6 @@ function initGroupPage() {
                 } else {
                     sidebarContent.insertBefore(inviteContainer, sidebarContent.firstChild);
                 }
-            }
-            
-            if (!document.getElementById('invite-btn-styles')) {
-                const styles = document.createElement('style');
-                styles.id = 'invite-btn-styles';
-                styles.textContent = `
-                    .invite-link-container {
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        border-radius: 12px;
-                        padding: 15px;
-                        margin: 15px 0;
-                        text-align: center;
-                    }
-                    
-                    .copy-invite-btn {
-                        background: white;
-                        color: #667eea;
-                        border: none;
-                        padding: 12px 20px;
-                        border-radius: 25px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 8px;
-                        width: 100%;
-                        transition: all 0.3s ease;
-                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-                    }
-                    
-                    .copy-invite-btn:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-                    }
-                    
-                    .copy-invite-btn:active {
-                        transform: translateY(0);
-                    }
-                    
-                    .copy-invite-btn:disabled {
-                        opacity: 0.7;
-                        cursor: not-allowed;
-                        transform: none !important;
-                    }
-                    
-                    .copy-invite-btn.copied {
-                        background: #4CAF50;
-                        color: white;
-                    }
-                    
-                    .copy-invite-btn.copied svg {
-                        animation: bounce 0.5s ease;
-                    }
-                    
-                    .invite-link-status {
-                        margin-top: 10px;
-                        font-size: 12px;
-                        color: rgba(255, 255, 255, 0.9);
-                        min-height: 18px;
-                    }
-                    
-                    .invite-link-status.success {
-                        color: #4CAF50;
-                    }
-                    
-                    .invite-link-status.error {
-                        color: #ff6b6b;
-                    }
-                    
-                    @keyframes bounce {
-                        0%, 100% { transform: translateY(0); }
-                        50% { transform: translateY(-5px); }
-                    }
-                    
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
-                `;
-                document.head.appendChild(styles);
             }
             
             // Clone and replace copy button to ensure clean event listeners
@@ -4194,6 +4195,30 @@ function initGroupPage() {
             });
             
             freshCopyBtn.title = 'Click to copy invite link (Ctrl+Shift+L)';
+        }
+    }
+    
+    async function loadInitialReactions() {
+        for (const message of messages) {
+            const reactions = await groupChat.getMessageReactions(groupId, message.id);
+            reactionsCache.set(message.id, reactions);
+        }
+    }
+    
+    function queueRender() {
+        if (!isRendering) {
+            isRendering = true;
+            requestAnimationFrame(() => {
+                displayMessages();
+                isRendering = false;
+                
+                if (renderQueue.length > 0) {
+                    renderQueue = [];
+                    queueRender();
+                }
+            });
+        } else {
+            renderQueue.push(true);
         }
     }
     
