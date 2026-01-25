@@ -36,7 +36,7 @@ const firebaseConfig = {
     storageBucket: "usa-dating-23bc3.firebasestorage.app",
     messagingSenderId: "423286263327",
     appId: "1:423286263327:web:17f0caf843dc349c144f2a"
-  };
+};
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -181,23 +181,71 @@ class GroupChat {
         
         // FIX: Track offline status
         this.isOnline = navigator.onLine;
-        this.setupNetworkListener();
         
+        // FIX: Connection state tracking
+        this.connectionState = 'connected';
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectDelay = 1000;
+        
+        this.setupNetworkListener();
         this.setupAuthListener();
         this.createReactionModal();
         this.checkRestrictedUsers();
         this.loadBlockedUsers();
+        
+        // FIX: Setup page visibility listener
+        this.setupPageVisibilityListener();
+    }
+
+    // NEW: Page visibility listener to handle page leave/return
+    setupPageVisibilityListener() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                // Page is being hidden/left
+                console.log('Page hidden - cleaning up processed messages');
+                // Don't clear processed IDs, just mark as inactive
+                this.connectionState = 'inactive';
+            } else {
+                // Page is visible again
+                console.log('Page visible - resetting connection state');
+                this.connectionState = 'reconnecting';
+                this.isOnline = navigator.onLine;
+                
+                // Clear page processed messages for current group when page becomes visible
+                if (this.currentGroupId) {
+                    const pageProcessedKey = `page_processed_${this.currentGroupId}`;
+                    this.pageProcessedMessageIdsByGroup.delete(pageProcessedKey);
+                    console.log('Cleared page processed messages for group:', this.currentGroupId);
+                }
+            }
+        });
     }
 
     setupNetworkListener() {
         window.addEventListener('online', () => {
             this.isOnline = true;
+            this.connectionState = 'reconnecting';
             console.log('Network: Online');
+            
+            // When coming back online, clear sent message IDs to allow resending
+            this.sentMessageIds.clear();
+            this.pendingMessages.clear();
+            
+            // Clear page processed messages for current group
+            if (this.currentGroupId) {
+                const pageProcessedKey = `page_processed_${this.currentGroupId}`;
+                this.pageProcessedMessageIdsByGroup.delete(pageProcessedKey);
+            }
         });
         
         window.addEventListener('offline', () => {
             this.isOnline = false;
+            this.connectionState = 'disconnected';
             console.log('Network: Offline');
+            
+            // Clear pending messages when offline
+            this.pendingMessages.clear();
         });
     }
 
@@ -2256,9 +2304,16 @@ class GroupChat {
             
             // Track if this is the first snapshot
             let isFirstSnapshot = true;
+            let initialMessagesProcessed = false;
             
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 try {
+                    // FIX: Check if we're offline or page is hidden
+                    if (!this.isOnline || this.connectionState === 'inactive') {
+                        console.log('Skipping message processing - offline or inactive');
+                        return;
+                    }
+                    
                     const messages = [];
                     const newMessageIds = [];
                     
@@ -2284,6 +2339,7 @@ class GroupChat {
                         if (isFirstSnapshot) {
                             console.log('Initial load:', messages.length, 'messages');
                             isFirstSnapshot = false;
+                            initialMessagesProcessed = true;
                         } else {
                             console.log('New messages received:', messages.length);
                         }
@@ -2295,7 +2351,15 @@ class GroupChat {
                 }
             }, (error) => {
                 console.error('Error in messages listener:', error);
-                // Don't clear processed IDs when listener errors
+                
+                // Handle connection errors gracefully
+                if (error.code === 'unavailable' || error.code === 'failed-precondition') {
+                    this.connectionState = 'disconnected';
+                    console.log('Firebase connection lost, attempting to reconnect...');
+                    
+                    // Don't clear processed IDs on connection error
+                    // The listener will reconnect automatically
+                }
             });
             
             this.unsubscribeMessages = unsubscribe;
@@ -3840,6 +3904,7 @@ function initGroupPage() {
     const pageProcessedKey = `page_processed_${groupId}`;
     if (groupChat.pageProcessedMessageIdsByGroup && groupChat.pageProcessedMessageIdsByGroup.has(pageProcessedKey)) {
         groupChat.pageProcessedMessageIdsByGroup.get(pageProcessedKey).clear();
+        console.log('Cleared page processed messages for group:', groupId);
     }
     
     // UPDATED: Create typing indicator at top
