@@ -76,7 +76,7 @@ const REACTION_EMOJIS = [
     '💔', '❤️‍🔥', '❤️‍🩹', '💤', '💢', '💬', '👁️‍🗨️', '🗨️', '🗯️', '💭',
     '💐', '🌸', '💮', '🏵️', '🌹', '🥀', '🌺', '🌻', '🌼', '🌷',
     '⚡', '💥', '💫', '⭐', '🌟', '🌠', '🌈', '☀️', '🌤️', '⛈️',
-    '❄️', '☃️', '⛄', '💧', '💦', '💨', '🕳️', '🎃', '🎄', '🎆',
+    '❄️', '☃', '⛄', '💧', '💦', '💨', '🕳️', '🎃', '🎄', '🎆',
     '🎇', '🧨', '✨', '🎈', '🎉', '🎊', '🎋', '🎍', '🎎', '🎏'
 ];
 
@@ -176,6 +176,9 @@ class GroupChat {
         // FIX: Track processed messages PER GROUP to prevent duplicates on reconnection
         this.processedMessageIdsByGroup = new Map();
         
+        // FIX: Track page processed messages PER GROUP (NEW - fixes duplicate issue)
+        this.pageProcessedMessageIdsByGroup = new Map();
+        
         // FIX: Track offline status
         this.isOnline = navigator.onLine;
         this.setupNetworkListener();
@@ -227,6 +230,11 @@ class GroupChat {
         if (this.processedMessageIdsByGroup) {
             this.processedMessageIdsByGroup.delete(`processed_${groupId}`);
         }
+        
+        // Clear page processed messages for this group
+        if (this.pageProcessedMessageIdsByGroup) {
+            this.pageProcessedMessageIdsByGroup.delete(`page_processed_${groupId}`);
+        }
     }
 
     clearAllCache() {
@@ -255,6 +263,11 @@ class GroupChat {
         // Clear processed messages for all groups
         if (this.processedMessageIdsByGroup) {
             this.processedMessageIdsByGroup.clear();
+        }
+        
+        // Clear page processed messages for all groups
+        if (this.pageProcessedMessageIdsByGroup) {
+            this.pageProcessedMessageIdsByGroup.clear();
         }
         
         // NEW: Clear typing and reward data
@@ -2227,19 +2240,19 @@ class GroupChat {
                 }
                 this.unsubscribeMessages = null;
             }
-            
-            // Create a unique key for this group's processed messages
-            const groupProcessedKey = `processed_${groupId}`;
-            
-            // Initialize processed message IDs for this group if not exists
-            if (!this.processedMessageIdsByGroup.has(groupProcessedKey)) {
-                this.processedMessageIdsByGroup.set(groupProcessedKey, new Set());
-            }
-            
-            const groupProcessedIds = this.processedMessageIdsByGroup.get(groupProcessedKey);
-            
+
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
+            
+            // Create a unique key for this group's page processed messages
+            const pageProcessedKey = `page_processed_${groupId}`;
+            
+            // Initialize processed message IDs for this page if not exists
+            if (!this.pageProcessedMessageIdsByGroup.has(pageProcessedKey)) {
+                this.pageProcessedMessageIdsByGroup.set(pageProcessedKey, new Set());
+            }
+            
+            const pageProcessedIds = this.pageProcessedMessageIdsByGroup.get(pageProcessedKey);
             
             // Track if this is the first snapshot
             let isFirstSnapshot = true;
@@ -2253,8 +2266,8 @@ class GroupChat {
                         const data = doc.data();
                         const messageId = doc.id;
                         
-                        // Check if we've already processed this message ID
-                        if (!groupProcessedIds.has(messageId)) {
+                        // Check if we've already processed this message ID in THIS PAGE
+                        if (!pageProcessedIds.has(messageId)) {
                             messages.push({ 
                                 id: messageId, 
                                 ...data,
@@ -2265,8 +2278,8 @@ class GroupChat {
                     });
                     
                     if (messages.length > 0) {
-                        // Mark these messages as processed
-                        newMessageIds.forEach(id => groupProcessedIds.add(id));
+                        // Mark these messages as processed FOR THIS PAGE
+                        newMessageIds.forEach(id => pageProcessedIds.add(id));
                         
                         if (isFirstSnapshot) {
                             console.log('Initial load:', messages.length, 'messages');
@@ -2282,8 +2295,7 @@ class GroupChat {
                 }
             }, (error) => {
                 console.error('Error in messages listener:', error);
-                // When listener errors (like network disconnect), don't clear processed IDs
-                // This prevents duplicates when reconnecting
+                // Don't clear processed IDs when listener errors
             });
             
             this.unsubscribeMessages = unsubscribe;
@@ -2291,7 +2303,6 @@ class GroupChat {
             return unsubscribe;
         } catch (error) {
             console.error('Error listening to messages:', error);
-            // Return a dummy unsubscribe function to prevent errors
             return () => {
                 console.log('Dummy unsubscribe for messages called');
             };
@@ -3559,6 +3570,11 @@ class GroupChat {
             this.processedMessageIdsByGroup.clear();
         }
         
+        // Clear page processed messages for all groups
+        if (this.pageProcessedMessageIdsByGroup) {
+            this.pageProcessedMessageIdsByGroup.clear();
+        }
+        
         // NEW: Clear typing timeouts
         this.typingUsers.forEach((userTyping, groupId) => {
             userTyping.forEach((timeout, userId) => {
@@ -3788,7 +3804,24 @@ function initGroupPage() {
     let lastTypingInputTime = 0;
     let lastMessageIds = '';
     let renderedMessageIds = new Set(); // Track which messages have been rendered
-    let pageProcessedMessageIds = new Set(); // Track which messages have been processed by this page
+    
+    // ADDED: Missing queueRender function
+    function queueRender() {
+        if (!isRendering) {
+            isRendering = true;
+            requestAnimationFrame(() => {
+                displayMessages();
+                isRendering = false;
+                
+                if (renderQueue.length > 0) {
+                    renderQueue = [];
+                    queueRender();
+                }
+            });
+        } else {
+            renderQueue.push(true);
+        }
+    }
     
     if (!groupId) {
         window.location.href = 'groups.html';
@@ -3803,10 +3836,10 @@ function initGroupPage() {
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
     
-    // Clear the processedMessageIds for this group when page loads
-    const groupProcessedKey = `processed_${groupId}`;
-    if (groupChat.processedMessageIdsByGroup && groupChat.processedMessageIdsByGroup.has(groupProcessedKey)) {
-        groupChat.processedMessageIdsByGroup.get(groupProcessedKey).clear();
+    // Clear the page processed messages for this group when page loads
+    const pageProcessedKey = `page_processed_${groupId}`;
+    if (groupChat.pageProcessedMessageIdsByGroup && groupChat.pageProcessedMessageIdsByGroup.has(pageProcessedKey)) {
+        groupChat.pageProcessedMessageIdsByGroup.get(pageProcessedKey).clear();
     }
     
     // UPDATED: Create typing indicator at top
@@ -4071,23 +4104,9 @@ function initGroupPage() {
             updateMembersList();
             
             if (isInitialLoad) {
-                messages = await groupChat.getMessages(groupId);
-                await loadInitialReactions();
-                // Clear rendered message IDs on initial load
+                // Just set up listeners, don't load initial messages
+                // The listener will handle initial load
                 renderedMessageIds.clear();
-                pageProcessedMessageIds.clear();
-                // Add initial messages to processed set
-                messages.forEach(msg => {
-                    renderedMessageIds.add(msg.id);
-                    pageProcessedMessageIds.add(msg.id);
-                    // Also add to group's processed messages
-                    const groupProcessedKey = `processed_${groupId}`;
-                    if (!groupChat.processedMessageIdsByGroup.has(groupProcessedKey)) {
-                        groupChat.processedMessageIdsByGroup.set(groupProcessedKey, new Set());
-                    }
-                    groupChat.processedMessageIdsByGroup.get(groupProcessedKey).add(msg.id);
-                });
-                queueRender();
                 isInitialLoad = false;
             }
             
@@ -4198,30 +4217,6 @@ function initGroupPage() {
         }
     }
     
-    async function loadInitialReactions() {
-        for (const message of messages) {
-            const reactions = await groupChat.getMessageReactions(groupId, message.id);
-            reactionsCache.set(message.id, reactions);
-        }
-    }
-    
-    function queueRender() {
-        if (!isRendering) {
-            isRendering = true;
-            requestAnimationFrame(() => {
-                displayMessages();
-                isRendering = false;
-                
-                if (renderQueue.length > 0) {
-                    renderQueue = [];
-                    queueRender();
-                }
-            });
-        } else {
-            renderQueue.push(true);
-        }
-    }
-    
     function createSidebarOverlay() {
         removeSidebarOverlay();
         
@@ -4283,33 +4278,26 @@ function initGroupPage() {
             typingUnsubscribe = null;
         }
         
-        // Clear processed message IDs for this page to avoid duplicates
-        pageProcessedMessageIds.clear();
-        
         // Set up new listeners
         const messagesUnsubscribe = groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Listener callback received:', newMessages.length, 'messages');
             
-            const uniqueMessages = [];
-            const seenIds = new Set();
-            
-            newMessages.forEach(msg => {
-                if (!seenIds.has(msg.id) && !pageProcessedMessageIds.has(msg.id)) {
-                    seenIds.add(msg.id);
-                    pageProcessedMessageIds.add(msg.id);
-                    uniqueMessages.push(msg);
-                }
-            });
-            
-            // Merge with existing messages
-            const existingIds = new Set(messages.map(m => m.id));
-            const newUniqueMessages = uniqueMessages.filter(msg => !existingIds.has(msg.id));
-            
-            if (newUniqueMessages.length > 0) {
-                console.log('Adding new messages:', newUniqueMessages.length);
-                messages = [...messages, ...newUniqueMessages];
+            // Clear messages array on first load
+            if (messages.length === 0) {
+                messages = newMessages;
                 setupReactionListeners();
                 queueRender();
+            } else {
+                // For subsequent updates, only add new messages
+                const existingIds = new Set(messages.map(m => m.id));
+                const newUniqueMessages = newMessages.filter(msg => !existingIds.has(msg.id));
+                
+                if (newUniqueMessages.length > 0) {
+                    console.log('Adding new messages:', newUniqueMessages.length);
+                    messages = [...messages, ...newUniqueMessages];
+                    setupReactionListeners();
+                    queueRender();
+                }
             }
         });
         
