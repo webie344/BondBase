@@ -1,4 +1,4 @@
-0<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -97,7 +97,7 @@
         }
 
         .logo::before {
-            content: "🔗";
+            content: "🎮";
         }
 
         .nav-menu {
@@ -910,246 +910,6 @@
             display: block;
         }
 
-        /* Ambassador Program */
-        .ambassador-program {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            border-radius: var(--radius);
-            padding: 2rem;
-            margin: 1rem 0;
-            color: white;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .ambassador-header {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .ambassador-icon {
-            font-size: 2rem;
-            background: rgba(255,255,255,0.2);
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .ambassador-icon .feather {
-            width: 30px;
-            height: 30px;
-            stroke: white;
-        }
-
-        .ambassador-tiers {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-            margin: 1rem 0;
-        }
-
-        .ambassador-tier {
-            background: rgba(255,255,255,0.1);
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            text-align: center;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        .tier-badge {
-            background: #ffd700;
-            color: #000;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-            display: inline-block;
-        }
-
-        .tier-badge.silver {
-            background: #c0c0c0;
-            color: #000;
-        }
-
-        .tier-badge.gold {
-            background: linear-gradient(45deg, #ffd700, #ffed4e);
-            color: #000;
-        }
-
-        .tier-reward {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin: 0.75rem 0;
-        }
-
-        .tier-requirement {
-            font-size: 0.9rem;
-            opacity: 0.9;
-            margin-bottom: 1rem;
-        }
-
-        .tier-features {
-            list-style: none;
-            padding: 0;
-            margin: 1rem 0;
-        }
-
-        .tier-features li {
-            padding: 0.5rem 0;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .tier-features li .feather {
-            width: 14px;
-            height: 14px;
-            stroke: white;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-        }
-
-        .modal-content {
-            background-color: var(--bg-card);
-            margin: 10% auto;
-            padding: 0;
-            border-radius: var(--radius-lg);
-            width: 90%;
-            max-width: 500px;
-            box-shadow: var(--shadow-lg);
-            border: 1px solid var(--border);
-            overflow: hidden;
-        }
-
-        .modal-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            color: var(--text-primary);
-            flex: 1;
-        }
-
-        .close-modal {
-            color: var(--text-light);
-            font-size: 1.5rem;
-            font-weight: bold;
-            cursor: pointer;
-            background: none;
-            border: none;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: all 0.3s ease;
-        }
-
-        .close-modal:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-primary);
-        }
-
-        .modal-body {
-            padding: 1.5rem;
-        }
-
-        .modal-body p {
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-            line-height: 1.5;
-        }
-
-        .post-preview {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: var(--radius);
-            padding: 1rem;
-            margin-top: 1rem;
-            border: 1px solid var(--border);
-        }
-
-        .preview-image {
-            margin-bottom: 0.75rem;
-        }
-
-        .preview-image img {
-            width: 100%;
-            max-height: 200px;
-            object-fit: cover;
-            border-radius: var(--radius);
-        }
-
-        .preview-caption {
-            color: var(--text-primary);
-            line-height: 1.4;
-        }
-
-        .modal-actions {
-            padding: 1.5rem;
-            border-top: 1px solid var(--border);
-            display: flex;
-            gap: 0.75rem;
-            justify-content: flex-end;
-        }
-
-        .btn-danger {
-            background: #8b0000;
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-danger:hover {
-            background: #660000;
-        }
-
-        /* Checkbox Styles */
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .checkbox-group input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--primary);
-        }
-
-        .checkbox-group label {
-            margin-bottom: 0;
-            cursor: pointer;
-        }
-
         /* ========== GAMER PROFILE STYLES ========== */
         .gamer-profile-form-container {
             background: linear-gradient(145deg, #1a1a1a 0%, #222222 100%);
@@ -1645,10 +1405,6 @@
                 flex-direction: column;
             }
 
-            .ambassador-tiers {
-                grid-template-columns: 1fr;
-            }
-
             .gamer-stats-grid {
                 grid-template-columns: 1fr;
             }
@@ -1658,7 +1414,7 @@
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="index.html" class="logo">WhipRoom</a>
+            <a href="index.html" class="logo">BondBase</a>
             <div class="nav-toggle" id="mobile-menu">
                 <span class="bar"></span>
                 <span class="bar"></span>
@@ -1673,7 +1429,7 @@
                             <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                         </svg>
-                        <span>Connect</span>
+                        Connect
                     </a>
                 </li>
                 <li class="nav-item">
@@ -1681,7 +1437,7 @@
                         <svg class="feather" data-feather="message-circle">
                             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
                         </svg>
-                        <span>Chat</span>
+                        Chat
                         <span class="message-count">0</span>
                     </a>
                 </li>
@@ -1691,7 +1447,7 @@
                             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                         </svg>
-                        <span>Resources</span>
+                        Resources
                     </a>
                 </li>
                 <li class="nav-item">
@@ -1709,7 +1465,7 @@
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        <span>My Profile</span>
+                        My Profile
                     </a>
                 </li>
                 <li class="nav-item">
@@ -1719,7 +1475,7 @@
                             <polyline points="16 17 21 12 16 7"></polyline>
                             <line x1="21" y1="12" x2="9" y2="12"></line>
                         </svg>
-                        <span>Logout</span>
+                        Logout
                     </a>
                 </li>
                 <li class="nav-item">
@@ -1730,7 +1486,7 @@
                             <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                         </svg>
-                        <span>Groups</span>
+                        Groups
                     </a>
                 </li>
             </ul>
@@ -1739,14 +1495,14 @@
 
     <div class="account-container">
         <div class="account-header">
-            <h1>My Educator Profile</h1>
-            <p>Update your information and educational preferences</p>
+            <h1>My Gaming Profile</h1>
+            <p>Update your gaming information and preferences</p>
             <a href="payment.html" class="back-btn">
                 <svg class="feather" data-feather="arrow-left">
                     <line x1="19" y1="12" x2="5" y2="12"></line>
                     <polyline points="12 19 5 12 12 5"></polyline>
                 </svg>
-                Manage Learning Credits
+                Manage Gaming Credits
             </a>
         </div>
         
@@ -1771,7 +1527,7 @@
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        Educator Profile
+                        Gaming Profile
                     </button>
                     <button class="menu-item" data-section="social">
                         <svg class="feather" data-feather="share-2">
@@ -1788,7 +1544,7 @@
                             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                         </svg>
-                        My Resources
+                        My Content
                     </button>
                     <button class="menu-item" data-section="gamer">
                         <svg class="feather" data-feather="cpu">
@@ -1803,7 +1559,7 @@
                             <line x1="1" y1="9" x2="4" y2="9"></line>
                             <line x1="1" y1="14" x2="4" y2="14"></line>
                         </svg>
-                        Gamer Profile
+                        Gamer Stats
                     </button>
                     <button class="menu-item" data-section="display">
                         <svg class="feather" data-feather="palette">
@@ -1821,7 +1577,7 @@
                             <polyline points="16 6 12 2 8 6"></polyline>
                             <line x1="12" y1="2" x2="12" y2="15"></line>
                         </svg>
-                        Share SafeConnect
+                        Share BondBase
                     </button>
                     <button class="menu-item" data-section="settings">
                         <svg class="feather" data-feather="settings">
@@ -1847,32 +1603,32 @@
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        Educator Information
+                        Gaming Information
                     </h2>
                     <form id="profileForm">
                         <div class="form-group">
-                            <label for="accountName">Full Name</label>
+                            <label for="accountName">Gamer Tag / Username</label>
                             <input type="text" id="accountName" required>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="accountAge">Years of Experience</label>
+                                <label for="accountAge">Gaming Experience (Years)</label>
                                 <input type="number" id="accountAge" min="1" max="50" required>
                             </div>
                             <div class="form-group">
-                                <label for="accountGender">Specialization</label>
+                                <label for="accountGender">Preferred Game Genre</label>
                                 <select id="accountGender" required>
-                                    <option value="sexual-health">Sexual Health</option>
-                                    <option value="consent-education">Consent Education</option>
-                                    <option value="relationship-communication">Relationship Communication</option>
-                                    <option value="bdsm-safety">BDSM Safety</option>
-                                    <option value="lgbtq-health">LGBTQ+ Health</option>
+                                    <option value="fps">First-Person Shooter</option>
+                                    <option value="rpg">Role-Playing Games</option>
+                                    <option value="strategy">Strategy Games</option>
+                                    <option value="sports">Sports Games</option>
+                                    <option value="racing">Racing Games</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="accountLocation">Practice Location</label>
+                            <label for="accountLocation">Gaming Region</label>
                             <div id="locationContainer" class="location-container">
                                 <div id="selectedLocation" class="selected-location"></div>
                                 <input type="hidden" id="accountLocation" name="location">
@@ -1888,13 +1644,13 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="accountBio">Professional Bio</label>
-                            <textarea id="accountBio" rows="4" placeholder="Describe your expertise, certifications, and approach to sexual health education..."></textarea>
+                            <label for="accountBio">Gaming Bio</label>
+                            <textarea id="accountBio" rows="4" placeholder="Describe your gaming style, favorite games, and gaming achievements..."></textarea>
                         </div>
                         <div class="form-group">
-                            <label>Areas of Expertise (Add up to 5)</label>
+                            <label>Favorite Games (Add up to 5)</label>
                             <div class="interests-input">
-                                <input type="text" id="accountInterests" placeholder="Add area of expertise">
+                                <input type="text" id="accountInterests" placeholder="Add favorite game">
                                 <button type="button" id="addInterestBtn">
                                     <svg class="feather" data-feather="plus">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -1905,8 +1661,8 @@
                             <div class="interests-container" id="accountInterestsContainer"></div>
                         </div>
                         <div class="form-group">
-                            <label for="accountPhone">Professional Contact (Optional)</label>
-                            <input type="tel" id="accountPhone">
+                            <label for="accountPhone">Discord / Steam ID (Optional)</label>
+                            <input type="tel" id="accountPhone" placeholder="e.g., username#1234">
                         </div>
                         <button type="submit" class="btn-primary">
                             <svg class="feather" data-feather="save">
@@ -1929,9 +1685,9 @@
                             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
                             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                         </svg>
-                        Professional Social Links
+                        Gaming Social Links
                     </h2>
-                    <p class="section-description">Add your professional social media links to connect with the community. These will be displayed on your educator profile.</p>
+                    <p class="section-description">Add your gaming social media links to connect with other gamers. These will be displayed on your gaming profile.</p>
                     
                     <div class="social-links-container">
                         <div class="social-input-group">
@@ -1939,9 +1695,9 @@
                                 <svg class="feather" data-feather="facebook" style="color: #1877F2;">
                                     <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
                                 </svg>
-                                <span>Facebook</span>
+                                <span>Facebook Gaming</span>
                             </div>
-                            <input type="text" id="social-facebook" class="social-input" placeholder="Professional Facebook page" data-platform="facebook">
+                            <input type="text" id="social-facebook" class="social-input" placeholder="Facebook Gaming profile" data-platform="facebook">
                             <div class="social-preview" id="preview-facebook">
                                 <small>Link: https://facebook.com/<span id="preview-text-facebook">username</span></small>
                             </div>
@@ -1954,9 +1710,9 @@
                                     <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                                     <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
                                 </svg>
-                                <span>Instagram</span>
+                                <span>Instagram Gaming</span>
                             </div>
-                            <input type="text" id="social-instagram" class="social-input" placeholder="Professional Instagram" data-platform="instagram">
+                            <input type="text" id="social-instagram" class="social-input" placeholder="Gaming Instagram" data-platform="instagram">
                             <div class="social-preview" id="preview-instagram">
                                 <small>Link: https://instagram.com/<span id="preview-text-instagram">username</span></small>
                             </div>
@@ -1969,7 +1725,7 @@
                                     <rect x="2" y="9" width="4" height="12"></rect>
                                     <circle cx="4" cy="4" r="2"></circle>
                                 </svg>
-                                <span>LinkedIn</span>
+                                <span>LinkedIn Gaming</span>
                             </div>
                             <input type="text" id="social-linkedin" class="social-input" placeholder="LinkedIn profile" data-platform="linkedin">
                             <div class="social-preview" id="preview-linkedin">
@@ -1984,9 +1740,9 @@
                                     <line x1="2" y1="12" x2="22" y2="12"></line>
                                     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                                 </svg>
-                                <span>Professional Website</span>
+                                <span>Gaming Website / Twitch</span>
                             </div>
-                            <input type="text" id="social-website" class="social-input" placeholder="Your professional website" data-platform="website">
+                            <input type="text" id="social-website" class="social-input" placeholder="Your gaming website or Twitch" data-platform="website">
                             <div class="social-preview" id="preview-website">
                                 <small>Link: <span id="preview-text-website">website.com</span></small>
                             </div>
@@ -1999,42 +1755,42 @@
                             <line x1="12" y1="8" x2="12" y2="12"></line>
                             <line x1="12" y1="16" x2="12.01" y2="16"></line>
                         </svg>
-                        <span>Please add at least one professional link to save your profile</span>
+                        <span>Please add at least one gaming link to save your profile</span>
                     </div>
 
                     <div class="social-preview-section">
-                        <h3>Your Professional Links Preview</h3>
-                        <p class="section-description">This is how your professional links will appear to community members:</p>
+                        <h3>Your Gaming Links Preview</h3>
+                        <p class="section-description">This is how your gaming links will appear to other gamers:</p>
                         <div class="social-icons-preview" id="socialIconsPreview">
                             <!-- Social icons will be dynamically added here -->
                         </div>
                     </div>
                 </div>
 
-                <!-- My Resources Section -->
+                <!-- My Content Section -->
                 <div class="account-section" id="postsSection" style="display: none;">
                     <h2>
                         <svg class="feather" data-feather="book-open">
                             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                         </svg>
-                        My Educational Resources
+                        My Gaming Content
                     </h2>
-                    <p class="section-description">Manage your educational content - click on any resource to delete it</p>
+                    <p class="section-description">Manage your gaming content - click on any post to delete it</p>
                     
                     <div class="user-posts-container" id="userPostsContainer">
-                        <div class="loading">Loading your educational resources...</div>
+                        <div class="loading">Loading your gaming content...</div>
                     </div>
 
                     <!-- Delete Confirmation Modal -->
                     <div id="deletePostModal" class="modal" style="display: none;">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h3>Delete Educational Resource</h3>
+                                <h3>Delete Gaming Content</h3>
                                 <span class="close-modal">&times;</span>
                             </div>
                             <div class="modal-body">
-                                <p>Are you sure you want to delete this educational resource? This action cannot be undone.</p>
+                                <p>Are you sure you want to delete this gaming content? This action cannot be undone.</p>
                                 <div class="post-preview" id="postPreview"></div>
                             </div>
                             <div class="modal-actions">
@@ -2046,14 +1802,14 @@
                                         <line x1="10" y1="11" x2="10" y2="17"></line>
                                         <line x1="14" y1="11" x2="14" y2="17"></line>
                                     </svg>
-                                    Delete Resource
+                                    Delete Content
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Gamer Profile Section -->
+                <!-- Gamer Stats Section -->
                 <div class="account-section" id="gamerSection" style="display: none;">
                     <h2>
                         <svg class="feather" data-feather="cpu">
@@ -2068,20 +1824,20 @@
                             <line x1="1" y1="9" x2="4" y2="9"></line>
                             <line x1="1" y1="14" x2="4" y2="14"></line>
                         </svg>
-                        Gamer Profile
+                        Gamer Stats
                     </h2>
                     <p class="section-description">Showcase your gaming skills and achievements. Share your stats and connect with fellow gamers.</p>
                     
                     <!-- Current Gamer Profile Preview -->
                     <div id="currentGamerProfile" class="profile-preview-container">
                         <div class="profile-preview-header">
-                            <h3>Your Current Gamer Profile</h3>
+                            <h3>Your Current Gamer Stats</h3>
                             <button id="editGamerProfileBtn" class="btn-primary">
                                 <svg class="feather" data-feather="edit">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                 </svg>
-                                Edit Profile
+                                Edit Stats
                             </button>
                         </div>
                         <div id="gamerProfilePreview" class="profile-preview-content">
@@ -2094,9 +1850,9 @@
                         <h3>
                             <svg class="feather" data-feather="edit">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
-                            Gamer Profile Details
+                            Gamer Stats Details
                         </h3>
                         
                         <div id="introStatus" style="margin: 1rem 0;"></div>
@@ -2321,7 +2077,7 @@
                                     <polyline points="17 21 17 13 7 13 7 21"></polyline>
                                     <polyline points="7 3 7 8 15 8"></polyline>
                                 </svg>
-                                Save Gamer Profile
+                                Save Gamer Stats
                             </button>
                         </form>
                     </div>
@@ -2338,7 +2094,7 @@
                             </svg>
                             Generate Public Profile
                         </h3>
-                        <p class="section-description">Create a public link to share your gamer profile with others.</p>
+                        <p class="section-description">Create a public link to share your gamer stats with others.</p>
                         
                         <button id="generateProfileBtn" class="generate-profile-btn">
                             <svg class="feather" data-feather="zap">
@@ -2379,7 +2135,7 @@
                             <circle cx="6.5" cy="12.5" r=".5"></circle>
                             <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
                         </svg>
-                        Profile Display
+                        Chat Display
                     </h2>
                     <p class="section-description">Customize your chat themes and interface appearance</p>
                     
@@ -2391,16 +2147,16 @@
                             </svg>
                             Chat Themes
                         </h3>
-                        <p class="section-description">Choose how your educational chat interface looks</p>
+                        <p class="section-description">Choose how your gaming chat interface looks</p>
                         
                         <div class="themes-grid" id="themesGrid">
                             <div class="theme-item">
                                 <div class="theme-preview">
                                     <div class="theme-preview-content" style="background: linear-gradient(135deg, #b3004b, #7a0034);">
-                                        Professional
+                                        Gaming Theme
                                     </div>
                                 </div>
-                                <div class="theme-label">Professional Theme</div>
+                                <div class="theme-label">Gaming Theme</div>
                             </div>
                             <div class="theme-item">
                                 <div class="theme-preview">
@@ -2438,18 +2194,18 @@
                             </svg>
                             Live Preview
                         </h3>
-                        <p class="section-description">See how your selected theme will look in educational chats</p>
+                        <p class="section-description">See how your selected theme will look in gaming chats</p>
                         
                         <div class="chat-preview" id="chatPreview">
                             <div class="preview-messages">
                                 <div class="preview-message received">
-                                    Hello, I have a question about consent education...
+                                    Hey, are you ready for the tournament this weekend?
                                 </div>
                                 <div class="preview-message sent">
-                                    I'd be happy to help! Consent is about clear communication and mutual agreement.
+                                    Definitely! I've been practicing all week. Our team is ready!
                                 </div>
                                 <div class="preview-message received">
-                                    Thank you! What are some key principles to remember?
+                                    Awesome! What's our strategy for the first match?
                                 </div>
                             </div>
                         </div>
@@ -2474,25 +2230,23 @@
                     </div>
                 </div>
 
-                <!-- Share SafeConnect Section -->
-                <div class="account-section" id="shareSection" style="display: none; ">
+                <!-- Share BondBase Section -->
+                <div class="account-section" id="shareSection" style="display: none;">
                     <h2>
-                        <svg class="feather" data-feather="share-alt">
-                            <circle cx="18" cy="5" r="3"></circle>
-                            <circle cx="6" cy="12" r="3"></circle>
-                            <circle cx="18" cy="19" r="3"></circle>
-                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                        <svg class="feather" data-feather="share">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                            <polyline points="16 6 12 2 8 6"></polyline>
+                            <line x1="12" y1="2" x2="12" y2="15"></line>
                         </svg>
-                        Share SafeConnect
+                        Share BondBase
                     </h2>
-                    <p class="section-description">Invite colleagues and community members to join SafeConnect. Help grow our educational community!</p>
+                    <p class="section-description">Invite friends to join BondBase. Help grow our gaming community!</p>
                     
                     <div class="share-container">
                         <div class="share-link-section">
-                            <h3>Share SafeConnect with Colleagues</h3>
+                            <h3>Share BondBase with Friends</h3>
                             <div class="link-input-group">
-                                <input type="text" id="bondlyLink" class="share-input" value="https://SafeConnectEducation.com" readonly>
+                                <input type="text" id="bondlyLink" class="share-input" value="https://BondBaseGaming.com" readonly>
                                 <button id="copyBondlyLinkBtn" class="btn-primary">
                                     <svg class="feather" data-feather="copy">
                                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -2503,134 +2257,6 @@
                             </div>
                             <div class="copy-feedback" id="copyBondlyFeedback"></div>
                         </div>
-
-                        <div class="share-options">
-                            <h3>Share via</h3>
-                            <div class="share-buttons-grid">
-                                <button class="share-button" id="shareBondlyButton">
-                                    <svg class="feather" data-feather="share-2">
-                                        <circle cx="18" cy="5" r="3"></circle>
-                                        <circle cx="6" cy="12" r="3"></circle>
-                                        <circle cx="18" cy="19" r="3"></circle>
-                                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                                    </svg>
-                                    <span>Share SafeConnect</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Community Ambassador Program -->
-                    <div class="ambassador-program">
-                        <div class="ambassador-header">
-                            <div class="ambassador-icon">
-                                <svg class="feather" data-feather="award">
-                                    <circle cx="12" cy="8" r="7"></circle>
-                                    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 style="color: white; margin: 0;">SafeConnect Community Ambassador</h3>
-                                <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0 0;">Earn recognition by growing our educational community!</p>
-                            </div>
-                        </div>
-
-                        <div class="ambassador-tiers">
-                            <div class="ambassador-tier">
-                                <div class="tier-badge">Community Educator</div>
-                                <h4 style="color: white; margin: 10px 0;">Share with 10 Colleagues</h4>
-                                <div class="tier-reward">Featured Profile</div>
-                                <div class="tier-requirement">Get 10 colleagues to join SafeConnect</div>
-                                <ul class="tier-features">
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Featured Educator Profile</li>
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Community Educator Badge</li>
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Early Access to Resources</li>
-                                </ul>
-                            </div>
-
-                            <div class="ambassador-tier">
-                                <div class="tier-badge silver">Lead Educator</div>
-                                <h4 style="color: white; margin: 10px 0;">Share with 25 Colleagues</h4>
-                                <div class="tier-reward">Workshop Host</div>
-                                <div class="tier-requirement">Get 25 colleagues to join SafeConnect</div>
-                                <ul class="tier-features">
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Official Workshop Host Status</li>
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Lead Educator Badge</li>
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Priority Resource Publishing</li>
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Community Recognition</li>
-                                </ul>
-                            </div>
-
-                            <div class="ambassador-tier">
-                                <div class="tier-badge gold">Master Educator</div>
-                                <h4 style="color: white; margin: 10px 0;">Share with 50 Colleagues</h4>
-                                <div class="tier-reward">Community Leader</div>
-                                <div class="tier-requirement">Get 50 colleagues to join SafeConnect</div>
-                                <ul class="tier-features">
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Community Leader Status</li>
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Master Educator Badge</li>
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Featured Workshop Promotion</li>
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Exclusive Training Access</li>
-                                    <li><svg class="feather" data-feather="check"><polyline points="20 6 9 17 4 12"></polyline></svg> Leadership Recognition</li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div class="progress-container">
-                            <div class="progress-header">
-                                <h4 style="color: white; margin: 0;">Your Community Growth Progress</h4>
-                                <span style="color: #ffd700; font-weight: bold;">8/25 to Lead Educator</span>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 32%"></div>
-                            </div>
-                            <div style="color: rgba(255,255,255,0.8); font-size: 14px;">
-                                Keep sharing to unlock community leadership rewards!
-                            </div>
-
-                            <div class="progress-stats">
-                                <div class="stat-card">
-                                    <div class="stat-number">8</div>
-                                    <div class="stat-label">Colleagues Joined</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-number">17</div>
-                                    <div class="stat-label">To Lead Educator</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-number">42</div>
-                                    <div class="stat-label">To Master Educator</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style="text-align: center; margin-top: 20px;">
-                            <button class="btn-primary" style="background: white; color: var(--primary); border: none; padding: 12px 30px;">
-                                <svg class="feather" data-feather="rocket" style="stroke: var(--primary);">
-                                    <line x1="16" y1="5" x2="16" y2="19"></line>
-                                    <path d="M12 19l-3-3 3-3"></path>
-                                    <path d="M12 5l3 3-3 3"></path>
-                                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                                </svg>
-                                Start Growing Our Community
-                            </button>
-                            <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin-top: 10px;">
-                                Track your referrals automatically when colleagues sign up using your shared link
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="share-info">
-                        <h4>
-                            <svg class="feather" data-feather="info">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="12" y1="16" x2="12" y2="12"></line>
-                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                            </svg>
-                            How It Works
-                        </h4>
-                        <p>Share your unique SafeConnect link with colleagues and community members. When they sign up using your link, they'll be counted toward your community growth progress. Earn recognition, featured profile placement, and leadership opportunities as you help grow our educational community!</p>
                     </div>
                 </div>
 
@@ -2682,23 +2308,23 @@
                     <form id="privacyForm">
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="showAge" checked>
-                            <label for="showAge">Show my experience level on profile</label>
+                            <label for="showAge">Show my gaming experience level on profile</label>
                         </div>
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="showLocation" checked>
-                            <label for="showLocation">Show my practice location on profile</label>
+                            <label for="showLocation">Show my gaming region on profile</label>
                         </div>
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="showOnlineStatus" checked>
-                            <label for="showOnlineStatus">Show when I'm available for questions</label>
+                            <label for="showOnlineStatus">Show when I'm online and gaming</label>
                         </div>
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="showSocialLinks" checked>
-                            <label for="showSocialLinks">Show my professional social links</label>
+                            <label for="showSocialLinks">Show my gaming social links</label>
                         </div>
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="showProfileEffects" checked>
-                            <label for="showProfileEffects">Show my profile as an active educator</label>
+                            <label for="showProfileEffects">Show my profile as an active gamer</label>
                         </div>
                         <button type="submit" class="btn-primary">
                             <svg class="feather" data-feather="save">
@@ -2777,12 +2403,12 @@
                     container.appendChild(tag);
                     interestInput.value = '';
                 } else {
-                    alert('Maximum 5 areas of expertise allowed');
+                    alert('Maximum 5 favorite games allowed');
                 }
             }
         });
 
-        // Copy SafeConnect link functionality
+        // Copy BondBase link functionality
         document.getElementById('copyBondlyLinkBtn').addEventListener('click', function() {
             const bondlyLink = document.getElementById('bondlyLink');
             const feedback = document.getElementById('copyBondlyFeedback');
@@ -2878,8 +2504,6 @@
                 alert('Failed to copy link');
             }
         });
-
-
 
         // Initialize gamer profile section
         document.addEventListener('DOMContentLoaded', function() {
