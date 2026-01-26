@@ -1,5 +1,5 @@
-// Additional features for Gaming Connect App - FIXED VERSION
-// Profile picture navigation, game animation library, and animated stickers
+// Additional features for Dating Connect App - PROFESSIONAL STICKERS VERSION
+// Profile picture navigation, animation library, and animated stickers
 
 import { 
     getAuth,
@@ -43,36 +43,36 @@ const app = window.app || (() => {
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Animation library configuration - GAMING THEME
+// REAL-LIFE ANIMATIONS - WhatsApp style
 const ANIMATION_EMOJIS = [
-    { emoji: '🎮', name: 'game_start', animation: 'gameStart' },
-    { emoji: '🏆', name: 'victory', animation: 'victoryTrophy' },
-    { emoji: '🌟', name: 'star_power', animation: 'starPower' },
-    { emoji: '🎯', name: 'bullseye', animation: 'bullseyeHit' },
-    { emoji: '⚡', name: 'power_up', animation: 'powerUp' },
-    { emoji: '💥', name: 'explosion', animation: 'explosionEffect' },
-    { emoji: '🎪', name: 'party_popper', animation: 'partyPopper' },
-    { emoji: '🔮', name: 'magic_spell', animation: 'magicSpell' },
-    { emoji: '🌀', name: 'vortex', animation: 'vortexSpin' },
-    { emoji: '🎲', name: 'dice_roll', animation: 'diceRoll' },
-    { emoji: '🎺', name: 'victory_fanfare', animation: 'victoryFanfare' },
-    { emoji: '✨', name: 'sparkle_burst', animation: 'sparkleBurst' }
+    { emoji: '❤️', name: 'heart_love', animation: 'heartLove' },
+    { emoji: '😊', name: 'smile_blush', animation: 'smileBlush' },
+    { emoji: '😂', name: 'laughing', animation: 'laughingTears' },
+    { emoji: '😍', name: 'heart_eyes', animation: 'heartEyes' },
+    { emoji: '🤗', name: 'hugging', animation: 'huggingFace' },
+    { emoji: '😘', name: 'kiss_heart', animation: 'kissHeart' },
+    { emoji: '🥰', name: 'smiling_hearts', animation: 'smilingHearts' },
+    { emoji: '😇', name: 'angel_halo', animation: 'angelHalo' },
+    { emoji: '🤩', name: 'star_struck', animation: 'starStruck' },
+    { emoji: '🥺', name: 'pleading_face', animation: 'pleadingFace' },
+    { emoji: '🤭', name: 'hand_mouth', animation: 'handOverMouth' },
+    { emoji: '🙏', name: 'praying_hands', animation: 'prayingHands' }
 ];
 
-// Animated Stickers configuration - GAMING THEME
+// PROFESSIONAL ANIMATED STICKERS - Real-life expressions
 const ANIMATED_STICKERS = [
-    { name: 'dancing_game', emoji: '🕹️💃', animation: 'danceGame', type: 'sticker' },
-    { name: 'jumping_joy', emoji: '🎮🦘', animation: 'jumpJoy', type: 'sticker' },
-    { name: 'fireworks_win', emoji: '🎆🏆', animation: 'fireworksWin', type: 'sticker' },
-    { name: 'spinning_coin', emoji: '🪙🌀', animation: 'spinCoin', type: 'sticker' },
-    { name: 'floating_power', emoji: '⚡🌟', animation: 'floatPower', type: 'sticker' },
-    { name: 'pulsing_heart', emoji: '❤️🎯', animation: 'pulseHeart', type: 'sticker' },
-    { name: 'bouncing_ball', emoji: '🏀⚡', animation: 'bounceBall', type: 'sticker' },
-    { name: 'swaying_flag', emoji: '🚩🎮', animation: 'swayFlag', type: 'sticker' },
-    { name: 'twinkling_star', emoji: '⭐✨', animation: 'twinkleStar', type: 'sticker' },
-    { name: 'fluttering_confetti', emoji: '🎊🎉', animation: 'flutterConfetti', type: 'sticker' },
-    { name: 'glowing_achievement', emoji: '🏅🌟', animation: 'glowAchievement', type: 'sticker' },
-    { name: 'rocket_launch', emoji: '🚀⚡', animation: 'rocketLaunch', type: 'sticker' }
+    { name: 'love_heart', emoji: '❤️', animation: 'loveHeart', type: 'sticker' },
+    { name: 'wink_kiss', emoji: '😉💋', animation: 'winkKiss', type: 'sticker' },
+    { name: 'happy_dance', emoji: '💃😄', animation: 'happyDance', type: 'sticker' },
+    { name: 'thinking_face', emoji: '🤔💭', animation: 'thinkingFace', type: 'sticker' },
+    { name: 'coffee_love', emoji: '☕❤️', animation: 'coffeeLove', type: 'sticker' },
+    { name: 'music_vibes', emoji: '🎵🎶', animation: 'musicVibes', type: 'sticker' },
+    { name: 'thumbs_up', emoji: '👍👌', animation: 'thumbsUp', type: 'sticker' },
+    { name: 'rainbow_heart', emoji: '🌈❤️', animation: 'rainbowHeart', type: 'sticker' },
+    { name: 'night_sky', emoji: '🌙✨', animation: 'nightSky', type: 'sticker' },
+    { name: 'camera_flash', emoji: '📸✨', animation: 'cameraFlash', type: 'sticker' },
+    { name: 'gift_heart', emoji: '🎁❤️', animation: 'giftHeart', type: 'sticker' },
+    { name: 'message_bubble', emoji: '💬💭', animation: 'messageBubble', type: 'sticker' }
 ];
 
 // Global variables
@@ -211,8 +211,8 @@ function addAnimationLibraryButton() {
     const animationBtn = document.createElement('button');
     animationBtn.id = 'animationLibraryBtn';
     animationBtn.className = 'animation-btn';
-    animationBtn.innerHTML = '<i class="fas fa-gamepad"></i>';
-    animationBtn.title = 'Game Animations & Stickers';
+    animationBtn.innerHTML = '<i class="fas fa-smile"></i>';
+    animationBtn.title = 'Expressions & Stickers';
     animationBtn.addEventListener('click', toggleAnimationLibrary);
 
     // Insert at the beginning of the chat input container
@@ -266,11 +266,11 @@ function createAnimationLibraryModal() {
     modal.innerHTML = `
         <div class="animation-modal-content">
             <div class="animation-modal-header">
-                <h3>Game Animations & Stickers</h3>
+                <h3>Expressions & Stickers</h3>
                 <button class="close-animation-modal">&times;</button>
             </div>
             <div class="animation-tabs">
-                <button class="tab-button active" data-tab="animations">Animations</button>
+                <button class="tab-button active" data-tab="animations">Reactions</button>
                 <button class="tab-button" data-tab="stickers">Stickers</button>
             </div>
             <div class="tab-content">
@@ -297,7 +297,7 @@ function createAnimationLibraryModal() {
             </div>
             <div class="animation-premium-notice" id="premiumNotice" style="display: none;">
                 <i class="fas fa-crown"></i>
-                <p>Premium feature: Upgrade to $200 lifetime plan to send animations & stickers</p>
+                <p>Premium feature: Upgrade to send animations & stickers</p>
             </div>
         </div>
     `;
@@ -397,7 +397,7 @@ function closeAnimationLibrary() {
 // Select animation
 async function selectAnimation(animationType) {
     if (!userHasPremium) {
-        showNotification('Premium feature: Upgrade to $200 lifetime plan to send game animations', 'warning');
+        showNotification('Premium feature: Upgrade to send animations', 'warning');
         return;
     }
 
@@ -407,7 +407,7 @@ async function selectAnimation(animationType) {
 
         await sendAnimationMessage(animationData);
         closeAnimationLibrary();
-        showNotification('Animation sent!', 'success');
+        showNotification('Reaction sent!', 'success');
     } catch (error) {
         showNotification('Error sending animation', 'error');
     }
@@ -416,7 +416,7 @@ async function selectAnimation(animationType) {
 // Select sticker
 async function selectSticker(stickerType) {
     if (!userHasPremium) {
-        showNotification('Premium feature: Upgrade to $200 lifetime plan to send animated stickers', 'warning');
+        showNotification('Premium feature: Upgrade to send stickers', 'warning');
         return;
     }
 
@@ -441,7 +441,7 @@ async function sendAnimationMessage(animationData) {
     try {
         const messageData = {
             senderId: currentUser.uid,
-            text: `Sent ${animationData.name.replace('_', ' ')} animation`,
+            text: `Sent ${animationData.name.replace('_', ' ')} reaction`,
             animation: animationData.animation,
             emoji: animationData.emoji,
             animationName: animationData.name,
@@ -457,7 +457,7 @@ async function sendAnimationMessage(animationData) {
         await setDoc(doc(db, 'conversations', currentThreadId), {
             participants: [currentUser.uid, chatPartnerId],
             lastMessage: {
-                text: `Sent ${animationData.name.replace('_', ' ')} animation`,
+                text: `Sent ${animationData.name.replace('_', ' ')} reaction`,
                 senderId: currentUser.uid,
                 timestamp: serverTimestamp()
             },
@@ -469,7 +469,7 @@ async function sendAnimationMessage(animationData) {
     }
 }
 
-// Send sticker message - FIXED: This will work with your app.js rendering
+// Send sticker message
 async function sendStickerMessage(stickerData) {
     if (!currentUser || !chatPartnerId || !currentThreadId) {
         return;
@@ -484,7 +484,7 @@ async function sendStickerMessage(stickerData) {
 
         const messageData = {
             senderId: currentUser.uid,
-            text: stickerData.emoji, // This is the key - use the emoji as text so app.js can render it
+            text: stickerData.emoji,
             sticker: stickerData.animation,
             emoji: stickerData.emoji,
             stickerName: stickerData.name,
@@ -512,7 +512,7 @@ async function sendStickerMessage(stickerData) {
     }
 }
 
-// FIXED: Deduct chat points function that works with your app.js
+// Deduct chat points function
 async function deductChatPoint() {
     if (!currentUser) return false;
     
@@ -696,10 +696,8 @@ function setupAnimationListener() {
                         // Trigger the animation or sticker
                         if (message.type === 'animation') {
                             triggerAnimation(message.animation);
-                            showNotification(`${message.emoji} ${message.animationName} animation received!`, 'info');
+                            showNotification(`${message.emoji} ${message.animationName} received!`, 'info');
                         } else if (message.type === 'sticker') {
-                            // Stickers are automatically displayed in the chat by app.js
-                            // since they're stored as regular messages with emoji text
                             showNotification(`${message.emoji} ${message.stickerName} sticker received!`, 'info');
                         }
                     }
@@ -709,7 +707,7 @@ function setupAnimationListener() {
     });
 }
 
-// Enhanced sticker display that works with app.js - FIXED ANIMATIONS
+// Enhanced sticker display that works with app.js
 function enhanceStickerDisplay() {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
@@ -728,19 +726,19 @@ function enhanceStickerDisplay() {
                     // Mark as enhanced to prevent duplicate processing
                     messageText.classList.add('sticker-enhanced');
                     
-                    // Add sticker classes - this is key for animations
+                    // Add sticker classes
                     messageText.classList.add('message-sticker', sticker.animation);
                     message.classList.add('sticker-message');
                     
                     // Add data attribute for easier CSS targeting
                     message.setAttribute('data-message-type', 'sticker');
                     
-                    // Apply minimal inline styles - don't override CSS animations
+                    // Apply styles
                     messageText.style.display = 'inline-block';
                     messageText.style.textAlign = 'center';
                     messageText.style.margin = '5px 0';
                     
-                    // Style based on sent/received for positioning only
+                    // Positioning
                     if (message.classList.contains('sent')) {
                         messageText.style.marginLeft = 'auto';
                         messageText.style.marginRight = '10px';
@@ -775,212 +773,209 @@ function triggerAnimation(animationType) {
     document.body.appendChild(effectContainer);
 
     switch(animationType) {
-        case 'gameStart': createGameStart(effectContainer); break;
-        case 'victoryTrophy': createVictoryTrophy(effectContainer); break;
-        case 'starPower': createStarPower(effectContainer); break;
-        case 'bullseyeHit': createBullseyeHit(effectContainer); break;
-        case 'powerUp': createPowerUp(effectContainer); break;
-        case 'explosionEffect': createExplosionEffect(effectContainer); break;
-        case 'partyPopper': createPartyPopper(effectContainer); break;
-        case 'magicSpell': createMagicSpell(effectContainer); break;
-        case 'vortexSpin': createVortexSpin(effectContainer); break;
-        case 'diceRoll': createDiceRoll(effectContainer); break;
-        case 'victoryFanfare': createVictoryFanfare(effectContainer); break;
-        case 'sparkleBurst': createSparkleBurst(effectContainer); break;
-        default: createGameStart(effectContainer);
+        case 'heartLove': createHeartLove(effectContainer); break;
+        case 'smileBlush': createSmileBlush(effectContainer); break;
+        case 'laughingTears': createLaughingTears(effectContainer); break;
+        case 'heartEyes': createHeartEyes(effectContainer); break;
+        case 'huggingFace': createHuggingFace(effectContainer); break;
+        case 'kissHeart': createKissHeart(effectContainer); break;
+        case 'smilingHearts': createSmilingHearts(effectContainer); break;
+        case 'angelHalo': createAngelHalo(effectContainer); break;
+        case 'starStruck': createStarStruck(effectContainer); break;
+        case 'pleadingFace': createPleadingFace(effectContainer); break;
+        case 'handOverMouth': createHandOverMouth(effectContainer); break;
+        case 'prayingHands': createPrayingHands(effectContainer); break;
+        default: createHeartLove(effectContainer);
     }
 
     setTimeout(() => {
         if (effectContainer.parentNode) {
             effectContainer.parentNode.removeChild(effectContainer);
         }
-    }, 5000);
+    }, 4000);
 }
 
-// Animation functions (all 12) - GAMING THEME
-function createGameStart(container) {
-    for (let i = 0; i < 30; i++) {
+// REAL-LIFE ANIMATION FUNCTIONS
+function createHeartLove(container) {
+    for (let i = 0; i < 20; i++) {
         setTimeout(() => {
-            const gamepad = document.createElement('div');
-            gamepad.className = 'gamepad';
-            gamepad.innerHTML = '🎮';
-            gamepad.style.left = Math.random() * 100 + 'vw';
-            gamepad.style.fontSize = (Math.random() * 20 + 15) + 'px';
-            gamepad.style.animationDuration = (Math.random() * 2 + 2) + 's';
-            container.appendChild(gamepad);
-        }, i * 100);
-    }
-}
-
-function createVictoryTrophy(container) {
-    for (let i = 0; i < 25; i++) {
-        setTimeout(() => {
-            const trophy = document.createElement('div');
-            trophy.className = 'trophy';
-            trophy.innerHTML = '🏆';
-            trophy.style.left = Math.random() * 100 + 'vw';
-            trophy.style.fontSize = (Math.random() * 20 + 20) + 'px';
-            trophy.style.animationDuration = (Math.random() * 2 + 3) + 's';
-            container.appendChild(trophy);
+            const heart = document.createElement('div');
+            heart.className = 'heart';
+            heart.innerHTML = '❤️';
+            heart.style.left = Math.random() * 100 + 'vw';
+            heart.style.fontSize = (Math.random() * 25 + 20) + 'px';
+            heart.style.animationDuration = (Math.random() * 2 + 3) + 's';
+            container.appendChild(heart);
         }, i * 150);
     }
 }
 
-function createStarPower(container) {
-    for (let i = 0; i < 40; i++) {
+function createSmileBlush(container) {
+    for (let i = 0; i < 15; i++) {
         setTimeout(() => {
-            const star = document.createElement('div');
-            star.className = 'star';
-            star.innerHTML = '🌟';
-            star.style.left = Math.random() * 100 + 'vw';
-            star.style.fontSize = (Math.random() * 20 + 20) + 'px';
-            star.style.animationDuration = (Math.random() * 1 + 2) + 's';
-            container.appendChild(star);
-        }, i * 80);
+            const smile = document.createElement('div');
+            smile.className = 'smile';
+            smile.innerHTML = '😊';
+            smile.style.left = Math.random() * 100 + 'vw';
+            smile.style.fontSize = (Math.random() * 20 + 25) + 'px';
+            smile.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
+            container.appendChild(smile);
+        }, i * 200);
     }
 }
 
-function createBullseyeHit(container) {
-    for (let i = 0; i < 35; i++) {
+function createLaughingTears(container) {
+    for (let i = 0; i < 12; i++) {
         setTimeout(() => {
-            const target = document.createElement('div');
-            target.className = 'target';
-            target.innerHTML = '🎯';
-            target.style.left = Math.random() * 100 + 'vw';
-            target.style.fontSize = (Math.random() * 25 + 25) + 'px';
-            target.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
-            container.appendChild(target);
+            const laugh = document.createElement('div');
+            laugh.className = 'laugh';
+            laugh.innerHTML = '😂';
+            laugh.style.left = Math.random() * 100 + 'vw';
+            laugh.style.fontSize = (Math.random() * 20 + 30) + 'px';
+            laugh.style.animationDuration = (Math.random() * 2 + 2) + 's';
+            container.appendChild(laugh);
+        }, i * 250);
+    }
+}
+
+function createHeartEyes(container) {
+    for (let i = 0; i < 18; i++) {
+        setTimeout(() => {
+            const heartEye = document.createElement('div');
+            heartEye.className = 'heart-eye';
+            heartEye.innerHTML = '😍';
+            heartEye.style.left = Math.random() * 100 + 'vw';
+            heartEye.style.fontSize = (Math.random() * 20 + 25) + 'px';
+            heartEye.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
+            container.appendChild(heartEye);
+        }, i * 180);
+    }
+}
+
+function createHuggingFace(container) {
+    for (let i = 0; i < 16; i++) {
+        setTimeout(() => {
+            const hug = document.createElement('div');
+            hug.className = 'hug';
+            hug.innerHTML = '🤗';
+            hug.style.left = Math.random() * 100 + 'vw';
+            hug.style.fontSize = (Math.random() * 20 + 28) + 'px';
+            hug.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
+            container.appendChild(hug);
+        }, i * 220);
+    }
+}
+
+function createKissHeart(container) {
+    for (let i = 0; i < 20; i++) {
+        setTimeout(() => {
+            const kiss = document.createElement('div');
+            kiss.className = 'kiss';
+            kiss.innerHTML = '😘';
+            kiss.style.left = Math.random() * 100 + 'vw';
+            kiss.style.fontSize = (Math.random() * 20 + 22) + 'px';
+            kiss.style.animationDuration = (Math.random() * 1 + 2) + 's';
+            container.appendChild(kiss);
+        }, i * 150);
+    }
+}
+
+function createSmilingHearts(container) {
+    for (let i = 0; i < 25; i++) {
+        setTimeout(() => {
+            const smileHeart = document.createElement('div');
+            smileHeart.className = 'smile-heart';
+            smileHeart.innerHTML = '🥰';
+            smileHeart.style.left = Math.random() * 100 + 'vw';
+            smileHeart.style.fontSize = (Math.random() * 20 + 20) + 'px';
+            smileHeart.style.animationDuration = (Math.random() * 2 + 2) + 's';
+            container.appendChild(smileHeart);
         }, i * 120);
     }
 }
 
-function createPowerUp(container) {
-    for (let i = 0; i < 30; i++) {
+function createAngelHalo(container) {
+    for (let i = 0; i < 15; i++) {
         setTimeout(() => {
-            const power = document.createElement('div');
-            power.className = 'power';
-            power.innerHTML = '⚡';
-            power.style.left = Math.random() * 100 + 'vw';
-            power.style.fontSize = (Math.random() * 20 + 18) + 'px';
-            power.style.animationDuration = (Math.random() * 2 + 2) + 's';
-            container.appendChild(power);
-        }, i * 90);
-    }
-}
-
-function createExplosionEffect(container) {
-    for (let i = 0; i < 25; i++) {
-        setTimeout(() => {
-            const explosion = document.createElement('div');
-            explosion.className = 'explosion';
-            explosion.innerHTML = '💥';
-            explosion.style.left = Math.random() * 100 + 'vw';
-            explosion.style.top = Math.random() * 100 + 'vh';
-            explosion.style.animationDuration = (Math.random() * 1 + 2) + 's';
-            container.appendChild(explosion);
+            const angel = document.createElement('div');
+            angel.className = 'angel';
+            angel.innerHTML = '😇';
+            angel.style.left = Math.random() * 100 + 'vw';
+            angel.style.fontSize = (Math.random() * 20 + 24) + 'px';
+            angel.style.animationDuration = (Math.random() * 2 + 3) + 's';
+            container.appendChild(angel);
         }, i * 200);
     }
 }
 
-function createPartyPopper(container) {
-    for (let i = 0; i < 20; i++) {
-        setTimeout(() => {
-            const popper = document.createElement('div');
-            popper.className = 'popper';
-            popper.innerHTML = '🎪';
-            popper.style.left = Math.random() * 100 + 'vw';
-            popper.style.fontSize = (Math.random() * 15 + 20) + 'px';
-            popper.style.animationDuration = (Math.random() * 1 + 2.5) + 's';
-            container.appendChild(popper);
-        }, i * 150);
-    }
-}
-
-function createMagicSpell(container) {
-    for (let i = 0; i < 20; i++) {
-        setTimeout(() => {
-            const spell = document.createElement('div');
-            spell.className = 'spell';
-            spell.innerHTML = '🔮';
-            spell.style.left = Math.random() * 100 + 'vw';
-            spell.style.top = Math.random() * 100 + 'vh';
-            spell.style.animationDuration = '1.5s';
-            container.appendChild(spell);
-        }, i * 200);
-    }
-}
-
-function createVortexSpin(container) {
-    for (let i = 0; i < 25; i++) {
-        setTimeout(() => {
-            const vortex = document.createElement('div');
-            vortex.className = 'vortex';
-            vortex.innerHTML = '🌀';
-            vortex.style.left = Math.random() * 100 + 'vw';
-            vortex.style.top = Math.random() * 100 + 'vh';
-            vortex.style.animationDuration = (Math.random() * 1 + 2) + 's';
-            container.appendChild(vortex);
-        }, i * 150);
-    }
-}
-
-function createDiceRoll(container) {
-    for (let i = 0; i < 18; i++) {
-        setTimeout(() => {
-            const dice = document.createElement('div');
-            dice.className = 'dice';
-            dice.innerHTML = '🎲';
-            dice.style.left = '50%';
-            dice.style.top = '50%';
-            dice.style.animationDuration = '3s';
-            container.appendChild(dice);
-        }, i * 166);
-    }
-}
-
-function createVictoryFanfare(container) {
+function createStarStruck(container) {
     for (let i = 0; i < 30; i++) {
         setTimeout(() => {
-            const fanfare = document.createElement('div');
-            fanfare.className = 'fanfare';
-            fanfare.innerHTML = '🎺';
-            fanfare.style.left = Math.random() * 100 + 'vw';
-            fanfare.style.top = Math.random() * 100 + 'vh';
-            fanfare.style.fontSize = (Math.random() * 15 + 15) + 'px';
-            fanfare.style.animationDuration = (Math.random() * 1 + 1.5) + 's';
-            container.appendChild(fanfare);
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.innerHTML = '🤩';
+            star.style.left = Math.random() * 100 + 'vw';
+            star.style.fontSize = (Math.random() * 15 + 20) + 'px';
+            star.style.animationDuration = (Math.random() * 1 + 2) + 's';
+            container.appendChild(star);
         }, i * 100);
     }
 }
 
-function createSparkleBurst(container) {
-    for (let i = 0; i < 40; i++) {
+function createPleadingFace(container) {
+    for (let i = 0; i < 18; i++) {
         setTimeout(() => {
-            const sparkle = document.createElement('div');
-            sparkle.className = 'sparkle';
-            sparkle.innerHTML = '✨';
-            sparkle.style.left = Math.random() * 100 + 'vw';
-            sparkle.style.top = Math.random() * 100 + 'vh';
-            sparkle.style.fontSize = (Math.random() * 20 + 15) + 'px';
-            sparkle.style.animationDuration = (Math.random() * 1 + 2) + 's';
-            sparkle.style.animationName = 'magicFloat';
-            container.appendChild(sparkle);
-        }, i * 75);
+            const plead = document.createElement('div');
+            plead.className = 'plead';
+            plead.innerHTML = '🥺';
+            plead.style.left = Math.random() * 100 + 'vw';
+            plead.style.fontSize = (Math.random() * 20 + 22) + 'px';
+            plead.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
+            container.appendChild(plead);
+        }, i * 180);
     }
 }
 
-// Load animation styles with improved responsive design
+function createHandOverMouth(container) {
+    for (let i = 0; i < 15; i++) {
+        setTimeout(() => {
+            const hand = document.createElement('div');
+            hand.className = 'hand';
+            hand.innerHTML = '🤭';
+            hand.style.left = Math.random() * 100 + 'vw';
+            hand.style.fontSize = (Math.random() * 20 + 25) + 'px';
+            hand.style.animationDuration = (Math.random() * 2 + 2) + 's';
+            container.appendChild(hand);
+        }, i * 200);
+    }
+}
+
+function createPrayingHands(container) {
+    for (let i = 0; i < 12; i++) {
+        setTimeout(() => {
+            const pray = document.createElement('div');
+            pray.className = 'pray';
+            pray.innerHTML = '🙏';
+            pray.style.left = Math.random() * 100 + 'vw';
+            pray.style.fontSize = (Math.random() * 20 + 28) + 'px';
+            pray.style.animationDuration = (Math.random() * 2 + 3) + 's';
+            container.appendChild(pray);
+        }, i * 250);
+    }
+}
+
+// Load animation styles with improved design
 function loadAnimationStyles() {
     if (document.getElementById('animation-styles')) return;
 
     const styles = `
-        /* Animation Library Styles - IMPROVED */
+        /* Animation Library Styles - PROFESSIONAL DESIGN */
         .chat-input-container {
             transition: all 0.3s ease;
         }
         
         .animation-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #FF6B8B 0%, #FF8E53 100%);
             border: none;
             border-radius: 50%;
             width: 35px;
@@ -997,9 +992,9 @@ function loadAnimationStyles() {
         }
         
         .animation-btn:hover { 
-            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            background: linear-gradient(135deg, #FF8E53 0%, #FF6B8B 100%);
             transform: scale(1.1); 
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px rgba(255, 107, 139, 0.4);
         }
         
         #messageInput {
@@ -1023,14 +1018,14 @@ function loadAnimationStyles() {
             top: 50%; 
             left: 50%; 
             transform: translate(-50%,-50%); 
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
             border-radius: 20px; 
             width: 90%; 
             max-width: 500px; 
             max-height: 80vh; 
             overflow: hidden; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-            border: 2px solid #667eea;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border: 2px solid #FF6B8B;
         }
         
         .animation-modal-header { 
@@ -1038,14 +1033,15 @@ function loadAnimationStyles() {
             justify-content: space-between; 
             align-items: center; 
             padding: 20px; 
-            border-bottom: 1px solid #667eea; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-bottom: 1px solid #e8e8e8; 
+            background: linear-gradient(135deg, #FF6B8B 0%, #FF8E53 100%);
             color: white; 
         }
         
         .animation-modal-header h3 { 
             margin: 0; 
             font-size: 1.2rem; 
+            font-weight: 600;
         }
         
         .close-animation-modal { 
@@ -1064,8 +1060,8 @@ function loadAnimationStyles() {
         
         .animation-tabs {
             display: flex;
-            border-bottom: 1px solid #667eea;
-            background: rgba(102, 126, 234, 0.1);
+            border-bottom: 1px solid #e8e8e8;
+            background: #f8f9fa;
         }
         
         .tab-button {
@@ -1076,19 +1072,20 @@ function loadAnimationStyles() {
             cursor: pointer;
             font-size: 14px;
             font-weight: 500;
-            color: #a0aec0;
+            color: #6c757d;
             transition: all 0.3s ease;
         }
         
         .tab-button.active {
-            color: white;
-            border-bottom: 2px solid #667eea;
-            background: rgba(102, 126, 234, 0.2);
+            color: #FF6B8B;
+            border-bottom: 2px solid #FF6B8B;
+            background: white;
         }
         
         .tab-content {
             max-height: 400px;
             overflow-y: auto;
+            background: white;
         }
         
         .tab-pane {
@@ -1111,20 +1108,19 @@ function loadAnimationStyles() {
             flex-direction: column; 
             align-items: center; 
             padding: 20px 10px; 
-            border-radius: 12px; 
+            border-radius: 15px; 
             cursor: pointer; 
             transition: all 0.3s ease; 
             border: 2px solid transparent; 
             position: relative; 
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
+            background: #f8f9fa;
         }
         
         .animation-item:hover, .sticker-item:hover { 
-            background: rgba(102, 126, 234, 0.2); 
+            background: #FF6B8B15; 
             transform: translateY(-5px); 
-            border-color: #667eea;
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            border-color: #FF6B8B;
+            box-shadow: 0 10px 20px rgba(255, 107, 139, 0.15);
         }
         
         .animation-item.premium-locked, .sticker-item.premium-locked { 
@@ -1143,21 +1139,19 @@ function loadAnimationStyles() {
         .animation-emoji { 
             font-size: 2.5rem; 
             margin-bottom: 10px; 
-            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
         }
         
         .sticker-emoji {
             font-size: 3rem;
             margin-bottom: 10px;
             transition: all 0.3s ease;
-            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
         }
         
         .animation-name, .sticker-name { 
             font-size: 0.85rem; 
             text-align: center; 
             text-transform: capitalize; 
-            color: #e2e8f0; 
+            color: #495057; 
             font-weight: 500;
         }
         
@@ -1178,196 +1172,202 @@ function loadAnimationStyles() {
         }
         
         .premium-badge { 
-            background: linear-gradient(45deg, #FFD700, #FFA500); 
-            color: #000; 
+            background: linear-gradient(45deg, #FF6B8B, #FF8E53); 
+            color: white; 
             padding: 8px 15px; 
             border-radius: 20px; 
             font-size: 12px; 
-            font-weight: bold; 
+            font-weight: 600; 
             display: inline-flex; 
             align-items: center; 
             gap: 5px; 
             margin: 10px; 
-            box-shadow: 0 2px 10px rgba(255, 215, 0, 0.4); 
+            box-shadow: 0 2px 10px rgba(255, 107, 139, 0.4); 
             z-index: 100; 
         }
 
         /* Sticker Animations in Library */
-        .sticker-item .danceGame { animation: danceGameAnim 2s infinite; }
-        .sticker-item .jumpJoy { animation: jumpJoyAnim 2s infinite; }
-        .sticker-item .fireworksWin { animation: fireworksWinAnim 2s infinite; }
-        .sticker-item .spinCoin { animation: spinCoinAnim 3s infinite linear; }
-        .sticker-item .floatPower { animation: floatPowerAnim 2s infinite; }
-        .sticker-item .pulseHeart { animation: pulseHeartAnim 1.5s infinite; }
-        .sticker-item .bounceBall { animation: bounceBallAnim 2s infinite; }
-        .sticker-item .swayFlag { animation: swayFlagAnim 2s infinite; }
-        .sticker-item .twinkleStar { animation: twinkleStarAnim 2s infinite; }
-        .sticker-item .flutterConfetti { animation: flutterConfettiAnim 2s infinite; }
-        .sticker-item .glowAchievement { animation: glowAchievementAnim 2s infinite; }
-        .sticker-item .rocketLaunch { animation: rocketLaunchAnim 2s infinite; }
+        .sticker-item .loveHeart { animation: loveHeartAnim 2s infinite; }
+        .sticker-item .winkKiss { animation: winkKissAnim 2s infinite; }
+        .sticker-item .happyDance { animation: happyDanceAnim 2s infinite; }
+        .sticker-item .thinkingFace { animation: thinkingFaceAnim 2s infinite; }
+        .sticker-item .coffeeLove { animation: coffeeLoveAnim 3s infinite linear; }
+        .sticker-item .musicVibes { animation: musicVibesAnim 2s infinite; }
+        .sticker-item .thumbsUp { animation: thumbsUpAnim 1.5s infinite; }
+        .sticker-item .rainbowHeart { animation: rainbowHeartAnim 2s infinite; }
+        .sticker-item .nightSky { animation: nightSkyAnim 2s infinite; }
+        .sticker-item .cameraFlash { animation: cameraFlashAnim 2s infinite; }
+        .sticker-item .giftHeart { animation: giftHeartAnim 2s infinite; }
+        .sticker-item .messageBubble { animation: messageBubbleAnim 2s infinite; }
 
-        /* Sticker Animation Keyframes - GAMING THEME */
-        @keyframes danceGameAnim {
+        /* Sticker Animation Keyframes - REAL LIFE THEME */
+        @keyframes loveHeartAnim {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        
+        @keyframes winkKissAnim {
             0%, 100% { transform: rotate(0deg) scale(1); }
-            25% { transform: rotate(-20deg) scale(1.1); }
-            75% { transform: rotate(20deg) scale(1.1); }
+            50% { transform: rotate(-10deg) scale(1.1); }
         }
         
-        @keyframes jumpJoyAnim {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-20px) scale(1.1); }
+        @keyframes happyDanceAnim {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-10px) rotate(-5deg); }
+            75% { transform: translateY(-10px) rotate(5deg); }
         }
         
-        @keyframes fireworksWinAnim {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.8; }
+        @keyframes thinkingFaceAnim {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-5deg); }
+            75% { transform: rotate(5deg); }
         }
         
-        @keyframes spinCoinAnim {
+        @keyframes coffeeLoveAnim {
             0% { transform: rotateY(0deg) scale(1); }
             50% { transform: rotateY(180deg) scale(1.1); }
             100% { transform: rotateY(360deg) scale(1); }
         }
         
-        @keyframes floatPowerAnim {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-15px) rotate(10deg); }
+        @keyframes musicVibesAnim {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-5px) scale(1.1); }
         }
         
-        @keyframes pulseHeartAnim {
+        @keyframes thumbsUpAnim {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.2) rotate(5deg); }
+        }
+        
+        @keyframes rainbowHeartAnim {
+            0%, 100% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.1); filter: brightness(1.2); }
+        }
+        
+        @keyframes nightSkyAnim {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(10deg) scale(1.1); }
+        }
+        
+        @keyframes cameraFlashAnim {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+        }
+        
+        @keyframes giftHeartAnim {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(1.1); }
+        }
+        
+        @keyframes messageBubbleAnim {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.3); }
-        }
-        
-        @keyframes bounceBallAnim {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-15px) scale(1.1); }
-        }
-        
-        @keyframes swayFlagAnim {
-            0%, 100% { transform: rotate(-5deg); }
-            50% { transform: rotate(5deg); }
-        }
-        
-        @keyframes twinkleStarAnim {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.1); }
-        }
-        
-        @keyframes flutterConfettiAnim {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-10px) rotate(5deg); }
-        }
-        
-        @keyframes glowAchievementAnim {
-            0%, 100% { filter: brightness(1) drop-shadow(0 0 5px rgba(255, 215, 0, 0.5)); }
-            50% { filter: brightness(1.3) drop-shadow(0 0 15px rgba(255, 215, 0, 0.8)); }
-        }
-        
-        @keyframes rocketLaunchAnim {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-15px) scale(1.1); }
+            50% { transform: scale(1.1); }
         }
 
-        /* Sticker Message Styles with Black Background - FIXED ANIMATIONS */
+        /* Sticker Message Styles - PROFESSIONAL WHATSAPP STYLE */
         .message-sticker {
-            background: linear-gradient(135deg, #000000, #222222) !important;
-            border-radius: 20px !important;
-            padding: 20px 25px !important;
+            background: white !important;
+            border-radius: 18px !important;
+            padding: 15px 20px !important;
             margin: 10px 0 !important;
             display: inline-block !important;
-            max-width: 220px !important;
+            max-width: 200px !important;
             text-align: center !important;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5) !important;
-            border: 3px solid #667eea !important;
-            color: white !important;
-            text-shadow: 0 0 10px rgba(102, 126, 234, 0.7) !important;
-            font-size: 3rem !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+            border: 2px solid #FF6B8B !important;
+            font-size: 2.5rem !important;
             animation-duration: 2s !important;
             animation-iteration-count: infinite !important;
             animation-timing-function: ease-in-out !important;
-            backdrop-filter: blur(5px);
         }
 
         /* Sent sticker messages */
         .message.sent .message-sticker {
-            background: linear-gradient(135deg, #1a1a2e, #16213e) !important;
-            border: 3px solid #764ba2 !important;
+            background: linear-gradient(135deg, #FF6B8B, #FF8E53) !important;
+            border: 2px solid #FF8E53 !important;
             margin-left: auto !important;
             margin-right: 15px !important;
+            color: white !important;
         }
 
         /* Received sticker messages */
         .message.received .message-sticker {
-            background: linear-gradient(135deg, #16213e, #0f3460) !important;
-            border: 3px solid #667eea !important;
+            background: white !important;
+            border: 2px solid #e8e8e8 !important;
             margin-left: 15px !important;
             margin-right: auto !important;
         }
 
         /* Sticker message hover effects */
         .message-sticker:hover {
-            transform: scale(1.08) !important;
+            transform: scale(1.05) !important;
             transition: transform 0.2s ease !important;
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6) !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
         }
 
-        /* Ensure sticker text/emoji stands out on black background */
-        .message-sticker p {
-            color: white !important;
-            text-shadow: 0 0 15px rgba(102, 126, 234, 0.8) !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        /* Sticker animations - MUST BE PRESERVED */
-        .message-sticker.danceGame { animation-name: danceGameAnim !important; }
-        .message-sticker.jumpJoy { animation-name: jumpJoyAnim !important; }
-        .message-sticker.fireworksWin { animation-name: fireworksWinAnim !important; }
-        .message-sticker.spinCoin { animation-name: spinCoinAnim !important; }
-        .message-sticker.floatPower { animation-name: floatPowerAnim !important; }
-        .message-sticker.pulseHeart { animation-name: pulseHeartAnim !important; }
-        .message-sticker.bounceBall { animation-name: bounceBallAnim !important; }
-        .message-sticker.swayFlag { animation-name: swayFlagAnim !important; }
-        .message-sticker.twinkleStar { animation-name: twinkleStarAnim !important; }
-        .message-sticker.flutterConfetti { animation-name: flutterConfettiAnim !important; }
-        .message-sticker.glowAchievement { animation-name: glowAchievementAnim !important; }
-        .message-sticker.rocketLaunch { animation-name: rocketLaunchAnim !important; }
+        /* Sticker animations */
+        .message-sticker.loveHeart { animation-name: loveHeartAnim !important; }
+        .message-sticker.winkKiss { animation-name: winkKissAnim !important; }
+        .message-sticker.happyDance { animation-name: happyDanceAnim !important; }
+        .message-sticker.thinkingFace { animation-name: thinkingFaceAnim !important; }
+        .message-sticker.coffeeLove { animation-name: coffeeLoveAnim !important; }
+        .message-sticker.musicVibes { animation-name: musicVibesAnim !important; }
+        .message-sticker.thumbsUp { animation-name: thumbsUpAnim !important; }
+        .message-sticker.rainbowHeart { animation-name: rainbowHeartAnim !important; }
+        .message-sticker.nightSky { animation-name: nightSkyAnim !important; }
+        .message-sticker.cameraFlash { animation-name: cameraFlashAnim !important; }
+        .message-sticker.giftHeart { animation-name: giftHeartAnim !important; }
+        .message-sticker.messageBubble { animation-name: messageBubbleAnim !important; }
 
         /* Sticker message timestamp styling */
         .message.sticker-message .message-time {
-            color: #a0aec0 !important;
+            color: #6c757d !important;
             font-size: 11px !important;
             margin-top: 8px !important;
             text-align: center !important;
             width: 100% !important;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
 
-        /* Make sure sticker messages don't have the normal message background */
-        .message[data-message-type="sticker"] {
-            background: transparent !important;
+        /* Animation Elements - REAL LIFE THEME */
+        .animation-effect { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            pointer-events: none; 
+            z-index: 9999; 
         }
-
-        .message[data-message-type="sticker"] .message-content {
-            background: transparent !important;
+        
+        .heart, .smile, .laugh, .heart-eye, .hug, .kiss, .smile-heart, .angel, .star, .plead, .hand, .pray { 
+            position: absolute; 
+            font-size: 24px; 
+            animation: floatAnim 3s ease-in-out forwards; 
+            pointer-events: none;
         }
-
-        /* Animation enhancements for stickers on black background */
-        .message-sticker {
-            filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.4)) !important;
+        
+        /* Animation Keyframes - REAL LIFE THEME */
+        @keyframes floatAnim {
+            0% { 
+                transform: translateY(100vh) rotate(0deg) scale(0); 
+                opacity: 1; 
+            }
+            50% { 
+                transform: translateY(50vh) rotate(180deg) scale(1); 
+                opacity: 1; 
+            }
+            100% { 
+                transform: translateY(-100px) rotate(360deg) scale(0); 
+                opacity: 0; 
+            }
         }
-
-        .message-sticker.glowAchievement {
-            filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.8)) !important;
-        }
-
+        
         /* Mobile responsiveness for stickers */
         @media (max-width: 768px) {
             .message-sticker {
-                max-width: 180px !important;
-                padding: 15px 20px !important;
-                font-size: 2.5rem !important;
+                max-width: 160px !important;
+                padding: 12px 15px !important;
+                font-size: 2rem !important;
             }
             
             .message.sent .message-sticker {
@@ -1390,90 +1390,6 @@ function loadAnimationStyles() {
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
-        }
-
-        .message:has(.message-sticker) .message-bubble {
-            background: transparent !important;
-            border: none !important;
-        }
-
-        /* Animation Elements - GAMING THEME */
-        .animation-effect { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            pointer-events: none; 
-            z-index: 9999; 
-        }
-        
-        .gamepad, .trophy, .star, .target, .power, .explosion, .popper, .spell, .vortex, .dice, .fanfare { 
-            position: absolute; 
-            font-size: 24px; 
-            animation: gameFloat 3s ease-in-out forwards; 
-            pointer-events: none;
-            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
-        }
-        
-        .sparkle { 
-            position: absolute; 
-            font-size: 24px; 
-            animation: gameSparkle 2s ease-in-out forwards; 
-            pointer-events: none;
-            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
-        }
-
-        /* Animation Keyframes - GAMING THEME */
-        @keyframes gameFloat {
-            0% { 
-                transform: translateY(100vh) rotate(0deg) scale(0); 
-                opacity: 1; 
-                filter: brightness(1);
-            }
-            50% { 
-                transform: translateY(50vh) rotate(180deg) scale(1); 
-                opacity: 1; 
-                filter: brightness(1.5) drop-shadow(0 0 10px currentColor);
-            }
-            100% { 
-                transform: translateY(-100px) rotate(360deg) scale(0); 
-                opacity: 0; 
-                filter: brightness(1);
-            }
-        }
-        
-        @keyframes gameSparkle {
-            0% { 
-                transform: translateY(100vh) rotate(0deg) scale(0); 
-                opacity: 1; 
-                filter: brightness(1);
-            }
-            50% { 
-                transform: translateY(50vh) rotate(180deg) scale(1); 
-                opacity: 1; 
-                filter: brightness(2) drop-shadow(0 0 15px currentColor);
-            }
-            100% { 
-                transform: translateY(-50px) rotate(360deg) scale(0); 
-                opacity: 0; 
-                filter: brightness(1);
-            }
-        }
-        
-        @keyframes magicFloat {
-            0% { 
-                transform: translateY(100vh) rotate(0deg) scale(0); 
-                opacity: 0; 
-            }
-            50% { 
-                transform: translateY(50vh) rotate(180deg) scale(1); 
-                opacity: 1; 
-            }
-            100% { 
-                transform: translateY(-100px) rotate(360deg) scale(0); 
-                opacity: 0; 
-            }
         }
     `;
 
