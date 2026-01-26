@@ -194,6 +194,23 @@ class SocialManager {
         }
     }
 
+    // ==================== FORMAT COUNT FUNCTION (TikTok Style) ====================
+    formatCount(count) {
+        if (!count && count !== 0) return '0';
+        
+        const num = typeof count === 'number' ? count : parseInt(count);
+        
+        if (isNaN(num)) return '0';
+        
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+        }
+        
+        return num.toString();
+    }
+
     // ==================== POSTS PAGE WITH FILTERS ====================
     setupPostsPage() {
         // Add filter buttons if they don't exist
@@ -805,11 +822,11 @@ class SocialManager {
                 <div class="post-actions">
                     <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${post.id}">
                         <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> 
-                        <span class="like-count">${post.likes || 0}</span>
+                        <span class="like-count">${this.formatCount(post.likes || 0)}</span>
                     </button>
                     <button class="post-action comment-btn active" data-post-id="${post.id}">
                         <i class="far fa-comment"></i> 
-                        <span class="comment-count">${post.commentsCount || 0}</span>
+                        <span class="comment-count">${this.formatCount(post.commentsCount || 0)}</span>
                     </button>
                 </div>
                 
@@ -992,11 +1009,11 @@ class SocialManager {
             <div class="post-actions">
                 <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${postId}">
                     <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> 
-                    <span class="like-count">${post.likes || 0}</span>
+                    <span class="like-count">${this.formatCount(post.likes || 0)}</span>
                 </button>
                 <button class="post-action comment-btn" data-post-id="${postId}">
                     <i class="far fa-comment"></i> 
-                    <span class="comment-count">${post.commentsCount || 0}</span>
+                    <span class="comment-count">${this.formatCount(post.commentsCount || 0)}</span>
                 </button>
             </div>
             
@@ -1172,7 +1189,7 @@ class SocialManager {
                 const commentCount = document.querySelector('.comment-count');
                 if (commentCount) {
                     const currentCount = parseInt(commentCount.textContent) || 0;
-                    commentCount.textContent = currentCount + 1;
+                    commentCount.textContent = this.formatCount(currentCount + 1);
                 }
             } else {
                 await this.loadComments(postId);
@@ -1180,7 +1197,7 @@ class SocialManager {
                 const commentCount = document.querySelector(`.comment-btn[data-post-id="${postId}"] .comment-count`);
                 if (commentCount) {
                     const currentCount = parseInt(commentCount.textContent) || 0;
-                    commentCount.textContent = currentCount + 1;
+                    commentCount.textContent = this.formatCount(currentCount + 1);
                 }
             }
 
@@ -1218,7 +1235,7 @@ class SocialManager {
                 const likeIcon = likeButton.querySelector('i');
                 
                 if (likeCount) {
-                    likeCount.textContent = newLikes;
+                    likeCount.textContent = this.formatCount(newLikes);
                 }
                 
                 if (likeIcon) {
@@ -1305,7 +1322,7 @@ class SocialManager {
 
         if (indicator) {
             if (count > 0) {
-                indicator.innerHTML = `<i class="fas fa-images"></i><span style="font-size: 10px; margin-left: 2px;">${count}</span>`;
+                indicator.innerHTML = `<i class="fas fa-images"></i><span style="font-size: 10px; margin-left: 2px;">${this.formatCount(count)}</span>`;
                 indicator.style.display = 'flex';
             } else {
                 indicator.style.display = 'none';
@@ -1840,10 +1857,10 @@ class SocialManager {
             
             <div class="post-actions">
                 <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${postId}">
-                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> <span class="like-count">${post.likes || 0}</span>
+                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> <span class="like-count">${this.formatCount(post.likes || 0)}</span>
                 </button>
                 <button class="post-action comment-btn" data-post-id="${postId}">
-                    <i class="far fa-comment"></i> <span class="comment-count">${post.commentsCount || 0}</span>
+                    <i class="far fa-comment"></i> <span class="comment-count">${this.formatCount(post.commentsCount || 0)}</span>
                 </button>
             </div>
             
@@ -2080,8 +2097,8 @@ class SocialManager {
                     <span class="post-time">${this.formatTime(post.createdAt)}</span>
                 </div>
                 <div class="post-stats">
-                    <span class="post-stat"><i class="far fa-heart"></i> ${post.likes || 0}</span>
-                    <span class="post-stat"><i class="far fa-comment"></i> ${post.commentsCount || 0}</span>
+                    <span class="post-stat"><i class="far fa-heart"></i> ${this.formatCount(post.likes || 0)}</span>
+                    <span class="post-stat"><i class="far fa-comment"></i> ${this.formatCount(post.commentsCount || 0)}</span>
                 </div>
             </div>
             
