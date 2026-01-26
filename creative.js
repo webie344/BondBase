@@ -1,4 +1,4 @@
-// creative.js - COMPLETELY STANDALONE - No app.js dependencies - BDSM THEME
+// creative.js - COMPLETELY STANDALONE - No app.js dependencies - FUN & GAMING THEME
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -30,18 +30,18 @@ const db = getFirestore(app);
 class CreativeManager {
     constructor() {
         this.currentUser = null;
-this.BANNERS = [
-    { id: 'single',      name: 'Bondage Lover',    class: 'banner-single',      icon: '⛓️' },
-    { id: 'playboy',     name: 'Chastisement',     class: 'bplayboy',           icon: '⚡' },
-    { id: 'serious',     name: 'Foot Worshipper',  class: 'banner-serious',     icon: '🦶' },
-    { id: 'adventurous', name: 'Dominant',         class: 'banner-adventurous', icon: '🖤' },
-    { id: 'romantic',    name: 'Submissive',       class: 'banner-romantic',    icon: '🎀' },
-    { id: 'funny',       name: 'Roleplay Freak',   class: 'banner-funny',       icon: '🎭' },
-    { id: 'ambitious',   name: 'Pain Enthusiast',  class: 'banner-ambitious',   icon: '🩸' },
-    { id: 'chill',       name: 'Rope Bunny',       class: 'banner-chill',       icon: '🐇' },
-    { id: 'mysterious',  name: 'Masked Fantasy',   class: 'banner-mysterious',  icon: '🎭‍' },
-    { id: 'creative',    name: 'Kink Explorer',    class: 'banner-creative',    icon: '🔥' }
-];
+        this.BANNERS = [
+            { id: 'single',      name: 'Fun Lover',    class: 'banner-single',      icon: '🎮' },
+            { id: 'playboy',     name: 'Party Starter',     class: 'bplayboy',           icon: '🎉' },
+            { id: 'serious',     name: 'Strategy Master',  class: 'banner-serious',     icon: '♟️' },
+            { id: 'adventurous', name: 'Adventure Seeker',         class: 'banner-adventurous', icon: '🗺️' },
+            { id: 'romantic',    name: 'Fun Companion',       class: 'banner-romantic',    icon: '😊' },
+            { id: 'funny',       name: 'Gaming Joker',   class: 'banner-funny',       icon: '🤣' },
+            { id: 'ambitious',   name: 'Achievement Hunter',  class: 'banner-ambitious',   icon: '🏆' },
+            { id: 'chill',       name: 'Chill Gamer',       class: 'banner-chill',       icon: '🌿' },
+            { id: 'mysterious',  name: 'Mystery Player',   class: 'banner-mysterious',  icon: '🕵️' },
+            { id: 'creative',    name: 'Creative Gamer',    class: 'banner-creative',    icon: '✨' }
+        ];
         
         this.init();
     }
@@ -235,7 +235,7 @@ this.BANNERS = [
                 display: none;
             }
             
-            /* BDSM Theme Banner Gradients */
+            /* Fun & Gaming Theme Banner Gradients */
             .banner-single { 
                 background: linear-gradient(135deg, rgba(179, 0, 75, 0.9) 0%, rgba(122, 0, 52, 0.8) 100%);
                 border: 1px solid rgba(179, 0, 75, 0.3);
@@ -344,12 +344,12 @@ this.BANNERS = [
         if (profileSection && !document.getElementById('creativePhotosSection')) {
             const additionalPhotosHTML = `
                 <div class="creative-additional-photos" id="creativePhotosSection">
-                    <h3><i class="fas fa-images"></i> Additional Profile Photo</h3>
+                    <h3><i class="fas fa-images"></i> Fun Profile Photo</h3>
                     <div class="creative-photo-upload">
                         <img src="/images-default-profile.jpg" class="creative-additional-photo" id="creativePhoto2" onerror="this.src='/default-profile.jpg'">
                         <br>
                         <button class="creative-upload-btn" onclick="window.creativeManager.triggerPhotoUpload(2)">
-                            <i class="fas fa-camera"></i> Add Second Photo
+                            <i class="fas fa-camera"></i> Add Fun Photo
                         </button>
                         <input type="file" id="creativeFile2" class="creative-file-input" accept="image/*">
                         <button class="creative-remove-btn" onclick="window.creativeManager.removePhoto(2)">
@@ -377,7 +377,7 @@ this.BANNERS = [
         if (accountMain && !document.getElementById('creativeBannerSection')) {
             const bannersHTML = `
                 <div class="creative-banner-section" id="creativeBannerSection">
-                    <h3><i class="fas fa-flag"></i> Choose Your Profile Banner</h3>
+                    <h3><i class="fas fa-flag"></i> Choose Your Fun Profile Banner</h3>
                     <div class="creative-banner-grid" id="creativeBannerGrid">
                         ${this.BANNERS.map(banner => `
                             <div class="creative-banner-item ${banner.class}" data-banner="${banner.id}">
@@ -447,7 +447,7 @@ this.BANNERS = [
                 photoElement.style.opacity = '1';
             }
             
-            this.showNotification('Photo uploaded successfully!', 'success');
+            this.showNotification('Fun photo uploaded successfully!', 'success');
         } catch (error) {
             this.showNotification('Failed to upload photo. Please try again.', 'error');
         }
@@ -495,7 +495,7 @@ this.BANNERS = [
             }
             
             await this.saveToFirebase('selectedBanner', banner);
-            this.showNotification(`Banner set to: ${this.getBannerName(banner)}`, 'success');
+            this.showNotification(`Fun banner set to: ${this.getBannerName(banner)}`, 'success');
         } catch (error) {
             this.showNotification('Failed to update banner', 'error');
         }
