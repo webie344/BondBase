@@ -65,6 +65,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// ==================== NUMBER FORMATTING FUNCTION ====================
+function formatNumber(num) {
+    if (typeof num !== 'number') {
+        num = parseInt(num) || 0;
+    }
+    
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    } else if (num >= 1000) {
+        return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    }
+    return num.toString();
+}
+
 // ==================== GAMERS DIRECTORY FUNCTIONALITY ====================
 async function initGamersDirectory() {
     try {
@@ -404,7 +418,7 @@ function createProfileItem(profile) {
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                         </svg>
-                        ${profile.likes}
+                        ${formatNumber(profile.likes)}
                     </span>
                 ` : ''}
             </div>
@@ -432,7 +446,7 @@ function createProfileItem(profile) {
                         <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                         <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
-                    ${followersCount}
+                    ${formatNumber(followersCount)}
                 </span>
             </div>
             <button class="${buttonClass}" data-profile-id="${profile.id}" data-following="${profile.isFollowing}">
@@ -499,10 +513,11 @@ function createProfileItem(profile) {
                     clanBtn.classList.remove('added');
                     clanBtn.textContent = 'Follow';
                     
-                    // Update followers count
+                    // Update followers count with TikTok-style formatting
                     const clanCountSpan = div.querySelector('.clan-count');
-                    const currentCount = parseInt(clanCountSpan.textContent) || 0;
-                    clanCountSpan.textContent = Math.max(0, currentCount - 1);
+                    const currentCount = parseInt(clanCountSpan.textContent.replace(/[kM]$/, '')) || 0;
+                    const newCount = Math.max(0, currentCount - 1);
+                    clanCountSpan.textContent = formatNumber(newCount);
                     
                     showNotification(`Unfollowed ${profile.name}`, 'info');
                 } else {
@@ -519,10 +534,11 @@ function createProfileItem(profile) {
                     clanBtn.classList.add('added');
                     clanBtn.textContent = 'Following';
                     
-                    // Update followers count
+                    // Update followers count with TikTok-style formatting
                     const clanCountSpan = div.querySelector('.clan-count');
-                    const currentCount = parseInt(clanCountSpan.textContent) || 0;
-                    clanCountSpan.textContent = currentCount + 1;
+                    const currentCount = parseInt(clanCountSpan.textContent.replace(/[kM]$/, '')) || 0;
+                    const newCount = currentCount + 1;
+                    clanCountSpan.textContent = formatNumber(newCount);
                     
                     showNotification(`Now following ${profile.name}`, 'success');
                 }
@@ -691,20 +707,20 @@ function updateProfileInfo(profileId, userData) {
     const workshopCountElement = document.getElementById('viewWorkshopCount');
     const workshopCountElement2 = document.getElementById('viewWorkshopCount2');
     if (workshopCountElement) {
-        workshopCountElement.textContent = userData.workshops || 0;
+        workshopCountElement.textContent = formatNumber(userData.workshops || 0);
     }
     if (workshopCountElement2) {
-        workshopCountElement2.textContent = userData.workshops || 0;
+        workshopCountElement2.textContent = formatNumber(userData.workshops || 0);
     }
     
     // Update certification count
     const certCountElement = document.getElementById('viewCertCount');
     const certCountElement2 = document.getElementById('viewCertCount2');
     if (certCountElement) {
-        certCountElement.textContent = userData.certifications || 0;
+        certCountElement.textContent = formatNumber(userData.certifications || 0);
     }
     if (certCountElement2) {
-        certCountElement2.textContent = userData.certifications || 0;
+        certCountElement2.textContent = formatNumber(userData.certifications || 0);
     }
     
     // Update interests
@@ -762,10 +778,10 @@ async function updateFollowersCount(profileId) {
     try {
         const count = await getFollowersCount(profileId);
         
-        // Update followers count in profile stats
+        // Update followers count in profile stats with TikTok-style formatting
         const followersStat = document.getElementById('followersCount');
         if (followersStat) {
-            followersStat.textContent = count;
+            followersStat.textContent = formatNumber(count);
         }
         
     } catch (error) {
@@ -871,11 +887,11 @@ async function loadGamerProfile(profileId) {
                 if (gamerStatsGrid) {
                     gamerStatsGrid.innerHTML = `
                         <div class="gamer-stat-card">
-                            <div class="stat-value">${gamerProfile.wins || 0}</div>
+                            <div class="stat-value">${formatNumber(gamerProfile.wins || 0)}</div>
                             <div class="stat-label">Wins</div>
                         </div>
                         <div class="gamer-stat-card">
-                            <div class="stat-value">${gamerProfile.losses || 0}</div>
+                            <div class="stat-value">${formatNumber(gamerProfile.losses || 0)}</div>
                             <div class="stat-label">Losses</div>
                         </div>
                         <div class="gamer-stat-card">
@@ -883,7 +899,7 @@ async function loadGamerProfile(profileId) {
                             <div class="stat-label">K/D Ratio</div>
                         </div>
                         <div class="gamer-stat-card">
-                            <div class="stat-value">${gamerProfile.playHours || 0}</div>
+                            <div class="stat-value">${formatNumber(gamerProfile.playHours || 0)}</div>
                             <div class="stat-label">Hours Played</div>
                         </div>
                     `;
