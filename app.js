@@ -1,3 +1,4 @@
+//how do all those sites like telegram and Whatsapp do it in such a way that even before the page is open the data is already and the data updates smartly without wasting time when data is connected am using service worker for this my app.js but when I open the message page and chat page the message.html page when you open it it shows the message from when you started the app instead if the most recent message at the top until after some seconds that the latest message is updated to top normally when you send leave the chat page it's supposed to update the offline message list in the message.html so that it loads that at once instead if first showing the old data before updating:
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -455,13 +456,12 @@ const navToggle = document.getElementById('mobile-menu');
 const navMenu = document.querySelector('.nav-menu');
 const messageCountElements = document.querySelectorAll('.message-count');
 
-// NEW: Enhanced pre-load data for current page with instant display
+// NEW: Pre-load data for current page
 async function preloadPageData() {
     if (!currentUser) return;
 
     const page = window.location.pathname.split('/').pop().split('.')[0];
     
-    // Show cached data INSTANTLY
     switch(page) {
         case 'mingle':
             await preloadMingleData();
@@ -476,11 +476,6 @@ async function preloadPageData() {
             await preloadDashboardData();
             break;
     }
-    
-    // Then fetch fresh data in background
-    setTimeout(() => {
-        fetchFreshDataForPage(page);
-    }, 100);
 }
 
 async function preloadMingleData() {
@@ -512,16 +507,8 @@ async function preloadChatData() {
         const cachedMessages = await cache.getMessages(threadId);
         if (cachedMessages && cachedMessages.length > 0) {
             // Sort by timestamp and display
-            cachedMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Most recent first
+            cachedMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
             updateMessagesDisplay(cachedMessages, currentUser.uid);
-            
-            // Scroll to bottom for latest messages
-            const messagesContainer = document.getElementById('chatMessages');
-            if (messagesContainer) {
-                setTimeout(() => {
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                }, 50);
-            }
         }
         
         // Try to load partner data from cache
@@ -538,97 +525,6 @@ async function preloadDashboardData() {
     if (cachedUserData) {
         userChatPoints = cachedUserData.chatPoints || 0;
         updateChatPointsDisplay();
-    }
-}
-
-// NEW: Fetch fresh data in background
-async function fetchFreshDataForPage(page) {
-    if (!currentUser || !isOnline) return;
-    
-    switch(page) {
-        case 'mingle':
-            await loadProfiles(true); // Force refresh
-            break;
-        case 'messages':
-            await loadMessageThreads(true); // Force refresh
-            break;
-        case 'chat':
-            if (chatPartnerId) {
-                // Reload chat messages
-                if (unsubscribeChat) {
-                    unsubscribeChat();
-                }
-                loadChatMessages(currentUser.uid, chatPartnerId);
-            }
-            break;
-        case 'dashboard':
-            await loadUserChatPoints();
-            break;
-    }
-}
-
-// NEW: Proactive preloading based on user behavior
-function setupProactivePreloading() {
-    if (!currentUser) return;
-    
-    // Listen for navigation hints
-    document.querySelectorAll('a[href]').forEach(link => {
-        link.addEventListener('mouseenter', () => {
-            const href = link.getAttribute('href');
-            const page = href.split('/').pop().split('.')[0];
-            preloadSpecificPageData(page);
-        });
-        
-        // Preload on touch devices too
-        link.addEventListener('touchstart', () => {
-            const href = link.getAttribute('href');
-            const page = href.split('/').pop().split('.')[0];
-            preloadSpecificPageData(page);
-        });
-    });
-}
-
-// NEW: Preload data for specific page
-async function preloadSpecificPageData(page) {
-    if (!currentUser) return;
-    
-    switch(page) {
-        case 'mingle':
-            // Preload profiles data
-            if (!cache.get('mingle_preloaded')) {
-                await cache.init();
-                const profiles = await cache.getProfiles();
-                if (!profiles || profiles.length === 0) {
-                    // Fetch profiles in background
-                    fetch('https://your-api.com/profiles').catch(() => {});
-                }
-                cache.set('mingle_preloaded', true, 'short');
-            }
-            break;
-            
-        case 'messages':
-            // Preload conversations
-            if (!cache.get('messages_preloaded')) {
-                const conversations = await cache.getConversations();
-                if (!conversations || conversations.length === 0) {
-                    // Fetch conversations in background
-                    fetch('https://your-api.com/conversations').catch(() => {});
-                }
-                cache.set('messages_preloaded', true, 'short');
-            }
-            break;
-            
-        case 'dashboard':
-            // Preload user data
-            if (!cache.get(`user_${currentUser.uid}`)) {
-                const userRef = doc(db, 'users', currentUser.uid);
-                getDoc(userRef).then(snap => {
-                    if (snap.exists()) {
-                        cache.set(`user_${currentUser.uid}`, snap.data(), 'medium');
-                    }
-                });
-            }
-            break;
     }
 }
 
@@ -1230,11 +1126,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Always set up offline support even without Service Worker
     setupOfflineSupport();
-    
-    // Set up proactive preloading
-    setTimeout(() => {
-        setupProactivePreloading();
-    }, 2000);
     
     // Add loader styles immediately
     const style = document.createElement('style');
@@ -2078,38 +1969,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         @keyframes recording-pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
-        }
-        
-        /* NEW: Instant loading animations */
-        .instant-fade-in {
-            animation: instantFadeIn 0.2s ease-out;
-        }
-        
-        @keyframes instantFadeIn {
-            from { opacity: 0.5; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .cached-data {
-            opacity: 0.9;
-            position: relative;
-        }
-        
-        .cached-data::after {
-            content: '';
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            width: 8px;
-            height: 8px;
-            background: #4CAF50;
-            border-radius: 50%;
-            animation: cachedPulse 2s infinite;
-        }
-        
-        @keyframes cachedPulse {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
         }
     `;
     document.head.appendChild(style);
@@ -3597,11 +3456,6 @@ function displayMessage(message, currentUserId) {
     messageDiv.className = `message ${message.senderId === currentUserId ? 'sent' : 'received'}`;
     messageDiv.dataset.messageId = message.id;
     
-    // Add instant fade-in animation for cached data
-    if (message.isCached) {
-        messageDiv.classList.add('instant-fade-in', 'cached-data');
-    }
-    
     if (message.id && (message.id.startsWith('temp_') || message.status === 'sending')) {
         messageDiv.style.opacity = '0.7';
         messageDiv.classList.add('sending');
@@ -4207,8 +4061,6 @@ function displayCachedMessages(messages) {
     messages.forEach(message => {
         const existingMessage = document.querySelector(`[data-message-id="${message.id}"]`);
         if (!existingMessage) {
-            // Mark as cached for visual indication
-            message.isCached = true;
             displayMessage(message, currentUser.uid);
         }
     });
