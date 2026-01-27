@@ -1,4 +1,4 @@
-// gamers.js - Complete with Profile Page Integration
+// gamers.js - Complete with Profile Page Integration + Enhanced with IndexedDB & Service Worker
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -26,7 +26,7 @@ const firebaseConfig = {
     storageBucket: "usa-dating-23bc3.firebasestorage.app",
     messagingSenderId: "423286263327",
     appId: "1:423286263327:web:17f0caf843dc349c144f2a"
-  };
+};
 
 // Initialize Firebase
 let app, auth, db;
@@ -39,7 +39,326 @@ try {
     console.error('Firebase initialization error:', error);
 }
 
-// Global variables
+// ==================== INDEXEDDB CACHE SYSTEM ====================
+class GamersIndexedDBCache {
+    constructor() {
+        this.dbName = 'GamersAppDB';
+        this.dbVersion = 3;
+        this.db = null;
+    }
+
+    async init() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, this.dbVersion);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                this.db = request.result;
+                resolve(this.db);
+            };
+            
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                
+                // Create object stores
+                if (!db.objectStoreNames.contains('profiles')) {
+                    const profilesStore = db.createObjectStore('profiles', { keyPath: 'id' });
+                    profilesStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+                    profilesStore.createIndex('isOnline', 'isOnline', { unique: false });
+                }
+                if (!db.objectStoreNames.contains('gamerProfiles')) {
+                    db.createObjectStore('gamerProfiles', { keyPath: 'userId' });
+                }
+                if (!db.objectStoreNames.contains('profileDetails')) {
+                    db.createObjectStore('profileDetails', { keyPath: 'userId' });
+                }
+                if (!db.objectStoreNames.contains('followStatus')) {
+                    const followStore = db.createObjectStore('followStatus', { keyPath: 'id' });
+                    followStore.createIndex('userId_targetId', ['userId', 'targetId'], { unique: true });
+                }
+            };
+        });
+    }
+
+    async set(storeName, data) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put(data);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+        });
+    }
+
+    async get(storeName, key) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+        });
+    }
+
+    async getAll(storeName, indexName = null, queryValue = null) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            let request;
+            
+            if (indexName && queryValue) {
+                const index = store.index(indexName);
+                const range = IDBKeyRange.only(queryValue);
+                request = index.getAll(range);
+            } else {
+                request = store.getAll();
+            }
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result || []);
+        });
+    }
+
+    async delete(storeName, key) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.delete(key);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
+    }
+
+    async clear(storeName) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.clear();
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
+    }
+
+    async setProfiles(profiles) {
+        await this.init();
+        for (const profile of profiles) {
+            await this.set('profiles', {
+                ...profile,
+                lastUpdated: Date.now()
+            });
+        }
+    }
+
+    async getProfiles() {
+        await this.init();
+        return await this.getAll('profiles');
+    }
+
+    async setProfileDetail(userId, detail) {
+        await this.init();
+        return await this.set('profileDetails', {
+            userId,
+            ...detail,
+            lastUpdated: Date.now()
+        });
+    }
+
+    async getProfileDetail(userId) {
+        await this.init();
+        return await this.get('profileDetails', userId);
+    }
+
+    async setFollowStatus(userId, targetId, isFollowing) {
+        await this.init();
+        return await this.set('followStatus', {
+            id: `${userId}_${targetId}`,
+            userId,
+            targetId,
+            isFollowing,
+            lastUpdated: Date.now()
+        });
+    }
+
+    async getFollowStatus(userId, targetId) {
+        await this.init();
+        const status = await this.get('followStatus', `${userId}_${targetId}`);
+        return status ? status.isFollowing : false;
+    }
+}
+
+const indexedDBCache = new GamersIndexedDBCache();
+
+// ==================== SERVICE WORKER REGISTRATION ====================
+async function registerServiceWorker() {
+    if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('Service Worker registered for gamers.js');
+            
+            // Set up background sync if supported
+            if ('sync' in registration) {
+                try {
+                    await registration.sync.register('gamers-data-sync');
+                } catch (syncError) {
+                    console.log('Background sync not supported:', syncError);
+                }
+            }
+            
+            return registration;
+        } catch (error) {
+            console.log('Service Worker registration failed:', error);
+            return null;
+        }
+    }
+    return null;
+}
+
+// ==================== LOCAL CACHE SYSTEM ====================
+class LocalCache {
+    constructor() {
+        this.cachePrefix = 'gamers_';
+        this.cacheExpiry = {
+            short: 1 * 60 * 1000, // 1 minute
+            medium: 5 * 60 * 1000, // 5 minutes
+            long: 30 * 60 * 1000 // 30 minutes
+        };
+    }
+
+    set(key, data, expiryType = 'medium') {
+        try {
+            const item = {
+                data: data,
+                expiry: Date.now() + (this.cacheExpiry[expiryType] || this.cacheExpiry.medium)
+            };
+            localStorage.setItem(this.cachePrefix + key, JSON.stringify(item));
+        } catch (error) {
+            console.error('Cache set error:', error);
+        }
+    }
+
+    get(key) {
+        try {
+            const itemStr = localStorage.getItem(this.cachePrefix + key);
+            if (!itemStr) return null;
+            
+            const item = JSON.parse(itemStr);
+            if (Date.now() > item.expiry) {
+                localStorage.removeItem(this.cachePrefix + key);
+                return null;
+            }
+            return item.data;
+        } catch (error) {
+            console.error('Cache get error:', error);
+            return null;
+        }
+    }
+
+    remove(key) {
+        try {
+            localStorage.removeItem(this.cachePrefix + key);
+        } catch (error) {
+            console.error('Cache remove error:', error);
+        }
+    }
+
+    clear() {
+        try {
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith(this.cachePrefix)) {
+                    localStorage.removeItem(key);
+                }
+            });
+        } catch (error) {
+            console.error('Cache clear error:', error);
+        }
+    }
+}
+
+const cache = new LocalCache();
+
+// ==================== NETWORK MONITORING ====================
+let isOnline = navigator.onLine;
+
+function setupNetworkMonitoring() {
+    window.addEventListener('online', handleNetworkOnline);
+    window.addEventListener('offline', handleNetworkOffline);
+    
+    // Create offline indicator
+    const offlineIndicator = document.createElement('div');
+    offlineIndicator.id = 'offlineIndicator';
+    offlineIndicator.className = 'offline-indicator';
+    offlineIndicator.innerHTML = '<i class="fas fa-wifi"></i> You are currently offline. Some features may be limited.';
+    offlineIndicator.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: #ff6b6b;
+        color: white;
+        text-align: center;
+        padding: 10px;
+        z-index: 10001;
+        font-size: 14px;
+        display: none;
+    `;
+    document.body.appendChild(offlineIndicator);
+    
+    // Initial check
+    if (!isOnline) {
+        handleNetworkOffline();
+    }
+}
+
+async function handleNetworkOnline() {
+    isOnline = true;
+    
+    // Hide offline indicator
+    const offlineIndicator = document.getElementById('offlineIndicator');
+    if (offlineIndicator) {
+        offlineIndicator.style.display = 'none';
+    }
+    
+    showNotification('Connection restored', 'success', 2000);
+    
+    // Refresh data when coming online
+    if (isGamersPage) {
+        await loadAllProfiles(true); // Force refresh
+    } else if (isProfilePage) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const profileId = urlParams.get('id');
+        if (profileId) {
+            await loadProfileData(profileId, true); // Force refresh
+        }
+    }
+}
+
+function handleNetworkOffline() {
+    isOnline = false;
+    
+    // Show offline indicator
+    const offlineIndicator = document.getElementById('offlineIndicator');
+    if (offlineIndicator) {
+        offlineIndicator.style.display = 'block';
+    }
+    
+    showNotification('No internet connection - working offline', 'offline', 5000);
+}
+
+// ==================== GLOBAL VARIABLES ====================
 let currentUser = null;
 let allProfiles = [];
 let currentFilter = 'all';
@@ -49,14 +368,20 @@ const isProfilePage = window.location.pathname.includes('profile.html');
 const isGamersPage = window.location.pathname.includes('gamers.html') || 
                      window.location.pathname.includes('mingle.html');
 
-// Initialize based on page
-document.addEventListener('DOMContentLoaded', () => {
+// ==================== INITIALIZATION ====================
+document.addEventListener('DOMContentLoaded', async () => {
     console.log('Initializing... Current page:', window.location.pathname);
     
+    // Register Service Worker
+    await registerServiceWorker();
+    
+    // Setup network monitoring
+    setupNetworkMonitoring();
+    
     if (isGamersPage) {
-        initGamersDirectory();
+        await initGamersDirectory();
     } else if (isProfilePage) {
-        initProfilePage();
+        await initProfilePage();
     } else {
         // For other pages, just initialize auth
         onAuthStateChanged(auth, (user) => {
@@ -92,7 +417,7 @@ async function initGamersDirectory() {
             console.log('Auth state changed:', user ? 'User logged in' : 'No user');
             currentUser = user;
             
-            // Load profiles regardless of auth status
+            // Load profiles regardless of auth status (with caching)
             await loadAllProfiles();
             setupEventListeners();
         }, (error) => {
@@ -107,7 +432,7 @@ async function initGamersDirectory() {
     }
 }
 
-async function loadAllProfiles() {
+async function loadAllProfiles(forceRefresh = false) {
     const gamersListElement = document.getElementById('gamersList');
     if (!gamersListElement) {
         console.error('Cannot find #gamersList element');
@@ -116,12 +441,35 @@ async function loadAllProfiles() {
     
     console.log('Loading profiles...');
     
-    // Show loading state
+    // Show loading state using original loading elements
     gamersListElement.innerHTML = '';
     for (let i = 0; i < 3; i++) {
         gamersListElement.appendChild(createLoadingProfileItem());
     }
     
+    // Try to load from IndexedDB cache first (unless force refresh)
+    if (!forceRefresh) {
+        try {
+            const cachedProfiles = await indexedDBCache.getProfiles();
+            if (cachedProfiles && cachedProfiles.length > 0) {
+                console.log(`Loaded ${cachedProfiles.length} profiles from IndexedDB cache`);
+                allProfiles = cachedProfiles;
+                renderProfilesList();
+                
+                // Still fetch fresh data in background
+                setTimeout(() => fetchFreshProfiles(), 100);
+                return;
+            }
+        } catch (cacheError) {
+            console.log('Could not load from IndexedDB cache:', cacheError);
+        }
+    }
+    
+    // Load fresh data from Firebase
+    await fetchFreshProfiles();
+}
+
+async function fetchFreshProfiles() {
     try {
         if (!db) {
             console.error('Firestore not initialized');
@@ -160,7 +508,7 @@ async function loadAllProfiles() {
         const profiles = await Promise.all(profilePromises);
         allProfiles = profiles.filter(profile => profile !== null);
         
-        console.log(`Loaded ${allProfiles.length} profiles`);
+        console.log(`Loaded ${allProfiles.length} profiles from Firebase`);
         
         // Sort profiles: online first, then by name
         allProfiles.sort((a, b) => {
@@ -169,12 +517,31 @@ async function loadAllProfiles() {
             return a.name.localeCompare(b.name);
         });
         
+        // Cache in IndexedDB
+        try {
+            await indexedDBCache.setProfiles(allProfiles);
+            console.log('Profiles cached in IndexedDB');
+        } catch (cacheError) {
+            console.log('Could not cache profiles in IndexedDB:', cacheError);
+        }
+        
+        // Cache in localStorage with shorter expiry
+        cache.set('all_profiles', allProfiles, 'short');
+        
         // Render profiles
         renderProfilesList();
         
     } catch (error) {
         console.error('Error loading profiles:', error);
         showError(`Failed to load profiles: ${error.message}`, true);
+        
+        // Try to show cached data if available
+        const cachedProfiles = cache.get('all_profiles');
+        if (cachedProfiles && cachedProfiles.length > 0) {
+            console.log('Showing cached profiles from localStorage');
+            allProfiles = cachedProfiles;
+            renderProfilesList();
+        }
     }
 }
 
@@ -222,9 +589,21 @@ async function processUserProfile(userId, userData) {
         // Get followers count (clan count)
         profile.clanCount = await getFollowersCount(userId);
         
-        // Check if current user is following this user
+        // Check if current user is following this user (check cache first)
         if (currentUser) {
-            profile.isFollowing = await checkIfFollowing(userId, currentUser.uid);
+            try {
+                const cachedStatus = await indexedDBCache.getFollowStatus(currentUser.uid, userId);
+                if (cachedStatus !== undefined) {
+                    profile.isFollowing = cachedStatus;
+                } else {
+                    profile.isFollowing = await checkIfFollowing(userId, currentUser.uid);
+                    // Cache the result
+                    await indexedDBCache.setFollowStatus(currentUser.uid, userId, profile.isFollowing);
+                }
+            } catch (error) {
+                console.log('Error checking follow status:', error);
+                profile.isFollowing = await checkIfFollowing(userId, currentUser.uid);
+            }
         }
         
         return profile;
@@ -519,6 +898,9 @@ function createProfileItem(profile) {
                     const newCount = Math.max(0, currentCount - 1);
                     clanCountSpan.textContent = formatNumber(newCount);
                     
+                    // Update cache
+                    await indexedDBCache.setFollowStatus(currentUser.uid, profile.id, false);
+                    
                     showNotification(`Unfollowed ${profile.name}`, 'info');
                 } else {
                     // Follow
@@ -539,6 +921,9 @@ function createProfileItem(profile) {
                     const currentCount = parseInt(clanCountSpan.textContent.replace(/[kM]$/, '')) || 0;
                     const newCount = currentCount + 1;
                     clanCountSpan.textContent = formatNumber(newCount);
+                    
+                    // Update cache
+                    await indexedDBCache.setFollowStatus(currentUser.uid, profile.id, true);
                     
                     showNotification(`Now following ${profile.name}`, 'success');
                 }
@@ -600,7 +985,7 @@ async function initProfilePage() {
             console.log('Auth state changed:', user ? 'User logged in' : 'No user');
             currentUser = user;
             
-            // Load profile data
+            // Load profile data with caching
             await loadProfileData(profileId);
             setupProfileEventListeners(profileId);
         }, (error) => {
@@ -615,7 +1000,7 @@ async function initProfilePage() {
     }
 }
 
-async function loadProfileData(profileId) {
+async function loadProfileData(profileId, forceRefresh = false) {
     try {
         if (!db) {
             console.error('Firestore not initialized');
@@ -623,6 +1008,35 @@ async function loadProfileData(profileId) {
             return;
         }
         
+        // Try to load from cache first (unless force refresh)
+        if (!forceRefresh) {
+            try {
+                const cachedDetail = await indexedDBCache.getProfileDetail(profileId);
+                if (cachedDetail) {
+                    console.log('Loaded profile detail from IndexedDB cache');
+                    updateProfileHeader(profileId, cachedDetail);
+                    updateProfileInfo(profileId, cachedDetail);
+                    
+                    // Still fetch fresh data in background
+                    setTimeout(() => fetchFreshProfileData(profileId), 100);
+                    return;
+                }
+            } catch (cacheError) {
+                console.log('Could not load from IndexedDB cache:', cacheError);
+            }
+        }
+        
+        // Load fresh data from Firebase
+        await fetchFreshProfileData(profileId);
+        
+    } catch (error) {
+        console.error('Error loading profile data:', error);
+        showError(`Failed to load profile: ${error.message}`, true);
+    }
+}
+
+async function fetchFreshProfileData(profileId) {
+    try {
         // Load user profile data
         const userRef = doc(db, 'users', profileId);
         const userSnap = await getDoc(userRef);
@@ -649,9 +1063,16 @@ async function loadProfileData(profileId) {
         // Load gamer profile if exists
         await loadGamerProfile(profileId);
         
+        // Cache the profile detail
+        try {
+            await indexedDBCache.setProfileDetail(profileId, userData);
+            console.log('Profile detail cached in IndexedDB');
+        } catch (cacheError) {
+            console.log('Could not cache profile detail:', cacheError);
+        }
+        
     } catch (error) {
-        console.error('Error loading profile data:', error);
-        showError(`Failed to load profile: ${error.message}`, true);
+        console.error('Error loading fresh profile data:', error);
     }
 }
 
@@ -807,8 +1228,21 @@ async function updateFollowButton(profileId) {
         return;
     }
     
-    // Check if following
-    const isFollowing = await checkIfFollowing(profileId, currentUser.uid);
+    // Check if following (check cache first)
+    let isFollowing = false;
+    try {
+        const cachedStatus = await indexedDBCache.getFollowStatus(currentUser.uid, profileId);
+        if (cachedStatus !== undefined) {
+            isFollowing = cachedStatus;
+        } else {
+            isFollowing = await checkIfFollowing(profileId, currentUser.uid);
+            // Cache the result
+            await indexedDBCache.setFollowStatus(currentUser.uid, profileId, isFollowing);
+        }
+    } catch (error) {
+        console.log('Error checking follow status from cache:', error);
+        isFollowing = await checkIfFollowing(profileId, currentUser.uid);
+    }
     
     if (isFollowing) {
         followBtn.innerHTML = '<svg class="feather" data-feather="user-check"></svg> Following';
@@ -945,6 +1379,9 @@ function setupProfileEventListeners(profileId) {
                     // Update followers count
                     await updateFollowersCount(profileId);
                     
+                    // Update cache
+                    await indexedDBCache.setFollowStatus(currentUser.uid, profileId, false);
+                    
                     showNotification(`Unfollowed user`, 'info');
                 } else {
                     // Follow
@@ -956,6 +1393,9 @@ function setupProfileEventListeners(profileId) {
                     
                     // Update followers count
                     await updateFollowersCount(profileId);
+                    
+                    // Update cache
+                    await indexedDBCache.setFollowStatus(currentUser.uid, profileId, true);
                     
                     showNotification(`Now following user`, 'success');
                 }
@@ -1283,4 +1723,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('gamers.js loaded successfully - Profile integration ready');
+console.log('gamers.js loaded successfully - Profile integration ready with IndexedDB caching and Service Worker support');
