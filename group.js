@@ -3381,9 +3381,7 @@ class GroupChat {
                 color: inherit;
             }
             
-            .group-item-telegram:hover {
-                background-color: #f8f9fa;
-            }
+            
             
             .group-item-telegram.active {
                 background-color: #e9ecef;
