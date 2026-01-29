@@ -1,6 +1,5 @@
-// gamers.js - Complete with Profile Page Integration + Enhanced with IndexedDB & Service Worker
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { 
+import {
     getAuth, 
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -15,7 +14,9 @@ import {
     updateDoc,
     arrayUnion,
     arrayRemove,
-    serverTimestamp
+    serverTimestamp,
+    increment,
+    Timestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -75,6 +76,9 @@ class GamersIndexedDBCache {
                 if (!db.objectStoreNames.contains('followStatus')) {
                     const followStore = db.createObjectStore('followStatus', { keyPath: 'id' });
                     followStore.createIndex('userId_targetId', ['userId', 'targetId'], { unique: true });
+                }
+                if (!db.objectStoreNames.contains('xpData')) {
+                    db.createObjectStore('xpData', { keyPath: 'userId' });
                 }
             };
         });
@@ -197,6 +201,20 @@ class GamersIndexedDBCache {
         await this.init();
         const status = await this.get('followStatus', `${userId}_${targetId}`);
         return status ? status.isFollowing : false;
+    }
+
+    async setXPData(userId, xpData) {
+        await this.init();
+        return await this.set('xpData', {
+            userId,
+            ...xpData,
+            lastUpdated: Date.now()
+        });
+    }
+
+    async getXPData(userId) {
+        await this.init();
+        return await this.get('xpData', userId);
     }
 }
 
@@ -362,11 +380,114 @@ function handleNetworkOffline() {
 let currentUser = null;
 let allProfiles = [];
 let currentFilter = 'all';
+let xpSystem = null;
 
 // Check if we're on profile page or gamers directory
 const isProfilePage = window.location.pathname.includes('profile.html');
 const isGamersPage = window.location.pathname.includes('gamers.html') || 
                      window.location.pathname.includes('mingle.html');
+const isXpPage = window.location.pathname.includes('xp.html');
+
+// ==================== XP SYSTEM INTEGRATION ====================
+// Import XP system
+async function loadXPSystem() {
+    if (xpSystem) return xpSystem;
+    
+    try {
+        // Dynamically import the XP system
+        const xpModule = await import('./xp.js');
+        xpSystem = xpModule.XPSystem || window.XPSystem;
+        
+        if (!xpSystem) {
+            console.error('XP System not found');
+            return null;
+        }
+        
+        // Initialize XP system
+        await xpSystem.initialize();
+        
+        // Start XP tracking for online activity
+        startXPTracking();
+        
+        console.log('XP System loaded successfully');
+        return xpSystem;
+    } catch (error) {
+        console.error('Error loading XP system:', error);
+        return null;
+    }
+}
+
+// Start XP tracking for user activity
+function startXPTracking() {
+    if (!xpSystem) return;
+    
+    // Track user activity for XP rewards
+    let activityTimer = null;
+    let lastActivityTime = Date.now();
+    
+    // Award XP for various activities
+    const awardXPForActivity = async (activity, xpAmount, reason) => {
+        try {
+            if (xpSystem && currentUser) {
+                await xpSystem.addXP(xpAmount, reason);
+                console.log(`Awarded ${xpAmount} XP for ${activity}`);
+            }
+        } catch (error) {
+            console.error(`Error awarding XP for ${activity}:`, error);
+        }
+    };
+    
+    // Monitor user activity
+    const activityEvents = ['click', 'scroll', 'mousemove', 'keydown'];
+    activityEvents.forEach(event => {
+        document.addEventListener(event, () => {
+            lastActivityTime = Date.now();
+            
+            // Clear existing timer
+            if (activityTimer) clearTimeout(activityTimer);
+            
+            // Set new timer to award XP after 3 minutes of activity
+            activityTimer = setTimeout(async () => {
+                const timeSinceLastActivity = Date.now() - lastActivityTime;
+                if (timeSinceLastActivity >= 3 * 60 * 1000) { // 3 minutes
+                    await awardXPForActivity('online_activity', 10, '3 Minutes Online Activity');
+                }
+            }, 3 * 60 * 1000); // Check every 3 minutes
+        }, { passive: true });
+    });
+    
+    // Award XP for profile views
+    if (isProfilePage) {
+        setTimeout(async () => {
+            await awardXPForActivity('profile_view', 5, 'Viewed a Profile');
+        }, 5000);
+    }
+    
+    // Award XP for sending messages
+    const messageButtons = document.querySelectorAll('.message-gamer-btn, #messageProfileBtn');
+    messageButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+            setTimeout(async () => {
+                await awardXPForActivity('message_sent', 5, 'Sent a Message');
+            }, 1000);
+        });
+    });
+    
+    // Award XP for adding friends/following
+    const followButtons = document.querySelectorAll('.add-clan-btn, #likeProfileBtn');
+    followButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+            if (button.classList.contains('added') || button.dataset.following === 'true') {
+                // Already following, do nothing
+                return;
+            }
+            
+            setTimeout(async () => {
+                await awardXPForActivity('friend_add', 15, 'Added a Friend');
+            }, 1000);
+        });
+    });
+}
 
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -377,6 +498,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Setup network monitoring
     setupNetworkMonitoring();
+    
+    // Load XP System (except on xp.html where it loads itself)
+    if (!isXpPage) {
+        await loadXPSystem();
+    }
     
     if (isGamersPage) {
         await initGamersDirectory();
@@ -562,7 +688,9 @@ async function processUserProfile(userId, userData) {
             isGamer: false,
             gamerProfile: null,
             clanCount: 0, // Followers count
-            isFollowing: false // Whether current user is following this user
+            isFollowing: false, // Whether current user is following this user
+            xpLevel: 1, // Default XP level
+            xpRank: "Newbie Explorer" // Default XP rank
         };
         
         // Get online status
@@ -606,12 +734,55 @@ async function processUserProfile(userId, userData) {
             }
         }
         
+        // Get XP data for this user
+        try {
+            const xpRef = doc(db, 'xpData', userId);
+            const xpSnap = await getDoc(xpRef);
+            if (xpSnap.exists()) {
+                const xpData = xpSnap.data();
+                profile.xpLevel = xpData.currentLevel || 1;
+                profile.totalXP = xpData.totalXP || 0;
+                profile.coins = xpData.coins || 0;
+                
+                // Determine rank based on XP
+                const rank = getRankFromXP(profile.totalXP);
+                profile.xpRank = rank.title;
+                profile.xpIcon = rank.icon;
+            }
+        } catch (error) {
+            console.log('No XP data for user:', userId);
+        }
+        
         return profile;
         
     } catch (error) {
         console.error('Error processing user profile:', userId, error);
         return null;
     }
+}
+
+// Helper function to get rank from XP
+function getRankFromXP(xp) {
+    const XP_RANKS = [
+        { level: 1, title: "Newbie Explorer", xpNeeded: 0, icon: "🌱", color: "#808080" },
+        { level: 2, title: "Apprentice Adventurer", xpNeeded: 100, icon: "🎒", color: "#A0522D" },
+        { level: 3, title: "Journeyman Voyager", xpNeeded: 200, icon: "🗺️", color: "#4682B4" },
+        { level: 4, title: "Skilled Pathfinder", xpNeeded: 350, icon: "🧭", color: "#32CD32" },
+        { level: 5, title: "Experienced Trailblazer", xpNeeded: 550, icon: "🔥", color: "#FF4500" }
+    ];
+    
+    // Default to first rank
+    let userRank = XP_RANKS[0];
+    
+    // Find the highest rank the user has achieved
+    for (let i = XP_RANKS.length - 1; i >= 0; i--) {
+        if (xp >= XP_RANKS[i].xpNeeded) {
+            userRank = XP_RANKS[i];
+            break;
+        }
+    }
+    
+    return userRank;
 }
 
 async function getFollowersCount(userId) {
@@ -699,6 +870,9 @@ function renderProfilesList() {
         case 'clan':
             filteredProfiles = allProfiles.filter(p => p.clanCount > 0);
             break;
+        case 'xp':
+            filteredProfiles = allProfiles.filter(p => p.xpLevel && p.xpLevel >= 10);
+            break;
     }
     
     if (filteredProfiles.length === 0) {
@@ -758,9 +932,20 @@ function createProfileItem(profile) {
     const buttonClass = profile.isFollowing ? 'add-clan-btn added' : 'add-clan-btn';
     const followersCount = profile.clanCount || 0;
     
+    // XP Badge
+    const xpBadge = profile.xpLevel ? `
+        <span class="attribute-tag" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none;">
+            <span style="margin-right: 3px;">${profile.xpIcon || '🌱'}</span>
+            Lvl ${profile.xpLevel}
+        </span>
+    ` : '';
+    
     div.innerHTML = `
-        <img src="${profile.profileImage}" alt="${profile.name}" class="gamer-avatar" 
-             onerror="this.onerror=null; this.src='images-default-profile.jpg';">
+        <div style="position: relative;">
+            <img src="${profile.profileImage}" alt="${profile.name}" class="gamer-avatar" 
+                 onerror="this.onerror=null; this.src='images-default-profile.jpg';">
+            ${xpBadge}
+        </div>
         <div class="gamer-info">
             <div class="gamer-header">
                 <span class="gamer-name">${profile.name}</span>
@@ -777,13 +962,13 @@ function createProfileItem(profile) {
                         ${profile.gamerProfile.rank}
                     </span>
                 ` : ''}
-                ${profile.isGamer && profile.gamerProfile?.level ? `
+                ${profile.xpLevel ? `
                     <span class="gamer-stat gamer-level">
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                             <polyline points="17 6 23 6 23 12"></polyline>
                         </svg>
-                        Lvl ${profile.gamerProfile.level}
+                        Lvl ${profile.xpLevel}
                     </span>
                 ` : ''}
                 <span class="gamer-stat" title="${profile.isOnline ? 'Online' : 'Offline'}">
@@ -925,6 +1110,11 @@ function createProfileItem(profile) {
                     // Update cache
                     await indexedDBCache.setFollowStatus(currentUser.uid, profile.id, true);
                     
+                    // Award XP for following someone
+                    if (xpSystem) {
+                        await xpSystem.addXP(15, `Followed ${profile.name}`);
+                    }
+                    
                     showNotification(`Now following ${profile.name}`, 'success');
                 }
             } catch (error) {
@@ -952,7 +1142,7 @@ function createProfileItem(profile) {
                 return;
             }
             
-            // Redirect to chat page with this user's ID - FIXED: Use ?id= not ?userId=
+            // Redirect to chat page with this user's ID
             window.location.href = `chat.html?id=${profile.id}`;
         });
     }
@@ -988,6 +1178,9 @@ async function initProfilePage() {
             // Load profile data with caching
             await loadProfileData(profileId);
             setupProfileEventListeners(profileId);
+            
+            // Add XP display to profile page
+            await addXPDisplayToProfile(profileId);
         }, (error) => {
             console.error('Auth error:', error);
             loadProfileData(profileId);
@@ -997,6 +1190,144 @@ async function initProfilePage() {
     } catch (error) {
         console.error('Error initializing profile page:', error);
         showError('Failed to load profile. Please refresh.', true);
+    }
+}
+
+async function addXPDisplayToProfile(profileId) {
+    try {
+        // Get XP data for this profile
+        const xpRef = doc(db, 'xpData', profileId);
+        const xpSnap = await getDoc(xpRef);
+        
+        if (xpSnap.exists()) {
+            const xpData = xpSnap.data();
+            const currentLevel = calculateLevelFromXP(xpData.totalXP || 0);
+            const rank = getRankFromXP(xpData.totalXP || 0);
+            
+            // Create XP display element
+            const xpDisplay = document.createElement('div');
+            xpDisplay.className = 'profile-xp-display';
+            xpDisplay.style.cssText = `
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                color: white;
+                padding: 15px;
+                border-radius: 15px;
+                margin: 20px 0;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            `;
+            
+            xpDisplay.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="font-size: 30px;">${rank.icon}</div>
+                    <div>
+                        <div style="font-size: 18px; font-weight: bold;">${rank.title}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">Level ${currentLevel}</div>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 24px; font-weight: bold;">${xpData.totalXP || 0} XP</div>
+                    <div style="font-size: 16px; opacity: 0.9;">${xpData.coins || 0} 🪙 Coins</div>
+                </div>
+            `;
+            
+            // Find where to insert the XP display
+            const profileContainer = document.querySelector('.profile-container, .profile-content');
+            if (profileContainer) {
+                // Insert after the basic profile info
+                const basicInfo = profileContainer.querySelector('.profile-basic-info, .profile-header');
+                if (basicInfo) {
+                    basicInfo.insertAdjacentElement('afterend', xpDisplay);
+                } else {
+                    profileContainer.prepend(xpDisplay);
+                }
+            }
+            
+            // Add floating triumph icons around profile picture
+            addTriumphIconsToProfile(profileId, currentLevel);
+        }
+    } catch (error) {
+        console.error('Error adding XP display to profile:', error);
+    }
+}
+
+function calculateLevelFromXP(xp) {
+    // Simple level calculation formula
+    if (xp < 100) return 1;
+    if (xp < 300) return 2;
+    if (xp < 600) return 3;
+    if (xp < 1000) return 4;
+    if (xp < 1500) return 5;
+    if (xp < 2100) return 6;
+    if (xp < 2800) return 7;
+    if (xp < 3600) return 8;
+    if (xp < 4500) return 9;
+    if (xp < 5500) return 10;
+    // For higher levels, continue the pattern
+    return Math.floor(Math.sqrt(xp / 100)) + 1;
+}
+
+function addTriumphIconsToProfile(profileId, level) {
+    const profilePic = document.querySelector('.profile-pic, .profile-avatar, [class*="avatar"], img[alt*="profile"]');
+    if (!profilePic) return;
+    
+    // Create container for floating icons
+    const iconContainer = document.createElement('div');
+    iconContainer.className = 'triumph-icons-container';
+    iconContainer.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 5;
+    `;
+    
+    // Determine number of icons based on level
+    const iconCount = Math.min(Math.floor(level / 5), 10);
+    const triumphIcons = ['🏆', '⭐', '👑', '💎', '🔥', '✨', '🎮', '⚔️', '🛡️', '🌟'];
+    
+    // Add floating icons
+    for (let i = 0; i < iconCount; i++) {
+        const icon = document.createElement('div');
+        icon.className = 'triumph-icon';
+        icon.textContent = triumphIcons[i % triumphIcons.length];
+        icon.style.cssText = `
+            position: absolute;
+            font-size: ${20 + (level / 10)}px;
+            opacity: 0.7;
+            animation: triumphFloat ${3 + Math.random() * 5}s infinite ease-in-out;
+            filter: drop-shadow(0 0 5px gold);
+        `;
+        
+        // Random starting position in a circle around the profile picture
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 80 + (level * 2);
+        icon.style.left = `calc(50% + ${Math.cos(angle) * radius}px)`;
+        icon.style.top = `calc(50% + ${Math.sin(angle) * radius}px)`;
+        
+        iconContainer.appendChild(icon);
+    }
+    
+    profilePic.parentElement.style.position = 'relative';
+    profilePic.parentElement.appendChild(iconContainer);
+    
+    // Add animation style if not exists
+    if (!document.getElementById('triumphAnimations')) {
+        const style = document.createElement('style');
+        style.id = 'triumphAnimations';
+        style.textContent = `
+            @keyframes triumphFloat {
+                0%, 100% { transform: translate(0, 0) rotate(0deg); }
+                25% { transform: translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px) rotate(90deg); }
+                50% { transform: translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px) rotate(180deg); }
+                75% { transform: translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px) rotate(270deg); }
+            }
+        `;
+        document.head.appendChild(style);
     }
 }
 
@@ -1397,6 +1728,11 @@ function setupProfileEventListeners(profileId) {
                     // Update cache
                     await indexedDBCache.setFollowStatus(currentUser.uid, profileId, true);
                     
+                    // Award XP for following someone
+                    if (xpSystem) {
+                        await xpSystem.addXP(15, 'Followed a User');
+                    }
+                    
                     showNotification(`Now following user`, 'success');
                 }
                 
@@ -1426,8 +1762,15 @@ function setupProfileEventListeners(profileId) {
                 return;
             }
             
-            // Redirect to chat page with this user's ID - FIXED: Use ?id= not ?userId=
+            // Redirect to chat page with this user's ID
             window.location.href = `chat.html?id=${profileId}`;
+            
+            // Award XP for sending a message (will be awarded when chat opens)
+            if (xpSystem) {
+                setTimeout(async () => {
+                    await xpSystem.addXP(5, 'Sent a Message');
+                }, 1000);
+            }
         });
     }
 }
@@ -1511,7 +1854,8 @@ function setupEventListeners() {
                     profile.location.toLowerCase().includes(searchTerm) ||
                     (profile.gamerProfile?.primaryGame?.toLowerCase().includes(searchTerm)) ||
                     profile.email.toLowerCase().includes(searchTerm) ||
-                    profile.bio.toLowerCase().includes(searchTerm)
+                    profile.bio.toLowerCase().includes(searchTerm) ||
+                    (profile.xpRank && profile.xpRank.toLowerCase().includes(searchTerm))
                 );
                 displayFilteredProfiles(filtered);
             } else {
@@ -1530,6 +1874,22 @@ function setupEventListeners() {
             renderProfilesList();
         });
     });
+    
+    // Add XP filter button if not exists
+    const filterContainer = document.querySelector('.filters');
+    if (filterContainer && !document.querySelector('.filter-btn[data-filter="xp"]')) {
+        const xpFilterBtn = document.createElement('button');
+        xpFilterBtn.className = 'filter-btn';
+        xpFilterBtn.dataset.filter = 'xp';
+        xpFilterBtn.innerHTML = '<i class="fas fa-trophy"></i> High XP';
+        xpFilterBtn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            xpFilterBtn.classList.add('active');
+            currentFilter = 'xp';
+            renderProfilesList();
+        });
+        filterContainer.appendChild(xpFilterBtn);
+    }
     
     console.log('Event listeners set up');
 }
@@ -1723,4 +2083,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('gamers.js loaded successfully - Profile integration ready with IndexedDB caching and Service Worker support');
+console.log('gamers.js loaded successfully - Profile integration ready with IndexedDB caching, Service Worker support, and XP System integration');

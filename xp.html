@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XP & Rank System - Gamers Network</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #ff2a6d;
+            --secondary-color: #05d9e8;
+            --dark-bg: #01012b;
+            --card-bg: #0a0a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #a9a9b8;
+            --success-color: #00ff9d;
+            --warning-color: #ffd700;
+            --danger-color: #ff4162;
+            --progress-bg: #1a1a3a;
+            --border-color: #2a2a5a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), #ff6b9d);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(255, 42, 109, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 30px 30px;
+            animation: float 20s linear infinite;
+            z-index: 0;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(-30px, -30px) rotate(360deg); }
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .user-xp-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 3px solid white;
+            object-fit: cover;
+        }
+
+        .xp-details h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            color: white;
+        }
+
+        .current-rank {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            color: var(--warning-color);
+            margin-bottom: 10px;
+        }
+
+        .xp-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 15px;
+            border-radius: 10px;
+            min-width: 120px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--success-color);
+        }
+
+        .coins-display {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            padding: 15px 25px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .coins-display i {
+            font-size: 28px;
+            color: #FFF;
+            animation: coinSpin 3s linear infinite;
+        }
+
+        @keyframes coinSpin {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(360deg); }
+        }
+
+        .coins-amount {
+            font-size: 32px;
+            font-weight: bold;
+            color: #FFF;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* Progress Section */
+        .progress-section {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 22px;
+            margin-bottom: 20px;
+            color: var(--secondary-color);
+        }
+
+        .level-progress {
+            margin-bottom: 25px;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .level-display {
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+
+        .xp-needed {
+            font-size: 14px;
+            color: var(--warning-color);
+        }
+
+        .progress-bar-container {
+            height: 20px;
+            background: var(--progress-bg);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 10px;
+            width: 0%;
+            transition: width 1.5s ease-in-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .progress-percentage {
+            position: absolute;
+            right: 10px;
+            top: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .next-rank-preview {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .next-rank-info h4 {
+            color: var(--success-color);
+            margin-bottom: 5px;
+        }
+
+        .next-rank-icon {
+            font-size: 40px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Milestones Section */
+        .milestones-section {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+
+        .milestones-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .milestone-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            transition: transform 0.3s, background 0.3s;
+            cursor: pointer;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .milestone-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .milestone-card.completed {
+            border-left-color: var(--success-color);
+            background: rgba(0, 255, 157, 0.1);
+        }
+
+        .milestone-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .milestone-icon {
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .milestone-xp {
+            margin-left: auto;
+            color: var(--warning-color);
+            font-weight: bold;
+        }
+
+        /* Ranks Gallery Section */
+        .ranks-section {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+
+        .ranks-filter {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 20px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .ranks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .rank-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .rank-card.current {
+            border: 2px solid var(--success-color);
+            box-shadow: 0 0 15px rgba(0, 255, 157, 0.5);
+            transform: scale(1.05);
+        }
+
+        .rank-card.achieved {
+            background: rgba(0, 255, 157, 0.1);
+        }
+
+        .rank-level {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--primary-color);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .rank-icon {
+            font-size: 40px;
+            margin: 10px 0;
+        }
+
+        .rank-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: var(--text-primary);
+        }
+
+        .rank-xp {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* XP History Section */
+        .history-section {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+
+        .xp-history {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .xp-event {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid transparent;
+        }
+
+        .xp-event.earned {
+            border-left-color: var(--success-color);
+        }
+
+        .xp-event.spent {
+            border-left-color: var(--danger-color);
+        }
+
+        .event-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            font-size: 18px;
+        }
+
+        .event-details {
+            flex-grow: 1;
+        }
+
+        .event-title {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .event-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .xp-change {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .xp-change.positive {
+            color: var(--success-color);
+        }
+
+        .xp-change.negative {
+            color: var(--danger-color);
+        }
+
+        /* Navigation */
+        .nav-tabs {
+            display: flex;
+            background: var(--card-bg);
+            border-radius: 15px;
+            margin-bottom: 30px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .nav-tab {
+            flex: 1;
+            text-align: center;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .nav-tab:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .nav-tab.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* Animations */
+        @keyframes xpGain {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .xp-gain-animation {
+            animation: xpGain 0.5s ease-in-out;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .xp-stats {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .ranks-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+            
+            .container {
+                padding: 10px;
+            }
+        }
+
+        /* Floating Icons Animation */
+        .floating-icons {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .floating-icon {
+            position: absolute;
+            font-size: 24px;
+            opacity: 0.1;
+            animation: floatAround 20s linear infinite;
+        }
+
+        @keyframes floatAround {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.1;
+            }
+            90% {
+                opacity: 0.1;
+            }
+            100% {
+                transform: translate(100vw, 100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="floating-icons" id="floatingIcons"></div>
+
+    <div class="container">
+        <!-- Header with User XP Info -->
+        <div class="header">
+            <div class="header-content">
+                <div class="user-xp-info">
+                    <img src="images-default-profile.jpg" alt="User Avatar" class="user-avatar" id="userAvatar">
+                    <div class="xp-details">
+                        <h1 id="userName">Loading...</h1>
+                        <div class="current-rank">
+                            <span id="currentRankIcon">🏆</span>
+                            <span id="currentRankTitle">Loading Rank...</span>
+                        </div>
+                        <div class="xp-stats">
+                            <div class="stat-box">
+                                <div class="stat-label">Current Level</div>
+                                <div class="stat-value" id="currentLevel">1</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">Total XP</div>
+                                <div class="stat-value" id="totalXP">0</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">XP to Next</div>
+                                <div class="stat-value" id="xpToNext">100</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="coins-display">
+                    <i class="fas fa-coins"></i>
+                    <div class="coins-amount" id="coinsAmount">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <a href="gamers.html" class="nav-tab">
+                <i class="fas fa-users"></i> Gamers
+            </a>
+            <a href="profile.html" class="nav-tab">
+                <i class="fas fa-user"></i> Profile
+            </a>
+            <a href="#" class="nav-tab active">
+                <i class="fas fa-trophy"></i> XP System
+            </a>
+            <a href="chat.html" class="nav-tab">
+                <i class="fas fa-comments"></i> Chat
+            </a>
+        </div>
+
+        <!-- Progress to Next Level -->
+        <div class="progress-section">
+            <h2 class="section-title">
+                <i class="fas fa-chart-line"></i> Level Progress
+            </h2>
+            <div class="level-progress">
+                <div class="progress-header">
+                    <div class="level-display">Level <span id="currentLevelDisplay">1</span> • <span id="currentTitle">Newbie Explorer</span></div>
+                    <div class="xp-needed" id="xpNeededDisplay">0/100 XP</div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="xpProgressBar" style="width: 0%"></div>
+                    <div class="progress-percentage" id="xpPercentage">0%</div>
+                </div>
+            </div>
+            <div class="next-rank-preview">
+                <div class="next-rank-info">
+                    <h4>Next Rank: <span id="nextRankTitle">Apprentice Adventurer</span></h4>
+                    <p>Earn <span id="nextRankXPNeeded">100</span> more XP to level up!</p>
+                </div>
+                <div class="next-rank-icon" id="nextRankIcon">🎒</div>
+            </div>
+        </div>
+
+        <!-- Milestones Section -->
+        <div class="milestones-section">
+            <h2 class="section-title">
+                <i class="fas fa-flag-checkered"></i> Recent Milestones
+            </h2>
+            <div class="milestones-grid" id="milestonesGrid">
+                <!-- Milestones will be loaded here -->
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- All Ranks Gallery -->
+        <div class="ranks-section">
+            <h2 class="section-title">
+                <i class="fas fa-medal"></i> All Ranks (1-100)
+            </h2>
+            <div class="ranks-filter">
+                <button class="filter-btn active" data-filter="all">All Ranks</button>
+                <button class="filter-btn" data-filter="current">My Progress</button>
+                <button class="filter-btn" data-filter="upcoming">Upcoming</button>
+                <button class="filter-btn" data-filter="legendary">Legendary</button>
+            </div>
+            <div class="ranks-grid" id="ranksGrid">
+                <!-- Ranks will be loaded here -->
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- XP History -->
+        <div class="history-section">
+            <h2 class="section-title">
+                <i class="fas fa-history"></i> Recent XP Activity
+            </h2>
+            <div class="xp-history" id="xpHistory">
+                <!-- XP events will be loaded here -->
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- XP Gain Notification (Hidden by default) -->
+    <div id="xpGainNotification" style="display: none; position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.9); color: white; padding: 20px; border-radius: 15px; z-index: 10000; border-left: 5px solid #00ff9d; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="font-size: 30px;">🎉</div>
+            <div>
+                <h3 style="margin: 0 0 5px 0; color: #00ff9d;">XP Earned!</h3>
+                <p style="margin: 0; font-size: 18px;" id="xpGainMessage">+10 XP for daily login!</p>
+                <small style="color: #aaa;" id="xpGainTime">Just now</small>
+            </div>
+        </div>
+    </div>
+
+    <script type="module"src="xp.js"></script>
+    <script>
+        // Initialize the XP system when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeXPSystem();
+            createFloatingIcons();
+        });
+
+        function createFloatingIcons() {
+            const icons = ['🏆', '⭐', '🎮', '⚔️', '🛡️', '👑', '💎', '🔥', '✨', '🌟'];
+            const container = document.getElementById('floatingIcons');
+            
+            for (let i = 0; i < 20; i++) {
+                const icon = document.createElement('div');
+                icon.className = 'floating-icon';
+                icon.textContent = icons[Math.floor(Math.random() * icons.length)];
+                icon.style.left = Math.random() * 100 + 'vw';
+                icon.style.top = Math.random() * 100 + 'vh';
+                icon.style.animationDelay = Math.random() * 20 + 's';
+                icon.style.animationDuration = (15 + Math.random() * 30) + 's';
+                container.appendChild(icon);
+            }
+        }
+
+        function showXPGainNotification(message) {
+            const notification = document.getElementById('xpGainNotification');
+            const messageEl = document.getElementById('xpGainMessage');
+            const timeEl = document.getElementById('xpGainTime');
+            
+            messageEl.textContent = message;
+            timeEl.textContent = 'Just now';
+            
+            notification.style.display = 'block';
+            notification.style.animation = 'slideInRight 0.5s ease-out';
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.5s ease-in';
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 500);
+            }, 5000);
+        }
+
+        // Add animation styles
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
