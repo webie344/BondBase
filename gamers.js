@@ -690,7 +690,9 @@ async function processUserProfile(userId, userData) {
             clanCount: 0, // Followers count
             isFollowing: false, // Whether current user is following this user
             xpLevel: 1, // Default XP level
-            xpRank: "Newbie Explorer" // Default XP rank
+            xpRank: "Newbie Explorer", // Default XP rank
+            xpIcon: "🌱", // Default XP icon
+            totalXP: 0 // Default total XP
         };
         
         // Get online status
@@ -740,14 +742,15 @@ async function processUserProfile(userId, userData) {
             const xpSnap = await getDoc(xpRef);
             if (xpSnap.exists()) {
                 const xpData = xpSnap.data();
-                profile.xpLevel = xpData.currentLevel || 1;
                 profile.totalXP = xpData.totalXP || 0;
                 profile.coins = xpData.coins || 0;
                 
-                // Determine rank based on XP
-                const rank = getRankFromXP(profile.totalXP);
-                profile.xpRank = rank.title;
-                profile.xpIcon = rank.icon;
+                // Get rank from XP
+                const userRank = getRankFromXP(profile.totalXP);
+                profile.xpLevel = userRank.level;
+                profile.xpRank = userRank.title;
+                profile.xpIcon = userRank.icon;
+                profile.xpColor = userRank.color;
             }
         } catch (error) {
             console.log('No XP data for user:', userId);
@@ -761,15 +764,111 @@ async function processUserProfile(userId, userData) {
     }
 }
 
-// Helper function to get rank from XP
+// Helper function to get rank from XP (using full XP_RANKS from xp.js)
 function getRankFromXP(xp) {
-    const XP_RANKS = [
-        { level: 1, title: "Newbie Explorer", xpNeeded: 0, icon: "🌱", color: "#808080" },
-        { level: 2, title: "Apprentice Adventurer", xpNeeded: 100, icon: "🎒", color: "#A0522D" },
-        { level: 3, title: "Journeyman Voyager", xpNeeded: 200, icon: "🗺️", color: "#4682B4" },
-        { level: 4, title: "Skilled Pathfinder", xpNeeded: 350, icon: "🧭", color: "#32CD32" },
-        { level: 5, title: "Experienced Trailblazer", xpNeeded: 550, icon: "🔥", color: "#FF4500" }
-    ];
+    // Full XP_RANKS array matching xp.js
+    const XP_RANKS = [];
+    // Generate 100 ranks with progressive XP requirements
+    for (let i = 1; i <= 100; i++) {
+        let xpNeeded = 0;
+        let title = "";
+        let icon = "";
+        let color = "";
+        
+        // Calculate XP needed (progressive scaling)
+        if (i === 1) {
+            xpNeeded = 0;
+        } else if (i <= 10) {
+            xpNeeded = (i - 1) * 100;
+        } else if (i <= 30) {
+            xpNeeded = 900 + (i - 10) * 200;
+        } else if (i <= 50) {
+            xpNeeded = 4900 + (i - 30) * 500;
+        } else if (i <= 75) {
+            xpNeeded = 14900 + (i - 50) * 1000;
+        } else {
+            xpNeeded = 39900 + (i - 75) * 2000;
+        }
+        
+        // Assign titles based on level ranges
+        if (i === 1) {
+            title = "Newbie Explorer";
+            icon = "🌱";
+            color = "#808080";
+        } else if (i <= 5) {
+            const titles = ["Apprentice Adventurer", "Journeyman Voyager", "Skilled Pathfinder", "Experienced Trailblazer", "Adept Wayfarer"];
+            title = titles[i-2];
+            icon = ["🎒", "🗺️", "🧭", "🔥", "⚔️"][i-2];
+            color = ["#A0522D", "#4682B4", "#32CD32", "#FF4500", "#9370DB"][i-2];
+        } else if (i <= 10) {
+            const titles = ["Valiant Guardian", "Mystic Seeker", "Radiant Champion", "Celestial Wanderer", "Ethereal Sage"];
+            title = titles[i-6];
+            icon = ["🛡️", "🔮", "✨", "🌠", "🧙"][i-6];
+            color = ["#FFD700", "#8A2BE2", "#FF69B4", "#00CED1", "#7CFC00"][i-6];
+        } else if (i <= 20) {
+            const titles = ["Ascended Hero", "Void Walker", "Starlight Sentinel", "Time Weaver", "Dream Shaper", 
+                           "Reality Bender", "Cosmic Pioneer", "Quantum Knight", "Nova Warden", "Infinity Seeker"];
+            title = titles[i-11];
+            icon = ["🦸", "🌌", "⭐", "⏳", "💭", "🌀", "🚀", "⚡", "🌞", "♾️"][i-11];
+            color = ["#FF6347", "#4B0082", "#FFD700", "#20B2AA", "#9370DB", "#FF1493", "#00BFFF", "#32CD32", "#FF8C00", "#8B0000"][i-11];
+        } else if (i <= 30) {
+            const titles = ["Arcane Master", "Celestial Emperor", "Void Emperor", "Time Lord", "Dream Emperor",
+                           "Reality Emperor", "Cosmic Emperor", "Quantum Emperor", "Nova Emperor", "Infinity Emperor"];
+            title = titles[i-21];
+            icon = ["🧙‍♂️", "👑", "🌑", "⏰", "💤", "🌐", "🌌", "⚛️", "☀️", "∞"][i-21];
+            color = ["#8B4513", "#FFD700", "#000000", "#808080", "#483D8B", "#2F4F4F", "#191970", "#006400", "#8B0000", "#4B0082"][i-21];
+        } else if (i <= 40) {
+            const titles = ["Mythic Legend", "Eternal Phoenix", "Dragon Sovereign", "Titan Slayer", "God Killer",
+                           "Universe Creator", "Multiverse Traveler", "Omnipotent Being", "Absolute Ruler", "Supreme Deity"];
+            title = titles[i-31];
+            icon = ["🏛️", "🔥", "🐉", "⚔️", "☠️", "🌍", "🌌", "👁️", "⚖️", "👑"][i-31];
+            color = ["#FF4500", "#FF8C00", "#DC143C", "#8B0000", "#2F4F4F", "#228B22", "#00008B", "#8B008B", "#B8860B", "#FFD700"][i-31];
+        } else if (i <= 50) {
+            const titles = ["Legendary Archon", "Mythic Overlord", "Eternal Champion", "Cosmic Sovereign", "Quantum God",
+                           "Reality Architect", "Dream Weaver Prime", "Time Guardian Supreme", "Void Conqueror", "Infinity Master"];
+            title = titles[i-41];
+            icon = ["👑", "🏆", "🦸‍♂️", "🌠", "⚛️", "🏗️", "🕸️", "🕰️", "⚫", "♾️"][i-41];
+            color = ["#C0C0C0", "#FFD700", "#FF6347", "#00CED1", "#32CD32", "#8A2BE2", "#FF69B4", "#808080", "#000000", "#4B0082"][i-41];
+        } else if (i <= 60) {
+            const titles = ["Transcendent Being", "Omniscient Oracle", "Unbound Spirit", "Ethereal Monarch", "Celestial God",
+                           "Stellar Emperor", "Galactic Warlord", "Interdimensional Traveler", "Paradox Resolver", "Existence Shaper"];
+            title = titles[i-51];
+            icon = ["👁️", "🔮", "👻", "👑", "⭐", "👑", "⚔️", "🚪", "🔄", "✏️"][i-51];
+            color = ["#8B008B", "#FF00FF", "#F0E68C", "#98FB98", "#FFD700", "#FF4500", "#DC143C", "#00BFFF", "#32CD32", "#8A2BE2"][i-51];
+        } else if (i <= 70) {
+            const titles = ["Reality Emperor", "Dream Lord", "Time Master", "Space Conqueror", "Quantum King",
+                           "Cosmic Ruler", "Void Master", "Infinity Lord", "Eternal Being", "Absolute Power"];
+            title = titles[i-61];
+            icon = ["👑", "💭", "⏰", "🚀", "⚛️", "🌌", "⚫", "∞", "♾️", "💪"][i-61];
+            color = ["#FF0000", "#9370DB", "#20B2AA", "#1E90FF", "#00FF00", "#00008B", "#000000", "#4B0082", "#8B0000", "#FFD700"][i-61];
+        } else if (i <= 80) {
+            const titles = ["Supreme Legend", "Mythic God", "Celestial King", "Starlight Emperor", "Galactic Ruler",
+                           "Universe Master", "Multiverse God", "Omnipotent Ruler", "All-Powerful Being", "Ultimate Deity"];
+            title = titles[i-71];
+            icon = ["🏆", "👑", "👑", "⭐", "🌌", "🌍", "🌌", "👑", "💪", "👁️"][i-71];
+            color = ["#FFD700", "#FF4500", "#00CED1", "#FFD700", "#00008B", "#228B22", "#4B0082", "#8B0000", "#DC143C", "#8B008B"][i-71];
+        } else if (i <= 90) {
+            const titles = ["God of Gods", "King of Kings", "Emperor of Emperors", "Master of Masters", "Ruler of Rulers",
+                           "Lord of Lords", "Champion of Champions", "Hero of Heroes", "Legend of Legends", "Myth of Myths"];
+            title = titles[i-81];
+            icon = ["👑", "👑", "👑", "👑", "👑", "👑", "🏆", "🦸", "🏛️", "📜"][i-81];
+            color = ["#FF0000", "#FF8C00", "#FFD700", "#32CD32", "#00CED1", "#1E90FF", "#9370DB", "#FF69B4", "#FF4500", "#8B0000"][i-81];
+        } else {
+            const titles = ["The Ultimate One", "The Final Boss", "The Alpha Omega", "The Beginning and End", 
+                           "The All-Knowing", "The All-Seeing", "The All-Powerful", "The Eternal", "The Infinite", "The Absolute"];
+            title = titles[i-91];
+            icon = ["👁️", "🐲", "αΩ", "🔚", "🧠", "👀", "💪", "♾️", "∞", "⚫"][i-91];
+            color = ["#FF00FF", "#DC143C", "#000000", "#FFFFFF", "#8A2BE2", "#00BFFF", "#FFD700", "#32CD32", "#4B0082", "#000000"][i-91];
+        }
+        
+        XP_RANKS.push({
+            level: i,
+            title: title,
+            xpNeeded: xpNeeded,
+            icon: icon,
+            color: color
+        });
+    }
     
     // Default to first rank
     let userRank = XP_RANKS[0];
@@ -932,18 +1031,36 @@ function createProfileItem(profile) {
     const buttonClass = profile.isFollowing ? 'add-clan-btn added' : 'add-clan-btn';
     const followersCount = profile.clanCount || 0;
     
-    // XP Badge
+    // XP Badge - Position it so it doesn't block the avatar
     const xpBadge = profile.xpLevel ? `
-        <span class="attribute-tag" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none;">
-            <span style="margin-right: 3px;">${profile.xpIcon || '🌱'}</span>
-            Lvl ${profile.xpLevel}
+        <span class="xp-badge" style="
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: linear-gradient(135deg, ${profile.xpColor || '#667eea'}, #764ba2);
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 10px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 2;
+            min-width: 40px;
+            justify-content: center;
+        ">
+            <span style="font-size: 12px;">${profile.xpIcon || '🌱'}</span>
+            <span>Lvl ${profile.xpLevel}</span>
         </span>
     ` : '';
     
     div.innerHTML = `
         <div style="position: relative;">
             <img src="${profile.profileImage}" alt="${profile.name}" class="gamer-avatar" 
-                 onerror="this.onerror=null; this.src='images-default-profile.jpg';">
+                 onerror="this.onerror=null; this.src='images-default-profile.jpg';"
+                 style="width: 70px; height: 70px; object-fit: cover; border-radius: 50%;">
             ${xpBadge}
         </div>
         <div class="gamer-info">
@@ -963,12 +1080,12 @@ function createProfileItem(profile) {
                     </span>
                 ` : ''}
                 ${profile.xpLevel ? `
-                    <span class="gamer-stat gamer-level">
+                    <span class="gamer-stat gamer-level" style="color: ${profile.xpColor || '#667eea'};">
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                             <polyline points="17 6 23 6 23 12"></polyline>
                         </svg>
-                        Lvl ${profile.xpLevel}
+                        ${profile.xpRank}
                     </span>
                 ` : ''}
                 <span class="gamer-stat" title="${profile.isOnline ? 'Online' : 'Offline'}">
@@ -1179,7 +1296,7 @@ async function initProfilePage() {
             await loadProfileData(profileId);
             setupProfileEventListeners(profileId);
             
-            // Add XP display to profile page
+            // Add XP display to profile page for the viewed user
             await addXPDisplayToProfile(profileId);
         }, (error) => {
             console.error('Auth error:', error);
@@ -1195,20 +1312,25 @@ async function initProfilePage() {
 
 async function addXPDisplayToProfile(profileId) {
     try {
-        // Get XP data for this profile
+        // Get XP data for THIS profile (the one being viewed)
         const xpRef = doc(db, 'xpData', profileId);
         const xpSnap = await getDoc(xpRef);
         
         if (xpSnap.exists()) {
             const xpData = xpSnap.data();
-            const currentLevel = calculateLevelFromXP(xpData.totalXP || 0);
-            const rank = getRankFromXP(xpData.totalXP || 0);
+            const userRank = getRankFromXP(xpData.totalXP || 0);
+            
+            // Remove any existing XP display
+            const existingDisplay = document.querySelector('.profile-xp-display');
+            if (existingDisplay) {
+                existingDisplay.remove();
+            }
             
             // Create XP display element
             const xpDisplay = document.createElement('div');
             xpDisplay.className = 'profile-xp-display';
             xpDisplay.style.cssText = `
-                background: linear-gradient(135deg, #667eea, #764ba2);
+                background: linear-gradient(135deg, ${userRank.color || '#667eea'}, #764ba2);
                 color: white;
                 padding: 15px;
                 border-radius: 15px;
@@ -1221,10 +1343,10 @@ async function addXPDisplayToProfile(profileId) {
             
             xpDisplay.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <div style="font-size: 30px;">${rank.icon}</div>
+                    <div style="font-size: 30px;">${userRank.icon}</div>
                     <div>
-                        <div style="font-size: 18px; font-weight: bold;">${rank.title}</div>
-                        <div style="font-size: 14px; opacity: 0.9;">Level ${currentLevel}</div>
+                        <div style="font-size: 18px; font-weight: bold;">${userRank.title}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">Level ${userRank.level}</div>
                     </div>
                 </div>
                 <div style="text-align: right;">
@@ -1245,33 +1367,29 @@ async function addXPDisplayToProfile(profileId) {
                 }
             }
             
-            // Add floating triumph icons around profile picture
-            addTriumphIconsToProfile(profileId, currentLevel);
+            // Add floating triumph icons around profile picture based on user's level
+            addTriumphIconsToProfile(profileId, userRank.level);
+            
+        } else {
+            console.log('No XP data found for user:', profileId);
         }
     } catch (error) {
         console.error('Error adding XP display to profile:', error);
     }
 }
 
-function calculateLevelFromXP(xp) {
-    // Simple level calculation formula
-    if (xp < 100) return 1;
-    if (xp < 300) return 2;
-    if (xp < 600) return 3;
-    if (xp < 1000) return 4;
-    if (xp < 1500) return 5;
-    if (xp < 2100) return 6;
-    if (xp < 2800) return 7;
-    if (xp < 3600) return 8;
-    if (xp < 4500) return 9;
-    if (xp < 5500) return 10;
-    // For higher levels, continue the pattern
-    return Math.floor(Math.sqrt(xp / 100)) + 1;
-}
-
 function addTriumphIconsToProfile(profileId, level) {
     const profilePic = document.querySelector('.profile-pic, .profile-avatar, [class*="avatar"], img[alt*="profile"]');
     if (!profilePic) return;
+    
+    // Clear any existing triumph icons
+    const existingIcons = document.querySelector('.triumph-icons-container');
+    if (existingIcons) {
+        existingIcons.remove();
+    }
+    
+    // Only add icons for higher levels (level 5+)
+    if (level < 5) return;
     
     // Create container for floating icons
     const iconContainer = document.createElement('div');
@@ -1297,7 +1415,7 @@ function addTriumphIconsToProfile(profileId, level) {
         icon.textContent = triumphIcons[i % triumphIcons.length];
         icon.style.cssText = `
             position: absolute;
-            font-size: ${20 + (level / 10)}px;
+            font-size: ${15 + (level / 10)}px;
             opacity: 0.7;
             animation: triumphFloat ${3 + Math.random() * 5}s infinite ease-in-out;
             filter: drop-shadow(0 0 5px gold);
@@ -1305,7 +1423,7 @@ function addTriumphIconsToProfile(profileId, level) {
         
         // Random starting position in a circle around the profile picture
         const angle = Math.random() * Math.PI * 2;
-        const radius = 80 + (level * 2);
+        const radius = 60 + (level * 1.5);
         icon.style.left = `calc(50% + ${Math.cos(angle) * radius}px)`;
         icon.style.top = `calc(50% + ${Math.sin(angle) * radius}px)`;
         
@@ -1582,7 +1700,7 @@ async function updateFollowButton(profileId) {
         followBtn.dataset.following = 'true';
     } else {
         followBtn.innerHTML = '<svg class="feather" data-feather="user-plus"></svg> Follow';
-        followBtn.classList.remove('btn-message');
+        followBtn.classList.remove('btn-follow');
         followBtn.classList.add('btn-follow');
         followBtn.dataset.following = 'false';
     }
