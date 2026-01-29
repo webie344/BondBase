@@ -1,8 +1,7 @@
+//this my group.js help.me include index db caching into it for faster data loading also change the display from that card display into this one line display like telegram where each group is displayed in one line then remove the enter group button so that when you click the group you'll have enter it:
 // FIXED: Message duplication issues
 // FIXED: Listener cleanup on page navigation
 // FIXED: Proper event listener management
-// ADDED: IndexedDB caching for faster data loading
-// ADDED: Single-line Telegram-like group display
 
 import { 
     getFirestore, 
@@ -97,171 +96,6 @@ const REWARD_TAGS = {
     TWENTY_MINUTES: '🌟 Ultimate Conversationalist'
 };
 
-// IndexedDB Configuration
-const DB_NAME = 'GroupChatDB';
-const DB_VERSION = 1;
-const STORES = {
-    GROUPS: 'groups',
-    MESSAGES: 'messages',
-    USER_PROFILES: 'user_profiles',
-    CACHE_META: 'cache_meta'
-};
-
-class IndexedDBCache {
-    constructor() {
-        this.db = null;
-        this.initPromise = null;
-    }
-
-    async init() {
-        if (this.initPromise) {
-            return this.initPromise;
-        }
-
-        this.initPromise = new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-            request.onerror = (event) => {
-                console.error('IndexedDB error:', event.target.error);
-                reject(event.target.error);
-            };
-
-            request.onsuccess = (event) => {
-                this.db = event.target.result;
-                resolve(this.db);
-            };
-
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-
-                // Create stores if they don't exist
-                if (!db.objectStoreNames.contains(STORES.GROUPS)) {
-                    const groupsStore = db.createObjectStore(STORES.GROUPS, { keyPath: 'id' });
-                    groupsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
-                    groupsStore.createIndex('cachedAt', 'cachedAt', { unique: false });
-                }
-
-                if (!db.objectStoreNames.contains(STORES.MESSAGES)) {
-                    const messagesStore = db.createObjectStore(STORES.MESSAGES, { keyPath: 'id' });
-                    messagesStore.createIndex('groupId', 'groupId', { unique: false });
-                    messagesStore.createIndex('timestamp', 'timestamp', { unique: false });
-                }
-
-                if (!db.objectStoreNames.contains(STORES.USER_PROFILES)) {
-                    const userStore = db.createObjectStore(STORES.USER_PROFILES, { keyPath: 'id' });
-                    userStore.createIndex('cachedAt', 'cachedAt', { unique: false });
-                }
-
-                if (!db.objectStoreNames.contains(STORES.CACHE_META)) {
-                    db.createObjectStore(STORES.CACHE_META, { keyPath: 'key' });
-                }
-            };
-        });
-
-        return this.initPromise;
-    }
-
-    async getStore(storeName, mode = 'readonly') {
-        await this.init();
-        const transaction = this.db.transaction(storeName, mode);
-        return transaction.objectStore(storeName);
-    }
-
-    async setItem(storeName, data) {
-        try {
-            const store = await this.getStore(storeName, 'readwrite');
-            return new Promise((resolve, reject) => {
-                const request = store.put(data);
-                request.onsuccess = () => resolve(data);
-                request.onerror = (event) => reject(event.target.error);
-            });
-        } catch (error) {
-            console.error('Error setting item in IndexedDB:', error);
-            return null;
-        }
-    }
-
-    async getItem(storeName, key) {
-        try {
-            const store = await this.getStore(storeName);
-            return new Promise((resolve, reject) => {
-                const request = store.get(key);
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = (event) => reject(event.target.error);
-            });
-        } catch (error) {
-            console.error('Error getting item from IndexedDB:', error);
-            return null;
-        }
-    }
-
-    async getAllItems(storeName, indexName = null, range = null) {
-        try {
-            const store = await this.getStore(storeName);
-            return new Promise((resolve, reject) => {
-                let request;
-                if (indexName && range) {
-                    const index = store.index(indexName);
-                    request = index.openCursor(range);
-                } else {
-                    request = store.openCursor();
-                }
-
-                const items = [];
-                request.onsuccess = (event) => {
-                    const cursor = event.target.result;
-                    if (cursor) {
-                        items.push(cursor.value);
-                        cursor.continue();
-                    } else {
-                        resolve(items);
-                    }
-                };
-                request.onerror = (event) => reject(event.target.error);
-            });
-        } catch (error) {
-            console.error('Error getting all items from IndexedDB:', error);
-            return [];
-        }
-    }
-
-    async deleteItem(storeName, key) {
-        try {
-            const store = await this.getStore(storeName, 'readwrite');
-            return new Promise((resolve, reject) => {
-                const request = store.delete(key);
-                request.onsuccess = () => resolve(true);
-                request.onerror = (event) => reject(event.target.error);
-            });
-        } catch (error) {
-            console.error('Error deleting item from IndexedDB:', error);
-            return false;
-        }
-    }
-
-    async clearStore(storeName) {
-        try {
-            const store = await this.getStore(storeName, 'readwrite');
-            return new Promise((resolve, reject) => {
-                const request = store.clear();
-                request.onsuccess = () => resolve(true);
-                request.onerror = (event) => reject(event.target.error);
-            });
-        } catch (error) {
-            console.error('Error clearing store:', error);
-            return false;
-        }
-    }
-
-    async getCacheMeta(key) {
-        return this.getItem(STORES.CACHE_META, key);
-    }
-
-    async setCacheMeta(key, value) {
-        return this.setItem(STORES.CACHE_META, { key, value });
-    }
-}
-
 class GroupChat {
     constructor() {
         this.currentUser = null;
@@ -338,12 +172,6 @@ class GroupChat {
         
         this.activeUploads = new Map();
         
-        // Initialize IndexedDB cache
-        this.indexedDBCache = new IndexedDBCache();
-        this.indexedDBCache.init().catch(error => {
-            console.error('Failed to initialize IndexedDB:', error);
-        });
-        
         this.setupAuthListener();
         this.createReactionModal();
         this.checkRestrictedUsers();
@@ -351,151 +179,6 @@ class GroupChat {
         
         // FIXED: Add beforeunload listener for cleanup
         window.addEventListener('beforeunload', () => this.cleanupAllListeners());
-    }
-
-    // IndexedDB Caching Methods
-    async cacheGroupsInIndexedDB(groups) {
-        try {
-            const cachePromises = groups.map(async (group) => {
-                const groupWithCache = {
-                    ...group,
-                    cachedAt: Date.now(),
-                    source: 'indexeddb'
-                };
-                return this.indexedDBCache.setItem(STORES.GROUPS, groupWithCache);
-            });
-            
-            await Promise.all(cachePromises);
-            await this.indexedDBCache.setCacheMeta('groups_last_updated', Date.now());
-            return true;
-        } catch (error) {
-            console.error('Error caching groups in IndexedDB:', error);
-            return false;
-        }
-    }
-
-    async getCachedGroupsFromIndexedDB() {
-        try {
-            // Check if cache is stale (older than 5 minutes)
-            const lastUpdated = await this.indexedDBCache.getCacheMeta('groups_last_updated');
-            if (lastUpdated && Date.now() - lastUpdated.value > 5 * 60 * 1000) {
-                return null; // Cache is stale
-            }
-
-            const groups = await this.indexedDBCache.getAllItems(STORES.GROUPS);
-            
-            // Sort by updatedAt in descending order
-            groups.sort((a, b) => {
-                const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-                const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-                return timeB - timeA;
-            });
-
-            return groups.length > 0 ? groups : null;
-        } catch (error) {
-            console.error('Error getting cached groups from IndexedDB:', error);
-            return null;
-        }
-    }
-
-    async cacheUserProfileInIndexedDB(userId, profile) {
-        try {
-            const profileWithCache = {
-                ...profile,
-                id: userId,
-                cachedAt: Date.now(),
-                source: 'indexeddb'
-            };
-            await this.indexedDBCache.setItem(STORES.USER_PROFILES, profileWithCache);
-            return true;
-        } catch (error) {
-            console.error('Error caching user profile in IndexedDB:', error);
-            return false;
-        }
-    }
-
-    async getCachedUserProfileFromIndexedDB(userId) {
-        try {
-            const profile = await this.indexedDBCache.getItem(STORES.USER_PROFILES, userId);
-            
-            if (!profile) {
-                return null;
-            }
-
-            // Check if cache is stale (older than 10 minutes)
-            if (Date.now() - profile.cachedAt > 10 * 60 * 1000) {
-                return null; // Cache is stale
-            }
-
-            return profile;
-        } catch (error) {
-            console.error('Error getting cached user profile from IndexedDB:', error);
-            return null;
-        }
-    }
-
-    async cacheMessagesInIndexedDB(groupId, messages) {
-        try {
-            const cachePromises = messages.map(async (message) => {
-                const messageWithCache = {
-                    ...message,
-                    id: `${groupId}_${message.id}`,
-                    groupId: groupId,
-                    cachedAt: Date.now()
-                };
-                return this.indexedDBCache.setItem(STORES.MESSAGES, messageWithCache);
-            });
-            
-            await Promise.all(cachePromises);
-            return true;
-        } catch (error) {
-            console.error('Error caching messages in IndexedDB:', error);
-            return false;
-        }
-    }
-
-    async getCachedMessagesFromIndexedDB(groupId, limitCount = 50) {
-        try {
-            const allMessages = await this.indexedDBCache.getAllItems(
-                STORES.MESSAGES,
-                'groupId',
-                IDBKeyRange.only(groupId)
-            );
-            
-            // Sort by timestamp and limit
-            const sortedMessages = allMessages
-                .sort((a, b) => {
-                    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-                    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-                    return timeB - timeA;
-                })
-                .slice(0, limitCount)
-                .sort((a, b) => {
-                    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-                    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-                    return timeA - timeB;
-                });
-
-            return sortedMessages.length > 0 ? sortedMessages : null;
-        } catch (error) {
-            console.error('Error getting cached messages from IndexedDB:', error);
-            return null;
-        }
-    }
-
-    async clearIndexedDBCache() {
-        try {
-            await Promise.all([
-                this.indexedDBCache.clearStore(STORES.GROUPS),
-                this.indexedDBCache.clearStore(STORES.MESSAGES),
-                this.indexedDBCache.clearStore(STORES.USER_PROFILES),
-                this.indexedDBCache.clearStore(STORES.CACHE_META)
-            ]);
-            return true;
-        } catch (error) {
-            console.error('Error clearing IndexedDB cache:', error);
-            return false;
-        }
     }
 
     // FIXED: Proper listener cleanup methods
@@ -748,11 +431,6 @@ class GroupChat {
         this.userActiveDurations.clear();
         
         this.activeUploads.clear();
-        
-        // Clear IndexedDB cache
-        this.clearIndexedDBCache().catch(error => {
-            console.error('Error clearing IndexedDB cache:', error);
-        });
     }
 
     async loadBlockedUsers() {
@@ -997,16 +675,8 @@ class GroupChat {
 
     async getUserProfile(userId, forceRefresh = false) {
         try {
-            // First try IndexedDB cache
-            if (!forceRefresh) {
-                const indexedDBCached = await this.getCachedUserProfileFromIndexedDB(userId);
-                if (indexedDBCached) {
-                    return indexedDBCached;
-                }
-            }
-
-            // Then try memory cache
             const cacheKey = `user_${userId}`;
+            
             if (!forceRefresh) {
                 const cached = this.getCachedItem(cacheKey, this.cache.userProfiles);
                 if (cached) {
@@ -1014,7 +684,6 @@ class GroupChat {
                 }
             }
 
-            // Fetch from Firebase
             const userRef = doc(db, 'group_users', userId);
             const userSnap = await getDoc(userRef);
             
@@ -1038,11 +707,7 @@ class GroupChat {
                     fireRing: userData.fireRing || false
                 };
                 
-                // Cache in memory
                 this.setCachedItem(cacheKey, profile, this.cache.userProfiles, CACHE_DURATION.USER_PROFILE);
-                
-                // Cache in IndexedDB
-                await this.cacheUserProfileInIndexedDB(userId, profile);
                 
                 return profile;
             }
@@ -1348,14 +1013,6 @@ class GroupChat {
     async getPrivateMessages(otherUserId, limitCount = 50) {
         try {
             const chatId = this.getPrivateChatId(this.firebaseUser.uid, otherUserId);
-            
-            // First try IndexedDB cache
-            const cachedMessages = await this.getCachedMessagesFromIndexedDB(chatId, limitCount);
-            if (cachedMessages) {
-                return cachedMessages;
-            }
-            
-            // Fetch from Firebase
             const messagesRef = collection(db, 'private_chats', chatId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(limitCount));
             const querySnapshot = await getDocs(q);
@@ -1371,12 +1028,7 @@ class GroupChat {
                 });
             });
             
-            const result = messages.reverse();
-            
-            // Cache in IndexedDB
-            await this.cacheMessagesInIndexedDB(chatId, result);
-            
-            return result;
+            return messages.reverse();
         } catch (error) {
             console.error('Error getting private messages:', error);
             return [];
@@ -1407,7 +1059,7 @@ class GroupChat {
                 this.displayedMessageIds.set(chatId, new Set());
             }
             
-            const unsubscribe = onSnapshot(q, async (snapshot) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
                 const newMessages = [];
                 
                 snapshot.forEach(doc => {
@@ -1428,9 +1080,6 @@ class GroupChat {
                 if (newMessages.length > 0) {
                     const displayedMessages = this.displayedMessageIds.get(chatId);
                     newMessages.forEach(msg => displayedMessages.add(msg.id));
-                    
-                    // Cache new messages in IndexedDB
-                    await this.cacheMessagesInIndexedDB(chatId, newMessages);
                     
                     callback(newMessages);
                 }
@@ -2060,9 +1709,6 @@ class GroupChat {
             
             this.cache.userProfiles.delete(`user_${this.firebaseUser.uid}`);
             
-            // Update IndexedDB cache
-            await this.cacheUserProfileInIndexedDB(this.firebaseUser.uid, this.currentUser);
-            
             return true;
         } catch (error) {
             console.error('Error updating user profile:', error);
@@ -2160,13 +1806,6 @@ class GroupChat {
             
             this.setCachedItem(groupRef.id, group, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
             
-            // Cache in IndexedDB
-            await this.indexedDBCache.setItem(STORES.GROUPS, {
-                ...group,
-                cachedAt: Date.now(),
-                source: 'indexeddb'
-            });
-            
             return { groupId: groupRef.id, inviteLink: inviteLink };
         } catch (error) {
             console.error('Error creating group:', error);
@@ -2222,24 +1861,10 @@ class GroupChat {
 
     async getAllGroups() {
         try {
-            // First try IndexedDB cache
-            const cachedGroups = await this.getCachedGroupsFromIndexedDB();
-            if (cachedGroups) {
-                console.log('Loaded groups from IndexedDB cache');
-                return cachedGroups;
-            }
-            
-            // Then try memory cache
             const cacheKey = 'all_groups';
             const cached = this.getCachedItem(cacheKey, this.cache.allGroups);
-            if (cached) {
-                console.log('Loaded groups from memory cache');
-                return cached;
-            }
-            
-            console.log('Fetching groups from Firebase...');
-            
-            // Fetch from Firebase
+            if (cached) return cached;
+
             const groupsRef = collection(db, 'groups');
             const q = query(groupsRef, orderBy('lastActivity', 'desc'));
             const querySnapshot = await getDocs(q);
@@ -2259,11 +1884,7 @@ class GroupChat {
                 this.setCachedItem(doc.id, group, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
             });
             
-            // Cache in memory
             this.setCachedItem(cacheKey, groups, this.cache.allGroups, CACHE_DURATION.GROUP_DATA);
-            
-            // Cache in IndexedDB
-            await this.cacheGroupsInIndexedDB(groups);
             
             return groups;
         } catch (error) {
@@ -2679,24 +2300,10 @@ class GroupChat {
 
     async getMessages(groupId, limitCount = 50) {
         try {
-            // First try IndexedDB cache
-            const cachedMessages = await this.getCachedMessagesFromIndexedDB(groupId, limitCount);
-            if (cachedMessages) {
-                console.log('Loaded messages from IndexedDB cache for group:', groupId);
-                return cachedMessages;
-            }
-            
-            // Then try memory cache
             const cacheKey = `messages_${groupId}_${limitCount}`;
             const cached = this.getCachedItem(cacheKey, this.cache.messages);
-            if (cached) {
-                console.log('Loaded messages from memory cache for group:', groupId);
-                return cached;
-            }
-            
-            console.log('Fetching messages from Firebase for group:', groupId);
-            
-            // Fetch from Firebase
+            if (cached) return cached;
+
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(limitCount));
             const querySnapshot = await getDocs(q);
@@ -2713,11 +2320,7 @@ class GroupChat {
             
             const result = messages.reverse();
             
-            // Cache in memory
             this.setCachedItem(cacheKey, result, this.cache.messages, 30000);
-            
-            // Cache in IndexedDB
-            await this.cacheMessagesInIndexedDB(groupId, result);
             
             return result;
         } catch (error) {
@@ -2748,7 +2351,7 @@ class GroupChat {
                 this.displayedMessageIds.set(groupId, new Set());
             }
             
-            const unsubscribe = onSnapshot(q, async (snapshot) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
                 const newMessages = [];
                 
                 snapshot.forEach(doc => {
@@ -2771,9 +2374,6 @@ class GroupChat {
                     
                     const cacheKey = `messages_${groupId}_${newMessages.length}`;
                     this.setCachedItem(cacheKey, newMessages, this.cache.messages, 30000);
-                    
-                    // Cache in IndexedDB
-                    await this.cacheMessagesInIndexedDB(groupId, newMessages);
                     
                     callback(newMessages);
                 }
@@ -3361,105 +2961,6 @@ class GroupChat {
                 stroke-linecap: round;
                 stroke-linejoin: round;
                 fill: none;
-            }
-            
-            /* Telegram-style single line group display */
-            .group-list-telegram {
-                display: flex;
-                flex-direction: column;
-                gap: 0;
-            }
-            
-            .group-item-telegram {
-                display: flex;
-                align-items: center;
-                padding: 12px 16px;
-                border-bottom: 1px solid #f0f0f0;
-                cursor: pointer;
-                transition: background-color 0.2s;
-                text-decoration: none;
-                color: inherit;
-            }
-            
-            
-            
-            .group-item-telegram.active {
-                background-color: #e9ecef;
-            }
-            
-            .group-avatar-telegram {
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                object-fit: cover;
-                margin-right: 12px;
-                flex-shrink: 0;
-            }
-            
-            .group-content-telegram {
-                flex: 1;
-                min-width: 0;
-            }
-            
-            .group-header-telegram {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 4px;
-            }
-            
-            .group-name-telegram {
-                font-weight: 500;
-                font-size: 16px;
-                color: #333;
-                margin: 0;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            .group-time-telegram {
-                font-size: 12px;
-                color: #999;
-                flex-shrink: 0;
-                margin-left: 8px;
-            }
-            
-            .group-message-telegram {
-                font-size: 14px;
-                color: #666;
-                margin: 0;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            .group-meta-telegram {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-top: 4px;
-            }
-            
-            .group-unread-telegram {
-                background-color: #007aff;
-                color: white;
-                font-size: 12px;
-                font-weight: 600;
-                padding: 2px 6px;
-                border-radius: 12px;
-                min-width: 20px;
-                text-align: center;
-            }
-            
-            .group-muted-telegram {
-                color: #999;
-                font-size: 12px;
-            }
-            
-            .group-pinned-telegram {
-                color: #007aff;
-                font-size: 12px;
             }
         `;
         
@@ -4390,12 +3891,6 @@ function initGroupsPage() {
     
     let allGroups = [];
     
-    // Replace the groupsGrid with Telegram-style list container
-    if (groupsGrid) {
-        // Remove any existing grid styles
-        groupsGrid.className = 'group-list-telegram';
-    }
-    
     loadGroups();
     
     if (createGroupBtn) {
@@ -4430,18 +3925,14 @@ function initGroupsPage() {
     async function loadGroups() {
         try {
             allGroups = await groupChat.getAllGroups();
-            displayGroupsTelegramStyle(allGroups);
+            displayGroups(allGroups);
         } catch (error) {
             console.error('Error loading groups:', error);
-            if (groupsGrid) {
-                groupsGrid.innerHTML = '<div class="no-groups"><p>Error loading groups. Please try again.</p></div>';
-            }
+            groupsGrid.innerHTML = '<div class="no-groups"><p>Error loading groups. Please try again.</p></div>';
         }
     }
     
-    function displayGroupsTelegramStyle(groups) {
-        if (!groupsGrid) return;
-        
+    function displayGroups(groups) {
         if (groups.length === 0) {
             groupsGrid.innerHTML = `
                 <div class="no-groups">
@@ -4460,43 +3951,92 @@ function initGroupsPage() {
         groupsGrid.innerHTML = '';
         
         groups.forEach(group => {
-            const groupItem = document.createElement('a');
-            groupItem.href = `#`;
-            groupItem.className = 'group-item-telegram';
-            groupItem.dataset.groupId = group.id;
-            
-            const avatarUrl = generateGroupAvatar(group);
-            const lastActivity = group.updatedAt || group.createdAt || new Date();
-            const timeAgo = formatTimeAgo(lastActivity);
-            const memberCount = group.memberCount || 0;
-            
-            groupItem.innerHTML = `
-                <img src="${avatarUrl}" alt="${group.name}" class="group-avatar-telegram">
-                <div class="group-content-telegram">
-                    <div class="group-header-telegram">
-                        <h3 class="group-name-telegram">${group.name}</h3>
-                        <span class="group-time-telegram">${timeAgo}</span>
+            const groupCard = document.createElement('div');
+            groupCard.className = 'group-card';
+            groupCard.innerHTML = `
+                <div class="group-header">
+                    <div class="group-avatar-section">
+                        <img src="${generateGroupAvatar(group)}" alt="${group.name}" class="group-avatar">
+                        <div class="group-title-section">
+                            <h3 class="group-name">${group.name}</h3>
+                            <span class="group-category">${group.category || 'General'}</span>
+                        </div>
                     </div>
-                    <p class="group-message-telegram">${group.description || 'No description'}</p>
-                    <div class="group-meta-telegram">
-                        <span>${memberCount} members</span>
-                        <span>•</span>
-                        <span>${group.category || 'General'}</span>
-                        ${group.privacy === 'private' ? 
-                            '<span>•</span><span style="color: #666;">🔒 Private</span>' : 
-                            '<span>•</span><span style="color: #666;">🌐 Public</span>'
-                        }
+                    <p class="group-description">${group.description}</p>
+                    <div class="group-meta">
+                        <span class="group-members">
+                            <svg class="feather" data-feather="users" style="width: 14px; height: 14px; margin-right: 4px;">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            ${group.memberCount || 0} / ${group.maxMembers || 1000}
+                        </span>
+                        <span class="group-privacy">
+                            <svg class="feather" data-feather="${group.privacy === 'private' ? 'lock' : 'globe'}" style="width: 14px; height: 14px; margin-right: 4px;">
+                                ${group.privacy === 'private' ? 
+                                    '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
+                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>'
+                                }
+                            </svg>
+                            ${group.privacy === 'private' ? 'Private' : 'Public'}
+                        </span>
                     </div>
+                </div>
+                <div class="group-content">
+                    <div class="group-topics">
+                        <h4 class="section-title">Discussion Topics</h4>
+                        <div class="topics-list">
+                            ${(group.topics || []).slice(0, 3).map(topic => 
+                                `<span class="topic-tag">${topic}</span>`
+                            ).join('')}
+                            ${(group.topics || []).length > 3 ? 
+                                `<span class="topic-tag">+${(group.topics || []).length - 3} more</span>` : ''
+                            }
+                        </div>
+                    </div>
+                    <div class="group-rules">
+                        <h4 class="section-title">Group Rules</h4>
+                        <ul class="rules-list">
+                            ${(group.rules || []).slice(0, 2).map(rule => 
+                                `<li class="rule-item">
+                                    <svg class="feather" data-feather="check-circle" style="width: 14px; height: 14px; margin-right: 8px;">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    </svg>
+                                    <span>${rule}</span>
+                                </li>`
+                            ).join('')}
+                            ${(group.rules || []).length > 2 ? 
+                                `<li class="rule-item">
+                                    <svg class="feather" data-feather="more-horizontal" style="width: 14px; height: 14px; margin-right: 8px;">
+                                        <circle cx="12" cy="12" r="1"></circle>
+                                        <circle cx="19" cy="12" r="1"></circle>
+                                        <circle cx="5" cy="12" r="1"></circle>
+                                    </svg>
+                                    <span>${(group.rules || []).length - 2} more rules</span>
+                                </li>` : ''
+                            }
+                        </ul>
+                    </div>
+                </div>
+                <div class="group-actions">
+                    <button class="join-btn" data-group-id="${group.id}">
+                        Join Group
+                    </button>
                 </div>
             `;
             
-            groupItem.addEventListener('click', async (e) => {
-                e.preventDefault();
-                const groupId = groupItem.dataset.groupId;
+            groupsGrid.appendChild(groupCard);
+        });
+        
+        document.querySelectorAll('.join-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const groupId = e.target.dataset.groupId;
                 
                 if (!groupChat.firebaseUser) {
                     window.location.href = 'login.html';
-                    return;
                 }
                 
                 const needsSetup = await groupChat.needsProfileSetup();
@@ -4505,21 +4045,18 @@ function initGroupsPage() {
                 } else {
                     try {
                         await groupChat.joinGroup(groupId);
-                        // Directly enter the group - no Enter Group button needed
                         window.location.href = `group.html?id=${groupId}`;
                     } catch (error) {
                         alert(error.message || 'Failed to join group. Please try again.');
                     }
                 }
             });
-            
-            groupsGrid.appendChild(groupItem);
         });
     }
     
     function filterGroups(searchTerm) {
         if (!searchTerm) {
-            displayGroupsTelegramStyle(allGroups);
+            displayGroups(allGroups);
             return;
         }
         
@@ -4532,31 +4069,7 @@ function initGroupsPage() {
             );
         });
         
-        displayGroupsTelegramStyle(filtered);
-    }
-    
-    function formatTimeAgo(date) {
-        if (!date) return '';
-        
-        if (!(date instanceof Date)) {
-            date = new Date(date);
-        }
-        
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
-        
-        if (diffDays > 0) {
-            return `${diffDays}d`;
-        } else if (diffHours > 0) {
-            return `${diffHours}h`;
-        } else if (diffMins > 0) {
-            return `${diffMins}m`;
-        } else {
-            return 'now';
-        }
+        displayGroups(filtered);
     }
 }
 
