@@ -40,6 +40,186 @@ try {
     console.error('Firebase initialization error:', error);
 }
 
+// ==================== INSTANT LOADING SYSTEM ====================
+class InstantLoadingSystem {
+    constructor() {
+        this.appData = {
+            profiles: [],
+            profileDetails: {},
+            followStatus: {},
+            xpData: {}
+        };
+        this.isInitialized = false;
+        this.initPromise = null;
+        this.hasRenderedFromCache = false;
+    }
+
+    async initialize() {
+        if (this.initPromise) return this.initPromise;
+        
+        this.initPromise = new Promise(async (resolve) => {
+            console.log('🚀 Starting instant preload...');
+            
+            // Start preloading immediately
+            const preloadStartTime = Date.now();
+            
+            // Load from IndexedDB cache immediately (instant)
+            try {
+                await indexedDBCache.init();
+                
+                // Load all cached data in parallel
+                const [profiles, details, xpData] = await Promise.allSettled([
+                    indexedDBCache.getProfiles(),
+                    this.loadAllProfileDetails(),
+                    this.loadAllXPData()
+                ]);
+                
+                this.appData.profiles = profiles.value || [];
+                this.appData.profileDetails = details.value || {};
+                this.appData.xpData = xpData.value || {};
+                
+                console.log(`⚡ Instant loaded ${this.appData.profiles.length} profiles from cache in ${Date.now() - preloadStartTime}ms`);
+                
+                // Set global allProfiles for immediate use
+                allProfiles = this.appData.profiles;
+                
+            } catch (error) {
+                console.error('Instant load error:', error);
+            }
+            
+            this.isInitialized = true;
+            resolve(this.appData);
+        });
+        
+        return this.initPromise;
+    }
+
+    async loadAllProfileDetails() {
+        const details = {};
+        try {
+            // Load profile details from IndexedDB
+            const allDetails = await indexedDBCache.getAll('profileDetails');
+            allDetails.forEach(detail => {
+                if (detail.userId) {
+                    details[detail.userId] = detail;
+                }
+            });
+        } catch (error) {
+            console.log('Could not load profile details:', error);
+        }
+        return details;
+    }
+
+    async loadAllXPData() {
+        const xpData = {};
+        try {
+            const allXP = await indexedDBCache.getAll('xpData');
+            allXP.forEach(data => {
+                if (data.userId) {
+                    xpData[data.userId] = data;
+                }
+            });
+        } catch (error) {
+            console.log('Could not load XP data:', error);
+        }
+        return xpData;
+    }
+
+    renderInstantly() {
+        if (this.hasRenderedFromCache) return;
+        
+        const gamersListElement = document.getElementById('gamersList');
+        if (!gamersListElement) return;
+        
+        if (this.appData.profiles.length > 0) {
+            console.log('⚡ Rendering instantly from cache...');
+            this.hasRenderedFromCache = true;
+            
+            // Clear any existing content
+            gamersListElement.innerHTML = '';
+            
+            // Show cached data immediately
+            allProfiles = this.appData.profiles;
+            
+            // Apply any existing filter
+            let filteredProfiles = [...allProfiles];
+            
+            switch(currentFilter) {
+                case 'online':
+                    filteredProfiles = allProfiles.filter(p => p.isOnline);
+                    break;
+                case 'highrank':
+                    filteredProfiles = allProfiles.filter(p => 
+                        p.isGamer && p.gamerProfile?.rank && 
+                        ['diamond', 'platinum', 'gold', 'master', 'grandmaster', 'challenger']
+                            .some(rank => p.gamerProfile.rank.toLowerCase().includes(rank))
+                    );
+                    break;
+                case 'clan':
+                    filteredProfiles = allProfiles.filter(p => p.clanCount > 0);
+                    break;
+                case 'xp':
+                    filteredProfiles = allProfiles.filter(p => p.xpLevel && p.xpLevel >= 10);
+                    break;
+            }
+            
+            filteredProfiles.forEach(profile => {
+                gamersListElement.appendChild(createProfileItem(profile));
+            });
+            
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+            
+            console.log('✅ Instant render complete');
+        }
+    }
+
+    startBackgroundRefresh() {
+        // Refresh data in background after initial render
+        setTimeout(async () => {
+            console.log('🔄 Starting background refresh...');
+            await fetchFreshProfiles(true); // Silent refresh
+            
+            // Schedule periodic refresh every 30 seconds
+            setInterval(async () => {
+                if (document.visibilityState === 'visible' && isOnline) {
+                    await fetchFreshProfiles(true); // Silent refresh
+                }
+            }, 30000);
+        }, 2000); // Wait 2 seconds before first refresh
+    }
+
+    getProfile(userId) {
+        return this.appData.profiles.find(p => p.id === userId);
+    }
+
+    getProfileDetail(userId) {
+        return this.appData.profileDetails[userId];
+    }
+
+    getXPData(userId) {
+        return this.appData.xpData[userId];
+    }
+
+    updateProfile(profile) {
+        const index = this.appData.profiles.findIndex(p => p.id === profile.id);
+        if (index !== -1) {
+            this.appData.profiles[index] = profile;
+        } else {
+            this.appData.profiles.push(profile);
+        }
+    }
+
+    updateProfileDetail(userId, detail) {
+        this.appData.profileDetails[userId] = detail;
+    }
+
+    updateXPData(userId, xpData) {
+        this.appData.xpData[userId] = xpData;
+    }
+}
+
 // ==================== INDEXEDDB CACHE SYSTEM ====================
 class GamersIndexedDBCache {
     constructor() {
@@ -219,6 +399,7 @@ class GamersIndexedDBCache {
 }
 
 const indexedDBCache = new GamersIndexedDBCache();
+const instantLoader = new InstantLoadingSystem();
 
 // ==================== SERVICE WORKER REGISTRATION ====================
 async function registerServiceWorker() {
@@ -352,14 +533,14 @@ async function handleNetworkOnline() {
     
     showNotification('Connection restored', 'success', 2000);
     
-    // Refresh data when coming online
+    // Refresh data when coming online (silent refresh)
     if (isGamersPage) {
-        await loadAllProfiles(true); // Force refresh
+        await fetchFreshProfiles(true); // Silent refresh
     } else if (isProfilePage) {
         const urlParams = new URLSearchParams(window.location.search);
         const profileId = urlParams.get('id');
         if (profileId) {
-            await loadProfileData(profileId, true); // Force refresh
+            await fetchFreshProfileData(profileId); // Refresh single profile
         }
     }
 }
@@ -381,6 +562,7 @@ let currentUser = null;
 let allProfiles = [];
 let currentFilter = 'all';
 let xpSystem = null;
+let isLoading = false;
 
 // Check if we're on profile page or gamers directory
 const isProfilePage = window.location.pathname.includes('profile.html');
@@ -491,7 +673,16 @@ function startXPTracking() {
 
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Initializing... Current page:', window.location.pathname);
+    console.log('🚀 Initializing with instant loading...');
+    
+    // Start instant loading IMMEDIATELY (before auth)
+    await instantLoader.initialize();
+    
+    // Render instantly if we're on gamers page
+    if (isGamersPage) {
+        instantLoader.renderInstantly();
+        setupEventListeners();
+    }
     
     // Register Service Worker
     await registerServiceWorker();
@@ -504,16 +695,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadXPSystem();
     }
     
-    if (isGamersPage) {
-        await initGamersDirectory();
-    } else if (isProfilePage) {
-        await initProfilePage();
-    } else {
-        // For other pages, just initialize auth
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-        });
-    }
+    // Set up auth state listener - NO RE-RENDER ON AUTH CHANGE
+    onAuthStateChanged(auth, async (user) => {
+        console.log('🔐 Auth state changed:', user ? 'User logged in' : 'No user');
+        currentUser = user;
+        
+        // Only refresh if we haven't loaded fresh data yet
+        if (!isLoading) {
+            if (isGamersPage) {
+                // Start background refresh (delayed to avoid flash)
+                setTimeout(() => {
+                    instantLoader.startBackgroundRefresh();
+                }, 1000);
+            } else if (isProfilePage) {
+                // Get profile ID from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const profileId = urlParams.get('id');
+                
+                if (profileId) {
+                    // Try to load from instant cache first
+                    const cachedProfile = instantLoader.getProfileDetail(profileId);
+                    if (cachedProfile) {
+                        console.log('⚡ Loading profile from instant cache');
+                        updateProfileHeader(profileId, cachedProfile);
+                        updateProfileInfo(profileId, cachedProfile);
+                    }
+                    
+                    // Setup listeners
+                    setupProfileEventListeners(profileId);
+                    
+                    // Fetch fresh data in background
+                    setTimeout(() => fetchFreshProfileData(profileId), 1000);
+                }
+            }
+        }
+    }, (error) => {
+        console.error('Auth error:', error);
+        // Don't re-render on auth error
+    });
 });
 
 // ==================== NUMBER FORMATTING FUNCTION ====================
@@ -538,19 +757,9 @@ async function initGamersDirectory() {
             feather.replace();
         }
         
-        // Set up auth state listener
-        onAuthStateChanged(auth, async (user) => {
-            console.log('Auth state changed:', user ? 'User logged in' : 'No user');
-            currentUser = user;
-            
-            // Load profiles regardless of auth status (with caching)
-            await loadAllProfiles();
-            setupEventListeners();
-        }, (error) => {
-            console.error('Auth error:', error);
-            loadAllProfiles();
-            setupEventListeners();
-        });
+        // Data is already rendered from instantLoader.initialize()
+        // Just setup event listeners
+        setupEventListeners();
         
     } catch (error) {
         console.error('Error initializing:', error);
@@ -559,58 +768,44 @@ async function initGamersDirectory() {
 }
 
 async function loadAllProfiles(forceRefresh = false) {
-    const gamersListElement = document.getElementById('gamersList');
-    if (!gamersListElement) {
-        console.error('Cannot find #gamersList element');
-        return;
-    }
-    
-    console.log('Loading profiles...');
-    
-    // Show loading state using original loading elements
-    gamersListElement.innerHTML = '';
-    for (let i = 0; i < 3; i++) {
-        gamersListElement.appendChild(createLoadingProfileItem());
-    }
-    
-    // Try to load from IndexedDB cache first (unless force refresh)
-    if (!forceRefresh) {
-        try {
-            const cachedProfiles = await indexedDBCache.getProfiles();
-            if (cachedProfiles && cachedProfiles.length > 0) {
-                console.log(`Loaded ${cachedProfiles.length} profiles from IndexedDB cache`);
-                allProfiles = cachedProfiles;
-                renderProfilesList();
-                
-                // Still fetch fresh data in background
-                setTimeout(() => fetchFreshProfiles(), 100);
-                return;
-            }
-        } catch (cacheError) {
-            console.log('Could not load from IndexedDB cache:', cacheError);
-        }
-    }
-    
-    // Load fresh data from Firebase
-    await fetchFreshProfiles();
+    // This is now just a wrapper that calls fetchFreshProfiles
+    // Data is already rendered from cache via instantLoader
+    await fetchFreshProfiles(forceRefresh);
 }
 
-async function fetchFreshProfiles() {
+async function fetchFreshProfiles(silentRefresh = false) {
+    if (isLoading) return; // Prevent multiple simultaneous loads
+    
+    isLoading = true;
     try {
         if (!db) {
             console.error('Firestore not initialized');
-            showError('Database service unavailable', false);
+            if (!silentRefresh) showError('Database service unavailable', false);
             return;
+        }
+        
+        // Don't show loading if silent refresh
+        if (!silentRefresh) {
+            const gamersListElement = document.getElementById('gamersList');
+            if (gamersListElement) {
+                // Only show loading if there's no content yet
+                if (gamersListElement.children.length === 0) {
+                    gamersListElement.innerHTML = '';
+                    for (let i = 0; i < 3; i++) {
+                        gamersListElement.appendChild(createLoadingProfileItem());
+                    }
+                }
+            }
         }
         
         // Get all users
         const usersRef = collection(db, 'users');
-        console.log('Querying users collection...');
+        console.log('🔄 Querying users collection...');
         
         const usersSnap = await getDocs(usersRef);
-        console.log(`Found ${usersSnap.size} users`);
+        console.log(`📊 Found ${usersSnap.size} users`);
         
-        allProfiles = [];
+        const newProfiles = [];
         const currentUserId = currentUser ? currentUser.uid : null;
         
         // Process all users in parallel
@@ -626,48 +821,121 @@ async function fetchFreshProfiles() {
                 return;
             }
             
-            // Create a promise for each profile
             profilePromises.push(processUserProfile(userId, userData));
         });
         
         // Wait for all profiles to be processed
         const profiles = await Promise.all(profilePromises);
-        allProfiles = profiles.filter(profile => profile !== null);
+        newProfiles.push(...profiles.filter(profile => profile !== null));
         
-        console.log(`Loaded ${allProfiles.length} profiles from Firebase`);
+        console.log(`✅ Loaded ${newProfiles.length} fresh profiles from Firebase`);
         
         // Sort profiles: online first, then by name
-        allProfiles.sort((a, b) => {
+        newProfiles.sort((a, b) => {
             if (a.isOnline && !b.isOnline) return -1;
             if (!a.isOnline && b.isOnline) return 1;
             return a.name.localeCompare(b.name);
         });
         
+        // Update in-memory cache
+        allProfiles = newProfiles;
+        
+        // Update instant loader cache
+        newProfiles.forEach(profile => {
+            instantLoader.updateProfile(profile);
+        });
+        
         // Cache in IndexedDB
         try {
-            await indexedDBCache.setProfiles(allProfiles);
-            console.log('Profiles cached in IndexedDB');
+            await indexedDBCache.setProfiles(newProfiles);
+            console.log('💾 Profiles cached in IndexedDB');
         } catch (cacheError) {
             console.log('Could not cache profiles in IndexedDB:', cacheError);
         }
         
         // Cache in localStorage with shorter expiry
-        cache.set('all_profiles', allProfiles, 'short');
+        cache.set('all_profiles', newProfiles, 'short');
         
-        // Render profiles
-        renderProfilesList();
+        // Update UI with fresh data (only if it's a non-silent refresh OR we have changes)
+        if (!silentRefresh || !instantLoader.hasRenderedFromCache) {
+            renderProfilesList();
+        } else {
+            // For silent refresh, update UI smoothly without clearing
+            smoothUpdateProfiles(newProfiles);
+        }
         
     } catch (error) {
-        console.error('Error loading profiles:', error);
-        showError(`Failed to load profiles: ${error.message}`, true);
-        
-        // Try to show cached data if available
-        const cachedProfiles = cache.get('all_profiles');
-        if (cachedProfiles && cachedProfiles.length > 0) {
-            console.log('Showing cached profiles from localStorage');
-            allProfiles = cachedProfiles;
-            renderProfilesList();
+        console.error('❌ Error loading profiles:', error);
+        if (!silentRefresh) {
+            showError(`Failed to load profiles: ${error.message}`, true);
+            
+            // Try to show cached data if available
+            const cachedProfiles = cache.get('all_profiles');
+            if (cachedProfiles && cachedProfiles.length > 0) {
+                console.log('Showing cached profiles from localStorage');
+                allProfiles = cachedProfiles;
+                if (!instantLoader.hasRenderedFromCache) {
+                    renderProfilesList();
+                }
+            }
         }
+    } finally {
+        isLoading = false;
+    }
+}
+
+function smoothUpdateProfiles(newProfiles) {
+    // Update existing items without clearing the list
+    const gamersListElement = document.getElementById('gamersList');
+    if (!gamersListElement) return;
+    
+    // Get existing profile items
+    const existingItems = Array.from(gamersListElement.children);
+    const updatedIds = new Set(newProfiles.map(p => p.id));
+    
+    // Remove items that are no longer in the list
+    existingItems.forEach(item => {
+        const profileId = item.dataset.profileId;
+        if (profileId && !updatedIds.has(profileId)) {
+            item.remove();
+        }
+    });
+    
+    // Update or add items
+    newProfiles.forEach((profile, index) => {
+        const existingItem = gamersListElement.querySelector(`[data-profile-id="${profile.id}"]`);
+        if (existingItem) {
+            // Update existing item if needed
+            updateProfileItem(existingItem, profile);
+        } else {
+            // Add new item at the correct position
+            const newItem = createProfileItem(profile);
+            if (index === 0) {
+                gamersListElement.prepend(newItem);
+            } else {
+                // Try to insert at correct position
+                const existingNextItem = gamersListElement.querySelector(`[data-profile-id="${newProfiles[index-1]?.id}"]`);
+                if (existingNextItem && existingNextItem.nextElementSibling) {
+                    existingNextItem.parentNode.insertBefore(newItem, existingNextItem.nextElementSibling);
+                } else {
+                    gamersListElement.appendChild(newItem);
+                }
+            }
+        }
+    });
+}
+
+function updateProfileItem(item, profile) {
+    // Only update if data has changed significantly
+    // This prevents unnecessary re-renders
+    const currentFollowing = item.querySelector('.add-clan-btn')?.dataset.following;
+    const currentOnline = item.querySelector('.gamer-stat[title*="Online"]')?.textContent.includes('Online');
+    
+    if (currentFollowing !== String(profile.isFollowing) || 
+        currentOnline !== profile.isOnline) {
+        
+        const newItem = createProfileItem(profile);
+        item.replaceWith(newItem);
     }
 }
 
@@ -950,7 +1218,6 @@ function renderProfilesList() {
     }
     
     console.log(`Rendering ${allProfiles.length} profiles`);
-    gamersListElement.innerHTML = '';
     
     // Apply current filter
     let filteredProfiles = [...allProfiles];
@@ -989,6 +1256,7 @@ function renderProfilesList() {
         return;
     }
     
+    gamersListElement.innerHTML = '';
     filteredProfiles.forEach(profile => {
         gamersListElement.appendChild(createProfileItem(profile));
     });
@@ -1287,22 +1555,8 @@ async function initProfilePage() {
         
         console.log('Loading profile:', profileId);
         
-        // Set up auth state listener
-        onAuthStateChanged(auth, async (user) => {
-            console.log('Auth state changed:', user ? 'User logged in' : 'No user');
-            currentUser = user;
-            
-            // Load profile data with caching
-            await loadProfileData(profileId);
-            setupProfileEventListeners(profileId);
-            
-            // Add XP display to profile page for the viewed user
-            await addXPDisplayToProfile(profileId);
-        }, (error) => {
-            console.error('Auth error:', error);
-            loadProfileData(profileId);
-            setupProfileEventListeners(profileId);
-        });
+        // Data may already be loaded from instant cache
+        // Auth listener will handle the rest
         
     } catch (error) {
         console.error('Error initializing profile page:', error);
@@ -1457,21 +1711,17 @@ async function loadProfileData(profileId, forceRefresh = false) {
             return;
         }
         
-        // Try to load from cache first (unless force refresh)
+        // Try to load from instant cache first
         if (!forceRefresh) {
-            try {
-                const cachedDetail = await indexedDBCache.getProfileDetail(profileId);
-                if (cachedDetail) {
-                    console.log('Loaded profile detail from IndexedDB cache');
-                    updateProfileHeader(profileId, cachedDetail);
-                    updateProfileInfo(profileId, cachedDetail);
-                    
-                    // Still fetch fresh data in background
-                    setTimeout(() => fetchFreshProfileData(profileId), 100);
-                    return;
-                }
-            } catch (cacheError) {
-                console.log('Could not load from IndexedDB cache:', cacheError);
+            const cachedDetail = instantLoader.getProfileDetail(profileId);
+            if (cachedDetail) {
+                console.log('⚡ Loading profile from instant cache');
+                updateProfileHeader(profileId, cachedDetail);
+                updateProfileInfo(profileId, cachedDetail);
+                
+                // Still fetch fresh data in background
+                setTimeout(() => fetchFreshProfileData(profileId), 100);
+                return;
             }
         }
         
@@ -1515,10 +1765,14 @@ async function fetchFreshProfileData(profileId) {
         // Cache the profile detail
         try {
             await indexedDBCache.setProfileDetail(profileId, userData);
-            console.log('Profile detail cached in IndexedDB');
+            instantLoader.updateProfileDetail(profileId, userData);
+            console.log('💾 Profile detail cached');
         } catch (cacheError) {
             console.log('Could not cache profile detail:', cacheError);
         }
+        
+        // Add XP display
+        await addXPDisplayToProfile(profileId);
         
     } catch (error) {
         console.error('Error loading fresh profile data:', error);
@@ -2201,4 +2455,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('gamers.js loaded successfully - Profile integration ready with IndexedDB caching, Service Worker support, and XP System integration');
+console.log('✅ gamers.js loaded successfully - Instant loading with IndexedDB caching, Service Worker support, and XP System integration');
