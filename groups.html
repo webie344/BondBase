@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -522,20 +522,17 @@
             margin: 0 auto;
         }
 
+        /* GROUP CARD - REMOVED HOVER EFFECT */
         .group-card {
             background: var(--bg-card);
             border-radius: var(--radius);
             overflow: hidden;
             border: 1px solid var(--border);
-            transition: all 0.3s ease;
-            cursor: pointer;
+            transition: border-color 0.3s ease;
+            cursor: default; /* Changed from pointer */
         }
 
-        .group-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-lg);
-            border-color: var(--primary-light);
-        }
+        /* REMOVED: .group-card:hover styles */
 
         .group-header {
             padding: 20px;
@@ -690,6 +687,31 @@
 
         .join-btn:hover {
             background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(179, 0, 75, 0.4);
+        }
+
+        /* Enter button styles (green for members) */
+        .enter-btn {
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .enter-btn:hover {
+            background: linear-gradient(135deg, #66BB6A, #388E3C);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
         }
 
         .join-btn.joined {
@@ -971,7 +993,7 @@
     <!-- Targeted fix for the video button insertion error -->
     <!-- Then your group.js script -->
     <script  src="clea.js"></script>
-    <script type="module" src="group.js"></script>
+    <script type="module" src="groups.js"></script>
     <script type="module" src="calls.js"></script>
     <script type="module" src="notification.js"></script>
     
