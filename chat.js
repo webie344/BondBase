@@ -147,6 +147,10 @@ class XPThemeIntegration {
             if (user) {
                 this.currentUser = user;
                 await this.loadUserXPData();
+                // Dispatch event when XP data is loaded
+                window.dispatchEvent(new CustomEvent('xpDataLoaded', {
+                    detail: { userLevel: this.userLevel }
+                }));
             }
         });
     }
@@ -186,115 +190,189 @@ class XPThemeIntegration {
             }
         }
         this.userLevel = currentLevel;
+        console.log(`XP Theme Integration: User is level ${this.userLevel}`);
     }
 
-    // Define which themes unlock at which levels
+    // Define which themes unlock at which levels - FIXED VERSION
     getThemeUnlockRules() {
-        return [
-            // Level 1: First 2 themes unlocked
-            { level: 1, unlockedThemes: ['default', 'dark-steel'], themesToUnlock: 2 },
-            
-            // Level 2-5: Unlock 2 more themes per level
-            { level: 2, unlockedThemes: ['leather-dark', 'crimson-night'], themesToUnlock: 2 },
-            { level: 3, unlockedThemes: ['metal-gray', 'deep-violet'], themesToUnlock: 2 },
-            { level: 4, unlockedThemes: ['midnight-sapphire', 'forest-deep'], themesToUnlock: 2 },
-            { level: 5, unlockedThemes: ['amber-glow', 'obsidian-black'], themesToUnlock: 2 },
-            
-            // Level 6-10: Unlock 3 themes per level
-            { level: 6, unlockedThemes: ['sunlight-bliss', 'ocean-breeze', 'lavender-dream'], themesToUnlock: 3 },
-            { level: 7, unlockedThemes: ['mint-fresh', 'peach-blossom', 'cotton-candy'], themesToUnlock: 3 },
-            { level: 8, unlockedThemes: ['vanilla-cream', 'sky-blue', 'lemon-zest'], themesToUnlock: 3 },
-            { level: 9, unlockedThemes: ['neon-purple', 'neon-green', 'neon-pink'], themesToUnlock: 3 },
-            { level: 10, unlockedThemes: ['neon-blue', 'neon-orange', 'neon-yellow'], themesToUnlock: 3 },
-            
-            // Level 11-15: Unlock 2 themes per level
-            { level: 11, unlockedThemes: ['neon-red', 'neon-cyan'], themesToUnlock: 2 },
-            { level: 12, unlockedThemes: ['neon-rainbow', 'forest-moss'], themesToUnlock: 2 },
-            { level: 13, unlockedThemes: ['ocean-depths', 'desert-sand'], themesToUnlock: 2 },
-            { level: 14, unlockedThemes: ['sunset-orange', 'mountain-gray'], themesToUnlock: 2 },
-            { level: 15, unlockedThemes: ['spring-blossom', 'tropical-lagoon'], themesToUnlock: 2 },
-            
-            // Level 16-20: Unlock 2 themes per level
-            { level: 16, unlockedThemes: ['autumn-leaves', 'winter-frost'], themesToUnlock: 2 },
-            { level: 17, unlockedThemes: ['purple-haze', 'sunset-glow'], themesToUnlock: 2 },
-            { level: 18, unlockedThemes: ['ocean-wave', 'forest-mist'], themesToUnlock: 2 },
-            { level: 19, unlockedThemes: ['fire-ember', 'galaxy-night'], themesToUnlock: 2 },
-            { level: 20, unlockedThemes: ['cotton-candy-grad', 'midnight-purple'], themesToUnlock: 2 },
-            
-            // Level 21-25: Unlock 1 theme per level (special themes)
-            { level: 21, unlockedThemes: ['aurora-borealis'], themesToUnlock: 1 },
-            { level: 22, unlockedThemes: ['golden-royal'], themesToUnlock: 1 },
-            { level: 23, unlockedThemes: ['silver-modern'], themesToUnlock: 1 },
-            { level: 24, unlockedThemes: ['rose-gold'], themesToUnlock: 1 },
-            { level: 25, unlockedThemes: ['cyberpunk'], themesToUnlock: 1 },
-            { level: 26, unlockedThemes: ['vintage-paper'], themesToUnlock: 1 },
-            
-            // Level 30: Unlock bonus themes
-            { level: 30, unlockedThemes: [], themesToUnlock: 0 }, // Milestone level
-            
-            // Level 40: Unlock bonus themes
-            { level: 40, unlockedThemes: [], themesToUnlock: 0 }, // Milestone level
-            
-            // Level 50: Unlock bonus themes
-            { level: 50, unlockedThemes: [], themesToUnlock: 0 }, // Milestone level
-            
-            // Level 75: Unlock bonus themes
-            { level: 75, unlockedThemes: [], themesToUnlock: 0 }, // Milestone level
-            
-            // Level 100: All themes unlocked
-            { level: 100, unlockedThemes: [], themesToUnlock: 0 } // All themes unlocked by now
-        ];
+        const rules = {};
+        
+        // Level 1: First 2 themes unlocked
+        rules[1] = ['default', 'dark-steel'];
+        
+        // Level 2: Unlock 2 more themes
+        rules[2] = ['leather-dark', 'crimson-night'];
+        
+        // Level 3: Unlock 2 more themes
+        rules[3] = ['metal-gray', 'deep-violet'];
+        
+        // Level 4: Unlock 2 more themes
+        rules[4] = ['midnight-sapphire', 'forest-deep'];
+        
+        // Level 5: Unlock 2 more themes
+        rules[5] = ['amber-glow', 'obsidian-black'];
+        
+        // Level 6: Unlock 3 themes
+        rules[6] = ['sunlight-bliss', 'ocean-breeze', 'lavender-dream'];
+        
+        // Level 7: Unlock 3 themes
+        rules[7] = ['mint-fresh', 'peach-blossom', 'cotton-candy'];
+        
+        // Level 8: Unlock 3 themes
+        rules[8] = ['vanilla-cream', 'sky-blue', 'lemon-zest'];
+        
+        // Level 9: Unlock 3 themes
+        rules[9] = ['neon-purple', 'neon-green', 'neon-pink'];
+        
+        // Level 10: Unlock 3 themes
+        rules[10] = ['neon-blue', 'neon-orange', 'neon-yellow'];
+        
+        // Level 11: Unlock 2 themes
+        rules[11] = ['neon-red', 'neon-cyan'];
+        
+        // Level 12: Unlock 2 themes
+        rules[12] = ['neon-rainbow', 'forest-moss'];
+        
+        // Level 13: Unlock 2 themes
+        rules[13] = ['ocean-depths', 'desert-sand'];
+        
+        // Level 14: Unlock 2 themes
+        rules[14] = ['sunset-orange', 'mountain-gray'];
+        
+        // Level 15: Unlock 2 themes
+        rules[15] = ['spring-blossom', 'tropical-lagoon'];
+        
+        // Level 16: Unlock 2 themes
+        rules[16] = ['autumn-leaves', 'winter-frost'];
+        
+        // Level 17: Unlock 2 themes
+        rules[17] = ['purple-haze', 'sunset-glow'];
+        
+        // Level 18: Unlock 2 themes
+        rules[18] = ['ocean-wave', 'forest-mist'];
+        
+        // Level 19: Unlock 2 themes
+        rules[19] = ['fire-ember', 'galaxy-night'];
+        
+        // Level 20: Unlock 2 themes
+        rules[20] = ['cotton-candy-grad', 'midnight-purple'];
+        
+        // Level 21: Unlock 1 theme
+        rules[21] = ['aurora-borealis'];
+        
+        // Level 22: Unlock 1 theme
+        rules[22] = ['golden-royal'];
+        
+        // Level 23: Unlock 1 theme
+        rules[23] = ['silver-modern'];
+        
+        // Level 24: Unlock 1 theme
+        rules[24] = ['rose-gold'];
+        
+        // Level 25: Unlock 1 theme
+        rules[25] = ['cyberpunk'];
+        
+        // Level 26: Unlock 1 theme
+        rules[26] = ['vintage-paper'];
+        
+        // Milestone levels - no new themes
+        rules[30] = [];
+        rules[40] = [];
+        rules[50] = [];
+        rules[75] = [];
+        rules[100] = [];
+        
+        return rules;
     }
 
-    // Get all themes unlocked up to current level
+    // Get all themes unlocked up to current level - FIXED VERSION
     getAllUnlockedThemes() {
         const unlockedThemes = new Set();
-        
-        for (const rule of this.themeUnlockRules) {
-            if (rule.level <= this.userLevel) {
-                rule.unlockedThemes.forEach(theme => unlockedThemes.add(theme));
-            }
-        }
         
         // Always include default theme
         unlockedThemes.add('default');
         
+        // Add all themes from unlock rules up to current level
+        for (let level = 1; level <= this.userLevel; level++) {
+            const themesForLevel = this.themeUnlockRules[level] || [];
+            themesForLevel.forEach(theme => unlockedThemes.add(theme));
+        }
+        
         return Array.from(unlockedThemes);
     }
 
-    // Check if a specific theme is unlocked
+    // Check if a specific theme is unlocked - FIXED VERSION
     isThemeUnlocked(themeId) {
-        const unlockedThemes = this.getAllUnlockedThemes();
-        return unlockedThemes.includes(themeId);
-    }
-
-    // Get required level for a theme
-    getRequiredLevelForTheme(themeId) {
-        for (const rule of this.themeUnlockRules) {
-            if (rule.unlockedThemes.includes(themeId)) {
-                return rule.level;
+        if (themeId === 'default') return true;
+        
+        // Check all levels up to current level
+        for (let level = 1; level <= this.userLevel; level++) {
+            const themesForLevel = this.themeUnlockRules[level] || [];
+            if (themesForLevel.includes(themeId)) {
+                return true;
             }
         }
+        
+        return false;
+    }
+
+    // Get required level for a theme - FIXED VERSION
+    getRequiredLevelForTheme(themeId) {
+        if (themeId === 'default') return 1;
+        
+        for (const [level, themes] of Object.entries(this.themeUnlockRules)) {
+            if (themes.includes(themeId)) {
+                return parseInt(level);
+            }
+        }
+        
         return 100; // Default to max level if not found
     }
 
-    // Get next theme unlock information
+    // Get next theme unlock information - FIXED VERSION
     getNextThemeUnlock() {
-        for (const rule of this.themeUnlockRules) {
-            if (rule.level > this.userLevel) {
+        const nextLevel = this.userLevel + 1;
+        
+        if (nextLevel > 100) return null;
+        
+        const themesForNextLevel = this.themeUnlockRules[nextLevel] || [];
+        
+        if (themesForNextLevel.length > 0) {
+            return {
+                level: nextLevel,
+                themes: themesForNextLevel,
+                count: themesForNextLevel.length
+            };
+        }
+        
+        // Find next level that has themes
+        for (let level = nextLevel + 1; level <= 100; level++) {
+            const themes = this.themeUnlockRules[level] || [];
+            if (themes.length > 0) {
                 return {
-                    level: rule.level,
-                    themes: rule.unlockedThemes,
-                    count: rule.themesToUnlock
+                    level: level,
+                    themes: themes,
+                    count: themes.length
                 };
             }
         }
+        
         return null;
     }
 
     // Get current rank info
     getCurrentRankInfo() {
         return XP_RANKS[this.userLevel - 1] || XP_RANKS[0];
+    }
+
+    // Get themes that unlock at specific level
+    getThemesForLevel(level) {
+        return this.themeUnlockRules[level] || [];
+    }
+
+    // Refresh method to reload XP data
+    async refresh() {
+        await this.loadUserXPData();
     }
 }
 
@@ -309,10 +387,10 @@ class ChatThemeManager {
 
     async init() {
         // Wait for auth state
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
                 this.currentUser = user;
-                this.loadUserTheme();
+                await this.loadUserTheme();
             }
         });
     }
@@ -346,7 +424,7 @@ class ChatThemeManager {
     applyTheme(theme) {
         // Check if theme is unlocked
         if (!this.xpIntegration.isThemeUnlocked(theme)) {
-            console.warn(`Theme ${theme} is locked!`);
+            console.warn(`Theme ${theme} is locked! User level: ${this.xpIntegration.userLevel}, Required: ${this.xpIntegration.getRequiredLevelForTheme(theme)}`);
             this.showThemeLockedMessage(theme);
             return false;
         }
@@ -392,6 +470,7 @@ class ChatThemeManager {
         const requiredLevel = this.xpIntegration.getRequiredLevelForTheme(themeId);
         const currentLevel = this.xpIntegration.userLevel;
         const nextRank = XP_RANKS[requiredLevel - 1];
+        const currentRank = XP_RANKS[currentLevel - 1];
         
         const notification = document.createElement('div');
         notification.style.cssText = `
@@ -423,15 +502,18 @@ class ChatThemeManager {
             <div style="background: rgba(255,255,255,0.1); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                     <span style="font-size: 13px; opacity: 0.8;">Your Level:</span>
-                    <span style="font-weight: 600;">${currentLevel}</span>
+                    <span style="font-weight: 600; color: ${currentRank.color};">${currentLevel} (${currentRank.title})</span>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
                     <span style="font-size: 13px; opacity: 0.8;">Required Level:</span>
-                    <span style="font-weight: 600; color: #FFD700;">${requiredLevel}</span>
+                    <span style="font-weight: 600; color: ${nextRank.color};">${requiredLevel} (${nextRank.title})</span>
                 </div>
             </div>
+            <div style="height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
+                <div style="height: 100%; background: ${currentLevel >= requiredLevel ? '#00FF9D' : 'rgba(255, 209, 102, 0.8)'}; width: ${Math.min(100, (currentLevel / requiredLevel) * 100)}%; transition: width 0.5s ease;"></div>
+            </div>
             <div style="font-size: 12px; opacity: 0.8; text-align: center;">
-                Keep leveling up to unlock more themes!
+                ${currentLevel >= requiredLevel ? '✓ Requirements met! You can select this theme.' : `Need ${requiredLevel - currentLevel} more level${requiredLevel - currentLevel === 1 ? '' : 's'} to unlock`}
             </div>
         `;
         
@@ -802,19 +884,38 @@ const themeManager = new ChatThemeManager();
 class ThemeSelectorUI {
     constructor() {
         this.themeManager = themeManager;
+        this.isInitialized = false;
         this.init();
     }
 
     async init() {
         // Only initialize if we're on the account page with display section
         if (this.isAccountPage()) {
-            // Wait for XP data to load
-            await new Promise(resolve => setTimeout(resolve, 500));
-            this.setupThemeSelector();
-            this.loadCurrentThemeSelection();
-            this.setupChatPreview();
-            this.setupSearchFilter();
-            this.setupLevelDisplay();
+            console.log('Initializing ThemeSelectorUI on account page');
+            
+            // Wait for XP data to load before setting up
+            window.addEventListener('xpDataLoaded', () => {
+                console.log('XP data loaded, setting up theme selector');
+                this.setupThemeSelector();
+                this.loadCurrentThemeSelection();
+                this.setupChatPreview();
+                this.setupSearchFilter();
+                this.setupLevelDisplay();
+                this.isInitialized = true;
+            });
+
+            // Also set up with a timeout in case event doesn't fire
+            setTimeout(() => {
+                if (!this.isInitialized) {
+                    console.log('Timeout fallback: Setting up theme selector');
+                    this.setupThemeSelector();
+                    this.loadCurrentThemeSelection();
+                    this.setupChatPreview();
+                    this.setupSearchFilter();
+                    this.setupLevelDisplay();
+                    this.isInitialized = true;
+                }
+            }, 2000);
         }
     }
 
@@ -828,16 +929,17 @@ class ThemeSelectorUI {
 
         const level = this.themeManager.getUserLevel();
         const rankInfo = this.themeManager.xpIntegration.getCurrentRankInfo();
+        const unlockedThemes = this.themeManager.xpIntegration.getAllUnlockedThemes();
         
         levelDisplay.innerHTML = `
             <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(179, 0, 75, 0.1); border-radius: 12px; border: 1px solid rgba(179, 0, 75, 0.3);">
                 <div style="font-size: 24px;">${rankInfo.icon}</div>
                 <div style="flex: 1;">
-                    <div style="font-weight: 600; font-size: 14px; color: rgba(255, 255, 255, 0.9);">Level ${level}</div>
-                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.7);">${rankInfo.title}</div>
+                    <div style="font-weight: 600; font-size: 14px; color: rgba(255, 255, 255, 0.9);">Level ${level} • ${rankInfo.title}</div>
+                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.7);">Unlocked: <span style="font-weight: 600; color: #00FF9D;">${unlockedThemes.length}/50</span> themes</div>
                 </div>
-                <div style="font-size: 12px; color: rgba(255, 255, 255, 0.7);">
-                    Unlocked: <span style="font-weight: 600; color: #00FF9D;">${this.themeManager.xpIntegration.getAllUnlockedThemes().length}/50</span> themes
+                <div style="font-size: 24px; color: ${rankInfo.color}; opacity: 0.8;">
+                    ${rankInfo.icon}
                 </div>
             </div>
         `;
@@ -845,37 +947,54 @@ class ThemeSelectorUI {
 
     setupThemeSelector() {
         const themesGrid = document.getElementById('themesGrid');
-        if (!themesGrid) return;
+        if (!themesGrid) {
+            console.error('themesGrid element not found!');
+            return;
+        }
 
+        // Clear any existing content
+        themesGrid.innerHTML = '';
+        
         const themes = this.themeManager.getAvailableThemes();
         const userLevel = this.themeManager.getUserLevel();
         
-        themesGrid.innerHTML = themes.map(theme => {
-            const isUnlocked = theme.unlocked;
-            const requiredLevel = theme.requiredLevel;
+        console.log(`Setting up theme selector. User Level: ${userLevel}`);
+        console.log('Available themes:', themes.map(t => ({ id: t.id, unlocked: t.unlocked })));
+        
+        themes.forEach(theme => {
+            const isUnlocked = this.themeManager.xpIntegration.isThemeUnlocked(theme.id);
+            const requiredLevel = this.themeManager.xpIntegration.getRequiredLevelForTheme(theme.id);
+            const isCurrentTheme = theme.id === this.themeManager.getCurrentTheme();
             
-            return `
-                <div class="theme-item ${isUnlocked ? '' : 'locked'}" data-theme="${theme.id}" 
-                     data-unlocked="${isUnlocked}" data-required-level="${requiredLevel}">
-                    <div class="theme-preview" style="background: ${theme.preview}">
-                        ${!isUnlocked ? `
-                            <div class="theme-lock-overlay">
-                                <div class="lock-icon">🔒</div>
-                                <div class="lock-text">Level ${requiredLevel}</div>
-                            </div>
-                        ` : ''}
-                        <div class="theme-preview-content ${!isUnlocked ? 'locked' : ''}">
-                            <div class="theme-message-preview" style="background: ${theme.messagePreview}"></div>
-                            <div class="theme-message-preview received" style="background: rgba(26, 26, 26, 0.95); border: 1px solid rgba(46, 46, 46, 0.6);"></div>
+            console.log(`Theme: ${theme.id}, Unlocked: ${isUnlocked}, Required Level: ${requiredLevel}, Current: ${isCurrentTheme}`);
+            
+            const themeItem = document.createElement('div');
+            themeItem.className = `theme-item ${isUnlocked ? '' : 'locked'}`;
+            themeItem.dataset.theme = theme.id;
+            themeItem.dataset.unlocked = isUnlocked;
+            themeItem.dataset.requiredLevel = requiredLevel;
+            
+            themeItem.innerHTML = `
+                <div class="theme-preview ${isCurrentTheme ? 'selected' : ''}" style="background: ${theme.preview}">
+                    ${!isUnlocked ? `
+                        <div class="theme-lock-overlay">
+                            <div class="lock-icon">🔒</div>
+                            <div class="lock-text">Level ${requiredLevel}</div>
                         </div>
-                    </div>
-                    <div class="theme-label">
-                        ${theme.name}
-                        ${!isUnlocked ? `<div class="theme-required">Level ${requiredLevel}</div>` : ''}
+                    ` : ''}
+                    <div class="theme-preview-content ${!isUnlocked ? 'locked' : ''}">
+                        <div class="theme-message-preview" style="background: ${theme.messagePreview}"></div>
+                        <div class="theme-message-preview received" style="background: rgba(26, 26, 26, 0.95); border: 1px solid rgba(46, 46, 46, 0.6);"></div>
                     </div>
                 </div>
+                <div class="theme-label">
+                    ${theme.name}
+                    ${!isUnlocked ? `<div class="theme-required">Level ${requiredLevel}</div>` : ''}
+                </div>
             `;
-        }).join('');
+            
+            themesGrid.appendChild(themeItem);
+        });
 
         // Add click listeners
         themesGrid.addEventListener('click', (e) => {
@@ -950,7 +1069,7 @@ class ThemeSelectorUI {
                         <div style="height: 100%; background: ${currentLevel >= requiredLevel ? '#00FF9D' : 'rgba(179, 0, 75, 0.8)'}; width: ${Math.min(100, (currentLevel / requiredLevel) * 100)}%; transition: width 0.5s ease;"></div>
                     </div>
                     <div style="font-size: 12px; color: var(--text-light); text-align: center;">
-                        ${currentLevel >= requiredLevel ? '✓ Unlock requirement met!' : `Need ${requiredLevel - currentLevel} more level${requiredLevel - currentLevel === 1 ? '' : 's'}`}
+                        ${currentLevel >= requiredLevel ? '✓ Unlock requirement met! You can select this theme.' : `Need ${requiredLevel - currentLevel} more level${requiredLevel - currentLevel === 1 ? '' : 's'}`}
                     </div>
                 </div>
 
@@ -976,18 +1095,20 @@ class ThemeSelectorUI {
                         cursor: pointer;
                         transition: all 0.3s ease;
                     ">Close</button>
-                    <button class="view-levels-btn" style="
+                    ${currentLevel >= requiredLevel ? `
+                    <button class="unlock-now-btn" style="
                         flex: 1;
                         padding: 14px;
-                        background: rgba(179, 0, 75, 0.8);
+                        background: rgba(0, 255, 157, 0.8);
                         border: none;
                         border-radius: 12px;
-                        color: white;
+                        color: black;
                         font-family: 'Inter', sans-serif;
                         font-weight: 600;
                         cursor: pointer;
                         transition: all 0.3s ease;
-                    ">View All Levels</button>
+                    ">Select Now</button>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -999,10 +1120,13 @@ class ThemeSelectorUI {
             popup.remove();
         });
 
-        popup.querySelector('.view-levels-btn').addEventListener('click', () => {
-            popup.remove();
-            this.showAllLevelsPopup();
-        });
+        // Add unlock now button if requirements are met
+        if (currentLevel >= requiredLevel) {
+            popup.querySelector('.unlock-now-btn').addEventListener('click', () => {
+                popup.remove();
+                this.selectTheme(themeId);
+            });
+        }
 
         // Close on background click
         popup.addEventListener('click', (e) => {
@@ -1023,115 +1147,6 @@ class ThemeSelectorUI {
             `;
             document.head.appendChild(style);
         }
-    }
-
-    showAllLevelsPopup() {
-        const popup = document.createElement('div');
-        popup.className = 'all-levels-popup';
-        popup.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 10001;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            animation: fadeIn 0.3s ease;
-            padding: 20px;
-            overflow-y: auto;
-        `;
-
-        // Generate levels content
-        const currentLevel = this.themeManager.getUserLevel();
-        const unlockRules = this.themeManager.xpIntegration.themeUnlockRules;
-        
-        let levelsContent = '';
-        
-        for (let i = 1; i <= 100; i++) {
-            const rank = XP_RANKS[i - 1];
-            const rule = unlockRules.find(r => r.level === i);
-            const isCurrentLevel = i === currentLevel;
-            const isUnlocked = i <= currentLevel;
-            
-            levelsContent += `
-                <div class="level-item ${isCurrentLevel ? 'current' : ''} ${isUnlocked ? 'unlocked' : 'locked'}" 
-                     style="background: ${isCurrentLevel ? 'rgba(179, 0, 75, 0.2)' : 'rgba(255,255,255,0.05)'}; 
-                            border: 1px solid ${isCurrentLevel ? 'rgba(179, 0, 75, 0.5)' : 'rgba(255,255,255,0.1)'}; 
-                            border-radius: 12px; 
-                            padding: 15px; 
-                            margin-bottom: 10px;
-                            transition: all 0.3s ease;">
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <div style="font-size: 24px; color: ${rank.color};">${rank.icon}</div>
-                        <div style="flex: 1;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                                <div style="font-weight: 600; color: ${isUnlocked ? 'var(--text-color)' : 'var(--text-light)'};">Level ${i}</div>
-                                <div style="font-size: 12px; color: ${rank.color};">${rank.title}</div>
-                            </div>
-                            ${rule ? `
-                                <div style="font-size: 12px; color: ${isUnlocked ? '#00FF9D' : 'var(--text-light)'};">
-                                    ${rule.themesToUnlock > 0 ? `Unlocks ${rule.themesToUnlock} theme${rule.themesToUnlock === 1 ? '' : 's'}` : 'Milestone Level'}
-                                </div>
-                            ` : ''}
-                        </div>
-                        ${isCurrentLevel ? `<div style="background: rgba(179, 0, 75, 0.8); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">Current</div>` : ''}
-                    </div>
-                </div>
-            `;
-        }
-
-        popup.innerHTML = `
-            <div style="background: var(--card-background); border-radius: 20px; padding: 30px; max-width: 800px; width: 100%; max-height: 80vh; overflow-y: auto; border: 2px solid var(--border-color); box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                    <h2 style="margin: 0; color: var(--text-color); font-size: 24px;">All Levels & Theme Unlocks</h2>
-                    <button class="close-levels-btn" style="
-                        background: transparent;
-                        border: none;
-                        color: var(--text-light);
-                        font-size: 24px;
-                        cursor: pointer;
-                        padding: 8px;
-                        border-radius: 50%;
-                        transition: all 0.3s ease;
-                    ">×</button>
-                </div>
-                
-                <div style="margin-bottom: 20px; padding: 15px; background: rgba(179, 0, 75, 0.1); border-radius: 12px; border: 1px solid rgba(179, 0, 75, 0.3);">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <div style="font-size: 20px;">🎯</div>
-                        <div>
-                            <div style="font-size: 14px; color: var(--text-color); font-weight: 600;">Your Progress</div>
-                            <div style="font-size: 12px; color: var(--text-light);">
-                                Level ${currentLevel} • ${this.themeManager.xpIntegration.getAllUnlockedThemes().length}/50 themes unlocked
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="height: 60vh; overflow-y: auto; padding-right: 10px;">
-                    ${levelsContent}
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(popup);
-
-        // Add close button functionality
-        popup.querySelector('.close-levels-btn').addEventListener('click', () => {
-            popup.remove();
-        });
-
-        // Close on background click
-        popup.addEventListener('click', (e) => {
-            if (e.target === popup) {
-                popup.remove();
-            }
-        });
     }
 
     setupSearchFilter() {
@@ -1175,6 +1190,11 @@ class ThemeSelectorUI {
         
         themeItems.forEach((item, index) => {
             const theme = themes[index];
+            if (!theme) {
+                item.style.display = 'none';
+                return;
+            }
+            
             let shouldShow = false;
             
             switch(category) {
@@ -1289,6 +1309,16 @@ class ThemeSelectorUI {
     }
 
     async selectTheme(themeId) {
+        console.log(`Attempting to select theme: ${themeId}`);
+        
+        // Check if theme is unlocked
+        if (!this.themeManager.xpIntegration.isThemeUnlocked(themeId)) {
+            console.log(`Theme ${themeId} is locked for user level ${this.themeManager.getUserLevel()}`);
+            const requiredLevel = this.themeManager.xpIntegration.getRequiredLevelForTheme(themeId);
+            this.showLockedThemePopup(themeId, requiredLevel);
+            return;
+        }
+
         // Update UI
         this.updateThemeSelectionUI(themeId);
         
@@ -1372,6 +1402,14 @@ class ThemeSelectorUI {
                     notification.parentNode.removeChild(notification);
                 }
             }, 3000);
+        }
+    }
+
+    // Refresh method to update theme selector
+    refresh() {
+        if (this.isAccountPage()) {
+            this.setupThemeSelector();
+            this.setupLevelDisplay();
         }
     }
 }
@@ -1694,23 +1732,16 @@ const addThemeSelectorStyles = () => {
             }
         }
 
-        /* Custom scrollbar */
-        .all-levels-popup div[style*="overflow-y: auto"]::-webkit-scrollbar {
-            width: 8px;
+        /* Animation for slideIn */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
-        .all-levels-popup div[style*="overflow-y: auto"]::-webkit-scrollbar-track {
-            background: rgba(255,255,255,0.05);
-            border-radius: 4px;
-        }
-
-        .all-levels-popup div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb {
-            background: rgba(179, 0, 75, 0.5);
-            border-radius: 4px;
-        }
-
-        .all-levels-popup div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
-            background: rgba(179, 0, 75, 0.8);
+        /* Animation for fadeIn */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
     `;
 
@@ -1810,6 +1841,31 @@ window.getUserRankInfo = function() {
     };
 };
 
+// Debug function to check theme unlock status
+window.debugThemeUnlocks = function() {
+    const level = themeManager.getUserLevel();
+    const unlocked = themeManager.xpIntegration.getAllUnlockedThemes();
+    
+    console.log('=== DEBUG THEME UNLOCKS ===');
+    console.log('User Level:', level);
+    console.log('Unlocked Themes:', unlocked);
+    console.log('Unlocked Count:', unlocked.length);
+    
+    // Check specific themes
+    const testThemes = ['default', 'dark-steel', 'leather-dark', 'metal-gray'];
+    testThemes.forEach(theme => {
+        const unlocked = themeManager.xpIntegration.isThemeUnlocked(theme);
+        const required = themeManager.xpIntegration.getRequiredLevelForTheme(theme);
+        console.log(`${theme}: Unlocked=${unlocked}, Required Level=${required}`);
+    });
+    
+    return {
+        level: level,
+        unlocked: unlocked,
+        count: unlocked.length
+    };
+};
+
 // Add category filter functionality
 window.setupThemeCategories = function() {
     const categories = [
@@ -1860,3 +1916,37 @@ if (document.readyState === 'loading') {
 } else {
     window.setupThemeCategories();
 }
+
+// Test function to simulate level up
+window.simulateLevelUp = function() {
+    const currentLevel = themeManager.getUserLevel();
+    const newLevel = Math.min(100, currentLevel + 1);
+    
+    console.log(`Simulating level up from ${currentLevel} to ${newLevel}`);
+    
+    // Update the user level
+    themeManager.xpIntegration.userLevel = newLevel;
+    
+    // Refresh the theme selector
+    if (themeSelectorUI.refresh) {
+        themeSelectorUI.refresh();
+    }
+    
+    return newLevel;
+};
+
+// Refresh themes function that can be called externally
+window.refreshThemeSelector = function() {
+    if (themeSelectorUI.refresh) {
+        themeSelectorUI.refresh();
+    }
+};
+
+// Listen for XP updates from other parts of the app
+window.addEventListener('xpUpdated', async () => {
+    console.log('XP updated event received, refreshing XP data');
+    await themeManager.xpIntegration.refresh();
+    if (themeSelectorUI.refresh) {
+        themeSelectorUI.refresh();
+    }
+});
