@@ -1,4 +1,4 @@
-// groupchat.js - Group Chat Functionality for group.html
+// groupchat.js - Enhanced with IndexedDB Caching, Service Worker Support & Voice Notes
 import { 
     getFirestore, 
     collection, 
@@ -59,6 +59,622 @@ const AVATAR_OPTIONS = [
     'https://api.dicebear.com/7.x/avataaars/svg?seed=user8'
 ];
 
+// ==================== INDEXEDDB CACHE SYSTEM ====================
+class GroupIndexedDBCache {
+    constructor() {
+        this.dbName = 'GroupChatDB';
+        this.dbVersion = 4;
+        this.db = null;
+    }
+
+    async init() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, this.dbVersion);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                this.db = request.result;
+                resolve(this.db);
+            };
+            
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                
+                // Create object stores
+                if (!db.objectStoreNames.contains('groups')) {
+                    const groupsStore = db.createObjectStore('groups', { keyPath: 'id' });
+                    groupsStore.createIndex('lastActivity', 'lastActivity', { unique: false });
+                    groupsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+                }
+                if (!db.objectStoreNames.contains('group_messages')) {
+                    const messagesStore = db.createObjectStore('group_messages', { 
+                        keyPath: 'id',
+                        autoIncrement: true 
+                    });
+                    messagesStore.createIndex('groupId_timestamp', ['groupId', 'timestamp'], { unique: false });
+                    messagesStore.createIndex('groupId', 'groupId', { unique: false });
+                }
+                if (!db.objectStoreNames.contains('group_members')) {
+                    const membersStore = db.createObjectStore('group_members', { keyPath: ['groupId', 'userId'] });
+                    membersStore.createIndex('groupId', 'groupId', { unique: false });
+                    membersStore.createIndex('userId', 'userId', { unique: false });
+                }
+                if (!db.objectStoreNames.contains('user_profiles')) {
+                    db.createObjectStore('user_profiles', { keyPath: 'userId' });
+                }
+                if (!db.objectStoreNames.contains('private_messages')) {
+                    const privateStore = db.createObjectStore('private_messages', { 
+                        keyPath: 'id',
+                        autoIncrement: true 
+                    });
+                    privateStore.createIndex('chatId_timestamp', ['chatId', 'timestamp'], { unique: false });
+                }
+                if (!db.objectStoreNames.contains('private_chats')) {
+                    db.createObjectStore('private_chats', { keyPath: 'chatId' });
+                }
+                if (!db.objectStoreNames.contains('message_reactions')) {
+                    const reactionsStore = db.createObjectStore('message_reactions', { 
+                        keyPath: ['groupId', 'messageId', 'emoji'] 
+                    });
+                    reactionsStore.createIndex('messageId', 'messageId', { unique: false });
+                }
+                if (!db.objectStoreNames.contains('offline_messages')) {
+                    db.createObjectStore('offline_messages', { 
+                        keyPath: 'localId',
+                        autoIncrement: true 
+                    });
+                }
+                if (!db.objectStoreNames.contains('typing_status')) {
+                    db.createObjectStore('typing_status', { keyPath: ['groupId', 'userId'] });
+                }
+                if (!db.objectStoreNames.contains('voice_notes')) {
+                    db.createObjectStore('voice_notes', { keyPath: 'localId' });
+                }
+            };
+        });
+    }
+
+    async set(storeName, data) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put(data);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+        });
+    }
+
+    async get(storeName, key) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+        });
+    }
+
+    async getAll(storeName, indexName = null, queryValue = null) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            let request;
+            
+            if (indexName && queryValue) {
+                const index = store.index(indexName);
+                const range = IDBKeyRange.only(queryValue);
+                request = index.getAll(range);
+            } else if (indexName && Array.isArray(queryValue)) {
+                const index = store.index(indexName);
+                const range = IDBKeyRange.bound(queryValue[0], queryValue[1]);
+                request = index.getAll(range);
+            } else {
+                request = store.getAll();
+            }
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result || []);
+        });
+    }
+
+    async delete(storeName, key) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.delete(key);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
+    }
+
+    async clear(storeName) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.clear();
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
+    }
+
+    // Group-specific methods
+    async setGroup(group) {
+        await this.init();
+        return await this.set('groups', {
+            ...group,
+            cachedAt: Date.now()
+        });
+    }
+
+    async getGroup(groupId) {
+        await this.init();
+        return await this.get('groups', groupId);
+    }
+
+    async setGroups(groups) {
+        await this.init();
+        for (const group of groups) {
+            await this.setGroup(group);
+        }
+    }
+
+    async getGroups() {
+        await this.init();
+        return await this.getAll('groups');
+    }
+
+    // Message-specific methods
+    async setGroupMessages(groupId, messages) {
+        await this.init();
+        const transaction = this.db.transaction(['group_messages'], 'readwrite');
+        const store = transaction.objectStore('group_messages');
+        
+        // Clear existing messages for this group
+        const index = store.index('groupId');
+        const range = IDBKeyRange.only(groupId);
+        const clearRequest = index.getAll(range);
+        
+        clearRequest.onsuccess = async () => {
+            const existingMessages = clearRequest.result;
+            for (const msg of existingMessages) {
+                store.delete(msg.id);
+            }
+            
+            // Add new messages
+            for (const message of messages) {
+                await store.put({
+                    ...message,
+                    groupId: groupId,
+                    cachedAt: Date.now()
+                });
+            }
+        };
+    }
+
+    async getGroupMessages(groupId, limit = 50) {
+        await this.init();
+        const messages = await this.getAll('group_messages', 'groupId_timestamp', [groupId, IDBKeyRange.upperBound(Date.now())]);
+        return messages
+            .sort((a, b) => (a.timestamp?.getTime?.() || a.timestamp) - (b.timestamp?.getTime?.() || b.timestamp))
+            .slice(-limit);
+    }
+
+    async addGroupMessage(groupId, message) {
+        await this.init();
+        return await this.set('group_messages', {
+            ...message,
+            groupId: groupId,
+            cachedAt: Date.now(),
+            id: message.id || `${groupId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        });
+    }
+
+    // Member-specific methods
+    async setGroupMembers(groupId, members) {
+        await this.init();
+        const transaction = this.db.transaction(['group_members'], 'readwrite');
+        const store = transaction.objectStore('group_members');
+        
+        // Clear existing members for this group
+        const index = store.index('groupId');
+        const range = IDBKeyRange.only(groupId);
+        const clearRequest = index.getAll(range);
+        
+        clearRequest.onsuccess = async () => {
+            const existingMembers = clearRequest.result;
+            for (const member of existingMembers) {
+                store.delete([groupId, member.userId || member.id]);
+            }
+            
+            // Add new members
+            for (const member of members) {
+                await store.put({
+                    ...member,
+                    groupId: groupId,
+                    userId: member.userId || member.id,
+                    cachedAt: Date.now()
+                });
+            }
+        };
+    }
+
+    async getGroupMembers(groupId) {
+        await this.init();
+        return await this.getAll('group_members', 'groupId', groupId);
+    }
+
+    // Offline message queuing
+    async queueOfflineMessage(message) {
+        await this.init();
+        const localId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        return await this.set('offline_messages', {
+            ...message,
+            localId: localId,
+            status: 'pending',
+            createdAt: Date.now(),
+            attempts: 0
+        });
+    }
+
+    async getOfflineMessages() {
+        await this.init();
+        return await this.getAll('offline_messages');
+    }
+
+    async updateOfflineMessageStatus(localId, status, error = null) {
+        await this.init();
+        const message = await this.get('offline_messages', localId);
+        if (message) {
+            message.status = status;
+            message.error = error;
+            message.attempts = (message.attempts || 0) + 1;
+            message.lastAttempt = Date.now();
+            await this.set('offline_messages', message);
+        }
+    }
+
+    async removeOfflineMessage(localId) {
+        await this.init();
+        return await this.delete('offline_messages', localId);
+    }
+
+    // Typing status
+    async setTypingStatus(groupId, userId, status) {
+        await this.init();
+        return await this.set('typing_status', {
+            groupId: groupId,
+            userId: userId,
+            isTyping: status,
+            timestamp: Date.now()
+        });
+    }
+
+    async getTypingStatus(groupId) {
+        await this.init();
+        const allStatus = await this.getAll('typing_status');
+        return allStatus.filter(s => s.groupId === groupId && s.isTyping);
+    }
+
+    async clearOldTypingStatus() {
+        await this.init();
+        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+        const allStatus = await this.getAll('typing_status');
+        
+        for (const status of allStatus) {
+            if (status.timestamp < fiveMinutesAgo) {
+                await this.delete('typing_status', [status.groupId, status.userId]);
+            }
+        }
+    }
+
+    // Voice notes
+    async saveVoiceNote(voiceNote) {
+        await this.init();
+        return await this.set('voice_notes', {
+            ...voiceNote,
+            cachedAt: Date.now()
+        });
+    }
+
+    async getVoiceNotes(groupId) {
+        await this.init();
+        const allNotes = await this.getAll('voice_notes');
+        return allNotes.filter(note => note.groupId === groupId);
+    }
+
+    async deleteVoiceNote(localId) {
+        await this.init();
+        return await this.delete('voice_notes', localId);
+    }
+}
+
+const indexedDBCache = new GroupIndexedDBCache();
+
+// ==================== SERVICE WORKER REGISTRATION ====================
+async function registerServiceWorker() {
+    if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw-group.js');
+            console.log('Service Worker registered for group.js');
+            
+            // Set up background sync if supported
+            if ('sync' in registration) {
+                try {
+                    await registration.sync.register('group-offline-sync');
+                } catch (syncError) {
+                    console.log('Background sync not supported:', syncError);
+                }
+            }
+            
+            return registration;
+        } catch (error) {
+            console.log('Service Worker registration failed:', error);
+            return null;
+        }
+    }
+    return null;
+}
+
+// ==================== LOCAL CACHE SYSTEM ====================
+class LocalCache {
+    constructor() {
+        this.cachePrefix = 'groupchat_';
+        this.cacheExpiry = {
+            short: 1 * 60 * 1000, // 1 minute
+            medium: 5 * 60 * 1000, // 5 minutes
+            long: 30 * 60 * 1000, // 30 minutes
+            veryLong: 24 * 60 * 60 * 1000 // 24 hours
+        };
+    }
+
+    set(key, data, expiryType = 'medium') {
+        try {
+            const item = {
+                data: data,
+                expiry: Date.now() + (this.cacheExpiry[expiryType] || this.cacheExpiry.medium)
+            };
+            localStorage.setItem(this.cachePrefix + key, JSON.stringify(item));
+        } catch (error) {
+            console.error('Cache set error:', error);
+        }
+    }
+
+    get(key) {
+        try {
+            const itemStr = localStorage.getItem(this.cachePrefix + key);
+            if (!itemStr) return null;
+            
+            const item = JSON.parse(itemStr);
+            if (Date.now() > item.expiry) {
+                localStorage.removeItem(this.cachePrefix + key);
+                return null;
+            }
+            return item.data;
+        } catch (error) {
+            console.error('Cache get error:', error);
+            return null;
+        }
+    }
+
+    remove(key) {
+        try {
+            localStorage.removeItem(this.cachePrefix + key);
+        } catch (error) {
+            console.error('Cache remove error:', error);
+        }
+    }
+
+    clear() {
+        try {
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith(this.cachePrefix)) {
+                    localStorage.removeItem(key);
+                }
+            });
+        } catch (error) {
+            console.error('Cache clear error:', error);
+        }
+    }
+}
+
+const cache = new LocalCache();
+
+// ==================== NETWORK MONITORING ====================
+let isOnline = navigator.onLine;
+
+function setupNetworkMonitoring() {
+    window.addEventListener('online', handleNetworkOnline);
+    window.addEventListener('offline', handleNetworkOffline);
+    
+    // Create offline indicator
+    const offlineIndicator = document.createElement('div');
+    offlineIndicator.id = 'offlineIndicator';
+    offlineIndicator.className = 'offline-indicator';
+    offlineIndicator.innerHTML = '<i class="fas fa-wifi"></i> You are currently offline. Messages will be sent when you reconnect.';
+    offlineIndicator.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: #ff6b6b;
+        color: white;
+        text-align: center;
+        padding: 10px;
+        z-index: 10001;
+        font-size: 14px;
+        display: none;
+    `;
+    document.body.appendChild(offlineIndicator);
+    
+    // Initial check
+    if (!isOnline) {
+        handleNetworkOffline();
+    }
+}
+
+async function handleNetworkOnline() {
+    isOnline = true;
+    
+    // Hide offline indicator
+    const offlineIndicator = document.getElementById('offlineIndicator');
+    if (offlineIndicator) {
+        offlineIndicator.style.display = 'none';
+    }
+    
+    showNotification('Connection restored', 'success', 2000);
+    
+    // Sync offline messages
+    await syncOfflineMessages();
+    
+    // Refresh data when coming online
+    if (window.groupChat && window.groupChat.currentGroupId) {
+        window.groupChat.clearGroupCache(window.groupChat.currentGroupId);
+    }
+}
+
+function handleNetworkOffline() {
+    isOnline = false;
+    
+    // Show offline indicator
+    const offlineIndicator = document.getElementById('offlineIndicator');
+    if (offlineIndicator) {
+        offlineIndicator.style.display = 'block';
+    }
+    
+    showNotification('No internet connection - working offline', 'offline', 5000);
+}
+
+async function syncOfflineMessages() {
+    try {
+        const offlineMessages = await indexedDBCache.getOfflineMessages();
+        const pendingMessages = offlineMessages.filter(m => m.status === 'pending');
+        
+        if (pendingMessages.length > 0) {
+            showNotification(`Sending ${pendingMessages.length} offline messages...`, 'info');
+            
+            for (const message of pendingMessages) {
+                try {
+                    // Re-send the message
+                    // You'll need to implement the actual resend logic based on your message structure
+                    console.log('Resending offline message:', message);
+                    
+                    // Update status to sent
+                    await indexedDBCache.updateOfflineMessageStatus(message.localId, 'sent');
+                    
+                } catch (error) {
+                    console.error('Error resending offline message:', error);
+                    await indexedDBCache.updateOfflineMessageStatus(message.localId, 'failed', error.message);
+                }
+            }
+            
+            // Clean up sent messages
+            const sentMessages = offlineMessages.filter(m => m.status === 'sent');
+            for (const message of sentMessages) {
+                await indexedDBCache.removeOfflineMessage(message.localId);
+            }
+        }
+    } catch (error) {
+        console.error('Error syncing offline messages:', error);
+    }
+}
+
+// ==================== NOTIFICATION SYSTEM ====================
+function showNotification(message, type = 'info', duration = 3000) {
+    // Remove existing notifications
+    const existingNotifications = document.querySelectorAll('.custom-notification');
+    existingNotifications.forEach(notification => notification.remove());
+    
+    const notification = document.createElement('div');
+    notification.className = `custom-notification ${type}`;
+    
+    const bgColor = type === 'error' ? '#dc2626' : 
+                   type === 'success' ? '#16a34a' : 
+                   type === 'warning' ? '#f59e0b' : 
+                   type === 'offline' ? '#f59e0b' : '#3b82f6';
+    
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: ${bgColor};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        max-width: 400px;
+        backdrop-filter: blur(10px);
+        font-family: 'Inter', sans-serif;
+    `;
+    
+    const icon = type === 'error' ? 'alert-circle' : 
+                type === 'success' ? 'check-circle' : 
+                type === 'warning' || type === 'offline' ? 'alert-triangle' : 'info';
+    
+    notification.innerHTML = `
+        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+            ${getNotificationIcon(icon)}
+        </svg>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, duration);
+}
+
+function getNotificationIcon(icon) {
+    switch(icon) {
+        case 'alert-circle':
+            return '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
+        case 'check-circle':
+            return '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>';
+        case 'alert-triangle':
+            return '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>';
+        default:
+            return '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12.01" y2="16"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>';
+    }
+}
+
+// Add animation styles
+if (!document.getElementById('notification-styles')) {
+    const style = document.createElement('style');
+    style.id = 'notification-styles';
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// ==================== MAIN GROUP CHAT CLASS ====================
 const CACHE_DURATION = {
     USER_PROFILE: 5 * 60 * 1000,
     GROUP_DATA: 2 * 60 * 1000,
@@ -93,6 +709,10 @@ const REWARD_TAGS = {
     TEN_MINUTES: '🔥 Chat Master',
     TWENTY_MINUTES: '🌟 Ultimate Conversationalist'
 };
+
+// Voice recording constants
+const MAX_VOICE_NOTE_DURATION = 120000; // 2 minutes
+const AUDIO_FORMATS = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/mpeg'];
 
 class GroupChat {
     constructor() {
@@ -173,6 +793,15 @@ class GroupChat {
         // NEW: Upload tracking
         this.activeUploads = new Map(); // uploadId -> { cancelFunction, progress, type }
         
+        // NEW: Voice recording
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.isRecording = false;
+        this.recordingStartTime = null;
+        this.recordingTimer = null;
+        this.recordingDuration = 0;
+        this.currentVoiceNote = null;
+        
         // FIX: Track processed messages PER GROUP to prevent duplicates on reconnection
         this.processedMessageIdsByGroup = new Map();
         
@@ -196,6 +825,938 @@ class GroupChat {
         
         // FIX: Setup page visibility listener
         this.setupPageVisibilityListener();
+        
+        // Initialize Service Worker
+        registerServiceWorker();
+        
+        // Setup network monitoring
+        setupNetworkMonitoring();
+        
+        // Setup voice recording styles
+        this.setupVoiceRecordingStyles();
+    }
+
+    // NEW: Setup voice recording styles
+    setupVoiceRecordingStyles() {
+        if (!document.getElementById('voice-recording-styles')) {
+            const style = document.createElement('style');
+            style.id = 'voice-recording-styles';
+            style.textContent = `
+                /* Voice Recording Button */
+                #voiceNoteBtn {
+                    background: none;
+                    border: none;
+                    color: var(--text-light);
+                    font-size: 1.2rem;
+                    cursor: pointer;
+                    padding: 8px;
+                    border-radius: 50%;
+                    transition: all 0.2s;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-left: 5px;
+                }
+                
+                #voiceNoteBtn:hover {
+                    background: rgba(102, 126, 234, 0.1);
+                    color: var(--primary);
+                }
+                
+                #voiceNoteBtn.recording {
+                    color: #ff3b30;
+                    animation: pulse 1.5s infinite;
+                }
+                
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.1); }
+                    100% { transform: scale(1); }
+                }
+                
+                /* Voice Recording Controls */
+                .voice-recording-container {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 20px;
+                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+                    max-width: 400px;
+                    width: 90%;
+                    animation: slideInUp 0.3s ease;
+                    position: fixed;
+                    bottom: 100px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    z-index: 1001;
+                }
+                
+                @keyframes slideInUp {
+                    from {
+                        transform: translateX(-50%) translateY(20px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(-50%) translateY(0);
+                        opacity: 1;
+                    }
+                }
+                
+                .voice-recording-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                }
+                
+                .voice-recording-title {
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #333;
+                }
+                
+                .voice-recording-timer {
+                    font-size: 14px;
+                    color: #666;
+                    font-family: monospace;
+                }
+                
+                .recording-visualizer {
+                    height: 60px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 20px 0;
+                }
+                
+                .visualizer-bar {
+                    width: 4px;
+                    height: 20px;
+                    background: var(--primary);
+                    margin: 0 2px;
+                    border-radius: 2px;
+                    animation: visualizer 1s ease-in-out infinite alternate;
+                }
+                
+                @keyframes visualizer {
+                    0% { height: 10px; }
+                    100% { height: 40px; }
+                }
+                
+                .voice-recording-controls {
+                    display: flex;
+                    justify-content: center;
+                    gap: 20px;
+                    margin-top: 20px;
+                }
+                
+                .voice-control-btn {
+                    width: 50px;
+                    height: 50px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: none;
+                    cursor: pointer;
+                    font-size: 20px;
+                    transition: all 0.2s;
+                }
+                
+                .cancel-recording {
+                    background: #ff3b30;
+                    color: white;
+                }
+                
+                .stop-recording {
+                    background: var(--primary);
+                    color: white;
+                }
+                
+                .voice-control-btn:hover {
+                    transform: scale(1.1);
+                }
+                
+                .voice-control-btn:active {
+                    transform: scale(0.95);
+                }
+                
+                /* Voice Note Preview */
+                .voice-note-preview {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 12px;
+                    padding: 15px;
+                    margin-bottom: 10px;
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                    animation: slideInDown 0.3s ease;
+                }
+                
+                @keyframes slideInDown {
+                    from {
+                        transform: translateY(-10px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateY(0);
+                        opacity: 1;
+                    }
+                }
+                
+                .voice-note-playback {
+                    flex: 1;
+                }
+                
+                .voice-note-waveform {
+                    height: 40px;
+                    background: rgba(255, 255, 255, 0.2);
+                    border-radius: 6px;
+                    position: relative;
+                    overflow: hidden;
+                    cursor: pointer;
+                }
+                
+                .waveform-progress {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    background: rgba(255, 255, 255, 0.3);
+                    width: 0%;
+                    transition: width 0.1s linear;
+                }
+                
+                .voice-note-controls {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-top: 5px;
+                }
+                
+                .play-pause-btn {
+                    background: white;
+                    color: var(--primary);
+                    border: none;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    font-size: 12px;
+                }
+                
+                .voice-note-duration {
+                    color: white;
+                    font-size: 12px;
+                    font-family: monospace;
+                }
+                
+                .voice-note-actions {
+                    display: flex;
+                    gap: 10px;
+                }
+                
+                .voice-action-btn {
+                    background: rgba(255, 255, 255, 0.2);
+                    border: none;
+                    color: white;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    font-size: 14px;
+                }
+                
+                .voice-action-btn:hover {
+                    background: rgba(255, 255, 255, 0.3);
+                }
+                
+                /* Voice Message Styles */
+                .voice-message-container {
+                    max-width: 250px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 18px;
+                    padding: 15px;
+                    position: relative;
+                    cursor: pointer;
+                    user-select: none;
+                }
+                
+                .voice-message-waveform {
+                    height: 40px;
+                    width: 100%;
+                    position: relative;
+                    margin-bottom: 8px;
+                }
+                
+                .voice-message-progress {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    background: rgba(255, 255, 255, 0.3);
+                    border-radius: 3px;
+                    width: 0%;
+                    transition: width 0.1s linear;
+                }
+                
+                .voice-message-controls {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    color: white;
+                }
+                
+                .voice-message-play {
+                    background: white;
+                    color: var(--primary);
+                    border: none;
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    font-size: 12px;
+                }
+                
+                .voice-message-duration {
+                    font-size: 12px;
+                    font-family: monospace;
+                }
+                
+                /* Recording Tips */
+                .recording-tips {
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: rgba(0, 0, 0, 0.05);
+                    border-radius: 8px;
+                    font-size: 12px;
+                    color: #666;
+                }
+                
+                .tip-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin: 5px 0;
+                }
+                
+                /* Voice note in message */
+                .message-text .voice-message-container {
+                    margin: 5px 0;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    // NEW: Voice recording methods
+    async startVoiceRecording() {
+        try {
+            // Stop typing indicator
+            if (this.currentGroupId) {
+                await this.stopTyping(this.currentGroupId);
+            }
+            
+            // Request microphone permission
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                } 
+            });
+            
+            // Create MediaRecorder
+            this.mediaRecorder = new MediaRecorder(stream, {
+                mimeType: 'audio/webm;codecs=opus'
+            });
+            
+            this.audioChunks = [];
+            this.isRecording = true;
+            this.recordingStartTime = Date.now();
+            this.recordingDuration = 0;
+            
+            // Handle data available
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                }
+            };
+            
+            // Handle recording stop
+            this.mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const duration = this.recordingDuration;
+                
+                // Create voice note object
+                this.currentVoiceNote = {
+                    blob: audioBlob,
+                    url: audioUrl,
+                    duration: duration,
+                    timestamp: Date.now(),
+                    size: audioBlob.size
+                };
+                
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Save to IndexedDB
+                if (indexedDBCache) {
+                    indexedDBCache.saveVoiceNote({
+                        ...this.currentVoiceNote,
+                        groupId: this.currentGroupId,
+                        localId: `voice_${Date.now()}`,
+                        status: 'recorded'
+                    });
+                }
+                
+                // Show preview
+                this.showVoiceNotePreview();
+            };
+            
+            // Start recording
+            this.mediaRecorder.start(100); // Collect data every 100ms
+            
+            // Update recording timer
+            this.updateRecordingTimer();
+            
+            // Show recording UI
+            this.showRecordingUI();
+            
+            return true;
+            
+        } catch (error) {
+            console.error('Error starting voice recording:', error);
+            
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                throw new Error('Microphone permission denied. Please allow microphone access to record voice notes.');
+            } else if (error.name === 'NotFoundError') {
+                throw new Error('No microphone found. Please connect a microphone to record voice notes.');
+            } else {
+                throw new Error('Failed to start recording. Please try again.');
+            }
+        }
+    }
+    
+    updateRecordingTimer() {
+        if (this.isRecording && this.recordingStartTime) {
+            this.recordingDuration = Date.now() - this.recordingStartTime;
+            
+            // Update UI timer
+            const timerElement = document.getElementById('voiceRecordingTimer');
+            if (timerElement) {
+                const minutes = Math.floor(this.recordingDuration / 60000);
+                const seconds = Math.floor((this.recordingDuration % 60000) / 1000);
+                timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            // Check max duration
+            if (this.recordingDuration >= MAX_VOICE_NOTE_DURATION) {
+                this.stopVoiceRecording();
+                showNotification('Maximum recording time reached (2 minutes)', 'warning');
+                return;
+            }
+            
+            // Continue timer
+            this.recordingTimer = setTimeout(() => this.updateRecordingTimer(), 1000);
+        }
+    }
+    
+    stopVoiceRecording() {
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+            
+            if (this.recordingTimer) {
+                clearTimeout(this.recordingTimer);
+                this.recordingTimer = null;
+            }
+            
+            // Hide recording UI
+            this.hideRecordingUI();
+            
+            return true;
+        }
+        return false;
+    }
+    
+    cancelVoiceRecording() {
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+            
+            if (this.recordingTimer) {
+                clearTimeout(this.recordingTimer);
+                this.recordingTimer = null;
+            }
+            
+            // Stop all tracks
+            if (this.mediaRecorder.stream) {
+                this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+            
+            // Clear voice note
+            this.currentVoiceNote = null;
+            this.audioChunks = [];
+            
+            // Hide recording UI
+            this.hideRecordingUI();
+            
+            // Remove preview if exists
+            this.removeVoiceNotePreview();
+            
+            showNotification('Recording cancelled', 'info');
+            
+            return true;
+        }
+        return false;
+    }
+    
+    async sendVoiceNote() {
+        if (!this.currentVoiceNote || !this.currentGroupId) {
+            throw new Error('No voice note to send');
+        }
+        
+        try {
+            // Create upload ID
+            const uploadId = 'voice_upload_' + Date.now();
+            
+            // Upload to Cloudinary
+            const voiceUrl = await this.uploadVoiceToCloudinary(
+                this.currentVoiceNote.blob,
+                uploadId
+            );
+            
+            // Send message with voice note
+            await this.sendMessage(
+                this.currentGroupId,
+                null, // No text
+                null, // No image
+                null, // No video
+                this.replyingToMessage?.id,
+                voiceUrl, // Voice URL
+                this.currentVoiceNote.duration
+            );
+            
+            // Clear current voice note
+            this.currentVoiceNote = null;
+            
+            // Remove preview
+            this.removeVoiceNotePreview();
+            
+            showNotification('Voice note sent successfully', 'success');
+            
+            return true;
+            
+        } catch (error) {
+            console.error('Error sending voice note:', error);
+            throw error;
+        }
+    }
+    
+    async uploadVoiceToCloudinary(audioBlob, uploadId) {
+        // FIX: Check if offline before starting upload
+        if (!this.isOnline) {
+            throw new Error('You are offline. Please check your network connection.');
+        }
+        
+        const formData = new FormData();
+        formData.append('file', audioBlob);
+        formData.append('upload_preset', cloudinaryConfig.uploadPreset);
+        formData.append('resource_type', 'video'); // Cloudinary treats audio as video
+        
+        const controller = new AbortController();
+        
+        try {
+            const response = await fetch(
+                `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/video/upload`,
+                {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    signal: controller.signal
+                }
+            );
+            
+            if (!response.ok) {
+                throw new Error(`Cloudinary error: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            if (!data.secure_url) {
+                throw new Error('Invalid response from Cloudinary');
+            }
+            
+            return data.secure_url;
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('Upload cancelled');
+            }
+            throw error;
+        }
+    }
+    
+    validateAudioFile(file) {
+        const maxSize = 10 * 1024 * 1000; // 10MB
+        if (file.size > maxSize) {
+            throw new Error('Audio file must be less than 10MB');
+        }
+        
+        if (!AUDIO_FORMATS.includes(file.type)) {
+            throw new Error('Please upload a valid audio file (MP3, WAV, OGG, WebM)');
+        }
+        
+        return true;
+    }
+    
+    showRecordingUI() {
+        // Remove existing UI
+        this.hideRecordingUI();
+        
+        const recordingUI = document.createElement('div');
+        recordingUI.id = 'voiceRecordingUI';
+        recordingUI.className = 'voice-recording-container';
+        
+        recordingUI.innerHTML = `
+            <div class="voice-recording-header">
+                <div class="voice-recording-title">Recording Voice Note</div>
+                <div class="voice-recording-timer" id="voiceRecordingTimer">00:00</div>
+            </div>
+            
+            <div class="recording-visualizer" id="recordingVisualizer">
+                ${Array.from({ length: 20 }, (_, i) => 
+                    `<div class="visualizer-bar" style="animation-delay: ${i * 0.05}s;"></div>`
+                ).join('')}
+            </div>
+            
+            <div class="recording-tips">
+                <div class="tip-item">
+                    <svg class="feather" style="width: 14px; height: 14px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span>Maximum recording time: 2 minutes</span>
+                </div>
+                <div class="tip-item">
+                    <svg class="feather" style="width: 14px; height: 14px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span>Speak clearly into your microphone</span>
+                </div>
+            </div>
+            
+            <div class="voice-recording-controls">
+                <button class="voice-control-btn cancel-recording" id="cancelRecording">
+                    <svg class="feather" style="width: 20px; height: 20px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+                <button class="voice-control-btn stop-recording" id="stopRecording">
+                    <svg class="feather" style="width: 20px; height: 20px;"><rect x="6" y="4" width="12" height="16" rx="2" ry="2"></rect></svg>
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(recordingUI);
+        
+        // Add event listeners
+        document.getElementById('cancelRecording').addEventListener('click', () => {
+            this.cancelVoiceRecording();
+        });
+        
+        document.getElementById('stopRecording').addEventListener('click', () => {
+            this.stopVoiceRecording();
+        });
+        
+        // Add overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'voiceRecordingOverlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        `;
+        document.body.appendChild(overlay);
+    }
+    
+    hideRecordingUI() {
+        const recordingUI = document.getElementById('voiceRecordingUI');
+        if (recordingUI) {
+            recordingUI.remove();
+        }
+        
+        const overlay = document.getElementById('voiceRecordingOverlay');
+        if (overlay) {
+            overlay.remove();
+        }
+    }
+    
+    showVoiceNotePreview() {
+        if (!this.currentVoiceNote) return;
+        
+        // Remove existing preview
+        this.removeVoiceNotePreview();
+        
+        const messageInputContainer = document.querySelector('.message-input-container');
+        if (!messageInputContainer) return;
+        
+        const previewContainer = document.createElement('div');
+        previewContainer.id = 'voiceNotePreview';
+        previewContainer.className = 'voice-note-preview';
+        
+        const duration = this.currentVoiceNote.duration;
+        const minutes = Math.floor(duration / 60000);
+        const seconds = Math.floor((duration % 60000) / 1000);
+        const durationText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        previewContainer.innerHTML = `
+            <div class="voice-note-icon">
+                <svg class="feather" style="width: 24px; height: 24px; color: white;">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+            </div>
+            
+            <div class="voice-note-playback">
+                <div class="voice-note-waveform" id="voiceNoteWaveform">
+                    <div class="waveform-progress" id="waveformProgress"></div>
+                </div>
+                <div class="voice-note-controls">
+                    <button class="play-pause-btn" id="playVoiceNote">
+                        <svg class="feather" style="width: 14px; height: 14px;">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                    </button>
+                    <div class="voice-note-duration" id="voiceNoteDuration">${durationText}</div>
+                </div>
+            </div>
+            
+            <div class="voice-note-actions">
+                <button class="voice-action-btn" id="deleteVoiceNote" title="Delete">
+                    <svg class="feather" style="width: 16px; height: 16px;">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <button class="voice-action-btn" id="sendVoiceNote" title="Send">
+                    <svg class="feather" style="width: 16px; height: 16px;">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        `;
+        
+        // Insert before message input container
+        messageInputContainer.parentNode.insertBefore(previewContainer, messageInputContainer);
+        
+        // Setup audio playback
+        const audio = new Audio(this.currentVoiceNote.url);
+        let isPlaying = false;
+        
+        document.getElementById('playVoiceNote').addEventListener('click', () => {
+            if (isPlaying) {
+                audio.pause();
+                document.getElementById('playVoiceNote').innerHTML = `
+                    <svg class="feather" style="width: 14px; height: 14px;">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                `;
+            } else {
+                audio.play();
+                document.getElementById('playVoiceNote').innerHTML = `
+                    <svg class="feather" style="width: 14px; height: 14px;">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                `;
+            }
+            isPlaying = !isPlaying;
+        });
+        
+        audio.addEventListener('timeupdate', () => {
+            const progress = (audio.currentTime / audio.duration) * 100;
+            document.getElementById('waveformProgress').style.width = `${progress}%`;
+            
+            // Update duration display
+            const currentMinutes = Math.floor(audio.currentTime / 60);
+            const currentSeconds = Math.floor(audio.currentTime % 60);
+            document.getElementById('voiceNoteDuration').textContent = 
+                `${currentMinutes.toString().padStart(2, '0')}:${currentSeconds.toString().padStart(2, '0')}`;
+        });
+        
+        audio.addEventListener('ended', () => {
+            isPlaying = false;
+            document.getElementById('playVoiceNote').innerHTML = `
+                <svg class="feather" style="width: 14px; height: 14px;">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+            `;
+            document.getElementById('waveformProgress').style.width = '0%';
+            document.getElementById('voiceNoteDuration').textContent = durationText;
+        });
+        
+        // Add click to seek on waveform
+        document.getElementById('voiceNoteWaveform').addEventListener('click', (e) => {
+            const rect = e.target.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percentage = clickX / rect.width;
+            audio.currentTime = audio.duration * percentage;
+        });
+        
+        // Add action buttons
+        document.getElementById('deleteVoiceNote').addEventListener('click', () => {
+            if (audio) {
+                audio.pause();
+                URL.revokeObjectURL(audio.src);
+            }
+            this.cancelVoiceRecording();
+        });
+        
+        document.getElementById('sendVoiceNote').addEventListener('click', async () => {
+            const sendBtn = document.getElementById('sendVoiceNote');
+            const originalHTML = sendBtn.innerHTML;
+            
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = `
+                <svg class="feather" style="width: 16px; height: 16px; animation: spin 1s linear infinite;">
+                    <circle cx="12" cy="12" r="10" />
+                </svg>
+            `;
+            
+            try {
+                await this.sendVoiceNote();
+            } catch (error) {
+                console.error('Error sending voice note:', error);
+                alert(error.message || 'Failed to send voice note. Please try again.');
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = originalHTML;
+            }
+        });
+    }
+    
+    removeVoiceNotePreview() {
+        const preview = document.getElementById('voiceNotePreview');
+        if (preview) {
+            preview.remove();
+        }
+    }
+    
+    createVoiceMessageElement(voiceUrl, duration, messageId = null) {
+        const container = document.createElement('div');
+        container.className = 'voice-message-container';
+        if (messageId) {
+            container.dataset.messageId = messageId;
+        }
+        
+        const minutes = Math.floor(duration / 60000);
+        const seconds = Math.floor((duration % 60000) / 1000);
+        const durationText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        container.innerHTML = `
+            <div class="voice-message-waveform" id="waveform-${messageId || 'preview'}">
+                <div class="voice-message-progress" id="waveformProgress-${messageId || 'preview'}"></div>
+            </div>
+            <div class="voice-message-controls">
+                <button class="voice-message-play" id="playBtn-${messageId || 'preview'}">
+                    <svg class="feather" style="width: 12px; height: 12px;">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                </button>
+                <div class="voice-message-duration" id="duration-${messageId || 'preview'}">${durationText}</div>
+            </div>
+        `;
+        
+        // Setup playback if URL is provided
+        if (voiceUrl) {
+            const audio = new Audio(voiceUrl);
+            let isPlaying = false;
+            const originalDuration = duration;
+            
+            container.addEventListener('click', (e) => {
+                if (e.target.closest('.voice-message-play') || e.target.closest('.voice-message-waveform')) {
+                    return; // Let button handlers handle it
+                }
+                
+                // Toggle play/pause on container click
+                if (isPlaying) {
+                    audio.pause();
+                } else {
+                    audio.play();
+                }
+            });
+            
+            document.getElementById(`playBtn-${messageId || 'preview'}`).addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isPlaying) {
+                    audio.pause();
+                } else {
+                    audio.play();
+                }
+            });
+            
+            audio.addEventListener('play', () => {
+                isPlaying = true;
+                document.getElementById(`playBtn-${messageId || 'preview'}`).innerHTML = `
+                    <svg class="feather" style="width: 12px; height: 12px;">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                `;
+            });
+            
+            audio.addEventListener('pause', () => {
+                isPlaying = false;
+                document.getElementById(`playBtn-${messageId || 'preview'}`).innerHTML = `
+                    <svg class="feather" style="width: 12px; height: 12px;">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                `;
+            });
+            
+            audio.addEventListener('timeupdate', () => {
+                const progress = (audio.currentTime / audio.duration) * 100;
+                document.getElementById(`waveformProgress-${messageId || 'preview'}`).style.width = `${progress}%`;
+                
+                // Update duration display
+                const currentMinutes = Math.floor(audio.currentTime / 60);
+                const currentSeconds = Math.floor(audio.currentTime % 60);
+                document.getElementById(`duration-${messageId || 'preview'}`).textContent = 
+                    `${currentMinutes.toString().padStart(2, '0')}:${currentSeconds.toString().padStart(2, '0')}`;
+            });
+            
+            audio.addEventListener('ended', () => {
+                isPlaying = false;
+                document.getElementById(`playBtn-${messageId || 'preview'}`).innerHTML = `
+                    <svg class="feather" style="width: 12px; height: 12px;">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                `;
+                document.getElementById(`waveformProgress-${messageId || 'preview'}`).style.width = '0%';
+                document.getElementById(`duration-${messageId || 'preview'}`).textContent = durationText;
+            });
+            
+            // Click to seek on waveform
+            document.getElementById(`waveform-${messageId || 'preview'}`).addEventListener('click', (e) => {
+                e.stopPropagation();
+                const rect = e.target.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const percentage = clickX / rect.width;
+                audio.currentTime = audio.duration * percentage;
+            });
+        }
+        
+        return container;
     }
 
     // NEW: Page visibility listener to handle page leave/return
@@ -283,6 +1844,20 @@ class GroupChat {
         if (this.pageProcessedMessageIdsByGroup) {
             this.pageProcessedMessageIdsByGroup.delete(`page_processed_${groupId}`);
         }
+        
+        // Clear IndexedDB cache for this group
+        if (indexedDBCache) {
+            // We'll handle IndexedDB clearing asynchronously
+            setTimeout(async () => {
+                try {
+                    await indexedDBCache.clear('group_messages');
+                    await indexedDBCache.clear('group_members');
+                    console.log('Cleared IndexedDB cache for group:', groupId);
+                } catch (error) {
+                    console.error('Error clearing IndexedDB cache:', error);
+                }
+            }, 0);
+        }
     }
 
     clearAllCache() {
@@ -326,8 +1901,35 @@ class GroupChat {
         this.userRewards.clear();
         this.userActiveDurations.clear();
         
+        // NEW: Clear voice recording
+        if (this.isRecording) {
+            this.cancelVoiceRecording();
+        }
+        this.currentVoiceNote = null;
+        this.audioChunks = [];
+        
         // Clear active uploads
         this.activeUploads.clear();
+        
+        // Clear local storage cache
+        cache.clear();
+        
+        // Clear IndexedDB cache
+        if (indexedDBCache) {
+            setTimeout(async () => {
+                try {
+                    await indexedDBCache.clear('groups');
+                    await indexedDBCache.clear('group_messages');
+                    await indexedDBCache.clear('group_members');
+                    await indexedDBCache.clear('user_profiles');
+                    await indexedDBCache.clear('offline_messages');
+                    await indexedDBCache.clear('voice_notes');
+                    console.log('Cleared all IndexedDB cache');
+                } catch (error) {
+                    console.error('Error clearing IndexedDB cache:', error);
+                }
+            }, 0);
+        }
     }
 
     async loadBlockedUsers() {
@@ -582,10 +2184,25 @@ class GroupChat {
         try {
             const cacheKey = `user_${userId}`;
             
+            // First check memory cache
             if (!forceRefresh) {
                 const cached = this.getCachedItem(cacheKey, this.cache.userProfiles);
                 if (cached) {
                     return cached;
+                }
+            }
+            
+            // Then check IndexedDB cache
+            if (!forceRefresh && indexedDBCache) {
+                try {
+                    const indexedDBCached = await indexedDBCache.get('user_profiles', userId);
+                    if (indexedDBCached) {
+                        // Update memory cache
+                        this.setCachedItem(cacheKey, indexedDBCached, this.cache.userProfiles, CACHE_DURATION.USER_PROFILE);
+                        return indexedDBCached;
+                    }
+                } catch (error) {
+                    console.log('Error getting user profile from IndexedDB:', error);
                 }
             }
 
@@ -613,7 +2230,21 @@ class GroupChat {
                     fireRing: userData.fireRing || false
                 };
                 
+                // Update memory cache
                 this.setCachedItem(cacheKey, profile, this.cache.userProfiles, CACHE_DURATION.USER_PROFILE);
+                
+                // Update IndexedDB cache
+                if (indexedDBCache) {
+                    try {
+                        await indexedDBCache.set('user_profiles', {
+                            userId: userId,
+                            ...profile,
+                            cachedAt: Date.now()
+                        });
+                    } catch (error) {
+                        console.log('Error caching user profile in IndexedDB:', error);
+                    }
+                }
                 
                 return profile;
             }
@@ -837,13 +2468,13 @@ class GroupChat {
         return streak >= CONSECUTIVE_MESSAGES_THRESHOLD * 2; // After 10 consecutive messages
     }
 
-    async sendPrivateMessage(toUserId, text = null, imageUrl = null, videoUrl = null, replyTo = null) {
+    async sendPrivateMessage(toUserId, text = null, imageUrl = null, videoUrl = null, replyTo = null, voiceUrl = null, duration = null) {
         try {
             if (!this.firebaseUser || !this.currentUser) {
                 throw new Error('You must be logged in to send messages');
             }
             
-            if (!text && !imageUrl && !videoUrl) {
+            if (!text && !imageUrl && !videoUrl && !voiceUrl) {
                 throw new Error('Message cannot be empty');
             }
             
@@ -886,13 +2517,19 @@ class GroupChat {
                 messageData.type = 'video';
             }
             
+            if (voiceUrl) {
+                messageData.voiceUrl = voiceUrl;
+                messageData.type = 'voice';
+                messageData.duration = duration;
+            }
+            
             await addDoc(messagesRef, messageData);
             
             const chatRef = doc(db, 'private_chats', chatId);
             await setDoc(chatRef, {
                 participants: [this.firebaseUser.uid, toUserId],
                 lastMessage: {
-                    text: text ? text.trim() : (imageUrl ? '📷 Image' : videoUrl ? '🎬 Video' : ''),
+                    text: text ? text.trim() : (imageUrl ? '📷 Image' : videoUrl ? '🎬 Video' : voiceUrl ? '🎤 Voice Note' : ''),
                     senderId: this.firebaseUser.uid,
                     senderName: this.currentUser.name,
                     timestamp: serverTimestamp()
@@ -911,9 +2548,12 @@ class GroupChat {
     async sendPrivateMediaMessage(toUserId, file, replyTo = null, onProgress = null, onCancel = null) {
         try {
             const isVideo = file.type.startsWith('video/');
+            const isAudio = file.type.startsWith('audio/');
             
             if (isVideo) {
                 this.validateVideoFile(file);
+            } else if (isAudio) {
+                this.validateAudioFile(file);
             } else {
                 this.validateImageFile(file);
             }
@@ -924,6 +2564,13 @@ class GroupChat {
             
             if (isVideo) {
                 await this.sendPrivateMessage(toUserId, null, null, mediaUrl, replyTo);
+            } else if (isAudio) {
+                // Get duration from audio file
+                const audio = new Audio(mediaUrl);
+                audio.addEventListener('loadedmetadata', async () => {
+                    await this.sendPrivateMessage(toUserId, null, null, null, replyTo, mediaUrl, Math.floor(audio.duration * 1000));
+                });
+                audio.load();
             } else {
                 await this.sendPrivateMessage(toUserId, null, mediaUrl, null, replyTo);
             }
@@ -1166,7 +2813,7 @@ class GroupChat {
                     if (!lastMessageSnap.empty) {
                         const msgData = lastMessageSnap.docs[0].data();
                         lastMessage = {
-                            text: msgData.text || (msgData.imageUrl ? '📷 Image' : msgData.videoUrl ? '🎬 Video' : ''),
+                            text: msgData.text || (msgData.imageUrl ? '📷 Image' : msgData.videoUrl ? '🎬 Video' : msgData.voiceUrl ? '🎤 Voice Note' : ''),
                             senderName: msgData.senderName || 'User',
                             timestamp: msgData.timestamp ? 
                                 (msgData.timestamp.toDate ? msgData.timestamp.toDate() : msgData.timestamp) : 
@@ -1357,11 +3004,26 @@ class GroupChat {
         }
     }
 
-    async getGroupMembersWithDetails(groupId) {
+    async getGroupMembersWithDetails(groupId, forceRefresh = false) {
         try {
-            const cachedMembers = this.getCachedItem(groupId, this.cache.groupMembers);
-            if (cachedMembers) {
-                return cachedMembers;
+            if (!forceRefresh) {
+                const cachedMembers = this.getCachedItem(groupId, this.cache.groupMembers);
+                if (cachedMembers) {
+                    return cachedMembers;
+                }
+                
+                // Try IndexedDB cache
+                if (indexedDBCache) {
+                    try {
+                        const indexedDBCached = await indexedDBCache.getGroupMembers(groupId);
+                        if (indexedDBCached && indexedDBCached.length > 0) {
+                            this.setCachedItem(groupId, indexedDBCached, this.cache.groupMembers, CACHE_DURATION.MEMBERS_LIST);
+                            return indexedDBCached;
+                        }
+                    } catch (error) {
+                        console.log('Error getting group members from IndexedDB:', error);
+                    }
+                }
             }
 
             const membersRef = collection(db, 'groups', groupId, 'members');
@@ -1382,7 +3044,7 @@ class GroupChat {
                 const userSnap = await getDoc(userRef);
                 const userData = userSnap.exists() ? userSnap.data() : {};
                 
-                members.push({
+                const member = {
                     id: docSnap.id,
                     name: data.name || userData.displayName || 'Unknown',
                     avatar: data.avatar || userData.avatar || AVATAR_OPTIONS[0],
@@ -1391,10 +3053,21 @@ class GroupChat {
                     joinedAt: data.joinedAt ? (data.joinedAt.toDate ? data.joinedAt.toDate() : data.joinedAt) : new Date(),
                     lastActive: data.lastActive ? (data.lastActive.toDate ? data.lastActive.toDate() : data.lastActive) : new Date(),
                     isAdmin: docSnap.id === adminId
-                });
+                };
+                
+                members.push(member);
             }
             
             this.setCachedItem(groupId, members, this.cache.groupMembers, CACHE_DURATION.MEMBERS_LIST);
+            
+            // Update IndexedDB cache
+            if (indexedDBCache) {
+                try {
+                    await indexedDBCache.setGroupMembers(groupId, members);
+                } catch (error) {
+                    console.log('Error caching group members in IndexedDB:', error);
+                }
+            }
             
             return members;
         } catch (error) {
@@ -1742,6 +3415,15 @@ class GroupChat {
             
             this.setCachedItem(groupRef.id, group, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
             
+            // Update IndexedDB cache
+            if (indexedDBCache) {
+                try {
+                    await indexedDBCache.setGroup(group);
+                } catch (error) {
+                    console.log('Error caching group in IndexedDB:', error);
+                }
+            }
+            
             return { groupId: groupRef.id, inviteLink: inviteLink };
         } catch (error) {
             console.error('Error creating group:', error);
@@ -1795,11 +3477,27 @@ class GroupChat {
         }
     }
 
-    async getAllGroups() {
+    async getAllGroups(forceRefresh = false) {
         try {
             const cacheKey = 'all_groups';
-            const cached = this.getCachedItem(cacheKey, this.cache.allGroups);
-            if (cached) return cached;
+            
+            if (!forceRefresh) {
+                const cached = this.getCachedItem(cacheKey, this.cache.allGroups);
+                if (cached) return cached;
+                
+                // Try IndexedDB cache
+                if (indexedDBCache) {
+                    try {
+                        const indexedDBCached = await indexedDBCache.getGroups();
+                        if (indexedDBCached && indexedDBCached.length > 0) {
+                            this.setCachedItem(cacheKey, indexedDBCached, this.cache.allGroups, CACHE_DURATION.GROUP_DATA);
+                            return indexedDBCached;
+                        }
+                    } catch (error) {
+                        console.log('Error getting groups from IndexedDB:', error);
+                    }
+                }
+            }
 
             const groupsRef = collection(db, 'groups');
             const q = query(groupsRef, orderBy('lastActivity', 'desc'));
@@ -1822,6 +3520,15 @@ class GroupChat {
             
             this.setCachedItem(cacheKey, groups, this.cache.allGroups, CACHE_DURATION.GROUP_DATA);
             
+            // Update IndexedDB cache
+            if (indexedDBCache) {
+                try {
+                    await indexedDBCache.setGroups(groups);
+                } catch (error) {
+                    console.log('Error caching groups in IndexedDB:', error);
+                }
+            }
+            
             return groups;
         } catch (error) {
             console.error('Error getting groups:', error);
@@ -1835,6 +3542,19 @@ class GroupChat {
                 const cachedGroup = this.getCachedItem(groupId, this.cache.groupData);
                 if (cachedGroup) {
                     return cachedGroup;
+                }
+                
+                // Try IndexedDB cache
+                if (indexedDBCache) {
+                    try {
+                        const indexedDBCached = await indexedDBCache.getGroup(groupId);
+                        if (indexedDBCached) {
+                            this.setCachedItem(groupId, indexedDBCached, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
+                            return indexedDBCached;
+                        }
+                    } catch (error) {
+                        console.log('Error getting group from IndexedDB:', error);
+                    }
                 }
             }
             
@@ -1852,6 +3572,15 @@ class GroupChat {
                 
                 this.setCachedItem(groupId, group, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
                 
+                // Update IndexedDB cache
+                if (indexedDBCache) {
+                    try {
+                        await indexedDBCache.setGroup(group);
+                    } catch (error) {
+                        console.log('Error caching group in IndexedDB:', error);
+                    }
+                }
+                
                 return group;
             }
             return null;
@@ -1863,31 +3592,7 @@ class GroupChat {
 
     async getGroupMembers(groupId, forceRefresh = false) {
         try {
-            if (!forceRefresh) {
-                const cachedMembers = this.getCachedItem(groupId, this.cache.groupMembers);
-                if (cachedMembers) {
-                    return cachedMembers;
-                }
-            }
-            
-            const membersRef = collection(db, 'groups', groupId, 'members');
-            const q = query(membersRef, orderBy('joinedAt', 'asc'));
-            const querySnapshot = await getDocs(q);
-            
-            const members = [];
-            querySnapshot.forEach(doc => {
-                const data = doc.data();
-                members.push({
-                    id: doc.id,
-                    ...data,
-                    joinedAt: data.joinedAt ? (data.joinedAt.toDate ? data.joinedAt.toDate() : data.joinedAt) : new Date(),
-                    lastActive: data.lastActive ? (data.lastActive.toDate ? data.lastActive.toDate() : data.lastActive) : new Date()
-                });
-            });
-            
-            this.setCachedItem(groupId, members, this.cache.groupMembers, CACHE_DURATION.MEMBERS_LIST);
-            
-            return members;
+            return await this.getGroupMembersWithDetails(groupId, forceRefresh);
         } catch (error) {
             console.error('Error getting group members:', error);
             return [];
@@ -2000,6 +3705,15 @@ class GroupChat {
         try {
             if (!this.firebaseUser || !this.currentUser || !groupId) return;
             
+            // Update local cache first
+            if (indexedDBCache) {
+                try {
+                    await indexedDBCache.setTypingStatus(groupId, this.firebaseUser.uid, true);
+                } catch (error) {
+                    console.log('Error caching typing status:', error);
+                }
+            }
+            
             const typingRef = doc(db, 'groups', groupId, 'typing', this.firebaseUser.uid);
             
             await setDoc(typingRef, {
@@ -2034,6 +3748,15 @@ class GroupChat {
     async stopTyping(groupId) {
         try {
             if (!this.firebaseUser || !groupId) return;
+            
+            // Update local cache
+            if (indexedDBCache) {
+                try {
+                    await indexedDBCache.setTypingStatus(groupId, this.firebaseUser.uid, false);
+                } catch (error) {
+                    console.log('Error caching typing status:', error);
+                }
+            }
             
             const typingRef = doc(db, 'groups', groupId, 'typing', this.firebaseUser.uid);
             
@@ -2071,6 +3794,24 @@ class GroupChat {
                 this.unsubscribeTyping = null;
             }
             
+            // First check IndexedDB cache for offline typing status
+            if (indexedDBCache) {
+                setTimeout(async () => {
+                    try {
+                        const cachedTyping = await indexedDBCache.getTypingStatus(groupId);
+                        if (cachedTyping && cachedTyping.length > 0) {
+                            callback(cachedTyping.map(status => ({
+                                userId: status.userId,
+                                userName: status.userName || 'User',
+                                timestamp: status.timestamp
+                            })));
+                        }
+                    } catch (error) {
+                        console.log('Error getting cached typing status:', error);
+                    }
+                }, 100);
+            }
+            
             const typingRef = collection(db, 'groups', groupId, 'typing');
             
             const unsubscribe = onSnapshot(typingRef, (snapshot) => {
@@ -2106,11 +3847,32 @@ class GroupChat {
         }
     }
 
-    async sendMessage(groupId, text = null, imageUrl = null, videoUrl = null, replyTo = null) {
+    async sendMessage(groupId, text = null, imageUrl = null, videoUrl = null, replyTo = null, voiceUrl = null, duration = null) {
         try {
             // FIX: Check if offline before sending
             if (!this.isOnline) {
-                throw new Error('You are offline. Please check your network connection and try again.');
+                // Queue message for offline sending
+                const offlineMessage = {
+                    groupId: groupId,
+                    text: text,
+                    imageUrl: imageUrl,
+                    videoUrl: videoUrl,
+                    voiceUrl: voiceUrl,
+                    duration: duration,
+                    replyTo: replyTo,
+                    senderId: this.firebaseUser.uid,
+                    senderName: this.currentUser.name,
+                    senderAvatar: this.currentUser.avatar,
+                    type: text ? 'text' : (imageUrl ? 'image' : videoUrl ? 'video' : voiceUrl ? 'voice' : 'text'),
+                    timestamp: new Date()
+                };
+                
+                if (indexedDBCache) {
+                    await indexedDBCache.queueOfflineMessage(offlineMessage);
+                    showNotification('Message queued for sending when you reconnect', 'offline');
+                }
+                
+                throw new Error('You are offline. Message will be sent when you reconnect.');
             }
             
             if (!this.firebaseUser || !this.currentUser) {
@@ -2122,7 +3884,7 @@ class GroupChat {
                 throw new Error('You are restricted from sending messages in this group for 2 hours due to using restricted words.');
             }
             
-            if (!text && !imageUrl && !videoUrl) {
+            if (!text && !imageUrl && !videoUrl && !voiceUrl) {
                 throw new Error('Message cannot be empty');
             }
             
@@ -2184,14 +3946,21 @@ class GroupChat {
                 messageData.type = 'video';
             }
             
-            await addDoc(messagesRef, messageData);
+            if (voiceUrl) {
+                messageData.voiceUrl = voiceUrl;
+                messageData.type = 'voice';
+                messageData.duration = duration;
+            }
+            
+            const docRef = await addDoc(messagesRef, messageData);
+            const finalMessageId = docRef.id;
             
             const groupRef = doc(db, 'groups', groupId);
             await updateDoc(groupRef, {
                 updatedAt: serverTimestamp(),
                 lastActivity: serverTimestamp(),
                 lastMessage: {
-                    text: text ? text.trim() : (imageUrl ? '📷 Image' : videoUrl ? '🎬 Video' : ''),
+                    text: text ? text.trim() : (imageUrl ? '📷 Image' : videoUrl ? '🎬 Video' : voiceUrl ? '🎤 Voice Note' : ''),
                     sender: this.currentUser.name,
                     timestamp: serverTimestamp()
                 }
@@ -2204,6 +3973,19 @@ class GroupChat {
             await this.stopTyping(groupId);
             
             await this.updateLastActive(groupId);
+            
+            // Cache the message in IndexedDB
+            if (indexedDBCache) {
+                try {
+                    await indexedDBCache.addGroupMessage(groupId, {
+                        id: finalMessageId,
+                        ...messageData,
+                        timestamp: new Date()
+                    });
+                } catch (error) {
+                    console.log('Error caching message in IndexedDB:', error);
+                }
+            }
             
             this.clearReply();
             
@@ -2221,9 +4003,12 @@ class GroupChat {
     async sendMediaMessage(groupId, file, replyTo = null, onProgress = null, onCancel = null) {
         try {
             const isVideo = file.type.startsWith('video/');
+            const isAudio = file.type.startsWith('audio/');
             
             if (isVideo) {
                 this.validateVideoFile(file);
+            } else if (isAudio) {
+                this.validateAudioFile(file);
             } else {
                 this.validateImageFile(file);
             }
@@ -2234,6 +4019,13 @@ class GroupChat {
             
             if (isVideo) {
                 await this.sendMessage(groupId, null, null, mediaUrl, replyTo);
+            } else if (isAudio) {
+                // Get duration from audio file
+                const audio = new Audio(mediaUrl);
+                audio.addEventListener('loadedmetadata', async () => {
+                    await this.sendMessage(groupId, null, null, null, replyTo, mediaUrl, Math.floor(audio.duration * 1000));
+                });
+                audio.load();
             } else {
                 await this.sendMessage(groupId, null, mediaUrl, null, replyTo);
             }
@@ -2248,8 +4040,23 @@ class GroupChat {
     async getMessages(groupId, limitCount = 50) {
         try {
             const cacheKey = `messages_${groupId}_${limitCount}`;
+            
+            // First check memory cache
             const cached = this.getCachedItem(cacheKey, this.cache.messages);
             if (cached) return cached;
+            
+            // Then check IndexedDB cache
+            if (indexedDBCache) {
+                try {
+                    const indexedDBCached = await indexedDBCache.getGroupMessages(groupId, limitCount);
+                    if (indexedDBCached && indexedDBCached.length > 0) {
+                        this.setCachedItem(cacheKey, indexedDBCached, this.cache.messages, 30000);
+                        return indexedDBCached;
+                    }
+                } catch (error) {
+                    console.log('Error getting messages from IndexedDB:', error);
+                }
+            }
 
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(limitCount));
@@ -2268,6 +4075,15 @@ class GroupChat {
             const result = messages.reverse();
             
             this.setCachedItem(cacheKey, result, this.cache.messages, 30000);
+            
+            // Update IndexedDB cache
+            if (indexedDBCache) {
+                try {
+                    await indexedDBCache.setGroupMessages(groupId, result);
+                } catch (error) {
+                    console.log('Error caching messages in IndexedDB:', error);
+                }
+            }
             
             return result;
         } catch (error) {
@@ -2305,6 +4121,28 @@ class GroupChat {
             // Track if this is the first snapshot
             let isFirstSnapshot = true;
             let initialMessagesProcessed = false;
+            
+            // Load cached messages from IndexedDB first
+            if (indexedDBCache && pageProcessedIds.size === 0) {
+                setTimeout(async () => {
+                    try {
+                        const cachedMessages = await indexedDBCache.getGroupMessages(groupId, 50);
+                        if (cachedMessages && cachedMessages.length > 0) {
+                            console.log('Loaded', cachedMessages.length, 'cached messages from IndexedDB');
+                            callback(cachedMessages);
+                            
+                            // Mark these messages as processed
+                            cachedMessages.forEach(msg => {
+                                if (msg.id) {
+                                    pageProcessedIds.add(msg.id);
+                                }
+                            });
+                        }
+                    } catch (error) {
+                        console.log('Error loading cached messages:', error);
+                    }
+                }, 100);
+            }
             
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 try {
@@ -2345,6 +4183,19 @@ class GroupChat {
                         }
                         
                         callback(messages);
+                        
+                        // Cache new messages in IndexedDB
+                        if (indexedDBCache) {
+                            setTimeout(async () => {
+                                try {
+                                    for (const message of messages) {
+                                        await indexedDBCache.addGroupMessage(groupId, message);
+                                    }
+                                } catch (error) {
+                                    console.log('Error caching new messages in IndexedDB:', error);
+                                }
+                            }, 0);
+                        }
                     }
                 } catch (error) {
                     console.error('Error processing messages:', error);
@@ -2385,6 +4236,21 @@ class GroupChat {
                 this.unsubscribeMembers = null;
             }
             
+            // Load cached members from IndexedDB first
+            if (indexedDBCache) {
+                setTimeout(async () => {
+                    try {
+                        const cachedMembers = await indexedDBCache.getGroupMembers(groupId);
+                        if (cachedMembers && cachedMembers.length > 0) {
+                            console.log('Loaded', cachedMembers.length, 'cached members from IndexedDB');
+                            callback(cachedMembers);
+                        }
+                    } catch (error) {
+                        console.log('Error loading cached members:', error);
+                    }
+                }, 100);
+            }
+            
             const membersRef = collection(db, 'groups', groupId, 'members');
             const q = query(membersRef, orderBy('joinedAt', 'asc'));
             
@@ -2402,6 +4268,17 @@ class GroupChat {
                 callback(members);
                 
                 this.setCachedItem(groupId, members, this.cache.groupMembers, CACHE_DURATION.MEMBERS_LIST);
+                
+                // Update IndexedDB cache
+                if (indexedDBCache) {
+                    setTimeout(async () => {
+                        try {
+                            await indexedDBCache.setGroupMembers(groupId, members);
+                        } catch (error) {
+                            console.log('Error caching members in IndexedDB:', error);
+                        }
+                    }, 0);
+                }
             }, (error) => {
                 console.error('Error in members listener:', error);
             });
@@ -3446,7 +5323,7 @@ class GroupChat {
         const truncatedName = this.truncateName(this.replyingToMessage.senderName);
         const truncatedMessage = this.replyingToMessage.text ? 
             this.truncateMessage(this.replyingToMessage.text) : 
-            (this.replyingToMessage.imageUrl ? '📷 Image' : this.replyingToMessage.videoUrl ? '🎬 Video' : '');
+            (this.replyingToMessage.imageUrl ? '📷 Image' : this.replyingToMessage.videoUrl ? '🎬 Video' : this.replyingToMessage.voiceUrl ? '🎤 Voice Note' : '');
         
         indicator.innerHTML = `
             <div class="reply-indicator-content">
@@ -3556,20 +5433,6 @@ class GroupChat {
         this.removeReplyIndicator();
     }
 
-    async logout() {
-        try {
-            await signOut(auth);
-            this.firebaseUser = null;
-            this.currentUser = null;
-            this.cleanup();
-            this.clearAllCache();
-            
-            window.location.href = 'login.html';
-        } catch (error) {
-            console.error('Error logging out:', error);
-        }
-    }
-
     cleanup() {
         console.log('Cleaning up group chat...');
         
@@ -3654,6 +5517,13 @@ class GroupChat {
         });
         this.userStreakTimers.clear();
         
+        // NEW: Clear voice recording
+        if (this.isRecording) {
+            this.cancelVoiceRecording();
+        }
+        this.currentVoiceNote = null;
+        this.audioChunks = [];
+        
         // Cancel all active uploads
         this.activeUploads.forEach((upload, uploadId) => {
             if (upload.cancelFunction && typeof upload.cancelFunction === 'function') {
@@ -3669,6 +5539,20 @@ class GroupChat {
         this.replyingToMessage = null;
         
         console.log('Group chat cleanup complete');
+    }
+
+    async logout() {
+        try {
+            await signOut(auth);
+            this.firebaseUser = null;
+            this.currentUser = null;
+            this.cleanup();
+            this.clearAllCache();
+            
+            window.location.href = 'login.html';
+        } catch (error) {
+            console.error('Error logging out:', error);
+        }
     }
 }
 
@@ -3737,16 +5621,23 @@ function createUploadModal(uploadId, fileName, fileType, onCancel) {
     modal.className = 'upload-modal';
     
     const isImage = fileType.startsWith('image/');
+    const isVideo = fileType.startsWith('video/');
+    const isAudio = fileType.startsWith('audio/');
+    
+    let fileTypeText = 'File';
+    if (isImage) fileTypeText = 'Image';
+    else if (isVideo) fileTypeText = 'Video';
+    else if (isAudio) fileTypeText = 'Audio';
     
     modal.innerHTML = `
         <div class="upload-header">
-            <h4>Uploading ${isImage ? 'Image' : 'Video'}</h4>
+            <h4>Uploading ${fileTypeText}</h4>
             <button class="cancel-upload-btn" id="cancel-upload-${uploadId}">×</button>
         </div>
         <div class="upload-content">
             <div class="upload-info">
                 <div class="upload-icon">
-                    ${isImage ? '📷' : '🎬'}
+                    ${isImage ? '📷' : isVideo ? '🎬' : isAudio ? '🎤' : '📄'}
                 </div>
                 <div class="upload-details">
                     <h5>${fileName}</h5>
@@ -4076,7 +5967,7 @@ function initGroupPage() {
     freshAttachmentBtn.addEventListener('click', () => {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
-        fileInput.accept = 'image/*,video/*';
+        fileInput.accept = 'image/*,video/*,audio/*';
         fileInput.multiple = false;
         
         fileInput.addEventListener('change', async (e) => {
@@ -4130,6 +6021,109 @@ function initGroupPage() {
         fileInput.click();
     });
     
+    // NEW: Add voice note button to sidebar
+    function addVoiceNoteButton() {
+        // Create voice note button
+        const voiceNoteBtn = document.createElement('button');
+        voiceNoteBtn.id = 'voiceNoteBtn';
+        voiceNoteBtn.className = 'voice-note-btn';
+        voiceNoteBtn.innerHTML = `
+            <svg class="feather" style="width: 20px; height: 20px;">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+        `;
+        voiceNoteBtn.title = 'Record voice note (Hold to record)';
+        
+        // Find message input container
+        const messageInputContainer = document.querySelector('.message-input-container');
+        if (messageInputContainer) {
+            // Insert voice note button before send button
+            const sendBtn = messageInputContainer.querySelector('#sendBtn');
+            if (sendBtn) {
+                messageInputContainer.insertBefore(voiceNoteBtn, sendBtn);
+            } else {
+                messageInputContainer.appendChild(voiceNoteBtn);
+            }
+        }
+        
+        // Add event listeners for voice recording
+        let pressTimer;
+        let isLongPress = false;
+        
+        voiceNoteBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isLongPress = false;
+            pressTimer = setTimeout(async () => {
+                isLongPress = true;
+                try {
+                    await groupChat.startVoiceRecording();
+                    voiceNoteBtn.classList.add('recording');
+                } catch (error) {
+                    alert(error.message || 'Failed to start recording. Please try again.');
+                }
+            }, 500); // Long press threshold
+        });
+        
+        voiceNoteBtn.addEventListener('mouseup', () => {
+            clearTimeout(pressTimer);
+            if (isLongPress && groupChat.isRecording) {
+                groupChat.stopVoiceRecording();
+                voiceNoteBtn.classList.remove('recording');
+            }
+        });
+        
+        voiceNoteBtn.addEventListener('mouseleave', () => {
+            clearTimeout(pressTimer);
+            if (isLongPress && groupChat.isRecording) {
+                groupChat.stopVoiceRecording();
+                voiceNoteBtn.classList.remove('recording');
+            }
+        });
+        
+        // Touch events for mobile
+        voiceNoteBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isLongPress = false;
+            pressTimer = setTimeout(async () => {
+                isLongPress = true;
+                try {
+                    await groupChat.startVoiceRecording();
+                    voiceNoteBtn.classList.add('recording');
+                } catch (error) {
+                    alert(error.message || 'Failed to start recording. Please try again.');
+                }
+            }, 500);
+        });
+        
+        voiceNoteBtn.addEventListener('touchend', () => {
+            clearTimeout(pressTimer);
+            if (isLongPress && groupChat.isRecording) {
+                groupChat.stopVoiceRecording();
+                voiceNoteBtn.classList.remove('recording');
+            }
+        });
+        
+        voiceNoteBtn.addEventListener('touchcancel', () => {
+            clearTimeout(pressTimer);
+            if (isLongPress && groupChat.isRecording) {
+                groupChat.stopVoiceRecording();
+                voiceNoteBtn.classList.remove('recording');
+            }
+        });
+        
+        // Click to cancel recording if active
+        voiceNoteBtn.addEventListener('click', (e) => {
+            if (!isLongPress && groupChat.isRecording) {
+                e.preventDefault();
+                groupChat.cancelVoiceRecording();
+                voiceNoteBtn.classList.remove('recording');
+            }
+        });
+    }
+    
     async function loadGroupData() {
         try {
             groupData = await groupChat.getGroup(groupId);
@@ -4164,6 +6158,9 @@ function initGroupPage() {
             
             // ADDED: Create copy invite link button for admin
             addInviteLinkButton();
+            
+            // ADDED: Add voice note button
+            addVoiceNoteButton();
             
             members = await groupChat.getGroupMembers(groupId);
             updateMembersList();
@@ -4581,7 +6578,7 @@ function initGroupPage() {
                                 const truncatedName = groupChat.truncateName(repliedMessage.senderName);
                                 const truncatedMessage = repliedMessage.text ? 
                                     groupChat.truncateMessage(repliedMessage.text) : 
-                                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : '');
+                                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : repliedMessage.voiceUrl ? '🎤 Voice Note' : '');
                                 
                                 replyHtml = `
                                     <div class="replying-to">
@@ -4627,6 +6624,12 @@ function initGroupPage() {
                                         <source src="${msg.videoUrl}" type="video/mp4">
                                         Your browser does not support the video tag.
                                     </video>
+                                </div>
+                            `;
+                        } else if (msg.voiceUrl) {
+                            messageContent = `
+                                <div class="message-voice-container" style="position: relative;">
+                                    ${groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id).outerHTML}
                                 </div>
                             `;
                         } else if (msg.type === 'system') {
