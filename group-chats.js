@@ -1,4 +1,4 @@
-// groupchat.js - Enhanced with IndexedDB Caching, Service Worker Support & Voice Notes
+//I don't know if you noticed but the message and the avatar are not on the same like arrangement the message is pushed a little to the middle that's how it's supposed to be but after adding some upgrades to this my js file I don't know how i.messed it up now the message and avatar are on the same line I don't know if it's any css that's affecting it look at the screenshots of before and after:// groupchat.js - Enhanced with IndexedDB Caching, Service Worker Support & Voice Notes
 import { 
     getFirestore, 
     collection, 

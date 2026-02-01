@@ -22,8 +22,55 @@
           .voice-message-container {
     cursor: pointer;
 }
+    .message-content-wrapper {
+    margin-left: 46px !important;
+    display: block !important;
+}
 /* Add this to your existing CSS or in a style tag in your HTML */
+/* ADD THIS - More specific selector */
+.message-group .message-header {
+    display: flex !important;
+    align-items: flex-start !important; /* Change from center */
+    flex-wrap: wrap !important;
+}
 
+.message-group .message-content {
+    margin-left: 46px !important;
+    width: calc(100% - 46px) !important;
+    display: block !important;
+    clear: both !important;
+}
+/* Entire message block gets the margin */
+.message-text {
+    margin-left: 46px !important;
+    display: block !important;
+    width: calc(100% - 46px) !important;
+}
+
+/* Remove individual margins since parent has it */
+.message-text .replying-to {
+    margin-left: 0 !important;
+}
+
+.message-text .message-content-wrapper {
+    margin-left: 0 !important;
+}
+/* Make sure avatar doesn't stretch */
+.message-group .message-avatar-container {
+    flex: 0 0 auto !important;
+    width: 36px !important;
+    height: 36px !important;
+}
+
+/* Force content to appear below header */
+.message-group .message-sender-info {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.message-group .message-time {
+    flex: 0 0 auto !important;
+}
 /* Remove ALL hover effects from voice messages */
 .voice-message-container {
     transition: none !important;
@@ -966,12 +1013,6 @@ video:hover {
             gap: 4px;
         }
 
-        .persistent-player-participants .feather {
-            width: 10px;
-            height: 10px;
-            stroke: white;
-        }
-
         .persistent-player-close {
             background: rgba(255, 255, 255, 0.2);
             border: none;
@@ -1280,6 +1321,8 @@ video:hover {
         .chat-container {
             display: flex;
             height: 100vh;
+            width: 100%;
+            position: relative;
         }
 
         /* Sidebar Styles */
@@ -1289,11 +1332,13 @@ video:hover {
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
+            flex-shrink: 0;
         }
 
         .sidebar-header {
             padding: 20px;
             border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
         }
 
         .back-btn {
@@ -1484,6 +1529,8 @@ video:hover {
             flex: 1;
             display: flex;
             flex-direction: column;
+            width: 100%;
+            min-width: 0; /* Important: prevents flex item from expanding */
         }
 
         .chat-header {
@@ -1493,6 +1540,7 @@ video:hover {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
         }
 
         .chat-title {
@@ -1543,6 +1591,15 @@ video:hover {
             padding: 20px;
             background: var(--bg-primary);
             position: relative;
+            width: 100%;
+        }
+
+        /* FIX: Ensure message content has proper margin-left */
+        .message-content {
+            margin-left: 52px !important; /* Force the gap between avatar and message */
+            font-size: 0.95rem;
+            line-height: 1.4;
+            width: calc(100% - 52px); /* Ensure it doesn't overflow */
         }
 
         .no-messages {
@@ -1559,8 +1616,6 @@ video:hover {
             animation: fadeInUp 0.3s ease;
         }
 
-        
-
         .message-header {
             display: flex;
             align-items: center;
@@ -1573,6 +1628,7 @@ video:hover {
             height: 40px;
             border-radius: 50%;
             object-fit: cover;
+            flex-shrink: 0; /* Prevent avatar from shrinking */
         }
 
         .message-sender {
@@ -1587,12 +1643,6 @@ video:hover {
             font-weight: normal;
         }
 
-        .message-content {
-            margin-left: 52px;
-            font-size: 0.95rem;
-            line-height: 1.4;
-        }
-
         .message-text {
             margin-bottom: 5px;
             word-wrap: break-word;
@@ -1600,10 +1650,9 @@ video:hover {
             border-radius: 6px;
             position: relative;
             cursor: pointer;
-            
+            max-width: 100%;
+            overflow-wrap: break-word;
         }
-
-
 
         /* System message styling */
         .system-message {
@@ -1658,6 +1707,7 @@ video:hover {
             animation: slideDown 0.2s ease;
             max-height: 44px;
             overflow: hidden;
+            margin-bottom: 10px;
         }
 
         @keyframes slideDown {
@@ -1955,6 +2005,8 @@ video:hover {
             padding: 16px 20px;
             border-top: 1px solid var(--border);
             position: relative;
+            flex-shrink: 0; /* FIX: Prevent input container from expanding */
+            width: 100%;
         }
 
         .message-input-container {
@@ -1966,6 +2018,8 @@ video:hover {
             padding: 6px 14px;
             gap: 8px;
             transition: all 0.3s ease;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .message-input-container:focus-within {
@@ -2002,6 +2056,7 @@ video:hover {
             justify-content: center;
             width: 36px;
             height: 36px;
+            flex-shrink: 0;
         }
 
         .inside-input-btn:hover {
@@ -2030,6 +2085,8 @@ video:hover {
             padding: 8px 0;
             line-height: 1.4;
             outline: none;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .message-input::placeholder {
@@ -2089,16 +2146,6 @@ video:hover {
             width: 100%;
             height: 100%;
             cursor: pointer;
-        }
-
-        /* Voice message button (if you add it later) */
-        .voice-message-btn {
-            color: var(--primary-light);
-        }
-
-        .voice-message-btn.recording {
-            color: #ff4757;
-            animation: pulse 1.5s infinite;
         }
 
         /* Lazy Loading More Indicator */
@@ -2375,7 +2422,6 @@ video:hover {
                     <h2 class="chat-title" id="chatTitle">Loading..</h2>
                 </div>
                 <div class="chat-header-actions">
-                    <!-- CALL BUTTON IN HEADER - ADDED -->
                     <button class="header-btn" id="sidebarToggle" type="button">
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <line x1="3" y1="12" x2="21" y2="12"></line>
