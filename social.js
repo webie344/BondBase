@@ -21,7 +21,8 @@ import {
     startAfter,
     arrayUnion,
     arrayRemove,
-    increment
+    increment,
+    where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -85,10 +86,18 @@ class SocialManager {
         this.lastVisiblePost = null;
         this.isLoading = false;
         this.hasMorePosts = true;
-        this.postsPerPage = 10;
-        this.currentFilter = 'all'; // 'all', 'following', 'top'
-        this.allPosts = []; // Store all posts for client-side filtering
-        this.followingStatus = {}; // Store following status for users
+        this.postsPerPage = 15; // Increased to get more posts for better sorting
+        this.allPosts = []; // Store all posts for sorting
+        
+        // People You May Know Settings
+        this.PYMK_PROFILES_PER_LOAD = 10;
+        this.PYMK_MIN_POSTS_BEFORE_SHOW = 6;
+        this.PYMK_MAX_POSTS_BEFORE_SHOW = 10;
+        this.viewedPYMKProfiles = new Set();
+        this.currentPYMKProfiles = [];
+        this.pymkLastVisible = null;
+        this.hasMorePYMK = true;
+        
         this.init();
     }
 
@@ -101,6 +110,7 @@ class SocialManager {
                 this.setupGlobalEventListeners();
                 this.loadViewedPosts();
                 this.loadLikedPosts();
+                this.loadViewedPYMKProfiles();
             } else {
                 if (!window.location.pathname.includes('login.html') && 
                     !window.location.pathname.includes('signup.html') &&
@@ -133,12 +143,6 @@ class SocialManager {
             if (e.target.id === 'loadMorePosts' || e.target.closest('#loadMorePosts')) {
                 this.loadMorePosts();
             }
-            // Filter buttons for posts page
-            if (e.target.classList.contains('posts-filter-btn') || e.target.closest('.posts-filter-btn')) {
-                const btn = e.target.classList.contains('posts-filter-btn') ? e.target : e.target.closest('.posts-filter-btn');
-                const filter = btn.dataset.filter;
-                this.changePostsFilter(filter);
-            }
             // Follow buttons
             if (e.target.classList.contains('follow-btn-post') || e.target.closest('.follow-btn-post')) {
                 const btn = e.target.classList.contains('follow-btn-post') ? e.target : e.target.closest('.follow-btn-post');
@@ -149,6 +153,27 @@ class SocialManager {
                     e.stopPropagation();
                     this.handlePostFollow(userId, btn, isFollowing);
                 }
+            }
+            // People You May Know follow buttons
+            if (e.target.classList.contains('pymk-follow-btn') || e.target.closest('.pymk-follow-btn')) {
+                const btn = e.target.classList.contains('pymk-follow-btn') ? e.target : e.target.closest('.pymk-follow-btn');
+                const userId = btn.dataset.userId;
+                const isFollowing = btn.dataset.following === 'true';
+                
+                if (userId && userId !== this.currentUser?.uid) {
+                    e.stopPropagation();
+                    this.handlePYMKFollow(userId, btn, isFollowing);
+                }
+            }
+            // PYMK navigation buttons
+            if (e.target.classList.contains('pymk-nav-btn') || e.target.closest('.pymk-nav-btn')) {
+                const btn = e.target.classList.contains('pymk-nav-btn') ? e.target : e.target.closest('.pymk-nav-btn');
+                const direction = btn.dataset.direction;
+                this.scrollPYMKCarousel(direction);
+            }
+            // Load more PYMK profiles
+            if (e.target.id === 'loadMorePYMK' || e.target.closest('#loadMorePYMK')) {
+                this.loadMorePYMKProfiles();
             }
         });
     }
@@ -211,147 +236,14 @@ class SocialManager {
         return num.toString();
     }
 
-    // ==================== POSTS PAGE WITH FILTERS ====================
+    // ==================== POSTS PAGE ====================
     setupPostsPage() {
-        // Add filter buttons if they don't exist
-        this.addFilterButtons();
-        
         // Load initial posts
         this.loadAllPosts();
         this.markAllPostsAsViewed();
     }
 
-    addFilterButtons() {
-        const postsContainer = document.getElementById('postsContainer');
-        if (!postsContainer) return;
-        
-        // Check if filter buttons already exist
-        if (document.getElementById('postsFilterButtons')) return;
-        
-        const filterContainer = document.createElement('div');
-        filterContainer.id = 'postsFilterButtons';
-        filterContainer.className = 'posts-filter-buttons';
-        filterContainer.innerHTML = `
-            <button class="posts-filter-btn active" data-filter="all">
-                <i class="fas fa-globe"></i> All Posts
-            </button>
-            <button class="posts-filter-btn" data-filter="top">
-                <i class="fas fa-fire"></i> Top Posts
-            </button>
-            <button class="posts-filter-btn" data-filter="following">
-                <i class="fas fa-user-friends"></i> Following
-            </button>
-        `;
-        
-        // Insert before posts container
-        postsContainer.parentNode.insertBefore(filterContainer, postsContainer);
-        
-        // Add styles
-        if (!document.getElementById('filterStyles')) {
-            const style = document.createElement('style');
-            style.id = 'filterStyles';
-            style.textContent = `
-                .posts-filter-buttons {
-                    display: flex;
-                    gap: 10px;
-                    margin-bottom: 20px;
-                    padding: 10px;
-                    background: var(--bg-secondary);
-                    border-radius: 10px;
-                    justify-content: center;
-                    flex-wrap: wrap;
-                }
-                .posts-filter-btn {
-                    background: var(--bg-primary);
-                    border: 1px solid var(--border);
-                    color: var(--text-primary);
-                    padding: 8px 16px;
-                    border-radius: 20px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    transition: all 0.3s;
-                    display: flex;
-                    align-items: center;
-                    gap: 5px;
-                }
-                .posts-filter-btn:hover {
-                    background: var(--hover);
-                }
-                .posts-filter-btn.active {
-                    background: var(--primary);
-                    color: white;
-                    border-color: var(--primary);
-                }
-                .posts-filter-btn i {
-                    font-size: 12px;
-                }
-                .follow-btn-post {
-                    background: var(--primary);
-                    color: white;
-                    border: none;
-                    padding: 4px 12px;
-                    border-radius: 15px;
-                    font-size: 12px;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                    transition: all 0.3s;
-                    margin-left: auto;
-                }
-                .follow-btn-post:hover {
-                    opacity: 0.9;
-                }
-                .follow-btn-post.following {
-                    background: var(--success);
-                }
-                .post-author-info {
-                    flex: 1;
-                    min-width: 0;
-                }
-                .post-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-    }
-
-    changePostsFilter(filter) {
-        // Update active button
-        document.querySelectorAll('.posts-filter-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        const activeBtn = document.querySelector(`.posts-filter-btn[data-filter="${filter}"]`);
-        if (activeBtn) {
-            activeBtn.classList.add('active');
-        }
-        
-        // Update current filter
-        this.currentFilter = filter;
-        
-        // Reset pagination
-        this.lastVisiblePost = null;
-        this.hasMorePosts = true;
-        
-        // Clear container
-        const container = document.getElementById('postsContainer');
-        if (container) {
-            container.innerHTML = '';
-            
-            // Add loading skeletons
-            for (let i = 0; i < 3; i++) {
-                container.appendChild(this.createLoadingPostItem());
-            }
-        }
-        
-        // Load posts with new filter
-        this.loadAllPosts();
-    }
-
-    // UPDATED: Load posts with pagination and client-side filtering
+    // NEW: Load posts with custom sorting strategy
     async loadAllPosts(lastVisible = null) {
         const container = document.getElementById('postsContainer');
         const loadMoreBtn = document.getElementById('loadMorePosts');
@@ -402,36 +294,36 @@ class SocialManager {
             // Check if we have more posts
             this.hasMorePosts = postsSnap.size >= this.postsPerPage;
             
+            // Get all posts
             const allPosts = [];
             postsSnap.forEach(doc => {
                 const postData = doc.data();
                 allPosts.push({ id: doc.id, ...postData });
             });
             
-            // Apply client-side filtering
-            let filteredPosts = allPosts;
-            
-            if (this.currentFilter === 'top') {
-                // Sort by likes (descending)
-                filteredPosts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
-            } else if (this.currentFilter === 'following') {
-                if (!this.currentUser) {
-                    filteredPosts = [];
-                } else {
-                    // Get following users
-                    const followingUsers = await this.getFollowingUsers();
-                    if (followingUsers.length === 0) {
-                        filteredPosts = [];
-                    } else {
-                        filteredPosts = allPosts.filter(post => 
-                            followingUsers.includes(post.userId)
-                        );
-                    }
-                }
+            // Get following users if logged in
+            let followingUsers = [];
+            if (this.currentUser) {
+                followingUsers = await this.getFollowingUsers();
             }
             
-            // Display filtered posts
-            await this.displayPosts(filteredPosts, lastVisible !== null);
+            // Sort posts according to strategy
+            const sortedPosts = await this.sortPostsStrategy(allPosts, followingUsers);
+            
+            // Display sorted posts
+            await this.displayPosts(sortedPosts, lastVisible !== null);
+            
+            // Check if we should show People You May Know (only on first load)
+            if (lastVisible === null) {
+                const postCount = container.querySelectorAll('.post-item:not(.loading)').length;
+                const randomPostCount = Math.floor(Math.random() * (this.PYMK_MAX_POSTS_BEFORE_SHOW - this.PYMK_MIN_POSTS_BEFORE_SHOW + 1)) + this.PYMK_MIN_POSTS_BEFORE_SHOW;
+                
+                if (postCount >= randomPostCount) {
+                    setTimeout(() => {
+                        this.insertPeopleYouMayKnowSection();
+                    }, 500);
+                }
+            }
             
             // Show/hide load more button
             if (loadMoreBtn) {
@@ -444,35 +336,6 @@ class SocialManager {
                 }
             }
             
-            // Show message if no posts in current filter
-            if (filteredPosts.length === 0 && lastVisible === null) {
-                let message = '';
-                switch(this.currentFilter) {
-                    case 'following':
-                        if (!this.currentUser) {
-                            message = 'Please log in to see posts from users you follow';
-                        } else {
-                            message = `
-                                <div class="no-posts-message">
-                                    <i class="fas fa-user-friends" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
-                                    <h3>No Posts from Followed Users</h3>
-                                    <p>You're not following anyone yet. Follow users to see their posts here!</p>
-                                    <a href="mingle.html" class="btn-primary">
-                                        <i class="fas fa-users"></i> Find Users to Follow
-                                    </a>
-                                </div>
-                            `;
-                        }
-                        break;
-                    case 'top':
-                        message = 'No posts with likes yet';
-                        break;
-                    default:
-                        message = 'No posts yet. Be the first to post!';
-                }
-                container.innerHTML = message;
-            }
-            
         } catch (error) {
             console.error('Error loading posts:', error);
             if (lastVisible === null) {
@@ -481,6 +344,56 @@ class SocialManager {
         } finally {
             this.isLoading = false;
         }
+    }
+
+    // NEW: Sorting strategy - Highest likes first, then followed users, then random
+    async sortPostsStrategy(posts, followingUsers) {
+        // Separate posts into categories
+        const highLikesPosts = []; // Posts with 10+ likes
+        const followedUserPosts = []; // Posts from users you follow
+        const otherPosts = []; // All other posts
+        
+        // Get current user info for checking if post is from current user
+        const currentUserId = this.currentUser?.uid;
+        
+        // Categorize posts
+        for (const post of posts) {
+            // Skip current user's own posts for better discovery
+            if (post.userId === currentUserId) {
+                otherPosts.push(post);
+                continue;
+            }
+            
+            const likes = post.likes || 0;
+            
+            if (likes >= 10) {
+                highLikesPosts.push(post);
+            } else if (followingUsers.includes(post.userId)) {
+                followedUserPosts.push(post);
+            } else {
+                otherPosts.push(post);
+            }
+        }
+        
+        // Sort high likes posts by likes (descending)
+        highLikesPosts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+        
+        // Shuffle each category to avoid monotony
+        this.shuffleArray(highLikesPosts);
+        this.shuffleArray(followedUserPosts);
+        this.shuffleArray(otherPosts);
+        
+        // Combine in order: high likes -> followed users -> other posts
+        return [...highLikesPosts, ...followedUserPosts, ...otherPosts];
+    }
+
+    // Helper function to shuffle array
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
     }
 
     // ==================== FOLLOWERS FUNCTIONALITY ====================
@@ -921,7 +834,7 @@ class SocialManager {
 
         for (const post of posts) {
             const user = usersData[post.userId] || {};
-            const postElement = await this.createPostElement(post, user, post.id); // Changed to async
+            const postElement = await this.createPostElement(post, user, post.id);
             container.appendChild(postElement);
         }
     }
@@ -1328,6 +1241,606 @@ class SocialManager {
                 indicator.style.display = 'none';
             }
         }
+    }
+
+    // ==================== PEOPLE YOU MAY KNOW FEATURE ====================
+    
+    async insertPeopleYouMayKnowSection() {
+        const container = document.getElementById('postsContainer');
+        if (!container) return;
+        
+        // Don't insert if already exists
+        if (document.getElementById('peopleYouMayKnowSection')) return;
+        
+        // Create the section
+        const pymkSection = document.createElement('div');
+        pymkSection.id = 'peopleYouMayKnowSection';
+        pymkSection.className = 'pymk-section';
+        
+        // Add CSS styles
+        this.addPYMKStyles();
+        
+        pymkSection.innerHTML = `
+            <div class="pymk-header">
+                <h3><i class="fas fa-user-friends"></i> People You May Know</h3>
+                <button class="pymk-see-all">See All</button>
+            </div>
+            <div class="pymk-content">
+                <button class="pymk-nav-btn left" data-direction="left">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="pymk-profiles-container" id="pymkProfilesContainer">
+                    <div class="pymk-loading">Loading suggestions...</div>
+                </div>
+                <button class="pymk-nav-btn right" data-direction="right">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="pymk-footer">
+                <button id="loadMorePYMK" class="pymk-load-more">
+                    <i class="fas fa-sync-alt"></i> Load More Suggestions
+                </button>
+            </div>
+        `;
+        
+        // Insert after a few posts
+        const posts = container.querySelectorAll('.post-item');
+        if (posts.length > 0) {
+            const randomIndex = Math.min(posts.length - 1, Math.floor(Math.random() * posts.length));
+            if (randomIndex < posts.length - 1) {
+                posts[randomIndex].insertAdjacentElement('afterend', pymkSection);
+            } else {
+                container.appendChild(pymkSection);
+            }
+        } else {
+            container.appendChild(pymkSection);
+        }
+        
+        // Load initial profiles
+        await this.loadPeopleYouMayKnow();
+        
+        // Add event listener for See All button
+        const seeAllBtn = pymkSection.querySelector('.pymk-see-all');
+        if (seeAllBtn) {
+            seeAllBtn.addEventListener('click', () => {
+                this.expandPYMKSection();
+            });
+        }
+    }
+
+    addPYMKStyles() {
+        if (!document.getElementById('pymkStyles')) {
+            const style = document.createElement('style');
+            style.id = 'pymkStyles';
+            style.textContent = `
+                .pymk-section {
+                    background: var(--bg-secondary);
+                    border-radius: 15px;
+                    padding: 20px;
+                    margin: 25px 0;
+                    border: 1px solid var(--border);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                }
+                .pymk-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                }
+                .pymk-header h3 {
+                    margin: 0;
+                    font-size: 18px;
+                    color: var(--text-primary);
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+                .pymk-header h3 i {
+                    color: var(--primary);
+                }
+                .pymk-see-all {
+                    background: transparent;
+                    border: 1px solid var(--primary);
+                    color: var(--primary);
+                    padding: 6px 15px;
+                    border-radius: 20px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                }
+                .pymk-see-all:hover {
+                    background: var(--primary);
+                    color: white;
+                }
+                .pymk-content {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    position: relative;
+                }
+                .pymk-nav-btn {
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    color: var(--text-primary);
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    flex-shrink: 0;
+                    z-index: 2;
+                }
+                .pymk-nav-btn:hover {
+                    background: var(--hover);
+                    border-color: var(--primary);
+                    color: var(--primary);
+                }
+                .pymk-nav-btn.left {
+                    position: absolute;
+                    left: -20px;
+                }
+                .pymk-nav-btn.right {
+                    position: absolute;
+                    right: -20px;
+                }
+                .pymk-profiles-container {
+                    display: flex;
+                    gap: 15px;
+                    overflow-x: auto;
+                    scroll-behavior: smooth;
+                    padding: 10px 0;
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                    flex: 1;
+                }
+                .pymk-profiles-container::-webkit-scrollbar {
+                    display: none;
+                }
+                .pymk-profile-card {
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    padding: 15px;
+                    min-width: 180px;
+                    max-width: 180px;
+                    text-align: center;
+                    transition: all 0.3s;
+                    flex-shrink: 0;
+                }
+                .pymk-profile-card:hover {
+                    transform: translateY(-5px);
+                    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+                    border-color: var(--primary);
+                }
+                .pymk-profile-avatar {
+                    width: 70px;
+                    height: 70px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                    margin: 0 auto 12px;
+                    border: 3px solid var(--primary);
+                }
+                .pymk-profile-name {
+                    font-weight: 600;
+                    font-size: 16px;
+                    margin: 0 0 5px;
+                    color: var(--text-primary);
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .pymk-profile-info {
+                    font-size: 12px;
+                    color: var(--text-light);
+                    margin: 0 0 10px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .pymk-profile-mutual {
+                    font-size: 11px;
+                    color: var(--text-light);
+                    margin: 0 0 15px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 5px;
+                }
+                .pymk-profile-mutual i {
+                    color: var(--success);
+                }
+                .pymk-follow-btn {
+                    width: 100%;
+                    padding: 8px;
+                    border-radius: 20px;
+                    border: none;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 5px;
+                }
+                .pymk-follow-btn:not(.following) {
+                    background: var(--primary);
+                    color: white;
+                }
+                .pymk-follow-btn.following {
+                    background: var(--success);
+                    color: white;
+                }
+                .pymk-follow-btn:hover {
+                    opacity: 0.9;
+                    transform: scale(1.05);
+                }
+                .pymk-footer {
+                    margin-top: 20px;
+                    text-align: center;
+                }
+                .pymk-load-more {
+                    background: transparent;
+                    border: 1px solid var(--border);
+                    color: var(--text-primary);
+                    padding: 10px 20px;
+                    border-radius: 20px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .pymk-load-more:hover {
+                    background: var(--hover);
+                    border-color: var(--primary);
+                    color: var(--primary);
+                }
+                .pymk-loading {
+                    text-align: center;
+                    padding: 40px;
+                    color: var(--text-light);
+                    font-style: italic;
+                }
+                .pymk-expanded {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.8);
+                    z-index: 10000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }
+                .pymk-expanded-content {
+                    background: var(--bg-primary);
+                    border-radius: 15px;
+                    padding: 30px;
+                    max-width: 90%;
+                    max-height: 90%;
+                    overflow-y: auto;
+                    position: relative;
+                }
+                .pymk-close-expanded {
+                    position: absolute;
+                    top: 15px;
+                    right: 15px;
+                    background: transparent;
+                    border: none;
+                    color: var(--text-light);
+                    font-size: 24px;
+                    cursor: pointer;
+                    width: 30px;
+                    height: 30px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 50%;
+                    transition: all 0.3s;
+                }
+                .pymk-close-expanded:hover {
+                    background: var(--hover);
+                    color: var(--text-primary);
+                }
+                .pymk-expanded-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                    gap: 20px;
+                    margin-top: 20px;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    async loadPeopleYouMayKnow() {
+        const container = document.getElementById('pymkProfilesContainer');
+        if (!container) return;
+
+        try {
+            // Get users that current user is not following and not themselves
+            const followingUsers = await this.getFollowingUsers();
+            const excludedUsers = [...followingUsers, this.currentUser?.uid].filter(Boolean);
+            
+            // Build query to get suggested users
+            let usersQuery = query(collection(db, 'users'), limit(this.PYMK_PROFILES_PER_LOAD));
+            
+            // Get users
+            const usersSnap = await getDocs(usersQuery);
+            
+            if (usersSnap.empty) {
+                container.innerHTML = '<div class="pymk-loading">No suggestions available at the moment.</div>';
+                return;
+            }
+            
+            // Filter out excluded users and already viewed profiles
+            const suggestedUsers = [];
+            usersSnap.forEach(doc => {
+                const userData = doc.data();
+                const userId = doc.id;
+                
+                if (!excludedUsers.includes(userId) && !this.viewedPYMKProfiles.has(userId)) {
+                    suggestedUsers.push({
+                        id: userId,
+                        ...userData
+                    });
+                }
+            });
+            
+            // Shuffle the suggestions
+            this.shuffleArray(suggestedUsers);
+            
+            // Store current profiles
+            this.currentPYMKProfiles = suggestedUsers.slice(0, 5); // Show 5 at a time
+            
+            // Display profiles
+            this.displayPYMKProfiles();
+            
+        } catch (error) {
+            console.error('Error loading PYMK:', error);
+            container.innerHTML = '<div class="pymk-loading">Error loading suggestions</div>';
+        }
+    }
+
+    displayPYMKProfiles() {
+        const container = document.getElementById('pymkProfilesContainer');
+        if (!container) return;
+        
+        if (this.currentPYMKProfiles.length === 0) {
+            container.innerHTML = '<div class="pymk-loading">No more suggestions available.</div>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        this.currentPYMKProfiles.forEach(async (user) => {
+            const profileCard = await this.createPYMKProfileCard(user);
+            container.appendChild(profileCard);
+            
+            // Mark as viewed
+            this.viewedPYMKProfiles.add(user.id);
+            this.saveViewedPYMKProfiles();
+        });
+    }
+
+    async createPYMKProfileCard(user) {
+        const card = document.createElement('div');
+        card.className = 'pymk-profile-card';
+        
+        // Check if current user is following this user
+        let isFollowing = false;
+        if (this.currentUser && user.id !== this.currentUser.uid) {
+            isFollowing = await this.checkIfFollowing(user.id);
+        }
+        
+        // Get mutual connections count (simulated for now)
+        const mutualConnections = Math.floor(Math.random() * 6); // 0-5 mutual connections
+        
+        // Generate location or status text
+        let profileInfo = '';
+        if (user.location) {
+            profileInfo = user.location;
+        } else if (user.bio) {
+            profileInfo = user.bio.length > 30 ? user.bio.substring(0, 30) + '...' : user.bio;
+        } else {
+            const statuses = ['New to Platform', 'Active now', 'Nearby', 'Popular User'];
+            profileInfo = statuses[Math.floor(Math.random() * statuses.length)];
+        }
+        
+        card.innerHTML = `
+            <img src="${user.profileImage || 'images/default-profile.jpg'}" 
+                 alt="${user.name}" class="pymk-profile-avatar">
+            <h4 class="pymk-profile-name" title="${user.name || 'Unknown User'}">
+                ${user.name || 'Unknown User'}
+            </h4>
+            <div class="pymk-profile-info" title="${profileInfo}">
+                ${profileInfo}
+            </div>
+            ${mutualConnections > 0 ? `
+                <div class="pymk-profile-mutual">
+                    <i class="fas fa-user-friends"></i>
+                    ${mutualConnections} mutual connection${mutualConnections !== 1 ? 's' : ''}
+                </div>
+            ` : ''}
+            <button class="pymk-follow-btn ${isFollowing ? 'following' : ''}" 
+                    data-user-id="${user.id}" 
+                    data-following="${isFollowing}">
+                <i class="fas ${isFollowing ? 'fa-user-check' : 'fa-user-plus'}"></i>
+                ${isFollowing ? 'In Clan' : 'Add Clan'}
+            </button>
+        `;
+        
+        return card;
+    }
+
+    scrollPYMKCarousel(direction) {
+        const container = document.getElementById('pymkProfilesContainer');
+        if (!container) return;
+        
+        const scrollAmount = 200; // Width of one card + gap
+        if (direction === 'left') {
+            container.scrollLeft -= scrollAmount;
+        } else {
+            container.scrollLeft += scrollAmount;
+        }
+    }
+
+    async loadMorePYMKProfiles() {
+        const loadMoreBtn = document.getElementById('loadMorePYMK');
+        if (loadMoreBtn) {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        }
+        
+        await this.loadPeopleYouMayKnow();
+        
+        if (loadMoreBtn) {
+            loadMoreBtn.disabled = false;
+            loadMoreBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Load More Suggestions';
+        }
+    }
+
+    async handlePYMKFollow(userId, button, isCurrentlyFollowing) {
+        if (!this.currentUser) {
+            alert('Please log in to add users to your clan');
+            window.location.href = 'login.html';
+            return;
+        }
+
+        // Don't allow following yourself
+        if (userId === this.currentUser.uid) {
+            return;
+        }
+
+        try {
+            if (isCurrentlyFollowing) {
+                // Remove from clan (unfollow)
+                await this.unfollowUser(userId);
+                button.innerHTML = '<i class="fas fa-user-plus"></i> Add Clan';
+                button.classList.remove('following');
+                button.dataset.following = 'false';
+                this.showNotification('Removed from clan', 'info');
+            } else {
+                // Add to clan (follow)
+                await this.followUser(userId);
+                button.innerHTML = '<i class="fas fa-user-check"></i> In Clan';
+                button.classList.add('following');
+                button.dataset.following = 'true';
+                this.showNotification('Added to your clan!', 'success');
+            }
+        } catch (error) {
+            console.error('Error toggling PYMK follow:', error);
+            this.showNotification('Failed to update clan status', 'error');
+        }
+    }
+
+    expandPYMKSection() {
+        // Create expanded view
+        const expandedView = document.createElement('div');
+        expandedView.className = 'pymk-expanded';
+        expandedView.innerHTML = `
+            <div class="pymk-expanded-content">
+                <button class="pymk-close-expanded">&times;</button>
+                <div class="pymk-header">
+                    <h3><i class="fas fa-user-friends"></i> People You May Know</h3>
+                </div>
+                <p style="color: var(--text-light); margin: 10px 0 20px;">
+                    Discover and connect with new people. Add them to your clan to see their posts first!
+                </p>
+                <div class="pymk-expanded-grid" id="pymkExpandedGrid">
+                    Loading all suggestions...
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(expandedView);
+        
+        // Load all PYMK profiles
+        this.loadAllPYMKProfilesForExpanded();
+        
+        // Close button event
+        const closeBtn = expandedView.querySelector('.pymk-close-expanded');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                expandedView.remove();
+            });
+        }
+        
+        // Close on background click
+        expandedView.addEventListener('click', (e) => {
+            if (e.target === expandedView) {
+                expandedView.remove();
+            }
+        });
+    }
+
+    async loadAllPYMKProfilesForExpanded() {
+        const grid = document.getElementById('pymkExpandedGrid');
+        if (!grid) return;
+
+        try {
+            // Get users that current user is not following and not themselves
+            const followingUsers = await this.getFollowingUsers();
+            const excludedUsers = [...followingUsers, this.currentUser?.uid].filter(Boolean);
+            
+            // Get all users
+            const usersQuery = query(collection(db, 'users'));
+            const usersSnap = await getDocs(usersQuery);
+            
+            const suggestedUsers = [];
+            usersSnap.forEach(doc => {
+                const userData = doc.data();
+                const userId = doc.id;
+                
+                if (!excludedUsers.includes(userId)) {
+                    suggestedUsers.push({
+                        id: userId,
+                        ...userData
+                    });
+                }
+            });
+            
+            // Shuffle the suggestions
+            this.shuffleArray(suggestedUsers);
+            
+            // Display in grid
+            grid.innerHTML = '';
+            
+            for (const user of suggestedUsers) {
+                const profileCard = await this.createPYMKProfileCard(user);
+                profileCard.style.minWidth = 'auto';
+                profileCard.style.maxWidth = 'none';
+                grid.appendChild(profileCard);
+            }
+            
+            if (suggestedUsers.length === 0) {
+                grid.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-light);">No suggestions available.</div>';
+            }
+            
+        } catch (error) {
+            console.error('Error loading all PYMK:', error);
+            grid.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--error);">Error loading suggestions</div>';
+        }
+    }
+
+    loadViewedPYMKProfiles() {
+        if (!this.currentUser) return;
+        const stored = localStorage.getItem(`viewedPYMKProfiles_${this.currentUser.uid}`);
+        if (stored) {
+            this.viewedPYMKProfiles = new Set(JSON.parse(stored));
+        }
+    }
+
+    saveViewedPYMKProfiles() {
+        if (!this.currentUser) return;
+        localStorage.setItem(`viewedPYMKProfiles_${this.currentUser.uid}`, JSON.stringify([...this.viewedPYMKProfiles]));
     }
 
     // ACCOUNT PAGE - Social Links Setup
