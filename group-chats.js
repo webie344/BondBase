@@ -625,14 +625,12 @@ function showNotification(message, type = 'info', duration = 3000) {
         font-family: 'Inter', sans-serif;
     `;
     
-    const icon = type === 'error' ? 'alert-circle' : 
-                type === 'success' ? 'check-circle' : 
-                type === 'warning' || type === 'offline' ? 'alert-triangle' : 'info';
+    const icon = type === 'error' ? 'fas fa-exclamation-circle' : 
+                type === 'success' ? 'fas fa-check-circle' : 
+                type === 'warning' || type === 'offline' ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle';
     
     notification.innerHTML = `
-        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2">
-            ${getNotificationIcon(icon)}
-        </svg>
+        <i class="${icon}"></i>
         <span>${message}</span>
     `;
     
@@ -642,19 +640,6 @@ function showNotification(message, type = 'info', duration = 3000) {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => notification.remove(), 300);
     }, duration);
-}
-
-function getNotificationIcon(icon) {
-    switch(icon) {
-        case 'alert-circle':
-            return '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
-        case 'check-circle':
-            return '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>';
-        case 'alert-triangle':
-            return '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>';
-        default:
-            return '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12.01" y2="16"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>';
-    }
 }
 
 // Add animation styles
@@ -1084,7 +1069,6 @@ class GroupChat {
                     padding: 15px;
                     position: relative;
                     cursor: pointer;
-                    user-select: none;
                 }
                 
                 .voice-message-waveform {
@@ -1151,6 +1135,26 @@ class GroupChat {
                 /* Voice note in message */
                 .message-text .voice-message-container {
                     margin: 5px 0;
+                }
+                
+                /* Font Awesome icons */
+                .fas {
+                    display: inline-block;
+                    font-style: normal;
+                    font-variant: normal;
+                    text-rendering: auto;
+                    -webkit-font-smoothing: antialiased;
+                }
+                
+                /* Remove hover effects from messages */
+                .message-text {
+                    transition: none !important;
+                }
+                
+                .message-text:hover {
+                    background: none !important;
+                    transform: none !important;
+                    box-shadow: none !important;
                 }
             `;
             document.head.appendChild(style);
@@ -1442,21 +1446,21 @@ class GroupChat {
             
             <div class="recording-tips">
                 <div class="tip-item">
-                    <svg class="feather" style="width: 14px; height: 14px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <i class="fas fa-info-circle"></i>
                     <span>Maximum recording time: 2 minutes</span>
                 </div>
                 <div class="tip-item">
-                    <svg class="feather" style="width: 14px; height: 14px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <i class="fas fa-info-circle"></i>
                     <span>Speak clearly into your microphone</span>
                 </div>
             </div>
             
             <div class="voice-recording-controls">
                 <button class="voice-control-btn cancel-recording" id="cancelRecording">
-                    <svg class="feather" style="width: 20px; height: 20px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <i class="fas fa-times"></i>
                 </button>
                 <button class="voice-control-btn stop-recording" id="stopRecording">
-                    <svg class="feather" style="width: 20px; height: 20px;"><rect x="6" y="4" width="12" height="16" rx="2" ry="2"></rect></svg>
+                    <i class="fas fa-stop"></i>
                 </button>
             </div>
         `;
@@ -1464,13 +1468,20 @@ class GroupChat {
         document.body.appendChild(recordingUI);
         
         // Add event listeners
-        document.getElementById('cancelRecording').addEventListener('click', () => {
-            this.cancelVoiceRecording();
-        });
+        const cancelBtn = document.getElementById('cancelRecording');
+        const stopBtn = document.getElementById('stopRecording');
         
-        document.getElementById('stopRecording').addEventListener('click', () => {
-            this.stopVoiceRecording();
-        });
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.cancelVoiceRecording();
+            });
+        }
+        
+        if (stopBtn) {
+            stopBtn.addEventListener('click', () => {
+                this.stopVoiceRecording();
+            });
+        }
         
         // Add overlay
         const overlay = document.createElement('div');
@@ -1519,12 +1530,7 @@ class GroupChat {
         
         previewContainer.innerHTML = `
             <div class="voice-note-icon">
-                <svg class="feather" style="width: 24px; height: 24px; color: white;">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                    <line x1="12" y1="19" x2="12" y2="23"></line>
-                    <line x1="8" y1="23" x2="16" y2="23"></line>
-                </svg>
+                <i class="fas fa-microphone" style="font-size: 24px; color: white;"></i>
             </div>
             
             <div class="voice-note-playback">
@@ -1533,9 +1539,7 @@ class GroupChat {
                 </div>
                 <div class="voice-note-controls">
                     <button class="play-pause-btn" id="playVoiceNote">
-                        <svg class="feather" style="width: 14px; height: 14px;">
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
+                        <i class="fas fa-play" id="playIcon"></i>
                     </button>
                     <div class="voice-note-duration" id="voiceNoteDuration">${durationText}</div>
                 </div>
@@ -1543,16 +1547,10 @@ class GroupChat {
             
             <div class="voice-note-actions">
                 <button class="voice-action-btn" id="deleteVoiceNote" title="Delete">
-                    <svg class="feather" style="width: 16px; height: 16px;">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
+                    <i class="fas fa-trash"></i>
                 </button>
                 <button class="voice-action-btn" id="sendVoiceNote" title="Send">
-                    <svg class="feather" style="width: 16px; height: 16px;">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                    </svg>
+                    <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
         `;
@@ -1564,85 +1562,94 @@ class GroupChat {
         const audio = new Audio(this.currentVoiceNote.url);
         let isPlaying = false;
         
-        document.getElementById('playVoiceNote').addEventListener('click', () => {
-            if (isPlaying) {
-                audio.pause();
-                document.getElementById('playVoiceNote').innerHTML = `
-                    <svg class="feather" style="width: 14px; height: 14px;">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                `;
-            } else {
-                audio.play();
-                document.getElementById('playVoiceNote').innerHTML = `
-                    <svg class="feather" style="width: 14px; height: 14px;">
-                        <rect x="6" y="4" width="4" height="16"></rect>
-                        <rect x="14" y="4" width="4" height="16"></rect>
-                    </svg>
-                `;
-            }
-            isPlaying = !isPlaying;
-        });
+        const playBtn = document.getElementById('playVoiceNote');
+        if (playBtn) {
+            playBtn.addEventListener('click', () => {
+                if (isPlaying) {
+                    audio.pause();
+                    playBtn.innerHTML = '<i class="fas fa-play" id="playIcon"></i>';
+                } else {
+                    audio.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause" id="playIcon"></i>';
+                }
+                isPlaying = !isPlaying;
+            });
+        }
         
         audio.addEventListener('timeupdate', () => {
             const progress = (audio.currentTime / audio.duration) * 100;
-            document.getElementById('waveformProgress').style.width = `${progress}%`;
+            const progressBar = document.getElementById('waveformProgress');
+            if (progressBar) {
+                progressBar.style.width = `${progress}%`;
+            }
             
             // Update duration display
             const currentMinutes = Math.floor(audio.currentTime / 60);
             const currentSeconds = Math.floor(audio.currentTime % 60);
-            document.getElementById('voiceNoteDuration').textContent = 
-                `${currentMinutes.toString().padStart(2, '0')}:${currentSeconds.toString().padStart(2, '0')}`;
+            const durationElement = document.getElementById('voiceNoteDuration');
+            if (durationElement) {
+                durationElement.textContent = 
+                    `${currentMinutes.toString().padStart(2, '0')}:${currentSeconds.toString().padStart(2, '0')}`;
+            }
         });
         
         audio.addEventListener('ended', () => {
             isPlaying = false;
-            document.getElementById('playVoiceNote').innerHTML = `
-                <svg class="feather" style="width: 14px; height: 14px;">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-            `;
-            document.getElementById('waveformProgress').style.width = '0%';
-            document.getElementById('voiceNoteDuration').textContent = durationText;
+            const playBtn = document.getElementById('playVoiceNote');
+            if (playBtn) {
+                playBtn.innerHTML = '<i class="fas fa-play" id="playIcon"></i>';
+            }
+            const progressBar = document.getElementById('waveformProgress');
+            if (progressBar) {
+                progressBar.style.width = '0%';
+            }
+            const durationElement = document.getElementById('voiceNoteDuration');
+            if (durationElement) {
+                durationElement.textContent = durationText;
+            }
         });
         
         // Add click to seek on waveform
-        document.getElementById('voiceNoteWaveform').addEventListener('click', (e) => {
-            const rect = e.target.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const percentage = clickX / rect.width;
-            audio.currentTime = audio.duration * percentage;
-        });
+        const waveform = document.getElementById('voiceNoteWaveform');
+        if (waveform) {
+            waveform.addEventListener('click', (e) => {
+                const rect = e.target.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const percentage = clickX / rect.width;
+                audio.currentTime = audio.duration * percentage;
+            });
+        }
         
         // Add action buttons
-        document.getElementById('deleteVoiceNote').addEventListener('click', () => {
-            if (audio) {
-                audio.pause();
-                URL.revokeObjectURL(audio.src);
-            }
-            this.cancelVoiceRecording();
-        });
+        const deleteBtn = document.getElementById('deleteVoiceNote');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                if (audio) {
+                    audio.pause();
+                    URL.revokeObjectURL(audio.src);
+                }
+                this.cancelVoiceRecording();
+            });
+        }
         
-        document.getElementById('sendVoiceNote').addEventListener('click', async () => {
-            const sendBtn = document.getElementById('sendVoiceNote');
-            const originalHTML = sendBtn.innerHTML;
-            
-            sendBtn.disabled = true;
-            sendBtn.innerHTML = `
-                <svg class="feather" style="width: 16px; height: 16px; animation: spin 1s linear infinite;">
-                    <circle cx="12" cy="12" r="10" />
-                </svg>
-            `;
-            
-            try {
-                await this.sendVoiceNote();
-            } catch (error) {
-                console.error('Error sending voice note:', error);
-                alert(error.message || 'Failed to send voice note. Please try again.');
-                sendBtn.disabled = false;
-                sendBtn.innerHTML = originalHTML;
-            }
-        });
+        const sendBtn = document.getElementById('sendVoiceNote');
+        if (sendBtn) {
+            sendBtn.addEventListener('click', async () => {
+                const originalHTML = sendBtn.innerHTML;
+                
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                try {
+                    await this.sendVoiceNote();
+                } catch (error) {
+                    console.error('Error sending voice note:', error);
+                    alert(error.message || 'Failed to send voice note. Please try again.');
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = originalHTML;
+                }
+            });
+        }
     }
     
     removeVoiceNotePreview() {
@@ -1653,6 +1660,7 @@ class GroupChat {
     }
     
     createVoiceMessageElement(voiceUrl, duration, messageId = null) {
+        // Create container div
         const container = document.createElement('div');
         container.className = 'voice-message-container';
         if (messageId) {
@@ -1663,17 +1671,18 @@ class GroupChat {
         const seconds = Math.floor((duration % 60000) / 1000);
         const durationText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         
+        const uniqueId = messageId || 'preview_' + Date.now();
+        
+        // Create the HTML structure
         container.innerHTML = `
-            <div class="voice-message-waveform" id="waveform-${messageId || 'preview'}">
-                <div class="voice-message-progress" id="waveformProgress-${messageId || 'preview'}"></div>
+            <div class="voice-message-waveform" id="waveform-${uniqueId}">
+                <div class="voice-message-progress" id="waveformProgress-${uniqueId}"></div>
             </div>
             <div class="voice-message-controls">
-                <button class="voice-message-play" id="playBtn-${messageId || 'preview'}">
-                    <svg class="feather" style="width: 12px; height: 12px;">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
+                <button class="voice-message-play" id="playBtn-${uniqueId}">
+                    <i class="fas fa-play" id="playIcon-${uniqueId}"></i>
                 </button>
-                <div class="voice-message-duration" id="duration-${messageId || 'preview'}">${durationText}</div>
+                <div class="voice-message-duration" id="duration-${uniqueId}">${durationText}</div>
             </div>
         `;
         
@@ -1683,6 +1692,7 @@ class GroupChat {
             let isPlaying = false;
             const originalDuration = duration;
             
+            // Add click event to container for play/pause
             container.addEventListener('click', (e) => {
                 if (e.target.closest('.voice-message-play') || e.target.closest('.voice-message-waveform')) {
                     return; // Let button handlers handle it
@@ -1696,64 +1706,94 @@ class GroupChat {
                 }
             });
             
-            document.getElementById(`playBtn-${messageId || 'preview'}`).addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (isPlaying) {
-                    audio.pause();
-                } else {
-                    audio.play();
-                }
-            });
+            // Play button event
+            const playBtn = document.getElementById(`playBtn-${uniqueId}`);
+            if (playBtn) {
+                playBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (isPlaying) {
+                        audio.pause();
+                    } else {
+                        audio.play();
+                    }
+                });
+            }
             
+            // Audio event listeners
             audio.addEventListener('play', () => {
                 isPlaying = true;
-                document.getElementById(`playBtn-${messageId || 'preview'}`).innerHTML = `
-                    <svg class="feather" style="width: 12px; height: 12px;">
-                        <rect x="6" y="4" width="4" height="16"></rect>
-                        <rect x="14" y="4" width="4" height="16"></rect>
-                    </svg>
-                `;
+                const playIcon = document.getElementById(`playIcon-${uniqueId}`);
+                if (playIcon) {
+                    playIcon.className = 'fas fa-pause';
+                }
             });
             
             audio.addEventListener('pause', () => {
                 isPlaying = false;
-                document.getElementById(`playBtn-${messageId || 'preview'}`).innerHTML = `
-                    <svg class="feather" style="width: 12px; height: 12px;">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                `;
+                const playIcon = document.getElementById(`playIcon-${uniqueId}`);
+                if (playIcon) {
+                    playIcon.className = 'fas fa-play';
+                }
             });
             
             audio.addEventListener('timeupdate', () => {
                 const progress = (audio.currentTime / audio.duration) * 100;
-                document.getElementById(`waveformProgress-${messageId || 'preview'}`).style.width = `${progress}%`;
+                const progressBar = document.getElementById(`waveformProgress-${uniqueId}`);
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                }
                 
                 // Update duration display
                 const currentMinutes = Math.floor(audio.currentTime / 60);
                 const currentSeconds = Math.floor(audio.currentTime % 60);
-                document.getElementById(`duration-${messageId || 'preview'}`).textContent = 
-                    `${currentMinutes.toString().padStart(2, '0')}:${currentSeconds.toString().padStart(2, '0')}`;
+                const durationElement = document.getElementById(`duration-${uniqueId}`);
+                if (durationElement) {
+                    durationElement.textContent = 
+                        `${currentMinutes.toString().padStart(2, '0')}:${currentSeconds.toString().padStart(2, '0')}`;
+                }
             });
             
             audio.addEventListener('ended', () => {
                 isPlaying = false;
-                document.getElementById(`playBtn-${messageId || 'preview'}`).innerHTML = `
-                    <svg class="feather" style="width: 12px; height: 12px;">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                `;
-                document.getElementById(`waveformProgress-${messageId || 'preview'}`).style.width = '0%';
-                document.getElementById(`duration-${messageId || 'preview'}`).textContent = durationText;
+                const playIcon = document.getElementById(`playIcon-${uniqueId}`);
+                if (playIcon) {
+                    playIcon.className = 'fas fa-play';
+                }
+                const progressBar = document.getElementById(`waveformProgress-${uniqueId}`);
+                if (progressBar) {
+                    progressBar.style.width = '0%';
+                }
+                const durationElement = document.getElementById(`duration-${uniqueId}`);
+                if (durationElement) {
+                    durationElement.textContent = durationText;
+                }
             });
             
             // Click to seek on waveform
-            document.getElementById(`waveform-${messageId || 'preview'}`).addEventListener('click', (e) => {
-                e.stopPropagation();
-                const rect = e.target.getBoundingClientRect();
-                const clickX = e.clientX - rect.left;
-                const percentage = clickX / rect.width;
-                audio.currentTime = audio.duration * percentage;
-            });
+            const waveform = document.getElementById(`waveform-${uniqueId}`);
+            if (waveform) {
+                waveform.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const rect = e.target.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const percentage = clickX / rect.width;
+                    audio.currentTime = audio.duration * percentage;
+                });
+            }
+            
+            // Clean up audio when container is removed
+            const cleanup = () => {
+                audio.pause();
+                audio.src = '';
+                container.removeEventListener('DOMNodeRemoved', cleanup);
+            };
+            
+            // Listen for element removal
+            container.addEventListener('DOMNodeRemoved', cleanup);
+            
+            // Store audio reference on container for external access
+            container._audio = audio;
+            container._isPlaying = false;
         }
         
         return container;
@@ -4818,15 +4858,13 @@ class GroupChat {
                 transition: width 0.3s ease;
             }
             
-            /* Ensure SVG icons display properly */
-            .feather {
+            /* Font Awesome icons */
+            .fas {
                 display: inline-block;
-                vertical-align: middle;
-                stroke: currentColor;
-                stroke-width: 2;
-                stroke-linecap: round;
-                stroke-linejoin: round;
-                fill: none;
+                font-style: normal;
+                font-variant: normal;
+                text-rendering: auto;
+                -webkit-font-smoothing: antialiased;
             }
             
             /* Copy invite link styles */
@@ -4904,13 +4942,46 @@ class GroupChat {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
             }
+            
+            /* REMOVE MESSAGE HOVER EFFECTS */
+            .message-text {
+                transition: none !important;
+            }
+            
+            .message-text:hover {
+                background: none !important;
+                transform: none !important;
+                box-shadow: none !important;
+            }
+            
+            .system-message {
+                transition: none !important;
+            }
+            
+            .system-message:hover {
+                background: none !important;
+                transform: none !important;
+                box-shadow: none !important;
+            }
+            
+            .message-group {
+                transition: none !important;
+            }
+            
+            .message-group:hover {
+                background: none !important;
+                transform: none !important;
+            }
         `;
         
         document.head.appendChild(reactionModalStyles);
         
-        this.reactionModal.querySelector('.close-reaction-modal').addEventListener('click', () => {
-            this.hideReactionModal();
-        });
+        const closeBtn = this.reactionModal.querySelector('.close-reaction-modal');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.hideReactionModal();
+            });
+        }
         
         this.reactionModal.querySelectorAll('.emoji-item').forEach(emoji => {
             emoji.addEventListener('click', () => {
@@ -4928,13 +4999,17 @@ class GroupChat {
     }
 
     showReactionModal(message) {
-        this.currentMessageForReaction = message;
-        this.reactionModal.classList.add('active');
+        if (this.reactionModal) {
+            this.currentMessageForReaction = message;
+            this.reactionModal.classList.add('active');
+        }
     }
 
     hideReactionModal() {
-        this.reactionModal.classList.remove('active');
-        this.currentMessageForReaction = null;
+        if (this.reactionModal) {
+            this.reactionModal.classList.remove('active');
+            this.currentMessageForReaction = null;
+        }
     }
 
     async addReactionToMessage(emoji) {
@@ -5181,10 +5256,7 @@ class GroupChat {
                     swipeIndicator = document.createElement('div');
                     swipeIndicator.className = 'swipe-reply-indicator';
                     swipeIndicator.innerHTML = `
-                        <svg class="feather" data-feather="corner-up-left" style="width: 16px; height: 16px; margin-right: 8px;">
-                            <polyline points="9 10 4 15 9 20"></polyline>
-                            <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
-                        </svg>
+                        <i class="fas fa-reply" style="margin-right: 8px;"></i>
                         <span>Swipe right to reply</span>
                     `;
                     document.body.appendChild(swipeIndicator);
@@ -5333,18 +5405,18 @@ class GroupChat {
                 <span class="reply-message">${truncatedMessage}</span>
             </div>
             <button class="cancel-reply" id="cancelReply">
-                <svg class="feather" data-feather="x" style="width: 16px; height: 16px;">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
+                <i class="fas fa-times"></i>
             </button>
         `;
         
         messageInputContainer.parentNode.insertBefore(indicator, messageInputContainer);
         
-        document.getElementById('cancelReply').addEventListener('click', () => {
-            this.clearReply();
-        });
+        const cancelBtn = document.getElementById('cancelReply');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.clearReply();
+            });
+        }
         
         const indicatorStyles = document.createElement('style');
         indicatorStyles.id = 'reply-indicator-styles';
@@ -5659,12 +5731,15 @@ function createUploadModal(uploadId, fileName, fileType, onCancel) {
     document.body.appendChild(modal);
     
     // Add cancel button handler
-    document.getElementById(`cancel-upload-${uploadId}`).addEventListener('click', () => {
-        if (onCancel && typeof onCancel === 'function') {
-            onCancel();
-        }
-        modal.remove();
-    });
+    const cancelBtn = document.getElementById(`cancel-upload-${uploadId}`);
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            if (onCancel && typeof onCancel === 'function') {
+                onCancel();
+            }
+            modal.remove();
+        });
+    }
     
     return modal;
 }
@@ -5818,38 +5893,40 @@ function initGroupPage() {
         setupListeners();
     })();
     
-    backBtn.addEventListener('click', () => {
-        console.log('Back button clicked, cleaning up...');
-        
-        // Clean up group chat
-        groupChat.cleanup();
-        
-        // Clean up reaction listeners
-        reactionUnsubscribers.forEach((unsub, messageId) => {
-            if (typeof unsub === 'function') {
-                try {
-                    unsub();
-                } catch (err) {
-                    console.log('Error unsubscribing from reactions:', err);
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            console.log('Back button clicked, cleaning up...');
+            
+            // Clean up group chat
+            groupChat.cleanup();
+            
+            // Clean up reaction listeners
+            reactionUnsubscribers.forEach((unsub, messageId) => {
+                if (typeof unsub === 'function') {
+                    try {
+                        unsub();
+                    } catch (err) {
+                        console.log('Error unsubscribing from reactions:', err);
+                    }
                 }
+            });
+            reactionUnsubscribers.clear();
+            
+            // UPDATED: Clean up typing indicator
+            if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
+                typingUnsubscribe();
             }
+            if (typingTimeout) {
+                clearTimeout(typingTimeout);
+            }
+            
+            // Remove all event listeners
+            removeAllEventListeners();
+            
+            removeSidebarOverlay();
+            window.location.href = 'groups.html';
         });
-        reactionUnsubscribers.clear();
-        
-        // UPDATED: Clean up typing indicator
-        if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
-            typingUnsubscribe();
-        }
-        if (typingTimeout) {
-            clearTimeout(typingTimeout);
-        }
-        
-        // Remove all event listeners
-        removeAllEventListeners();
-        
-        removeSidebarOverlay();
-        window.location.href = 'groups.html';
-    });
+    }
     
     // Clone and replace sidebar toggle to ensure clean event listeners
     if (sidebarToggle) {
@@ -5858,21 +5935,23 @@ function initGroupPage() {
         
         const freshToggle = document.getElementById('sidebarToggle');
         
-        freshToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            
-            if (sidebar) {
-                const isActive = sidebar.classList.contains('active');
-                if (isActive) {
-                    sidebar.classList.remove('active');
-                    removeSidebarOverlay();
-                } else {
-                    sidebar.classList.add('active');
-                    createSidebarOverlay();
+        if (freshToggle) {
+            freshToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                if (sidebar) {
+                    const isActive = sidebar.classList.contains('active');
+                    if (isActive) {
+                        sidebar.classList.remove('active');
+                        removeSidebarOverlay();
+                    } else {
+                        sidebar.classList.add('active');
+                        createSidebarOverlay();
+                    }
                 }
-            }
-        });
+            });
+        }
     }
     
     if (infoBtn) {
@@ -5882,144 +5961,164 @@ function initGroupPage() {
         
         const freshInfoBtn = document.getElementById('infoBtn');
         
-        freshInfoBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            
-            if (sidebar) {
-                const isActive = sidebar.classList.contains('active');
-                if (isActive) {
-                    sidebar.classList.remove('active');
-                    removeSidebarOverlay();
-                } else {
-                    sidebar.classList.add('active');
-                    createSidebarOverlay();
+        if (freshInfoBtn) {
+            freshInfoBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                if (sidebar) {
+                    const isActive = sidebar.classList.contains('active');
+                    if (isActive) {
+                        sidebar.classList.remove('active');
+                        removeSidebarOverlay();
+                    } else {
+                        sidebar.classList.add('active');
+                        createSidebarOverlay();
+                    }
                 }
+            });
+        }
+    }
+    
+    // UPDATED: Typing indicator for message input
+    if (messageInput) {
+        messageInput.addEventListener('input', () => {
+            if (sendBtn) {
+                sendBtn.disabled = !messageInput.value.trim();
+            }
+            
+            messageInput.style.height = 'auto';
+            messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+            
+            // UPDATED: Start typing indicator when user types
+            const now = Date.now();
+            if (now - lastTypingInputTime > 1000) { // Throttle to 1 second
+                groupChat.startTyping(groupId);
+                lastTypingInputTime = now;
+            }
+            
+            // Reset typing timeout
+            if (typingTimeout) {
+                clearTimeout(typingTimeout);
+            }
+            
+            // Stop typing after 3 seconds of inactivity
+            typingTimeout = setTimeout(() => {
+                groupChat.stopTyping(groupId);
+            }, 3000);
+        });
+        
+        // UPDATED: Stop typing when input loses focus
+        messageInput.addEventListener('blur', () => {
+            groupChat.stopTyping(groupId);
+            if (typingTimeout) {
+                clearTimeout(typingTimeout);
             }
         });
     }
     
-    // UPDATED: Typing indicator for message input
-    messageInput.addEventListener('input', () => {
-        sendBtn.disabled = !messageInput.value.trim();
-        
-        messageInput.style.height = 'auto';
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
-        
-        // UPDATED: Start typing indicator when user types
-        const now = Date.now();
-        if (now - lastTypingInputTime > 1000) { // Throttle to 1 second
-            groupChat.startTyping(groupId);
-            lastTypingInputTime = now;
-        }
-        
-        // Reset typing timeout
-        if (typingTimeout) {
-            clearTimeout(typingTimeout);
-        }
-        
-        // Stop typing after 3 seconds of inactivity
-        typingTimeout = setTimeout(() => {
-            groupChat.stopTyping(groupId);
-        }, 3000);
-    });
-    
-    // UPDATED: Stop typing when input loses focus
-    messageInput.addEventListener('blur', () => {
-        groupChat.stopTyping(groupId);
-        if (typingTimeout) {
-            clearTimeout(typingTimeout);
-        }
-    });
-    
     // FIXED: Send button always shows airplane icon, no loader - prevent form submission
-    sendBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        sendMessage();
-    });
-    
-    messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+    if (sendBtn) {
+        sendBtn.addEventListener('click', (e) => {
             e.preventDefault();
             sendMessage();
-        }
-    });
+        });
+    }
     
-    // Clone and replace emoji button
-    const newEmojiBtn = emojiBtn.cloneNode(true);
-    emojiBtn.parentNode.replaceChild(newEmojiBtn, emojiBtn);
-    const freshEmojiBtn = document.getElementById('emojiBtn');
-    
-    freshEmojiBtn.addEventListener('click', () => {
-        const emojis = ['😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '❤️', '🔥', '✨'];
-        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-        
-        messageInput.value += randomEmoji;
-        messageInput.focus();
-        messageInput.dispatchEvent(new Event('input'));
-    });
-    
-    // Clone and replace attachment button
-    const newAttachmentBtn = attachmentBtn.cloneNode(true);
-    attachmentBtn.parentNode.replaceChild(newAttachmentBtn, attachmentBtn);
-    const freshAttachmentBtn = document.getElementById('attachmentBtn');
-    
-    freshAttachmentBtn.addEventListener('click', () => {
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'image/*,video/*,audio/*';
-        fileInput.multiple = false;
-        
-        fileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                try {
-                    const uploadId = 'upload_' + Date.now();
-                    
-                    // Create upload modal
-                    const modal = createUploadModal(uploadId, file.name, file.type, () => {
-                        // Cancel function will be called by the modal
-                    });
-                    
-                    // Send media with progress tracking
-                    await groupChat.sendMediaMessage(
-                        groupId, 
-                        file, 
-                        groupChat.replyingToMessage?.id,
-                        (progress) => {
-                            updateUploadProgress(uploadId, progress);
-                        },
-                        (cancelFunction) => {
-                            // Store cancel function in the modal's cancel button
-                            const cancelBtn = document.getElementById(`cancel-upload-${uploadId}`);
-                            if (cancelBtn) {
-                                const originalClick = cancelBtn.onclick;
-                                cancelBtn.onclick = () => {
-                                    if (cancelFunction && typeof cancelFunction === 'function') {
-                                        cancelFunction();
-                                    }
-                                    if (originalClick && typeof originalClick === 'function') {
-                                        originalClick();
-                                    }
-                                };
-                            }
-                        }
-                    );
-                    
-                    // Remove upload modal on completion
-                    removeUploadModal(uploadId);
-                    
-                } catch (error) {
-                    console.error('Error sending media:', error);
-                    if (error.message !== 'Upload cancelled') {
-                        alert(error.message || 'Failed to send media. Please try again.');
-                    }
-                }
+    if (messageInput) {
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
             }
         });
+    }
+    
+    // Clone and replace emoji button
+    if (emojiBtn) {
+        const newEmojiBtn = emojiBtn.cloneNode(true);
+        emojiBtn.parentNode.replaceChild(newEmojiBtn, emojiBtn);
+        const freshEmojiBtn = document.getElementById('emojiBtn');
         
-        fileInput.click();
-    });
+        if (freshEmojiBtn) {
+            freshEmojiBtn.addEventListener('click', () => {
+                const emojis = ['😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '❤️', '🔥', '✨'];
+                const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+                
+                if (messageInput) {
+                    messageInput.value += randomEmoji;
+                    messageInput.focus();
+                    messageInput.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+    }
+    
+    // Clone and replace attachment button
+    if (attachmentBtn) {
+        const newAttachmentBtn = attachmentBtn.cloneNode(true);
+        attachmentBtn.parentNode.replaceChild(newAttachmentBtn, attachmentBtn);
+        const freshAttachmentBtn = document.getElementById('attachmentBtn');
+        
+        if (freshAttachmentBtn) {
+            freshAttachmentBtn.addEventListener('click', () => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'image/*,video/*,audio/*';
+                fileInput.multiple = false;
+                
+                fileInput.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        try {
+                            const uploadId = 'upload_' + Date.now();
+                            
+                            // Create upload modal
+                            const modal = createUploadModal(uploadId, file.name, file.type, () => {
+                                // Cancel function will be called by the modal
+                            });
+                            
+                            // Send media with progress tracking
+                            await groupChat.sendMediaMessage(
+                                groupId, 
+                                file, 
+                                groupChat.replyingToMessage?.id,
+                                (progress) => {
+                                    updateUploadProgress(uploadId, progress);
+                                },
+                                (cancelFunction) => {
+                                    // Store cancel function in the modal's cancel button
+                                    const cancelBtn = document.getElementById(`cancel-upload-${uploadId}`);
+                                    if (cancelBtn) {
+                                        const originalClick = cancelBtn.onclick;
+                                        cancelBtn.onclick = () => {
+                                            if (cancelFunction && typeof cancelFunction === 'function') {
+                                                cancelFunction();
+                                            }
+                                            if (originalClick && typeof originalClick === 'function') {
+                                                originalClick();
+                                            }
+                                        };
+                                    }
+                                }
+                            );
+                            
+                            // Remove upload modal on completion
+                            removeUploadModal(uploadId);
+                            
+                        } catch (error) {
+                            console.error('Error sending media:', error);
+                            if (error.message !== 'Upload cancelled') {
+                                alert(error.message || 'Failed to send media. Please try again.');
+                            }
+                        }
+                    }
+                });
+                
+                fileInput.click();
+            });
+        }
+    }
     
     // NEW: Add voice note button to sidebar
     function addVoiceNoteButton() {
@@ -6028,12 +6127,7 @@ function initGroupPage() {
         voiceNoteBtn.id = 'voiceNoteBtn';
         voiceNoteBtn.className = 'voice-note-btn';
         voiceNoteBtn.innerHTML = `
-            <svg class="feather" style="width: 20px; height: 20px;">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                <line x1="12" y1="19" x2="12" y2="23"></line>
-                <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>
+            <i class="fas fa-microphone"></i>
         `;
         voiceNoteBtn.title = 'Record voice note (Hold to record)';
         
@@ -6151,7 +6245,7 @@ function initGroupPage() {
                 (groupData.rules || []).forEach(rule => {
                     const li = document.createElement('li');
                     li.className = 'rule-item';
-                    li.innerHTML = `<svg class="feather" data-feather="check-circle" style="width: 14px; height: 14px; margin-right: 8px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg><span>${rule}</span>`;
+                    li.innerHTML = `<i class="fas fa-check-circle" style="margin-right: 8px;"></i><span>${rule}</span>`;
                     rulesList.appendChild(li);
                 });
             }
@@ -6193,7 +6287,7 @@ function initGroupPage() {
             const copyBtn = document.createElement('button');
             copyBtn.id = 'copyInviteBtn';
             copyBtn.className = 'copy-invite-btn';
-            copyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
+            copyBtn.innerHTML = '<i class="fas fa-link" style="margin-right: 8px;"></i> Copy Invite Link';
             
             const statusDiv = document.createElement('div');
             statusDiv.id = 'inviteLinkStatus';
@@ -6217,65 +6311,67 @@ function initGroupPage() {
             copyBtn.parentNode.replaceChild(originalCopyBtn, copyBtn);
             const freshCopyBtn = document.getElementById('copyInviteBtn');
             
-            freshCopyBtn.addEventListener('click', async () => {
-                let isCopying = false;
-                
-                if (isCopying) return;
-                
-                isCopying = true;
-                freshCopyBtn.disabled = true;
-                freshCopyBtn.innerHTML = '<svg class="feather" data-feather="loader" style="animation: spin 1s linear infinite; margin-right: 8px;"><circle cx="12" cy="12" r="10" /></svg> Getting link...';
-                statusDiv.textContent = '';
-                statusDiv.className = 'invite-link-status';
-                
-                try {
-                    const inviteLink = await groupChat.getGroupInviteLink(groupId);
+            if (freshCopyBtn) {
+                freshCopyBtn.addEventListener('click', async () => {
+                    let isCopying = false;
                     
-                    await navigator.clipboard.writeText(inviteLink);
+                    if (isCopying) return;
                     
-                    freshCopyBtn.innerHTML = '<svg class="feather" data-feather="check" style="margin-right: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Link Copied!';
-                    freshCopyBtn.classList.add('copied');
+                    isCopying = true;
+                    freshCopyBtn.disabled = true;
+                    freshCopyBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 8px;"></i> Getting link...';
+                    statusDiv.textContent = '';
+                    statusDiv.className = 'invite-link-status';
                     
-                    statusDiv.textContent = 'Invite link copied to clipboard!';
-                    statusDiv.classList.add('success');
-                    
-                    freshCopyBtn.title = `Link: ${inviteLink}`;
-                    
-                    setTimeout(() => {
-                        freshCopyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
-                        freshCopyBtn.classList.remove('copied');
+                    try {
+                        const inviteLink = await groupChat.getGroupInviteLink(groupId);
+                        
+                        await navigator.clipboard.writeText(inviteLink);
+                        
+                        freshCopyBtn.innerHTML = '<i class="fas fa-check" style="margin-right: 8px;"></i> Link Copied!';
+                        freshCopyBtn.classList.add('copied');
+                        
+                        statusDiv.textContent = 'Invite link copied to clipboard!';
+                        statusDiv.classList.add('success');
+                        
+                        freshCopyBtn.title = `Link: ${inviteLink}`;
+                        
+                        setTimeout(() => {
+                            freshCopyBtn.innerHTML = '<i class="fas fa-link" style="margin-right: 8px;"></i> Copy Invite Link';
+                            freshCopyBtn.classList.remove('copied');
+                            freshCopyBtn.disabled = false;
+                            statusDiv.textContent = 'Share this link to invite others';
+                            statusDiv.className = 'invite-link-status';
+                            isCopying = false;
+                        }, 3000);
+                        
+                    } catch (error) {
+                        console.error('Error copying invite link:', error);
+                        
+                        freshCopyBtn.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i> Error';
                         freshCopyBtn.disabled = false;
-                        statusDiv.textContent = 'Share this link to invite others';
-                        statusDiv.className = 'invite-link-status';
-                        isCopying = false;
-                    }, 3000);
-                    
-                } catch (error) {
-                    console.error('Error copying invite link:', error);
-                    
-                    freshCopyBtn.innerHTML = '<svg class="feather" data-feather="alert-triangle" style="margin-right: 8px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Error';
-                    freshCopyBtn.disabled = false;
-                    
-                    statusDiv.textContent = 'Failed to copy link. Please try again.';
-                    statusDiv.classList.add('error');
-                    
-                    setTimeout(() => {
-                        freshCopyBtn.innerHTML = '<svg class="feather" data-feather="link" style="width: 16px; height: 16px; margin-right: 8px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Copy Invite Link';
-                        statusDiv.textContent = '';
-                        statusDiv.className = 'invite-link-status';
-                        isCopying = false;
-                    }, 3000);
-                }
-            });
-            
-            document.addEventListener('keydown', (e) => {
-                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'L') {
-                    e.preventDefault();
-                    freshCopyBtn.click();
-                }
-            });
-            
-            freshCopyBtn.title = 'Click to copy invite link (Ctrl+Shift+L)';
+                        
+                        statusDiv.textContent = 'Failed to copy link. Please try again.';
+                        statusDiv.classList.add('error');
+                        
+                        setTimeout(() => {
+                            freshCopyBtn.innerHTML = '<i class="fas fa-link" style="margin-right: 8px;"></i> Copy Invite Link';
+                            statusDiv.textContent = '';
+                            statusDiv.className = 'invite-link-status';
+                            isCopying = false;
+                        }, 3000);
+                    }
+                });
+                
+                document.addEventListener('keydown', (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'L') {
+                        e.preventDefault();
+                        freshCopyBtn.click();
+                    }
+                });
+                
+                freshCopyBtn.title = 'Click to copy invite link (Ctrl+Shift+L)';
+            }
         }
     }
     
@@ -6627,11 +6723,14 @@ function initGroupPage() {
                                 </div>
                             `;
                         } else if (msg.voiceUrl) {
-                            messageContent = `
-                                <div class="message-voice-container" style="position: relative;">
-                                    ${groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id).outerHTML}
-                                </div>
-                            `;
+                            // FIXED: Create voice message element as DOM element and attach it properly
+                            const voiceElement = groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id);
+                            // Create a wrapper div and append the voice element directly
+                            const voiceWrapper = document.createElement('div');
+                            voiceWrapper.className = 'message-voice-container';
+                            voiceWrapper.style.position = 'relative';
+                            voiceWrapper.appendChild(voiceElement);
+                            messageContent = ''; // We'll add this after HTML is set
                         } else if (msg.type === 'system') {
                             messageContent = `
                                 <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
@@ -6646,26 +6745,46 @@ function initGroupPage() {
                         
                         const cachedReactions = reactionsCache.get(msg.id) || [];
                         
-                        return `
-                            <div class="${messageDivClass}${extraClasses}${rewardUpgradeClass}" data-message-id="${msg.id}" id="${messageDivId}">
-                                ${replyHtml}
+                        // Create message div
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = `${messageDivClass}${extraClasses}${rewardUpgradeClass}`;
+                        messageDiv.dataset.messageId = msg.id;
+                        messageDiv.id = messageDivId;
+                        
+                        // Add basic content first
+                        messageDiv.innerHTML = `
+                            ${replyHtml}
+                            <div class="message-content-wrapper">
                                 ${messageContent}
-                                <div class="message-reactions" id="reactions-${msg.id}">
-                                    ${cachedReactions.map(reaction => {
-                                        const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
-                                        return `
-                                            <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
-                                                <span class="reaction-emoji">${reaction.emoji}</span>
-                                                <span class="reaction-count">${reaction.count}</span>
-                                            </div>
-                                        `;
-                                    }).join('')}
-                                    <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
-                                        +
-                                    </div>
+                            </div>
+                            <div class="message-reactions" id="reactions-${msg.id}">
+                                ${cachedReactions.map(reaction => {
+                                    const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
+                                    return `
+                                        <div class="reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}" data-emoji="${reaction.emoji}">
+                                            <span class="reaction-emoji">${reaction.emoji}</span>
+                                            <span class="reaction-count">${reaction.count}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                                <div class="reaction-bubble add-reaction" style="opacity: 0; pointer-events: none; padding: 0; width: 0; height: 0;">
+                                    +
                                 </div>
                             </div>
                         `;
+                        
+                        // If it's a voice message, we need to handle it specially
+                        if (msg.voiceUrl) {
+                            // Create voice element separately and insert it
+                            const voiceElement = groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id);
+                            const contentWrapper = messageDiv.querySelector('.message-content-wrapper');
+                            if (contentWrapper) {
+                                contentWrapper.innerHTML = '';
+                                contentWrapper.appendChild(voiceElement);
+                            }
+                        }
+                        
+                        return messageDiv.outerHTML;
                     }).join('')}
                 </div>
             `;
@@ -6675,6 +6794,9 @@ function initGroupPage() {
         
         // Append new messages to the container (don't clear existing ones)
         messagesContainer.appendChild(fragment);
+        
+        // Now we need to re-attach event listeners to the newly added voice message elements
+        // This is done automatically when createVoiceMessageElement is called above
         
         document.querySelectorAll('.message-avatar').forEach(avatar => {
             avatar.addEventListener('click', (e) => {
@@ -6759,6 +6881,8 @@ function initGroupPage() {
     }
     
     function updateReactionsDisplay(container, reactions, messageId) {
+        if (!container) return;
+        
         container.innerHTML = '';
         
         reactions.forEach(reaction => {
@@ -6790,9 +6914,9 @@ function initGroupPage() {
     }
     
     async function sendMessage() {
-        const text = messageInput.value.trim();
+        const text = messageInput ? messageInput.value.trim() : '';
         
-        if (!text) return;
+        if (!text && !groupChat.currentVoiceNote) return;
         
         // UPDATED: Clear typing timeout before sending
         if (typingTimeout) {
@@ -6804,27 +6928,53 @@ function initGroupPage() {
         
         // FIXED: Send button always shows airplane icon, no loader
         // We only disable it temporarily to prevent double sends
-        const originalHTML = sendBtn.innerHTML;
-        const originalDisabled = sendBtn.disabled;
-        sendBtn.disabled = true;
-        
-        try {
-            await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
+        if (sendBtn) {
+            const originalHTML = sendBtn.innerHTML;
+            const originalDisabled = sendBtn.disabled;
+            sendBtn.disabled = true;
             
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
-            messageInput.dispatchEvent(new Event('input'));
-            
-            // Clear the reply indicator after sending
-            groupChat.clearReply();
-            
-        } catch (error) {
-            console.error('Error sending message:', error);
-            alert(error.message || 'Failed to send message. Please try again.');
-        } finally {
-            // FIXED: Always restore airplane icon immediately
-            sendBtn.disabled = originalDisabled;
-            sendBtn.innerHTML = originalHTML;
+            try {
+                if (groupChat.currentVoiceNote) {
+                    // Send voice note
+                    await groupChat.sendVoiceNote();
+                } else {
+                    // Send text message
+                    await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
+                    
+                    if (messageInput) {
+                        messageInput.value = '';
+                        messageInput.style.height = 'auto';
+                        messageInput.dispatchEvent(new Event('input'));
+                    }
+                }
+                
+                // Clear the reply indicator after sending
+                groupChat.clearReply();
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert(error.message || 'Failed to send message. Please try again.');
+            } finally {
+                // FIXED: Always restore airplane icon immediately
+                sendBtn.disabled = originalDisabled;
+                sendBtn.innerHTML = originalHTML;
+            }
+        } else {
+            // Send without UI updates
+            try {
+                if (groupChat.currentVoiceNote) {
+                    await groupChat.sendVoiceNote();
+                } else {
+                    await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
+                }
+                
+                // Clear the reply indicator after sending
+                groupChat.clearReply();
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert(error.message || 'Failed to send message. Please try again.');
+            }
         }
     }
     

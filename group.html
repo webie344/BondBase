@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,7 +20,22 @@
         /* ==========================================================================
            VOICE CHANNELS SECTION STYLES
            ========================================================================== */
+          .voice-message-container {
+    cursor: pointer;
+}
 
+.voice-message-play {
+    cursor: pointer;
+}.message-text {
+    transition: none !important;
+    cursor: default !important;
+}
+
+.message-text:hover {
+    background: none !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
         /* Icon Styling */
         .feather {
             width: 20px;
@@ -1320,16 +1336,7 @@
             animation: fadeInUp 0.3s ease;
         }
 
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+        
 
         .message-header {
             display: flex;
@@ -1370,12 +1377,10 @@
             border-radius: 6px;
             position: relative;
             cursor: pointer;
-            transition: background 0.2s;
+            
         }
 
-        .message-text:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
+
 
         /* System message styling */
         .system-message {
