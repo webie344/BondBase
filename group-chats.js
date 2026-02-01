@@ -802,6 +802,9 @@ class GroupChat {
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 1000;
         
+        // FIX: Add pending uploads tracking
+        this.pendingUploads = new Map();
+        
         this.setupNetworkListener();
         this.setupAuthListener();
         this.createReactionModal();
@@ -1100,8 +1103,8 @@ class GroupChat {
                     background: white;
                     color: var(--primary);
                     border: none;
-                    width: 30px;
-                    height: 30px;
+                    width: 40px;
+                    height: 40px;
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
@@ -1673,7 +1676,7 @@ class GroupChat {
         
         const uniqueId = messageId || 'preview_' + Date.now();
         
-        // Create the HTML structure
+        // Create the HTML structure - FIXED: Added proper audio playback
         container.innerHTML = `
             <div class="voice-message-waveform" id="waveform-${uniqueId}">
                 <div class="voice-message-progress" id="waveformProgress-${uniqueId}"></div>
@@ -1691,6 +1694,10 @@ class GroupChat {
             const audio = new Audio(voiceUrl);
             let isPlaying = false;
             const originalDuration = duration;
+            
+            // FIXED: Store audio reference on container
+            container._audio = audio;
+            container._isPlaying = false;
             
             // Add click event to container for play/pause
             container.addEventListener('click', (e) => {
@@ -1722,6 +1729,7 @@ class GroupChat {
             // Audio event listeners
             audio.addEventListener('play', () => {
                 isPlaying = true;
+                container._isPlaying = true;
                 const playIcon = document.getElementById(`playIcon-${uniqueId}`);
                 if (playIcon) {
                     playIcon.className = 'fas fa-pause';
@@ -1730,6 +1738,7 @@ class GroupChat {
             
             audio.addEventListener('pause', () => {
                 isPlaying = false;
+                container._isPlaying = false;
                 const playIcon = document.getElementById(`playIcon-${uniqueId}`);
                 if (playIcon) {
                     playIcon.className = 'fas fa-play';
@@ -1755,6 +1764,7 @@ class GroupChat {
             
             audio.addEventListener('ended', () => {
                 isPlaying = false;
+                container._isPlaying = false;
                 const playIcon = document.getElementById(`playIcon-${uniqueId}`);
                 if (playIcon) {
                     playIcon.className = 'fas fa-play';
@@ -1780,16 +1790,6 @@ class GroupChat {
                     audio.currentTime = audio.duration * percentage;
                 });
             }
-            
-            // Clean up audio when container is removed
-            const cleanup = () => {
-                audio.pause();
-                audio.src = '';
-                container.removeEventListener('DOMNodeRemoved', cleanup);
-            };
-            
-            // Listen for element removal
-            container.addEventListener('DOMNodeRemoved', cleanup);
             
             // Store audio reference on container for external access
             container._audio = audio;
@@ -3887,6 +3887,7 @@ class GroupChat {
         }
     }
 
+    // FIXED: sendMessage method with better duplicate prevention
     async sendMessage(groupId, text = null, imageUrl = null, videoUrl = null, replyTo = null, voiceUrl = null, duration = null) {
         try {
             // FIX: Check if offline before sending
@@ -3941,22 +3942,40 @@ class GroupChat {
             const shouldGlow = this.shouldGlowMessage(this.firebaseUser.uid);
             const shouldHaveFireRing = this.shouldHaveFireRing(this.firebaseUser.uid);
             
-            const messageId = `${groupId}_${this.firebaseUser.uid}_${Date.now()}`;
+            // FIXED: Better message ID generation to prevent duplicates
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substr(2, 9);
+            const messageId = `${groupId}_${this.firebaseUser.uid}_${timestamp}_${randomId}`;
             
-            if (this.sentMessageIds.has(messageId) || this.pendingMessages.has(messageId)) {
-                console.log('Duplicate message prevented:', messageId);
+            // FIXED: Use stronger duplicate prevention
+            if (this.sentMessageIds.has(messageId)) {
+                console.log('Duplicate message prevented (already in sent set):', messageId);
                 return true;
             }
             
+            // FIXED: Check pending messages with timeout
+            if (this.pendingMessages.has(messageId)) {
+                console.log('Duplicate message prevented (already pending):', messageId);
+                return true;
+            }
+            
+            // FIXED: Add to both sets immediately
             this.sentMessageIds.add(messageId);
             this.pendingMessages.add(messageId);
+            
+            // FIXED: Remove from pending after 10 seconds (fail-safe)
+            setTimeout(() => {
+                this.pendingMessages.delete(messageId);
+            }, 10000);
             
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const messageData = {
                 senderId: this.firebaseUser.uid,
                 senderName: this.currentUser.name,
                 senderAvatar: this.currentUser.avatar,
-                timestamp: serverTimestamp()
+                timestamp: serverTimestamp(),
+                // FIXED: Add a unique client-generated ID to prevent Firebase duplicates
+                clientMessageId: messageId
             };
             
             // NEW: Add glow effect and fire ring data
@@ -4029,13 +4048,19 @@ class GroupChat {
             
             this.clearReply();
             
+            // FIXED: Remove from pending immediately after success
             this.pendingMessages.delete(messageId);
             
+            console.log('Message sent successfully:', finalMessageId);
             return true;
         } catch (error) {
             console.error('Error sending message:', error);
+            
+            // FIXED: Clean up IDs on error
             this.sentMessageIds.delete(messageId);
             this.pendingMessages.delete(messageId);
+            
+            // Re-throw the error for UI handling
             throw error;
         }
     }
@@ -4198,6 +4223,13 @@ class GroupChat {
                     snapshot.forEach(doc => {
                         const data = doc.data();
                         const messageId = doc.id;
+                        
+                        // FIXED: Check clientMessageId for duplicates
+                        const clientMessageId = data.clientMessageId;
+                        if (clientMessageId && this.sentMessageIds.has(clientMessageId)) {
+                            console.log('Skipping duplicate message by client ID:', clientMessageId);
+                            return;
+                        }
                         
                         // Check if we've already processed this message ID in THIS PAGE
                         if (!pageProcessedIds.has(messageId)) {
@@ -5807,6 +5839,7 @@ function initGroupPage() {
     const sendBtn = document.getElementById('sendBtn');
     const emojiBtn = document.getElementById('emojiBtn');
     const attachmentBtn = document.getElementById('attachmentBtn');
+    const voiceNoteBtn = document.getElementById('voiceNoteBtn');
     const groupAvatar = document.getElementById('groupAvatar');
     const groupNameSidebar = document.getElementById('groupNameSidebar');
     const groupMembersCount = document.getElementById('groupMembersCount');
@@ -6120,100 +6153,108 @@ function initGroupPage() {
         }
     }
     
-    // NEW: Add voice note button to sidebar
+    // FIXED: Add voice note button with proper event listeners
     function addVoiceNoteButton() {
-        // Create voice note button
-        const voiceNoteBtn = document.createElement('button');
-        voiceNoteBtn.id = 'voiceNoteBtn';
-        voiceNoteBtn.className = 'voice-note-btn';
-        voiceNoteBtn.innerHTML = `
-            <i class="fas fa-microphone"></i>
-        `;
-        voiceNoteBtn.title = 'Record voice note (Hold to record)';
-        
-        // Find message input container
-        const messageInputContainer = document.querySelector('.message-input-container');
-        if (messageInputContainer) {
-            // Insert voice note button before send button
-            const sendBtn = messageInputContainer.querySelector('#sendBtn');
-            if (sendBtn) {
-                messageInputContainer.insertBefore(voiceNoteBtn, sendBtn);
-            } else {
-                messageInputContainer.appendChild(voiceNoteBtn);
+        // Create voice note button if it doesn't exist
+        let voiceNoteBtn = document.getElementById('voiceNoteBtn');
+        if (!voiceNoteBtn) {
+            voiceNoteBtn = document.createElement('button');
+            voiceNoteBtn.id = 'voiceNoteBtn';
+            voiceNoteBtn.className = 'voice-note-btn';
+            voiceNoteBtn.innerHTML = `
+                <i class="fas fa-microphone"></i>
+            `;
+            voiceNoteBtn.title = 'Record voice note (Hold to record)';
+            
+            // Find message input container
+            const messageInputContainer = document.querySelector('.message-input-container');
+            if (messageInputContainer) {
+                // Insert voice note button before send button
+                const sendBtn = messageInputContainer.querySelector('#sendBtn');
+                if (sendBtn) {
+                    messageInputContainer.insertBefore(voiceNoteBtn, sendBtn);
+                } else {
+                    messageInputContainer.appendChild(voiceNoteBtn);
+                }
             }
         }
+        
+        // Clear any existing event listeners by cloning the button
+        const newVoiceNoteBtn = voiceNoteBtn.cloneNode(true);
+        voiceNoteBtn.parentNode.replaceChild(newVoiceNoteBtn, voiceNoteBtn);
+        const freshVoiceNoteBtn = document.getElementById('voiceNoteBtn');
         
         // Add event listeners for voice recording
         let pressTimer;
         let isLongPress = false;
         
-        voiceNoteBtn.addEventListener('mousedown', (e) => {
+        freshVoiceNoteBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
             isLongPress = false;
             pressTimer = setTimeout(async () => {
                 isLongPress = true;
                 try {
                     await groupChat.startVoiceRecording();
-                    voiceNoteBtn.classList.add('recording');
+                    freshVoiceNoteBtn.classList.add('recording');
                 } catch (error) {
                     alert(error.message || 'Failed to start recording. Please try again.');
                 }
             }, 500); // Long press threshold
         });
         
-        voiceNoteBtn.addEventListener('mouseup', () => {
+        freshVoiceNoteBtn.addEventListener('mouseup', () => {
             clearTimeout(pressTimer);
             if (isLongPress && groupChat.isRecording) {
                 groupChat.stopVoiceRecording();
-                voiceNoteBtn.classList.remove('recording');
+                freshVoiceNoteBtn.classList.remove('recording');
             }
         });
         
-        voiceNoteBtn.addEventListener('mouseleave', () => {
+        freshVoiceNoteBtn.addEventListener('mouseleave', () => {
             clearTimeout(pressTimer);
             if (isLongPress && groupChat.isRecording) {
                 groupChat.stopVoiceRecording();
-                voiceNoteBtn.classList.remove('recording');
+                freshVoiceNoteBtn.classList.remove('recording');
             }
         });
         
         // Touch events for mobile
-        voiceNoteBtn.addEventListener('touchstart', (e) => {
+        freshVoiceNoteBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             isLongPress = false;
             pressTimer = setTimeout(async () => {
                 isLongPress = true;
                 try {
                     await groupChat.startVoiceRecording();
-                    voiceNoteBtn.classList.add('recording');
+                    freshVoiceNoteBtn.classList.add('recording');
                 } catch (error) {
                     alert(error.message || 'Failed to start recording. Please try again.');
                 }
             }, 500);
         });
         
-        voiceNoteBtn.addEventListener('touchend', () => {
+        freshVoiceNoteBtn.addEventListener('touchend', () => {
             clearTimeout(pressTimer);
             if (isLongPress && groupChat.isRecording) {
                 groupChat.stopVoiceRecording();
-                voiceNoteBtn.classList.remove('recording');
+                freshVoiceNoteBtn.classList.remove('recording');
             }
         });
         
-        voiceNoteBtn.addEventListener('touchcancel', () => {
+        freshVoiceNoteBtn.addEventListener('touchcancel', () => {
             clearTimeout(pressTimer);
             if (isLongPress && groupChat.isRecording) {
                 groupChat.stopVoiceRecording();
-                voiceNoteBtn.classList.remove('recording');
+                freshVoiceNoteBtn.classList.remove('recording');
             }
         });
         
         // Click to cancel recording if active
-        voiceNoteBtn.addEventListener('click', (e) => {
+        freshVoiceNoteBtn.addEventListener('click', (e) => {
             if (!isLongPress && groupChat.isRecording) {
                 e.preventDefault();
                 groupChat.cancelVoiceRecording();
-                voiceNoteBtn.classList.remove('recording');
+                freshVoiceNoteBtn.classList.remove('recording');
             }
         });
     }
@@ -6648,6 +6689,7 @@ function initGroupPage() {
             const rewardTag = userProfile?.rewardTag || '';
             const hasFireRing = userProfile?.fireRing || false;
             
+            // Create group HTML
             groupDiv.innerHTML = `
                 <div class="message-header">
                     <div class="message-avatar-container" style="position: relative; display: inline-block;">
@@ -6723,14 +6765,8 @@ function initGroupPage() {
                                 </div>
                             `;
                         } else if (msg.voiceUrl) {
-                            // FIXED: Create voice message element as DOM element and attach it properly
-                            const voiceElement = groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id);
-                            // Create a wrapper div and append the voice element directly
-                            const voiceWrapper = document.createElement('div');
-                            voiceWrapper.className = 'message-voice-container';
-                            voiceWrapper.style.position = 'relative';
-                            voiceWrapper.appendChild(voiceElement);
-                            messageContent = ''; // We'll add this after HTML is set
+                            // FIXED: Create a placeholder for voice message - will be added separately
+                            messageContent = `<div class="voice-message-placeholder" data-voice-url="${msg.voiceUrl}" data-duration="${msg.duration || 0}" data-message-id="${msg.id}"></div>`;
                         } else if (msg.type === 'system') {
                             messageContent = `
                                 <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
@@ -6773,17 +6809,6 @@ function initGroupPage() {
                             </div>
                         `;
                         
-                        // If it's a voice message, we need to handle it specially
-                        if (msg.voiceUrl) {
-                            // Create voice element separately and insert it
-                            const voiceElement = groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id);
-                            const contentWrapper = messageDiv.querySelector('.message-content-wrapper');
-                            if (contentWrapper) {
-                                contentWrapper.innerHTML = '';
-                                contentWrapper.appendChild(voiceElement);
-                            }
-                        }
-                        
                         return messageDiv.outerHTML;
                     }).join('')}
                 </div>
@@ -6795,8 +6820,21 @@ function initGroupPage() {
         // Append new messages to the container (don't clear existing ones)
         messagesContainer.appendChild(fragment);
         
-        // Now we need to re-attach event listeners to the newly added voice message elements
-        // This is done automatically when createVoiceMessageElement is called above
+        // FIXED: Now we need to handle voice messages separately
+        // Find all voice message placeholders and replace them with actual voice message elements
+        document.querySelectorAll('.voice-message-placeholder').forEach(placeholder => {
+            const voiceUrl = placeholder.getAttribute('data-voice-url');
+            const duration = parseInt(placeholder.getAttribute('data-duration'));
+            const messageId = placeholder.getAttribute('data-message-id');
+            
+            if (voiceUrl && duration) {
+                // Create voice message element
+                const voiceElement = groupChat.createVoiceMessageElement(voiceUrl, duration, messageId);
+                
+                // Replace placeholder with actual voice element
+                placeholder.parentNode.replaceChild(voiceElement, placeholder);
+            }
+        });
         
         document.querySelectorAll('.message-avatar').forEach(avatar => {
             avatar.addEventListener('click', (e) => {

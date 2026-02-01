@@ -23,7 +23,231 @@
           .voice-message-container {
     cursor: pointer;
 }
+/* Add this to your existing CSS or in a style tag in your HTML */
 
+/* Remove ALL hover effects from voice messages */
+.voice-message-container {
+    transition: none !important;
+    animation: none !important;
+}
+
+.voice-message-container:hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    transform: none !important;
+    box-shadow: none !important;
+    cursor: pointer !important;
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+/* Remove hover from voice message play button */
+.voice-message-play {
+    transition: none !important;
+}
+
+.voice-message-play:hover {
+    transform: none !important;
+    background: white !important;
+    color: var(--primary) !important;
+    box-shadow: none !important;
+}
+
+/* Remove hover from voice message waveform */
+.voice-message-waveform {
+    transition: none !important;
+}
+
+.voice-message-waveform:hover {
+    transform: none !important;
+    background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Remove hover from progress bar */
+.voice-message-progress {
+    transition: width 0.1s linear !important;
+}
+
+.voice-message-progress:hover {
+    background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Remove hover effects from all message elements */
+.message-text {
+    transition: none !important;
+    animation: none !important;
+}
+
+.message-text:hover {
+    background: none !important;
+    transform: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    cursor: default !important;
+}
+
+/* Remove hover from message images */
+.message-image {
+    transition: none !important;
+}
+
+.message-image:hover {
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+/* Remove hover from message videos */
+video {
+    transition: none !important;
+}
+
+video:hover {
+    transform: none !important;
+    filter: none !important;
+}
+
+/* Remove hover from reaction bubbles */
+.reaction-bubble {
+    transition: none !important;
+}
+
+.reaction-bubble:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+    transform: none !important;
+}
+
+.reaction-bubble.user-reacted:hover {
+    background: rgba(29, 155, 240, 0.1) !important;
+    transform: none !important;
+}
+
+/* Remove hover from message groups */
+.message-group {
+    transition: none !important;
+}
+
+.message-group:hover {
+    background: none !important;
+    transform: none !important;
+}
+
+/* Remove hover from message avatars */
+.message-avatar {
+    transition: none !important;
+}
+
+.message-avatar:hover {
+    transform: none !important;
+    filter: none !important;
+}
+
+/* Remove hover from system messages */
+.system-message {
+    transition: none !important;
+}
+
+.system-message:hover {
+    background: none !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Remove hover from reply indicators */
+.replying-to {
+    transition: none !important;
+}
+
+.replying-to:hover {
+    background: rgba(102, 126, 234, 0.1) !important;
+    transform: none !important;
+}
+
+/* Remove all CSS animations that might interfere */
+@keyframes none {
+    0% { transform: none; }
+    100% { transform: none; }
+}
+
+/* Ensure voice messages are clickable without hover interference */
+.voice-message-container * {
+    pointer-events: auto !important;
+}
+
+/* Specifically target and disable any problematic animations */
+.voice-message-container:active,
+.voice-message-container:focus,
+.voice-message-container:focus-within {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Disable any transform transitions */
+* {
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Remove touch feedback on mobile */
+.voice-message-container:active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+/* Ensure play button is always visible and clickable */
+.voice-message-play:active {
+    transform: scale(0.95) !important;
+}
+
+
+
+/* Disable any hover effects from parent containers */
+.message-content-wrapper:hover .voice-message-container,
+.message-content:hover .voice-message-container,
+.message-group:hover .voice-message-container {
+    transform: none !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+/* Remove any glow or shadow effects on hover */
+.voice-message-container:hover::before,
+.voice-message-container:hover::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* Ensure no transition delays */
+* {
+    transition-delay: 0s !important;
+    animation-delay: 0s !important;
+}
+
+/* Additional fix for mobile touch devices */
+@media (hover: none) and (pointer: coarse) {
+    .voice-message-container:hover,
+    .voice-message-container:active,
+    .voice-message-container:focus {
+        transform: none !important;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    }
+    
+    .voice-message-play:hover,
+    .voice-message-play:active {
+        transform: none !important;
+        background: white !important;
+    }
+    
+    .voice-message-waveform:hover {
+        background: rgba(255, 255, 255, 0.3) !important;
+    }
+}
+
+/* Force remove any remaining hover styles */
+.voice-message-container:hover .voice-message-play,
+.voice-message-container:hover .voice-message-waveform,
+.voice-message-container:hover .voice-message-duration {
+    transform: none !important;
+    color: white !important;
+    background: none !important;
+}
 .voice-message-play {
     cursor: pointer;
 }.message-text {
@@ -2146,8 +2370,219 @@
 <script type="module" src="lin.js"></script>
     <script type="module" src="ap.js"></script>
     <script type="module" src="additiona-group.js"></script>
+<script>
+// Fix for voice message play button click issue
+(function() {
+    // Wait for DOM to be fully loaded
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fixVoiceMessageClick);
+    } else {
+        fixVoiceMessageClick();
+    }
     
+    function fixVoiceMessageClick() {
+        console.log('Fixing voice message click issues...');
+        
+        // Fix existing voice messages
+        fixExistingVoiceMessages();
+        
+        // Also watch for new voice messages being added dynamically
+        setupMutationObserver();
+    }
     
+    function fixExistingVoiceMessages() {
+        // Find all voice message containers
+        const voiceContainers = document.querySelectorAll('.voice-message-container');
+        
+        voiceContainers.forEach(container => {
+            fixVoiceMessageContainer(container);
+        });
+    }
     
+    function fixVoiceMessageContainer(container) {
+        // Remove any existing click handlers that might be interfering
+        container.onclick = null;
+        container.onmouseenter = null;
+        container.onmouseleave = null;
+        
+        // Find the play button inside this container
+        const playBtn = container.querySelector('.voice-message-play');
+        const waveform = container.querySelector('.voice-message-waveform');
+        
+        if (playBtn) {
+            // Remove all existing event listeners from play button
+            const newPlayBtn = playBtn.cloneNode(true);
+            playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
+            
+            // Get the unique ID from the container or create one
+            const containerId = container.id || container.dataset.messageId || 'voice-' + Date.now();
+            const playBtnId = 'playBtn-' + containerId;
+            const playIconId = 'playIcon-' + containerId;
+            const waveformId = 'waveform-' + containerId;
+            const progressId = 'waveformProgress-' + containerId;
+            const durationId = 'duration-' + containerId;
+            
+            // Set IDs for easier access
+            newPlayBtn.id = playBtnId;
+            const playIcon = newPlayBtn.querySelector('i');
+            if (playIcon) playIcon.id = playIconId;
+            
+            // Try to find the audio element
+            let audio = container._audio;
+            
+            // If no audio element exists, try to create one from data attributes
+            if (!audio && container.dataset.voiceUrl) {
+                audio = new Audio(container.dataset.voiceUrl);
+                container._audio = audio;
+            }
+            
+            if (audio) {
+                // Set up the play button click handler
+                newPlayBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    if (audio.paused) {
+                        audio.play();
+                    } else {
+                        audio.pause();
+                    }
+                });
+                
+                // Set up audio event listeners
+                audio.addEventListener('play', function() {
+                    const icon = document.getElementById(playIconId);
+                    if (icon) {
+                        icon.className = 'fas fa-pause';
+                    }
+                });
+                
+                audio.addEventListener('pause', function() {
+                    const icon = document.getElementById(playIconId);
+                    if (icon) {
+                        icon.className = 'fas fa-play';
+                    }
+                });
+                
+                audio.addEventListener('timeupdate', function() {
+                    if (audio.duration) {
+                        const progress = (audio.currentTime / audio.duration) * 100;
+                        const progressBar = document.getElementById(progressId);
+                        if (progressBar) {
+                            progressBar.style.width = progress + '%';
+                        }
+                        
+                        // Update duration display
+                        const currentMinutes = Math.floor(audio.currentTime / 60);
+                        const currentSeconds = Math.floor(audio.currentTime % 60);
+                        const durationElement = document.getElementById(durationId);
+                        if (durationElement) {
+                            durationElement.textContent = 
+                                currentMinutes.toString().padStart(2, '0') + ':' + 
+                                currentSeconds.toString().padStart(2, '0');
+                        }
+                    }
+                });
+                
+                audio.addEventListener('ended', function() {
+                    const icon = document.getElementById(playIconId);
+                    if (icon) {
+                        icon.className = 'fas fa-play';
+                    }
+                    const progressBar = document.getElementById(progressId);
+                    if (progressBar) {
+                        progressBar.style.width = '0%';
+                    }
+                });
+            }
+        }
+        
+        // Fix waveform click for seeking
+        if (waveform) {
+            waveform.addEventListener('click', function(e) {
+                e.stopPropagation();
+                
+                const audio = container._audio;
+                if (audio && audio.duration) {
+                    const rect = e.target.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const percentage = clickX / rect.width;
+                    audio.currentTime = audio.duration * percentage;
+                }
+            });
+        }
+        
+        // Prevent container click from interfering with button clicks
+        container.addEventListener('click', function(e) {
+            // Only handle container click if not clicking on button or waveform
+            if (!e.target.closest('.voice-message-play') && 
+                !e.target.closest('.voice-message-waveform')) {
+                
+                const audio = container._audio;
+                if (audio) {
+                    if (audio.paused) {
+                        audio.play();
+                    } else {
+                        audio.pause();
+                    }
+                }
+            }
+        });
+        
+        // Add a small CSS fix to ensure clicks work
+        const style = document.createElement('style');
+        style.textContent = `
+            .voice-message-container * {
+                pointer-events: auto !important;
+            }
+            
+            .voice-message-container {
+                cursor: pointer !important;
+            }
+            
+            .voice-message-play {
+                z-index: 10 !important;
+                position: relative !important;
+            }
+            
+            .voice-message-waveform {
+                z-index: 5 !important;
+                position: relative !important;
+            }
+        `;
+        container.appendChild(style);
+    }
+    
+    function setupMutationObserver() {
+        // Watch for new voice messages being added to the DOM
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1) { // Element node
+                            // Check if this is a voice message container
+                            if (node.classList && node.classList.contains('voice-message-container')) {
+                                fixVoiceMessageContainer(node);
+                            }
+                            
+                            // Check for voice messages inside the added node
+                            const voiceContainers = node.querySelectorAll('.voice-message-container');
+                            voiceContainers.forEach(container => {
+                                fixVoiceMessageContainer(container);
+                            });
+                        }
+                    });
+                }
+            });
+        });
+        
+        // Start observing the document body for changes
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+})();
+</script>
 </body>
 </html>
