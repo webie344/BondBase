@@ -7,7 +7,7 @@
     <!-- Add these in your head tag -->
      
     <link rel="stylesheet" href="style.css">
-       <link rel="stylesheet" href="scrol-fix.css">
+    <link rel="stylesheet" href="scrol-fix.css">
     <link rel="stylesheet" href="chat.css">
     
     
@@ -48,39 +48,6 @@
     .game-icon-btn:hover {
         background: rgba(179, 0, 75, 0.2);
         color: var(--primary-light);
-    }
-
-    /* Override the existing chat-input styles for focus state */
-    .chat-input.input-focused {
-        position: relative !important;
-    }
-
-    .chat-input.input-focused input {
-        position: absolute !important;
-        left: 0 !important;
-        width: 100% !important;
-        flex: none !important;
-        padding-right: 50px !important;
-        background: var(--bg-card) !important;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3) !important;
-        z-index: 100 !important;
-        border: 1px solid var(--primary) !important;
-    }
-
-    .chat-input.input-focused .send-btn {
-        position: absolute !important;
-        right: 10px !important;
-        z-index: 101 !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        background: var(--primary) !important;
-    }
-
-    .chat-input.input-focused .attachment-btn,
-    .chat-input.input-focused .voice-note-btn-main {
-        opacity: 0 !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
     }
 
     .message.sending .message-time {
@@ -451,24 +418,155 @@
     }
 
     .chat-input input {
-        background: var(--bg-primary);
         color: var(--text-primary);
-        border: 1px solid var(--border);
+        border: none;
+        background: transparent;
     }
 
     .chat-input input::placeholder {
         color: var(--text-light);
     }
 
-    .attachment-btn, .voice-note-btn-main, .send-btn {
-        background: rgba(255, 255, 255, 0.05);
-        color: var(--text-primary);
-        border: 1px solid var(--border);
+    /* MODERN CHAT INPUT STYLES */
+    .chat-input-container {
+        padding: 12px 16px;
+        background: var(--bg-card);
+        border-top: 1px solid var(--border);
     }
 
-    .attachment-btn:hover, .voice-note-btn-main:hover, .send-btn:hover {
+    .chat-input {
+        display: flex;
+        align-items: center;
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 6px 14px;
+        gap: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .chat-input:focus-within {
+        border-color: var(--primary-light);
+        box-shadow: 0 0 0 2px rgba(230, 57, 134, 0.1);
+    }
+
+    /* Input controls inside the input wrapper */
+    .input-controls-left {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    .input-controls-right {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    /* Buttons inside the input */
+    .inside-input-btn {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+    }
+
+    .inside-input-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--primary-light);
+    }
+
+    .inside-input-btn .feather {
+        width: 20px;
+        height: 20px;
+        stroke: currentColor;
+        stroke-width: 2;
+    }
+
+    /* Main text input */
+    #messageInput {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        font-family: 'Inter', sans-serif;
+        padding: 8px 0;
+        line-height: 1.4;
+        outline: none;
+        min-height: 24px;
+        max-height: 120px;
+    }
+
+    /* Send button */
+    .send-btn {
         background: var(--primary);
         color: white;
+        border: none;
+        border-radius: 50%;
+        padding: 0;
+        width: 36px;
+        height: 36px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .send-btn:hover:not(:disabled) {
+        background: var(--primary-light);
+        transform: scale(1.05);
+    }
+
+    .send-btn:active:not(:disabled) {
+        transform: scale(0.95);
+    }
+
+    .send-btn:disabled {
+        background: var(--border);
+        cursor: not-allowed;
+        transform: none !important;
+    }
+
+    .send-btn .feather {
+        width: 18px;
+        height: 18px;
+        stroke: white;
+        stroke-width: 2.5;
+    }
+
+    /* Game button inside input */
+    .game-icon-btn {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        font-size: 18px !important;
+    }
+
+    .game-icon-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--primary-light);
     }
 
     /* Voice note player styles */
@@ -517,42 +615,6 @@
         stroke: currentColor;
     }
 
-    /* Game button styling */
-    #gameInviteBtn {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--border);
-        color: var(--text-primary);
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    #gameInviteBtn:hover {
-        background: var(--primary);
-        color: white;
-        transform: scale(1.1);
-    }
-
-    /* Chat input buttons */
-    .attachment-btn .feather,
-    .voice-note-btn-main .feather,
-    .send-btn .feather {
-        width: 18px;
-        height: 18px;
-        stroke: currentColor;
-    }
-
-    .attachment-btn:hover .feather,
-    .voice-note-btn-main:hover .feather,
-    .send-btn:hover .feather {
-        stroke: white;
-    }
-
     /* Voice note indicator buttons */
     .voice-note-btn .feather {
         width: 16px;
@@ -563,8 +625,6 @@
     .voice-note-btn:hover .feather {
         stroke: white;
     }
-
-   
 
     .chat-partner-info {
         display: flex;
@@ -616,19 +676,77 @@
         stroke: white;
     }
 
-    @media (max-width: 480px) {
-        .call-controls {
-            gap: 6px;
+    /* Responsive adjustments for modern input */
+    @media (max-width: 768px) {
+        .chat-input-container {
+            padding: 10px 12px;
         }
         
-        .call-btn {
+        .chat-input {
+            padding: 4px 12px;
+        }
+        
+        .inside-input-btn, .game-icon-btn {
+            width: 32px;
+            height: 32px;
+            padding: 6px;
+        }
+        
+        .inside-input-btn .feather {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .send-btn {
             width: 32px;
             height: 32px;
         }
         
-        .call-btn .feather {
+        .send-btn .feather {
             width: 16px;
             height: 16px;
+        }
+        
+        #messageInput {
+            font-size: 0.9rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .chat-input-container {
+            padding: 8px 10px;
+        }
+        
+        .chat-input {
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+        
+        .inside-input-btn, .game-icon-btn {
+            width: 28px;
+            height: 28px;
+            padding: 5px;
+        }
+        
+        .inside-input-btn .feather {
+            width: 16px;
+            height: 16px;
+        }
+        
+        .send-btn {
+            width: 28px;
+            height: 28px;
+        }
+        
+        .send-btn .feather {
+            width: 14px;
+            height: 14px;
+        }
+        
+        #messageInput {
+            font-size: 0.85rem;
+            padding: 6px 0;
+            min-height: 20px;
         }
     }
     </style>
@@ -691,8 +809,8 @@
                     <div class="reply-preview-text"></div>
                 </div>
                 <button id="cancelReply" class="reply-preview-cancel">
-    <i class="fas fa-times"></i>
-</button>
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             
             <!-- Voice note recording indicator -->
@@ -714,27 +832,43 @@
                 </div>
             </div>
             
+            <!-- MODERN CHAT INPUT -->
             <div class="chat-input">
-                <button class="attachment-btn" id="attachmentBtn">
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                    </svg>
-                </button>
-                <input type="file" id="imageUpload" accept="image/*" style="display: none;">
-                <button class="voice-note-btn-main" id="voiceNoteBtn">
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                        <line x1="12" y1="19" x2="12" y2="23"></line>
-                        <line x1="8" y1="23" x2="16" y2="23"></line>
-                    </svg>
-                </button>
-                <!-- Game Invite Button -->
-                <button id="gameInviteBtn" class="game-icon-btn" title="Play Games" onclick="openGameSelection()">
-                     👾 
-                </button>
+                <!-- Left side controls (inside input) -->
+                <div class="input-controls-left">
+                    <!-- Attachment button -->
+                    <button class="inside-input-btn" id="attachmentBtn" title="Attach file">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                        </svg>
+                    </button>
+                    
+                    <!-- Voice note button -->
+                    <button class="inside-input-btn" id="voiceNoteBtn" title="Record voice note">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" y1="19" x2="12" y2="23"></line>
+                            <line x1="8" y1="23" x2="16" y2="23"></line>
+                        </svg>
+                    </button>
+                    
+                    <!-- Game button -->
+                    <button id="gameInviteBtn" class="game-icon-btn" title="Play Games">
+                        👾
+                    </button>
+                </div>
+                
+                <!-- Main text input -->
                 <input type="text" id="messageInput" placeholder="Type a message...">
-                <button class="send-btn" id="sendMessageBtn">
+                
+                <!-- Right side controls (inside input) -->
+                <div class="input-controls-right">
+                    <!-- You could add more buttons here if needed -->
+                </div>
+                
+                <!-- Send button -->
+                <button class="send-btn" id="sendMessageBtn" title="Send message">
                     <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <line x1="22" y1="2" x2="11" y2="13"></line>
                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -744,19 +878,18 @@
         </div>
     </div>
     
+    <!-- Hidden file input -->
+    <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+    
     <!-- Load all your existing scripts exactly as before -->
-
     <script type="module" src="app.js"></script>
-        <script type="module" src="chat.js"></script>
+    <script type="module" src="chat.js"></script>
     <script src="fix.js"></script>
     <script src="fli.js"></script>
     <script src="smoot.js"></script>
     <script type="module" src="call.js"></script>
     <script type="module" src="pic.js"></script>
-    
     <script type="module" src="chattin.js"></script>
-    
-    
     <script type="module" src="game.js"></script>
     <script type="module" src="additional.js"></script>
 
@@ -810,6 +943,16 @@
                 }
             }
         });
+        
+        // Setup file input button
+        const attachmentBtn = document.getElementById('attachmentBtn');
+        const fileInput = document.getElementById('imageUpload');
+        
+        if (attachmentBtn && fileInput) {
+            attachmentBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+        }
     });
     </script>
 
@@ -851,30 +994,6 @@
             alert('Please start a chat with someone first or wait for game system to load');
         }
     }
-    </script>
-    
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const chatInput = document.querySelector('.chat-input');
-        const inputField = document.querySelector('.chat-input input[type="text"]');
-        
-        if (!inputField) return;
-        
-        inputField.addEventListener('focus', function() {
-            chatInput.classList.add('input-focused');
-        });
-        
-        inputField.addEventListener('blur', function() {
-            chatInput.classList.remove('input-focused');
-        });
-        
-        // Close when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!chatInput.contains(e.target)) {
-                chatInput.classList.remove('input-focused');
-            }
-        });
-    });
     </script>
 </body>
 </html>

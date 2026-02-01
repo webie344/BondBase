@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1950,121 +1949,156 @@ video:hover {
             overflow: hidden;
         }
 
-        /* Input Area */
+        /* MODERN INPUT AREA STYLES */
         .input-container {
             background: var(--bg-card);
-            padding: 20px;
+            padding: 16px 20px;
             border-top: 1px solid var(--border);
             position: relative;
         }
 
         .message-input-container {
             display: flex;
-            align-items: center;
-            gap: 2px;
-        }
-
-        .message-input {
-            flex: 1;
-            padding: 12px 15px;
+            align-items: flex-end;
             background: var(--bg-primary);
             border: 1px solid var(--border);
-            border-radius: 18px;
-            color: var(--text-primary);
-            font-size: 0.7rem;
-            font-family: 'Inter', sans-serif;
-            resize: none;
-            max-height: 120px;
-            min-height: 44px;
-        }
-
-        .message-input:focus {
-            outline: none;
-            border-color: var(--primary-light);
-        }
-
-        .input-actions {
-            display: flex;
+            border-radius: 24px;
+            padding: 6px 14px;
             gap: 8px;
+            transition: all 0.3s ease;
         }
 
-        .action-btn {
+        .message-input-container:focus-within {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 2px rgba(230, 57, 134, 0.1);
+        }
+
+        /* Input controls inside the input wrapper */
+        .input-controls-left {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .input-controls-right {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        /* Buttons inside the input */
+        .inside-input-btn {
             background: none;
             border: none;
             color: var(--text-secondary);
             cursor: pointer;
             padding: 8px;
-            border-radius: 6px;
+            border-radius: 50%;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
+            width: 36px;
+            height: 36px;
         }
 
-        .action-btn:hover {
+        .inside-input-btn:hover {
             background: rgba(255, 255, 255, 0.05);
             color: var(--primary-light);
         }
 
-        .action-btn .feather {
-            width: 22px;
-            height: 22px;
+        .inside-input-btn .feather {
+            width: 20px;
+            height: 20px;
             stroke: currentColor;
+            stroke-width: 2;
         }
 
+        /* Main textarea */
+        .message-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-family: 'Inter', sans-serif;
+            resize: none;
+            max-height: 120px;
+            min-height: 24px;
+            padding: 8px 0;
+            line-height: 1.4;
+            outline: none;
+        }
+
+        .message-input::placeholder {
+            color: var(--text-light);
+        }
+
+        /* Send button */
         .send-btn {
             background: var(--primary);
             color: white;
             border: none;
-            border-radius: 8px;
-            padding: 10px 10px;
-            font-weight: 600;
+            border-radius: 50%;
+            padding: 0;
+            width: 36px;
+            height: 36px;
             cursor: pointer;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
-        .send-btn:hover {
+        .send-btn:hover:not(:disabled) {
             background: var(--primary-light);
+            transform: scale(1.05);
+        }
+
+        .send-btn:active:not(:disabled) {
+            transform: scale(0.95);
         }
 
         .send-btn:disabled {
             background: var(--border);
             cursor: not-allowed;
+            transform: none !important;
         }
 
         .send-btn .feather {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             stroke: white;
             stroke-width: 2.5;
         }
 
         /* File Input Button */
         .file-input-btn {
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 6px;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: relative;
+            overflow: hidden;
         }
 
-        .file-input-btn:hover {
-            background: rgba(255, 255, 255, 0.05);
+        .file-input-btn input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        /* Voice message button (if you add it later) */
+        .voice-message-btn {
             color: var(--primary-light);
         }
 
-        .file-input-btn .feather {
-            width: 22px;
-            height: 22px;
-            stroke: currentColor;
+        .voice-message-btn.recording {
+            color: #ff4757;
+            animation: pulse 1.5s infinite;
         }
 
         /* Lazy Loading More Indicator */
@@ -2175,6 +2209,40 @@ video:hover {
                 height: 12px;
             }
 
+            /* Mobile adjustments for modern input */
+            .input-container {
+                padding: 12px 16px;
+            }
+            
+            .message-input-container {
+                padding: 4px 12px;
+            }
+            
+            .inside-input-btn {
+                width: 32px;
+                height: 32px;
+                padding: 6px;
+            }
+            
+            .inside-input-btn .feather {
+                width: 18px;
+                height: 18px;
+            }
+            
+            .send-btn {
+                width: 32px;
+                height: 32px;
+            }
+            
+            .send-btn .feather {
+                width: 16px;
+                height: 16px;
+            }
+            
+            .message-input {
+                font-size: 0.9rem;
+            }
+
             /* Mobile call buttons adjustments */
             .call-buttons {
                 gap: 8px;
@@ -2196,11 +2264,39 @@ video:hover {
             }
 
             .input-container {
-                padding: 15px;
-            }
-
-            .message-input {
                 padding: 10px 12px;
+            }
+            
+            .message-input-container {
+                padding: 3px 10px;
+                border-radius: 20px;
+            }
+            
+            .inside-input-btn {
+                width: 28px;
+                height: 28px;
+                padding: 5px;
+            }
+            
+            .inside-input-btn .feather {
+                width: 16px;
+                height: 16px;
+            }
+            
+            .send-btn {
+                width: 28px;
+                height: 28px;
+            }
+            
+            .send-btn .feather {
+                width: 14px;
+                height: 14px;
+            }
+            
+            .message-input {
+                font-size: 0.85rem;
+                padding: 6px 0;
+                min-height: 20px;
             }
 
             .reply-indicator {
@@ -2232,7 +2328,7 @@ video:hover {
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <button  class="back-btn" id="backBtn">
+                <button class="back-btn" id="backBtn">
                     <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <line x1="19" y1="12" x2="5" y2="12"></line>
                         <polyline points="12 19 5 12 12 5"></polyline>
@@ -2242,19 +2338,17 @@ video:hover {
                 <div class="group-header-info">
                     <img src="" alt="Group Avatar" class="group-avatar" id="groupAvatar">
                     <h3 class="group-name-sidebar" id="groupNameSidebar"></h3>
-                                        <p class="chat-subtitle" id="chatSubtitle">..</p>
+                    <p class="chat-subtitle" id="chatSubtitle">..</p>
                     <p class="group-members-count" id="groupMembersCount"></p>
                     
                     <!-- CALL BUTTONS IN SIDEBAR - ADDED -->
-                                        <div class="call-buttons">
-      
-                                              <button id="groupVoiceCallBtn" class="call-btn group-call" type="button"> 
-                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" >
+                    <div class="call-buttons">
+                        <button id="groupVoiceCallBtn" class="call-btn group-call" type="button"> 
+                            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                             </svg>
-                                                             Start Group Call
+                            Start Group Call
                         </button>                
-                      
                     </div>
                 </div>
             </div>
@@ -2279,13 +2373,9 @@ video:hover {
             <div class="chat-header">
                 <div>
                     <h2 class="chat-title" id="chatTitle">Loading..</h2>
-
                 </div>
                 <div class="chat-header-actions">
                     <!-- CALL BUTTON IN HEADER - ADDED -->
-                   
-
-                        
                     <button class="header-btn" id="sidebarToggle" type="button">
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -2323,23 +2413,21 @@ video:hover {
                 <p>No messages yet. Start the conversation!</p>
             </div>
 
-            <!-- Input Area -->
+            <!-- MODERN INPUT AREA -->
             <div class="input-container">
                 <div class="message-input-container">
-                    <textarea 
-                        class="message-input" 
-                        id="messageInput" 
-                        placeholder="Type your message here..."
-                        rows="1"></textarea>
-                    <div class="input-actions">
-                        <!-- Image/File attachment button -->
-                        <button class="file-input-btn" id="attachmentBtn" type="button">
+                    <!-- Left side controls (inside input) -->
+                    <div class="input-controls-left">
+                        <!-- Attachment button -->
+                        <button class="inside-input-btn file-input-btn" id="attachmentBtn" type="button" title="Attach file">
                             <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
                             </svg>
+                            <input type="file" id="fileInput" style="display: none;" multiple>
                         </button>
+                        
                         <!-- Emoji button -->
-                        <button class="action-btn" id="emojiBtn" type="button">
+                        <button class="inside-input-btn" id="emojiBtn" type="button" title="Insert emoji">
                             <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
@@ -2348,7 +2436,21 @@ video:hover {
                             </svg>
                         </button>
                     </div>
-                    <button class="send-btn" id="sendBtn" disabled type="button">
+                    
+                    <!-- Main textarea -->
+                    <textarea 
+                        class="message-input" 
+                        id="messageInput" 
+                        placeholder="Type your message here..."
+                        rows="1"></textarea>
+                    
+                    <!-- Right side controls (inside input) -->
+                    <div class="input-controls-right">
+                        <!-- You could add more buttons here if needed -->
+                    </div>
+                    
+                    <!-- Send button -->
+                    <button class="send-btn" id="sendBtn" disabled type="button" title="Send message">
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <line x1="22" y1="2" x2="11" y2="13"></line>
                             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -2358,231 +2460,235 @@ video:hover {
             </div>
         </div>
     </div>
-<!-- Import the calls module for voice calls -->
-    
-    
+
+    <!-- Import the calls module for voice calls -->
     <script type="module" src="edi.js"></script>
     <script type="module" src="calls.js"></script>
     <script type="module" src="group-chats.js"></script>
     <!-- Add AFTER group.js but BEFORE any other scripts -->
-    <!-- Add this line to group.html -->
-<script type="module" src="gist.js"></script>
-<script type="module" src="lin.js"></script>
+    <script type="module" src="gist.js"></script>
+    <script type="module" src="lin.js"></script>
     <script type="module" src="ap.js"></script>
     <script type="module" src="additiona-group.js"></script>
-<script>
-// Fix for voice message play button click issue
-(function() {
-    // Wait for DOM to be fully loaded
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fixVoiceMessageClick);
-    } else {
-        fixVoiceMessageClick();
-    }
     
-    function fixVoiceMessageClick() {
-        console.log('Fixing voice message click issues...');
-        
-        // Fix existing voice messages
-        fixExistingVoiceMessages();
-        
-        // Also watch for new voice messages being added dynamically
-        setupMutationObserver();
-    }
-    
-    function fixExistingVoiceMessages() {
-        // Find all voice message containers
-        const voiceContainers = document.querySelectorAll('.voice-message-container');
-        
-        voiceContainers.forEach(container => {
-            fixVoiceMessageContainer(container);
-        });
-    }
-    
-    function fixVoiceMessageContainer(container) {
-        // Remove any existing click handlers that might be interfering
-        container.onclick = null;
-        container.onmouseenter = null;
-        container.onmouseleave = null;
-        
-        // Find the play button inside this container
-        const playBtn = container.querySelector('.voice-message-play');
-        const waveform = container.querySelector('.voice-message-waveform');
-        
-        if (playBtn) {
-            // Remove all existing event listeners from play button
-            const newPlayBtn = playBtn.cloneNode(true);
-            playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
-            
-            // Get the unique ID from the container or create one
-            const containerId = container.id || container.dataset.messageId || 'voice-' + Date.now();
-            const playBtnId = 'playBtn-' + containerId;
-            const playIconId = 'playIcon-' + containerId;
-            const waveformId = 'waveform-' + containerId;
-            const progressId = 'waveformProgress-' + containerId;
-            const durationId = 'duration-' + containerId;
-            
-            // Set IDs for easier access
-            newPlayBtn.id = playBtnId;
-            const playIcon = newPlayBtn.querySelector('i');
-            if (playIcon) playIcon.id = playIconId;
-            
-            // Try to find the audio element
-            let audio = container._audio;
-            
-            // If no audio element exists, try to create one from data attributes
-            if (!audio && container.dataset.voiceUrl) {
-                audio = new Audio(container.dataset.voiceUrl);
-                container._audio = audio;
-            }
-            
-            if (audio) {
-                // Set up the play button click handler
-                newPlayBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    
-                    if (audio.paused) {
-                        audio.play();
-                    } else {
-                        audio.pause();
-                    }
-                });
-                
-                // Set up audio event listeners
-                audio.addEventListener('play', function() {
-                    const icon = document.getElementById(playIconId);
-                    if (icon) {
-                        icon.className = 'fas fa-pause';
-                    }
-                });
-                
-                audio.addEventListener('pause', function() {
-                    const icon = document.getElementById(playIconId);
-                    if (icon) {
-                        icon.className = 'fas fa-play';
-                    }
-                });
-                
-                audio.addEventListener('timeupdate', function() {
-                    if (audio.duration) {
-                        const progress = (audio.currentTime / audio.duration) * 100;
-                        const progressBar = document.getElementById(progressId);
-                        if (progressBar) {
-                            progressBar.style.width = progress + '%';
-                        }
-                        
-                        // Update duration display
-                        const currentMinutes = Math.floor(audio.currentTime / 60);
-                        const currentSeconds = Math.floor(audio.currentTime % 60);
-                        const durationElement = document.getElementById(durationId);
-                        if (durationElement) {
-                            durationElement.textContent = 
-                                currentMinutes.toString().padStart(2, '0') + ':' + 
-                                currentSeconds.toString().padStart(2, '0');
-                        }
-                    }
-                });
-                
-                audio.addEventListener('ended', function() {
-                    const icon = document.getElementById(playIconId);
-                    if (icon) {
-                        icon.className = 'fas fa-play';
-                    }
-                    const progressBar = document.getElementById(progressId);
-                    if (progressBar) {
-                        progressBar.style.width = '0%';
-                    }
-                });
-            }
+    <script>
+    // Fix for voice message play button click issue
+    (function() {
+        // Wait for DOM to be fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', fixVoiceMessageClick);
+        } else {
+            fixVoiceMessageClick();
         }
         
-        // Fix waveform click for seeking
-        if (waveform) {
-            waveform.addEventListener('click', function(e) {
-                e.stopPropagation();
-                
-                const audio = container._audio;
-                if (audio && audio.duration) {
-                    const rect = e.target.getBoundingClientRect();
-                    const clickX = e.clientX - rect.left;
-                    const percentage = clickX / rect.width;
-                    audio.currentTime = audio.duration * percentage;
-                }
+        function fixVoiceMessageClick() {
+            console.log('Fixing voice message click issues...');
+            
+            // Fix existing voice messages
+            fixExistingVoiceMessages();
+            
+            // Also watch for new voice messages being added dynamically
+            setupMutationObserver();
+        }
+        
+        function fixExistingVoiceMessages() {
+            // Find all voice message containers
+            const voiceContainers = document.querySelectorAll('.voice-message-container');
+            
+            voiceContainers.forEach(container => {
+                fixVoiceMessageContainer(container);
             });
         }
         
-        // Prevent container click from interfering with button clicks
-        container.addEventListener('click', function(e) {
-            // Only handle container click if not clicking on button or waveform
-            if (!e.target.closest('.voice-message-play') && 
-                !e.target.closest('.voice-message-waveform')) {
+        function fixVoiceMessageContainer(container) {
+            // Remove any existing click handlers that might be interfering
+            container.onclick = null;
+            container.onmouseenter = null;
+            container.onmouseleave = null;
+            
+            // Find the play button inside this container
+            const playBtn = container.querySelector('.voice-message-play');
+            const waveform = container.querySelector('.voice-message-waveform');
+            
+            if (playBtn) {
+                // Remove all existing event listeners from play button
+                const newPlayBtn = playBtn.cloneNode(true);
+                playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
                 
-                const audio = container._audio;
-                if (audio) {
-                    if (audio.paused) {
-                        audio.play();
-                    } else {
-                        audio.pause();
-                    }
+                // Get the unique ID from the container or create one
+                const containerId = container.id || container.dataset.messageId || 'voice-' + Date.now();
+                const playBtnId = 'playBtn-' + containerId;
+                const playIconId = 'playIcon-' + containerId;
+                const waveformId = 'waveform-' + containerId;
+                const progressId = 'waveformProgress-' + containerId;
+                const durationId = 'duration-' + containerId;
+                
+                // Set IDs for easier access
+                newPlayBtn.id = playBtnId;
+                const playIcon = newPlayBtn.querySelector('i');
+                if (playIcon) playIcon.id = playIconId;
+                
+                // Try to find the audio element
+                let audio = container._audio;
+                
+                // If no audio element exists, try to create one from data attributes
+                if (!audio && container.dataset.voiceUrl) {
+                    audio = new Audio(container.dataset.voiceUrl);
+                    container._audio = audio;
                 }
-            }
-        });
-        
-        // Add a small CSS fix to ensure clicks work
-        const style = document.createElement('style');
-        style.textContent = `
-            .voice-message-container * {
-                pointer-events: auto !important;
-            }
-            
-            .voice-message-container {
-                cursor: pointer !important;
-            }
-            
-            .voice-message-play {
-                z-index: 10 !important;
-                position: relative !important;
-            }
-            
-            .voice-message-waveform {
-                z-index: 5 !important;
-                position: relative !important;
-            }
-        `;
-        container.appendChild(style);
-    }
-    
-    function setupMutationObserver() {
-        // Watch for new voice messages being added to the DOM
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.addedNodes && mutation.addedNodes.length > 0) {
-                    mutation.addedNodes.forEach(function(node) {
-                        if (node.nodeType === 1) { // Element node
-                            // Check if this is a voice message container
-                            if (node.classList && node.classList.contains('voice-message-container')) {
-                                fixVoiceMessageContainer(node);
+                
+                if (audio) {
+                    // Set up the play button click handler
+                    newPlayBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        
+                        if (audio.paused) {
+                            audio.play();
+                        } else {
+                            audio.pause();
+                        }
+                    });
+                    
+                    // Set up audio event listeners
+                    audio.addEventListener('play', function() {
+                        const icon = document.getElementById(playIconId);
+                        if (icon) {
+                            icon.className = 'fas fa-pause';
+                        }
+                    });
+                    
+                    audio.addEventListener('pause', function() {
+                        const icon = document.getElementById(playIconId);
+                        if (icon) {
+                            icon.className = 'fas fa-play';
+                        }
+                    });
+                    
+                    audio.addEventListener('timeupdate', function() {
+                        if (audio.duration) {
+                            const progress = (audio.currentTime / audio.duration) * 100;
+                            const progressBar = document.getElementById(progressId);
+                            if (progressBar) {
+                                progressBar.style.width = progress + '%';
                             }
                             
-                            // Check for voice messages inside the added node
-                            const voiceContainers = node.querySelectorAll('.voice-message-container');
-                            voiceContainers.forEach(container => {
-                                fixVoiceMessageContainer(container);
-                            });
+                            // Update duration display
+                            const currentMinutes = Math.floor(audio.currentTime / 60);
+                            const currentSeconds = Math.floor(audio.currentTime % 60);
+                            const durationElement = document.getElementById(durationId);
+                            if (durationElement) {
+                                durationElement.textContent = 
+                                    currentMinutes.toString().padStart(2, '0') + ':' + 
+                                    currentSeconds.toString().padStart(2, '0');
+                            }
+                        }
+                    });
+                    
+                    audio.addEventListener('ended', function() {
+                        const icon = document.getElementById(playIconId);
+                        if (icon) {
+                            icon.className = 'fas fa-play';
+                        }
+                        const progressBar = document.getElementById(progressId);
+                        if (progressBar) {
+                            progressBar.style.width = '0%';
                         }
                     });
                 }
+            }
+            
+            // Fix waveform click for seeking
+            if (waveform) {
+                waveform.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    
+                    const audio = container._audio;
+                    if (audio && audio.duration) {
+                        const rect = e.target.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const percentage = clickX / rect.width;
+                        audio.currentTime = audio.duration * percentage;
+                    }
+                });
+            }
+            
+            // Prevent container click from interfering with button clicks
+            container.addEventListener('click', function(e) {
+                // Only handle container click if not clicking on button or waveform
+                if (!e.target.closest('.voice-message-play') && 
+                    !e.target.closest('.voice-message-waveform')) {
+                    
+                    const audio = container._audio;
+                    if (audio) {
+                        if (audio.paused) {
+                            audio.play();
+                        } else {
+                            audio.pause();
+                        }
+                    }
+                }
             });
-        });
+            
+            // Add a small CSS fix to ensure clicks work
+            const style = document.createElement('style');
+            style.textContent = `
+                .voice-message-container * {
+                    pointer-events: auto !important;
+                }
+                
+                .voice-message-container {
+                    cursor: pointer !important;
+                }
+                
+                .voice-message-play {
+                    z-index: 10 !important;
+                    position: relative !important;
+                }
+                
+                .voice-message-waveform {
+                    z-index: 5 !important;
+                    position: relative !important;
+                }
+            `;
+            container.appendChild(style);
+        }
         
-        // Start observing the document body for changes
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-    }
-})();
-</script>
+        function setupMutationObserver() {
+            // Watch for new voice messages being added to the DOM
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+                        mutation.addedNodes.forEach(function(node) {
+                            if (node.nodeType === 1) { // Element node
+                                // Check if this is a voice message container
+                                if (node.classList && node.classList.contains('voice-message-container')) {
+                                    fixVoiceMessageContainer(node);
+                                }
+                                
+                                // Check for voice messages inside the added node
+                                const voiceContainers = node.querySelectorAll('.voice-message-container');
+                                voiceContainers.forEach(container => {
+                                    fixVoiceMessageContainer(container);
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+            
+            // Start observing the document body for changes
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    })();
+    
+    // Fix for file input button
+    document.getElementById('attachmentBtn')?.addEventListener('click', function() {
+        document.getElementById('fileInput')?.click();
+    });
+    </script>
 </body>
 </html>
