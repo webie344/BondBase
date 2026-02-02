@@ -1,4 +1,4 @@
-//I don't know if you noticed but the message and the avatar are not on the same like arrangement the message is pushed a little to the middle that's how it's supposed to be but after adding some upgrades to this my js file I don't know how i.messed it up now the message and avatar are on the same line I don't know if it's any css that's affecting it look at the screenshots of before and after:// groupchat.js - Enhanced with IndexedDB Caching, Service Worker Support & Voice Notes
+// groupchat.js - Enhanced with IndexedDB Caching, Service Worker Support & Voice Notes
 import { 
     getFirestore, 
     collection, 
@@ -6623,152 +6623,124 @@ function initGroupPage() {
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
         
-        // Group new messages by sender and time
-        const groupedMessages = [];
-        let currentGroup = null;
-        
-        newMessages.forEach((message, index) => {
+        // Create individual message elements (not grouped)
+        newMessages.forEach(message => {
             const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-            const prevMessage = index > 0 ? messages.find(m => m.id === messages[index - 1]?.id) : null;
-            const prevTime = prevMessage && prevMessage.timestamp ? new Date(prevMessage.timestamp) : new Date(0);
-            
-            const timeDiff = Math.abs(messageTime - prevTime) / (1000 * 60);
-            
-            if (!prevMessage || 
-                prevMessage.senderId !== message.senderId || 
-                timeDiff > 5) {
-                currentGroup = {
-                    senderId: message.senderId,
-                    senderName: message.senderName,
-                    senderAvatar: message.senderAvatar,
-                    messages: [message]
-                };
-                groupedMessages.push(currentGroup);
-            } else {
-                currentGroup.messages.push(message);
-            }
-        });
-        
-        groupedMessages.forEach(group => {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'message-group';
-            groupDiv.dataset.senderId = group.senderId;
-            
-            const firstMessage = group.messages[0];
-            const firstMessageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
             
             // Get user profile for reward tag
             const userProfile = groupChat.cache.userProfiles ? 
-                groupChat.cache.userProfiles.get(`user_${group.senderId}`)?.data : null;
+                groupChat.cache.userProfiles.get(`user_${message.senderId}`)?.data : null;
             
             const rewardTag = userProfile?.rewardTag || '';
             const hasFireRing = userProfile?.fireRing || false;
+            const hasGlowEffect = message.glowEffect || false;
+            const isRewardUpgrade = message.rewardUpgrade || false;
+            const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
+            const extraClasses = hasGlowEffect ? ' glowing-message' : '';
             
-            groupDiv.innerHTML = `
-                <div class="message-header">
-                    <div class="message-avatar-container" style="position: relative; display: inline-block;">
+            const messageDivClass = message.type === 'system' ? 'system-message' : 'message-text';
+            
+            let replyHtml = '';
+            if (message.replyTo) {
+                const repliedMessage = messages.find(m => m.id === message.replyTo);
+                if (repliedMessage) {
+                    const truncatedName = groupChat.truncateName(repliedMessage.senderName);
+                    const truncatedMessage = repliedMessage.text ? 
+                        groupChat.truncateMessage(repliedMessage.text) : 
+                        (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : repliedMessage.voiceUrl ? '🎤 Voice Note' : '');
+                    
+                    replyHtml = `
+                        <div class="replying-to">
+                            <span class="reply-label">Replying to</span> 
+                            <span class="reply-sender">${truncatedName}</span>
+                            <span class="reply-separator">:</span> 
+                            <span class="reply-message">${truncatedMessage}</span>
+                        </div>
+                    `;
+                }
+            }
+            
+            let messageContent = '';
+            
+            if (message.imageUrl) {
+                messageContent = `
+                    <div class="message-image-container" style="position: relative;">
+                        <img src="${message.imageUrl}" 
+                             alt="Shared image" 
+                             class="message-image"
+                             style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
+                             onload="this.style.opacity='1';"
+                             onerror="this.style.display='none';"
+                             onclick="openImageModal('${message.imageUrl}')">
+                    </div>
+                `;
+            } else if (message.videoUrl) {
+                messageContent = `
+                    <div class="message-video-container" style="position: relative;">
+                        <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
+                               onload="this.style.opacity='1';"
+                               onerror="this.style.display='none';">
+                            <source src="${message.videoUrl}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                `;
+            } else if (message.voiceUrl) {
+                // Create placeholder for voice message - we'll create the actual element later
+                const voiceElementId = `voice-${message.id}`;
+                messageContent = `<div id="${voiceElementId}" class="voice-message-placeholder" data-voice-url="${message.voiceUrl}" data-duration="${message.duration || 0}"></div>`;
+            } else if (message.type === 'system') {
+                messageContent = `
+                    <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
+                        ${message.text}
+                    </div>
+                `;
+            } else {
+                messageContent = message.text || '';
+            }
+            
+            const cachedReactions = reactionsCache.get(message.id) || [];
+            
+            // Create message container with avatar and message content side by side
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'message-container';
+            messageContainer.dataset.messageId = message.id;
+            
+            messageContainer.innerHTML = `
+                <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;">
+                    <!-- Avatar on the left -->
+                    <div class="message-avatar-container" style="position: relative; flex-shrink: 0;">
                         ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
-                        <img src="${group.senderAvatar}" 
-                             alt="${group.senderName}" 
+                        <img src="${message.senderAvatar}" 
+                             alt="${message.senderName}" 
                              class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
-                             data-user-id="${group.senderId}">
+                             data-user-id="${message.senderId}"
+                             style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; cursor: pointer;">
                     </div>
-                    <div class="message-sender-info">
-                        <span class="message-sender">${group.senderName}</span>
-                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
-                    </div>
-                    <span class="message-time">${formatTime(firstMessageTime)}</span>
-                </div>
-                <div class="message-content">
-                    ${group.messages.map(msg => {
-                        const messageTime = msg.timestamp ? new Date(msg.timestamp) : new Date();
+                    
+                    <!-- Message content on the right -->
+                    <div style="flex: 1; min-width: 0;">
+                        <!-- Sender info -->
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                            <span style="font-weight: 600; color: #333; font-size: 14px;">${message.senderName}</span>
+                            ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
+                            <span style="color: #999; font-size: 12px; margin-left: auto;">${formatTime(messageTime)}</span>
+                        </div>
                         
-                        let replyHtml = '';
-                        if (msg.replyTo) {
-                            const repliedMessage = messages.find(m => m.id === msg.replyTo);
-                            if (repliedMessage) {
-                                const truncatedName = groupChat.truncateName(repliedMessage.senderName);
-                                const truncatedMessage = repliedMessage.text ? 
-                                    groupChat.truncateMessage(repliedMessage.text) : 
-                                    (repliedMessage.imageUrl ? '📷 Image' : repliedMessage.videoUrl ? '🎬 Video' : repliedMessage.voiceUrl ? '🎤 Voice Note' : '');
-                                
-                                replyHtml = `
-                                    <div class="replying-to">
-                                        <span class="reply-label">Replying to</span> 
-                                        <span class="reply-sender">${truncatedName}</span>
-                                        <span class="reply-separator">:</span> 
-                                        <span class="reply-message">${truncatedMessage}</span>
-                                    </div>
-                                `;
-                            }
-                        }
-                        
-                        const messageDivClass = msg.type === 'system' ? 'system-message' : 'message-text';
-                        
-                        // UPDATED: Add soft glowing effect class if message has glowEffect
-                        const hasGlowEffect = msg.glowEffect || false;
-                        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
-                        
-                        // Check if this is a reward upgrade message
-                        const isRewardUpgrade = msg.rewardUpgrade || false;
-                        const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
-                        
-                        let messageContent = '';
-                        
-                        if (msg.imageUrl) {
-                            messageContent = `
-                                <div class="message-image-container" style="position: relative;">
-                                    <img src="${msg.imageUrl}" 
-                                         alt="Shared image" 
-                                         class="message-image"
-                                         style="max-width: 250px; max-height: 250px; border-radius: 8px; cursor: pointer; width: 100%; height: auto;"
-                                         onload="this.style.opacity='1';"
-                                         onerror="this.style.display='none';"
-                                         onclick="openImageModal('${msg.imageUrl}')">
-                                </div>
-                            `;
-                        } else if (msg.videoUrl) {
-                            messageContent = `
-                                <div class="message-video-container" style="position: relative;">
-                                    <video controls style="max-width: 250px; max-height: 250px; border-radius: 8px; width: 100%; height: auto;"
-                                           onload="this.style.opacity='1';"
-                                           onerror="this.style.display='none';">
-                                        <source src="${msg.videoUrl}" type="video/mp4">
-                                        Your browser does not support the video tag.
-                                    </video>
-                                </div>
-                            `;
-                        } else if (msg.voiceUrl) {
-                            // FIXED: Create placeholder for voice message - we'll create the actual element later
-                            const voiceElementId = `voice-${msg.id}`;
-                            messageContent = `<div id="${voiceElementId}" class="voice-message-placeholder" data-voice-url="${msg.voiceUrl}" data-duration="${msg.duration || 0}"></div>`;
-                        } else if (msg.type === 'system') {
-                            messageContent = `
-                                <div style="font-style: italic; color: #666; text-align: center; padding: 4px 0;">
-                                    ${msg.text}
-                                </div>
-                            `;
-                        } else {
-                            messageContent = msg.text || '';
-                        }
-                        
-                        const messageDivId = `message-${msg.id}`;
-                        
-                        const cachedReactions = reactionsCache.get(msg.id) || [];
-                        
-                        // Create message div
-                        const messageDiv = document.createElement('div');
-                        messageDiv.className = `${messageDivClass}${extraClasses}${rewardUpgradeClass}`;
-                        messageDiv.dataset.messageId = msg.id;
-                        messageDiv.id = messageDivId;
-                        
-                        // Set HTML content
-                        messageDiv.innerHTML = `
+                        <!-- Message content -->
+                        <div class="${messageDivClass}${extraClasses}${rewardUpgradeClass}" 
+                             data-message-id="${message.id}"
+                             style="background: ${messageDivClass === 'system-message' ? 'transparent' : (message.senderId === groupChat.firebaseUser?.uid ? '#dcf8c6' : '#f0f0f0')}; 
+                                    padding: 8px 12px; 
+                                    border-radius: 12px; 
+                                    max-width: 80%;
+                                    word-wrap: break-word;
+                                    ${message.senderId === groupChat.firebaseUser?.uid ? 'margin-left: auto; background: #dcf8c6;' : 'margin-right: auto; background: #ffffff; border: 1px solid #e0e0e0;'}">
                             ${replyHtml}
                             <div class="message-content-wrapper">
                                 ${messageContent}
                             </div>
-                            <div class="message-reactions" id="reactions-${msg.id}">
+                            <div class="message-reactions" id="reactions-${message.id}">
                                 ${cachedReactions.map(reaction => {
                                     const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
                                     return `
@@ -6782,15 +6754,12 @@ function initGroupPage() {
                                     +
                                 </div>
                             </div>
-                        `;
-                        
-                        fragment.appendChild(messageDiv);
-                        return ''; // Empty string since we already added the messageDiv
-                    }).join('')}
+                        </div>
+                    </div>
                 </div>
             `;
             
-            fragment.appendChild(groupDiv);
+            fragment.appendChild(messageContainer);
         });
         
         // Append new messages to the container (don't clear existing ones)

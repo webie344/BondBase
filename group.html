@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -33,7 +33,39 @@
     align-items: flex-start !important; /* Change from center */
     flex-wrap: wrap !important;
 }
+/* WhatsApp Dark Messages - All Dark Gray */
+.message-text {
+    padding: 8px 12px !important;
+    border-radius: 12px !important;
+    max-width: 80% !important;
+    word-wrap: break-word !important;
+    margin-bottom: 4px !important;
+}
 
+/* Your messages (sent by you) - Darker gray on right */
+.message-text[style*="margin-left: auto;"] {
+    background: #202c33 !important; /* Dark gray */
+    color: #e9edef !important; /* Light text */
+    border: 1px solid #2a3942 !important;
+    margin-left: auto !important;
+}
+
+/* Others' messages - Slightly lighter dark gray on left */
+.message-text[style*="margin-right: auto;"] {
+    background: #2a3942 !important; /* Slightly lighter dark gray */
+    color: #e9edef !important; /* Light text */
+    border: 1px solid #202c33 !important;
+    margin-right: auto !important;
+}
+
+/* System messages */
+.system-message {
+    background: transparent !important;
+    color: #8696a0 !important;
+    font-style: italic !important;
+    text-align: center !important;
+    padding: 4px 0 !important;
+}
 .message-group .message-content {
     margin-left: 46px !important;
     width: calc(100% - 46px) !important;
@@ -1652,6 +1684,7 @@ video:hover {
             cursor: pointer;
             max-width: 100%;
             overflow-wrap: break-word;
+            color:black;
         }
 
         /* System message styling */
