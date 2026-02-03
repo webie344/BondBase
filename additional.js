@@ -1,6 +1,8 @@
 // Additional features for Dating Connect App - STICKER CREATION VERSION
 // Profile picture navigation and custom sticker creation like WhatsApp/Telegram
 
+// Import Firebase modules directly
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth,
     onAuthStateChanged
@@ -24,29 +26,51 @@ import {
 
 // Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
-    authDomain: "dating-connect.firebaseapp.com",
-    projectId: "dating-connect",
-    storageBucket: "dating-connect.appspot.com",
-    messagingSenderId: "1062172180210",
-    appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
+    apiKey: "AIzaSyC8_PEsfTOr-gJ8P1MoXobOAfqwTVqEZWo",
+    authDomain: "usa-dating-23bc3.firebaseapp.com",
+    projectId: "usa-dating-23bc3",
+    storageBucket: "usa-dating-23bc3.firebasestorage.app",
+    messagingSenderId: "423286263327",
+    appId: "1:423286263327:web:17f0caf843dc349c144f2a"
 };
 
 // Cloudinary configuration - REPLACE WITH YOUR CREDENTIALS
-const CLOUDINARY_CLOUD_NAME = "YOUR_CLOUDINARY_CLOUD_NAME";
-const CLOUDINARY_UPLOAD_PRESET = "dating_connect_stickers";
+const CLOUDINARY_CLOUD_NAME = "ddtdqrh1b";
+const CLOUDINARY_UPLOAD_PRESET = "profile-pictures";
 
-// Initialize Firebase
-const app = window.app || (() => {
-    try {
-        return window.initializeApp(firebaseConfig);
-    } catch (e) {
-        return window.app;
+// Initialize Firebase - FIXED
+let app;
+let auth;
+let db;
+
+try {
+    // Check if Firebase app is already initialized
+    if (!window.firebaseApps) {
+        window.firebaseApps = {};
     }
-})();
-
-const auth = getAuth(app);
-const db = getFirestore(app);
+    
+    const appName = '[DEFAULT]';
+    
+    if (!window.firebaseApps[appName]) {
+        app = initializeApp(firebaseConfig, appName);
+        window.firebaseApps[appName] = app;
+        console.log('Firebase app initialized successfully');
+    } else {
+        app = window.firebaseApps[appName];
+        console.log('Using existing Firebase app');
+    }
+    
+    // Initialize auth and firestore
+    auth = getAuth(app);
+    db = getFirestore(app);
+    
+} catch (error) {
+    console.error('Error initializing Firebase:', error);
+    // Create fallback dummy objects to prevent crashes
+    app = { name: 'DEFAULT', options: {} };
+    auth = { currentUser: null };
+    db = {};
+}
 
 // Global variables
 let currentUser = null;
@@ -62,20 +86,57 @@ let stickerCreatorVars = {
     imageFile: null
 };
 
+// Track sent sticker IDs to prevent duplicates
+const sentStickerIds = new Set();
+let isStickerSending = false; // Flag to prevent multiple sticker sends
+
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     loadStickerStyles();
     
-    // Set up auth state listener
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            currentUser = user;
-            initializeFeatures();
-        } else {
-            currentUser = null;
-        }
-    });
+    // Set up auth state listener - with error handling
+    if (auth && typeof onAuthStateChanged === 'function') {
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                initializeFeatures();
+            } else {
+                currentUser = null;
+                // If not authenticated, still try to initialize basic features
+                try {
+                    initializeBasicFeatures();
+                } catch (e) {
+                    console.log('User not authenticated, skipping Firebase features');
+                }
+            }
+        }, (error) => {
+            console.error('Auth state error:', error);
+            // Still try to initialize basic UI features
+            initializeBasicFeatures();
+        });
+    } else {
+        console.log('Auth not available, initializing basic features');
+        initializeBasicFeatures();
+    }
 });
+
+// Initialize basic UI features without Firebase
+function initializeBasicFeatures() {
+    if (window.location.pathname.includes('chat.html')) {
+        // Still try to setup UI elements
+        setTimeout(() => {
+            try {
+                initProfilePictureNavigation();
+                loadStickerStyles();
+                addStickerButton(); // Add button but with limited functionality
+                setupStickerPickerEvents();
+                setupMessagePrevention(); // Setup prevention for sticker messages
+            } catch (e) {
+                console.log('Could not initialize all features:', e);
+            }
+        }, 1000);
+    }
+}
 
 // Initialize features after auth
 function initializeFeatures() {
@@ -95,8 +156,120 @@ function initializeFeatures() {
         setTimeout(() => {
             setupStickerListener();
             setupStickerMessageEnhancer();
+            setupMessagePrevention(); // CRITICAL: Setup message prevention
+            interceptSendButton(); // Intercept send button to handle stickers
         }, 2000);
     }
+}
+
+// Setup message prevention to stop stickers from being sent as text
+function setupMessagePrevention() {
+    console.log('Setting up message prevention...');
+    
+    // Method 1: Override the global sendMessage function if it exists
+    if (typeof window.sendMessage === 'function') {
+        console.log('Found sendMessage function, overriding...');
+        const originalSendMessage = window.sendMessage;
+        window.sendMessage = function(text, type = 'text') {
+            // Check if this is a sticker message that should be prevented
+            if (text && (text.includes('[STICKER]') || text.includes('sticker:'))) {
+                console.log('Preventing sticker text from being sent as regular message:', text);
+                return false; // Don't send
+            }
+            return originalSendMessage.call(this, text, type);
+        };
+        console.log('sendMessage function overridden successfully');
+    }
+    
+    // Method 2: Intercept the send button directly
+    function setupSendButtonInterception() {
+        const sendButton = document.getElementById('sendButton');
+        if (!sendButton) {
+            setTimeout(setupSendButtonInterception, 500);
+            return;
+        }
+        
+        console.log('Found send button, setting up interception...');
+        
+        // Remove any existing event listeners first
+        const newSendButton = sendButton.cloneNode(true);
+        sendButton.parentNode.replaceChild(newSendButton, sendButton);
+        
+        // Add new click handler
+        newSendButton.addEventListener('click', function(e) {
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) {
+                const text = messageInput.value;
+                // Check if this is a sticker message
+                if (text && (text.includes('[STICKER]') || text.includes('sticker:'))) {
+                    console.log('Preventing sticker from send button:', text);
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    e.stopPropagation();
+                    messageInput.value = ''; // Clear the input
+                    return false;
+                }
+            }
+            
+            // Let the original handler run for normal messages
+            return true;
+        }, true); // Use capture phase to intercept early
+        
+        console.log('Send button interception set up');
+    }
+    
+    setupSendButtonInterception();
+    
+    // Method 3: Also intercept form submission if there's a form
+    const chatForm = document.querySelector('.chat-input-container form') || 
+                     document.querySelector('form[action*="send"]') ||
+                     document.querySelector('form');
+    if (chatForm) {
+        chatForm.addEventListener('submit', function(e) {
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) {
+                const text = messageInput.value;
+                if (text && (text.includes('[STICKER]') || text.includes('sticker:'))) {
+                    console.log('Preventing sticker from form submission');
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    messageInput.value = '';
+                    return false;
+                }
+            }
+        }, true);
+    }
+    
+    console.log('Message prevention setup complete');
+}
+
+// Intercept the send button to handle stickers properly
+function interceptSendButton() {
+    const sendButton = document.getElementById('sendButton');
+    if (!sendButton) {
+        setTimeout(interceptSendButton, 1000);
+        return;
+    }
+    
+    // Store original onclick
+    const originalOnClick = sendButton.onclick;
+    
+    // Replace with our own handler
+    sendButton.onclick = function(e) {
+        // Check if we're in sticker mode
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput && (messageInput.value.includes('[STICKER]') || messageInput.value.includes('sticker:'))) {
+            e.preventDefault();
+            e.stopPropagation();
+            messageInput.value = ''; // Clear sticker text
+            return false;
+        }
+        
+        // Otherwise, call original handler
+        if (originalOnClick) {
+            return originalOnClick.call(this, e);
+        }
+    };
 }
 
 // Setup sticker message enhancer
@@ -142,14 +315,31 @@ function enhanceStickerMessages() {
         const messageText = message.querySelector('p');
         if (!messageText) return;
         
-        const textContent = messageText.textContent || '';
-        
         // Check if message has sticker data attributes
         const stickerData = extractStickerDataFromMessage(message);
         
         if (stickerData) {
             createStickerDisplay(message, messageText, stickerData);
             message.classList.add('sticker-enhanced', 'sticker-message');
+            
+            // Hide the text content if it's a sticker
+            const textContent = messageText.textContent || '';
+            if (textContent.includes('[STICKER]') || 
+                textContent.includes('sticker:')) {
+                messageText.style.display = 'none';
+            }
+        } else {
+            // Check if it's a sticker by text content and hide it
+            const textContent = messageText.textContent || '';
+            if (textContent.includes('[STICKER]') || textContent.includes('sticker:')) {
+                // This is likely a sticker that hasn't been enhanced yet
+                // Hide it temporarily until the real sticker loads
+                messageText.style.opacity = '0';
+                messageText.style.height = '0';
+                messageText.style.padding = '0';
+                messageText.style.margin = '0';
+                messageText.style.overflow = 'hidden';
+            }
         }
     });
 }
@@ -174,6 +364,13 @@ function extractStickerDataFromMessage(message) {
     if (!messageText) return null;
     
     const text = messageText.textContent || '';
+    
+    // Check if this message contains sticker indicator
+    if (text.includes('[STICKER]') && message.dataset.messageId) {
+        // This might be a sticker that hasn't been enhanced yet
+        // We'll need to check Firebase for the actual sticker data
+        return null;
+    }
     
     // If message has image URL in data attributes
     if (message.dataset.imageUrl) {
@@ -239,7 +436,7 @@ function createStickerDisplay(message, messageText, stickerData) {
 
 // Load user's custom stickers
 async function loadUserStickers() {
-    if (!currentUser) return;
+    if (!currentUser || !db) return;
     
     try {
         const userRef = doc(db, 'users', currentUser.uid);
@@ -1005,7 +1202,7 @@ async function createTextSticker(modal) {
 
 // Save sticker to Firebase
 async function saveStickerToFirebase(stickerData) {
-    if (!currentUser) throw new Error('User not authenticated');
+    if (!currentUser || !db) throw new Error('User not authenticated or Firebase not available');
 
     const userRef = doc(db, 'users', currentUser.uid);
     await updateDoc(userRef, {
@@ -1013,23 +1210,38 @@ async function saveStickerToFirebase(stickerData) {
     });
 }
 
-// Send sticker in chat
+// Send sticker in chat - FIXED TO PREVENT DUPLICATE TEXT MESSAGES
 async function sendSticker(sticker) {
-    if (!currentUser || !chatPartnerId || !currentThreadId) {
-        showNotification('Cannot send sticker', 'error');
+    if (!currentUser || !chatPartnerId || !currentThreadId || !db) {
+        showNotification('Cannot send sticker - Firebase not available', 'error');
         return;
     }
+
+    // Prevent multiple clicks
+    if (isStickerSending) {
+        console.log('Sticker already sending, please wait...');
+        return;
+    }
+
+    isStickerSending = true;
 
     try {
         // Check chat points
         const hasPoints = await deductChatPoint();
         if (!hasPoints) {
+            isStickerSending = false;
             return;
         }
 
+        // Generate a unique temporary ID for this sticker
+        const tempStickerId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Add to sent sticker tracking
+        sentStickerIds.add(tempStickerId);
+
         const messageData = {
             senderId: currentUser.uid,
-            text: sticker.text || sticker.emoji || sticker.name,
+            text: `[STICKER] ${sticker.name}`, // Use a clear marker
             stickerId: sticker.id,
             stickerName: sticker.name,
             stickerType: sticker.type,
@@ -1040,8 +1252,11 @@ async function sendSticker(sticker) {
             timestamp: serverTimestamp(),
             type: 'sticker',
             isCustom: true,
-            messageId: generateMessageId()
+            messageId: generateMessageId(),
+            tempId: tempStickerId
         };
+
+        console.log('Sending sticker message to Firebase:', messageData);
 
         const docRef = await addDoc(collection(db, 'conversations', currentThreadId, 'messages'), messageData);
         
@@ -1059,16 +1274,25 @@ async function sendSticker(sticker) {
         closeStickerPicker();
         showNotification('Sticker sent!', 'success');
         
-        // Immediately add sticker to chat display
-        addStickerToChatDisplay(sticker, true, docRef.id);
+        // Immediately add sticker to chat display with temporary ID
+        addStickerToChatDisplay(sticker, true, tempStickerId);
+        
+        // Clear any text in the input that might trigger regular message sending
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput) {
+            messageInput.value = '';
+        }
+        
     } catch (error) {
         console.error('Error sending sticker:', error);
         showNotification('Error sending sticker', 'error');
+    } finally {
+        isStickerSending = false;
     }
 }
 
 // Add sticker to chat display immediately
-function addStickerToChatDisplay(sticker, isSent = true, messageId = null) {
+function addStickerToChatDisplay(sticker, isSent = true, tempId = null) {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
     
@@ -1083,7 +1307,9 @@ function addStickerToChatDisplay(sticker, isSent = true, messageId = null) {
     messageDiv.dataset.stickerText = sticker.text || '';
     messageDiv.dataset.isCustom = 'true';
     messageDiv.dataset.type = 'sticker';
-    if (messageId) messageDiv.dataset.messageId = messageId;
+    if (tempId) {
+        messageDiv.dataset.tempId = tempId;
+    }
     
     // Create a paragraph for the message
     const messageText = document.createElement('p');
@@ -1160,7 +1386,7 @@ function generateMessageId() {
 
 // Deduct chat points
 async function deductChatPoint() {
-    if (!currentUser) return false;
+    if (!currentUser || !db) return false;
     
     try {
         const userRef = doc(db, 'users', currentUser.uid);
@@ -1196,7 +1422,7 @@ async function deductChatPoint() {
 
 // Setup sticker listener for received stickers
 function setupStickerListener() {
-    if (!currentUser || !chatPartnerId || !currentThreadId) {
+    if (!currentUser || !chatPartnerId || !currentThreadId || !db) {
         return;
     }
 
@@ -1212,9 +1438,21 @@ function setupStickerListener() {
                 const message = change.doc.data();
                 const messageId = change.doc.id;
                 
-                if (message.type === 'sticker') {
+                if (message.type === 'sticker' || message.text?.includes('[STICKER]')) {
                     // Check if this is our own message that was just sent
                     const isOwnMessage = message.senderId === currentUser.uid;
+                    
+                    if (isOwnMessage && message.tempId) {
+                        // Check if we already displayed this sticker
+                        if (sentStickerIds.has(message.tempId)) {
+                            // Remove from tracking set so we don't display it again
+                            sentStickerIds.delete(message.tempId);
+                            
+                            // Find and update the existing sticker with the real message ID
+                            updateExistingStickerWithMessageId(message.tempId, messageId);
+                            return; // Skip, we already displayed it
+                        }
+                    }
                     
                     // Display sticker in chat
                     displayReceivedSticker(message, isOwnMessage, messageId);
@@ -1229,6 +1467,20 @@ function setupStickerListener() {
     });
 }
 
+// Update existing sticker with the real message ID
+function updateExistingStickerWithMessageId(tempId, messageId) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) return;
+    
+    // Find the sticker with the temp ID
+    const existingSticker = messagesContainer.querySelector(`[data-temp-id="${tempId}"]`);
+    if (existingSticker) {
+        // Update with the real message ID
+        existingSticker.dataset.messageId = messageId;
+        delete existingSticker.dataset.tempId;
+    }
+}
+
 // Display received sticker
 function displayReceivedSticker(message, isOwnMessage = false, messageId = null) {
     const stickerData = {
@@ -1240,12 +1492,12 @@ function displayReceivedSticker(message, isOwnMessage = false, messageId = null)
         text: message.stickerText
     };
     
-    addStickerToChatDisplay(stickerData, isOwnMessage, messageId);
+    addStickerToChatDisplay(stickerData, isOwnMessage, message.tempId || messageId);
 }
 
 // Save received sticker automatically
 async function saveReceivedSticker(message) {
-    if (!currentUser || message.isCustom !== true) return;
+    if (!currentUser || message.isCustom !== true || !db) return;
     
     try {
         const stickerData = {
@@ -1274,7 +1526,7 @@ async function saveReceivedSticker(message) {
 
 // Load saved stickers
 async function loadSavedStickers() {
-    if (!currentUser) return;
+    if (!currentUser || !db) return;
     
     try {
         const userRef = doc(db, 'users', currentUser.uid);
@@ -2167,3 +2419,13 @@ window.stickerFunctions = {
     loadUserStickers,
     loadSavedStickers
 };
+
+// Export for module usage if needed
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        firebaseConfig,
+        initializeFeatures,
+        loadUserStickers,
+        sendSticker
+    };
+}
