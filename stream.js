@@ -1,4 +1,4 @@
-// stream.js - Video Grid functionality
+// stream.js - Video Grid functionality with WhatsApp-style stories
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getFirestore, 
@@ -32,7 +32,7 @@ const firebaseConfig = {
     storageBucket: "usa-dating-23bc3.firebasestorage.app",
     messagingSenderId: "423286263327",
     appId: "1:423286263327:web:17f0caf843dc349c144f2a"
-  };
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -58,6 +58,9 @@ let videoGridInstance = null;
 
 // Video Modal Instance
 let videoModalInstance = null;
+
+// WhatsApp Stories Instance
+let whatsappStoriesInstance = null;
 
 // Comment tracking to prevent duplicates
 let activeCommentListeners = new Map();
@@ -145,33 +148,516 @@ const videoCache = {
     }
 };
 
-// Supported video formats
-const SUPPORTED_VIDEO_FORMATS = [
-    'video/mp4', 'video/quicktime', 'video/x-m4v', 'video/3gpp', 'video/3gpp2',
-    'video/mpeg', 'video/webm', 'video/ogg', 'video/x-msvideo', 'video/x-matroska',
-    'video/mp2t', 'video/h264', 'video/hevc', 'video/avi', 'video/x-flv',
-    'video/x-ms-wmv', 'video/x-ms-asf', 'video/mp4v-es', 'video/mj2',
-    'video/x-mpeg', 'video/mp2p', 'video/mp2t', 'video/MP2T'
-];
+// WhatsApp Stories Class
+class WhatsAppStories {
+    constructor() {
+        this.storiesContainer = null;
+        this.storiesScroll = null;
+        this.stories = [];
+        this.userStories = new Map();
+        this.currentStoryIndex = 0;
+        this.currentUserIndex = 0;
+        this.isPlaying = false;
+        this.progressInterval = null;
+        this.storyDuration = 5000; // 5 seconds per story
+        
+        this.init();
+    }
 
-// Supported file extensions
-const SUPPORTED_EXTENSIONS = [
-    '.mp4', '.mov', '.m4v', '.3gp', '.3g2', '.mpeg', '.mpg', '.webm', '.ogg',
-    '.avi', '.mkv', '.ts', '.mts', '.m2ts', '.flv', '.f4v', '.wmv', '.mpg', '.mpeg',
-    '.qt', '.mxf', '.m2v', '.m4p', '.m4b', '.mp2', '.mpv', '.mpe', '.m1v', '.m2p',
-    '.divx', '.xvid', '.vob', '.mod', '.tod', '.mts', '.m2t', '.m2ts'
-];
+    init() {
+        this.createStoriesContainer();
+        this.loadStories();
+        
+        // Listen for story updates
+        streamManager.listenToStreams((streams) => {
+            this.stories = this.groupStoriesByUser(streams);
+            this.renderStories();
+        }, 'all');
+    }
 
-// Problematic formats that often need conversion
-const PROBLEMATIC_FORMATS = [
-    'video/quicktime',
-    'video/x-msvideo',
-    'video/x-matroska',
-    'video/x-ms-wmv',
-    'video/x-flv',
-    'video/3gpp',
-    'video/3gpp2'
-];
+    createStoriesContainer() {
+        // Check if stories section already exists
+        this.storiesContainer = document.querySelector('.stories-container');
+        
+        if (!this.storiesContainer) {
+            // Create the stories section if it doesn't exist
+            const postsHeader = document.querySelector('.posts-header');
+            if (!postsHeader) return;
+            
+            const storiesHTML = `
+                <div class="video-grid-section">
+                    <div class="stories-container">
+                        <div class="stories-scroll"></div>
+                        <button class="story-nav-btn story-prev" aria-label="Previous stories">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="story-nav-btn story-next" aria-label="Next stories">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            postsHeader.insertAdjacentHTML('afterend', storiesHTML);
+            
+            this.storiesContainer = document.querySelector('.stories-container');
+            this.storiesScroll = document.querySelector('.stories-scroll');
+            
+            // Add navigation buttons
+            this.setupNavigation();
+        } else {
+            this.storiesScroll = this.storiesContainer.querySelector('.stories-scroll');
+        }
+    }
+
+    setupNavigation() {
+        const prevBtn = document.querySelector('.story-prev');
+        const nextBtn = document.querySelector('.story-next');
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                this.storiesScroll.scrollBy({
+                    left: -200,
+                    behavior: 'smooth'
+                });
+            });
+        }
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                this.storiesScroll.scrollBy({
+                    left: 200,
+                    behavior: 'smooth'
+                });
+            });
+        }
+    }
+
+    groupStoriesByUser(streams) {
+        const userStories = new Map();
+        
+        // Group streams by user
+        streams.forEach(stream => {
+            if (!userStories.has(stream.authorId)) {
+                userStories.set(stream.authorId, {
+                    userId: stream.authorId,
+                    userName: stream.authorName,
+                    userImage: stream.authorImage || 'images-defaultse-profile.jpg',
+                    stories: []
+                });
+            }
+            
+            userStories.get(stream.authorId).stories.push({
+                id: stream.id,
+                thumbnail: getVideoThumbnail(stream),
+                videoUrl: stream.videoUrl,
+                headline: stream.headline,
+                createdAt: stream.createdAt,
+                viewed: viewedStreams.has(stream.id)
+            });
+        });
+        
+        // Sort stories within each user by creation date (newest first)
+        userStories.forEach(userStory => {
+            userStory.stories.sort((a, b) => {
+                const timeA = a.createdAt?.toDate?.()?.getTime() || new Date().getTime();
+                const timeB = b.createdAt?.toDate?.()?.getTime() || new Date().getTime();
+                return timeB - timeA;
+            });
+        });
+        
+        // Convert to array and sort users by most recent story
+        return Array.from(userStories.values()).sort((a, b) => {
+            const timeA = a.stories[0]?.createdAt?.toDate?.()?.getTime() || 0;
+            const timeB = b.stories[0]?.createdAt?.toDate?.()?.getTime() || 0;
+            return timeB - timeA;
+        });
+    }
+
+    async loadStories() {
+        try {
+            const streams = await streamManager.getStreams('all');
+            this.stories = this.groupStoriesByUser(streams);
+            this.renderStories();
+        } catch (error) {
+            console.error('Error loading stories:', error);
+        }
+    }
+
+    renderStories() {
+        if (!this.storiesScroll) return;
+        
+        if (this.stories.length === 0) {
+            this.storiesScroll.innerHTML = `
+                <div class="no-stories">
+                    <div class="no-stories-icon">
+                        <i class="fas fa-video-slash"></i>
+                    </div>
+                    <p class="no-stories-text">No videos yet</p>
+                    <a href="poststream.html" class="create-story-btn">
+                        <i class="fas fa-plus"></i> Create First Video
+                    </a>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        
+        // Add "Add Story" button for current user
+        if (currentUser) {
+            html += `
+                <div class="story-item add-story" onclick="window.location.href='poststream.html'">
+                    <div class="story-avatar-container">
+                        <div class="story-avatar add-story-avatar">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                    </div>
+                    <span class="story-username">Add Video</span>
+                </div>
+            `;
+        }
+        
+        // Add user stories
+        this.stories.forEach((userStory, index) => {
+            const latestStory = userStory.stories[0];
+            const hasNewStories = userStory.stories.some(story => !story.viewed);
+            
+            html += `
+                <div class="story-item ${hasNewStories ? 'has-new' : 'viewed'}" 
+                     data-user-index="${index}"
+                     data-user-id="${userStory.userId}"
+                     onclick="whatsappStoriesInstance.openStoryViewer(${index})">
+                    <div class="story-avatar-container ${hasNewStories ? 'has-new' : ''}">
+                        <img src="${userStory.userImage}" 
+                             alt="${userStory.userName}"
+                             class="story-avatar"
+                             loading="lazy"
+                             onerror="this.src='images-defaultse-profile.jpg'">
+                    </div>
+                    <span class="story-username">${userStory.userName}</span>
+                </div>
+            `;
+        });
+        
+        this.storiesScroll.innerHTML = html;
+    }
+
+    openStoryViewer(userIndex) {
+        if (userIndex < 0 || userIndex >= this.stories.length) return;
+        
+        const userStory = this.stories[userIndex];
+        this.currentUserIndex = userIndex;
+        this.currentStoryIndex = 0;
+        
+        this.createStoryViewer();
+        this.showStoryViewer(userStory);
+        this.startStoryProgress();
+    }
+
+    createStoryViewer() {
+        // Remove existing viewer if any
+        const existingViewer = document.querySelector('.story-viewer-overlay');
+        if (existingViewer) existingViewer.remove();
+        
+        // Create story viewer overlay
+        const viewerHTML = `
+            <div class="story-viewer-overlay">
+                <div class="story-viewer-container">
+                    <div class="story-header">
+                        <div class="story-user-info">
+                            <img src="" alt="" class="story-viewer-avatar" id="storyViewerAvatar">
+                            <div class="story-viewer-info">
+                                <h3 id="storyViewerUsername"></h3>
+                                <span id="storyViewerTime"></span>
+                            </div>
+                        </div>
+                        <button class="story-close-btn" onclick="whatsappStoriesInstance.closeStoryViewer()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="story-progress-container">
+                        <div class="story-progress-bars" id="storyProgressBars"></div>
+                    </div>
+                    
+                    <div class="story-content">
+                        <video class="story-video" id="storyVideo" 
+                               playsinline webkit-playsinline 
+                               preload="auto" controls>
+                        </video>
+                        
+                        <div class="story-nav-area">
+                            <div class="story-prev-area" onclick="whatsappStoriesInstance.prevStory()"></div>
+                            <div class="story-next-area" onclick="whatsappStoriesInstance.nextStory()"></div>
+                        </div>
+                        
+                        <div class="story-actions">
+                            <button class="story-action-btn" onclick="whatsappStoriesInstance.handleStoryLike()">
+                                <i class="far fa-heart" id="storyLikeIcon"></i>
+                            </button>
+                            <button class="story-action-btn" onclick="whatsappStoriesInstance.openStoryComments()">
+                                <i class="far fa-comment"></i>
+                            </button>
+                            <button class="story-action-btn" onclick="whatsappStoriesInstance.shareStory()">
+                                <i class="fas fa-share"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="story-caption" id="storyCaption"></div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', viewerHTML);
+        
+        // Setup video element
+        this.storyVideo = document.getElementById('storyVideo');
+        if (this.storyVideo) {
+            this.storyVideo.addEventListener('ended', () => this.nextStory());
+            this.storyVideo.addEventListener('click', () => this.nextStory());
+        }
+        
+        // Setup keyboard navigation
+        document.addEventListener('keydown', this.handleKeyDown.bind(this));
+    }
+
+    showStoryViewer(userStory) {
+        if (!userStory || !userStory.stories[this.currentStoryIndex]) return;
+        
+        const story = userStory.stories[this.currentStoryIndex];
+        
+        // Update user info
+        document.getElementById('storyViewerAvatar').src = userStory.userImage;
+        document.getElementById('storyViewerUsername').textContent = userStory.userName;
+        document.getElementById('storyViewerTime').textContent = formatTime(story.createdAt);
+        
+        // Update caption
+        document.getElementById('storyCaption').textContent = story.headline;
+        
+        // Update progress bars
+        this.updateProgressBars(userStory);
+        
+        // Load and play video
+        if (this.storyVideo) {
+            this.storyVideo.src = story.videoUrl;
+            this.storyVideo.load();
+            
+            this.storyVideo.play().catch(e => {
+                console.log('Auto-play prevented:', e);
+            });
+            
+            // Mark as viewed
+            if (!viewedStreams.has(story.id)) {
+                viewedStreams.add(story.id);
+                markStreamAsViewed(story.id);
+                
+                // Update UI
+                const storyItem = document.querySelector(`.story-item[data-user-id="${userStory.userId}"]`);
+                if (storyItem) {
+                    storyItem.classList.remove('has-new');
+                    storyItem.classList.add('viewed');
+                    storyItem.querySelector('.story-avatar-container').classList.remove('has-new');
+                }
+            }
+            
+            // Update like button
+            this.updateStoryLikeButton(story.id);
+        }
+    }
+
+    updateProgressBars(userStory) {
+        const progressContainer = document.getElementById('storyProgressBars');
+        if (!progressContainer) return;
+        
+        let html = '';
+        for (let i = 0; i < userStory.stories.length; i++) {
+            const isActive = i === this.currentStoryIndex;
+            const isViewed = i < this.currentStoryIndex || userStory.stories[i].viewed;
+            
+            html += `
+                <div class="story-progress">
+                    <div class="story-progress-bar ${isViewed ? 'viewed' : ''} ${isActive ? 'active' : ''}">
+                        <div class="story-progress-fill"></div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        progressContainer.innerHTML = html;
+    }
+
+    startStoryProgress() {
+        this.stopStoryProgress();
+        this.isPlaying = true;
+        
+        this.progressInterval = setInterval(() => {
+            this.updateActiveProgress();
+        }, 100);
+    }
+
+    stopStoryProgress() {
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = null;
+        }
+        this.isPlaying = false;
+    }
+
+    updateActiveProgress() {
+        const progressBars = document.querySelectorAll('.story-progress-bar.active .story-progress-fill');
+        if (progressBars.length === 0) return;
+        
+        const progressFill = progressBars[0];
+        if (!this.storyVideo || !this.storyVideo.duration) return;
+        
+        const progressPercent = (this.storyVideo.currentTime / this.storyVideo.duration) * 100;
+        progressFill.style.width = `${progressPercent}%`;
+        
+        // Auto-advance when video ends
+        if (this.storyVideo.ended) {
+            this.nextStory();
+        }
+    }
+
+    nextStory() {
+        const currentUserStory = this.stories[this.currentUserIndex];
+        
+        if (this.currentStoryIndex < currentUserStory.stories.length - 1) {
+            // Next story in same user
+            this.currentStoryIndex++;
+            this.showStoryViewer(currentUserStory);
+            this.startStoryProgress();
+        } else if (this.currentUserIndex < this.stories.length - 1) {
+            // Next user
+            this.currentUserIndex++;
+            this.currentStoryIndex = 0;
+            this.showStoryViewer(this.stories[this.currentUserIndex]);
+            this.startStoryProgress();
+        } else {
+            // End of all stories
+            this.closeStoryViewer();
+        }
+    }
+
+    prevStory() {
+        if (this.currentStoryIndex > 0) {
+            // Previous story in same user
+            this.currentStoryIndex--;
+            this.showStoryViewer(this.stories[this.currentUserIndex]);
+            this.startStoryProgress();
+        } else if (this.currentUserIndex > 0) {
+            // Previous user
+            this.currentUserIndex--;
+            const prevUserStories = this.stories[this.currentUserIndex];
+            this.currentStoryIndex = prevUserStories.stories.length - 1;
+            this.showStoryViewer(prevUserStories);
+            this.startStoryProgress();
+        }
+    }
+
+    async handleStoryLike() {
+        if (!currentUser) {
+            alert('Please login to like videos');
+            return;
+        }
+        
+        const currentUserStory = this.stories[this.currentUserIndex];
+        const currentStory = currentUserStory.stories[this.currentStoryIndex];
+        
+        if (!currentStory) return;
+        
+        try {
+            const result = await streamManager.handleLike(currentStory.id);
+            if (result) {
+                this.updateStoryLikeButton(currentStory.id);
+            }
+        } catch (error) {
+            console.error('Error liking story:', error);
+        }
+    }
+
+    updateStoryLikeButton(storyId) {
+        const likeIcon = document.getElementById('storyLikeIcon');
+        if (!likeIcon) return;
+        
+        if (likedStreams.has(storyId)) {
+            likeIcon.className = 'fas fa-heart';
+            likeIcon.style.color = '#ff2d55';
+        } else {
+            likeIcon.className = 'far fa-heart';
+            likeIcon.style.color = 'white';
+        }
+    }
+
+    openStoryComments() {
+        const currentUserStory = this.stories[this.currentUserIndex];
+        const currentStory = currentUserStory.stories[this.currentStoryIndex];
+        
+        if (currentStory && videoModalInstance) {
+            videoModalInstance.open(currentStory.id, [currentStory], 0);
+        }
+    }
+
+    shareStory() {
+        const currentUserStory = this.stories[this.currentUserIndex];
+        const currentStory = currentUserStory.stories[this.currentStoryIndex];
+        
+        if (!currentStory) return;
+        
+        const shareUrl = `${window.location.origin}/stream.html?video=${currentStory.id}`;
+        const shareText = `Check out this video: ${currentStory.headline}`;
+        
+        if (navigator.share) {
+            navigator.share({
+                title: currentStory.headline,
+                text: shareText,
+                url: shareUrl
+            }).catch(console.error);
+        } else {
+            // Fallback: copy to clipboard
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                alert('Link copied to clipboard!');
+            });
+        }
+    }
+
+    handleKeyDown(e) {
+        if (!document.querySelector('.story-viewer-overlay')) return;
+        
+        switch(e.key) {
+            case 'ArrowRight':
+            case ' ':
+                e.preventDefault();
+                this.nextStory();
+                break;
+            case 'ArrowLeft':
+                e.preventDefault();
+                this.prevStory();
+                break;
+            case 'Escape':
+                e.preventDefault();
+                this.closeStoryViewer();
+                break;
+        }
+    }
+
+    closeStoryViewer() {
+        this.stopStoryProgress();
+        
+        const viewer = document.querySelector('.story-viewer-overlay');
+        if (viewer) viewer.remove();
+        
+        if (this.storyVideo) {
+            this.storyVideo.pause();
+            this.storyVideo.src = '';
+        }
+        
+        // Remove keyboard listeners
+        document.removeEventListener('keydown', this.handleKeyDown.bind(this));
+    }
+}
 
 // Stream Manager Class with Cloudinary integration
 class StreamManager {
@@ -611,7 +1097,7 @@ class StreamManager {
     }
 
     // LIKE FUNCTIONALITY
-    async handleLike(streamId, likeButton) {
+    async handleLike(streamId, likeButton = null) {
         if (!currentUser) {
             alert('Please login to like videos');
             return null;
@@ -2419,6 +2905,33 @@ function setupLogout() {
     }
 }
 
+// WhatsApp Stories initialization
+async function initializeWhatsAppStories() {
+    if (!document.querySelector('.posts-header')) return;
+    
+    try {
+        await initializeAuth();
+        
+        if (currentUser) {
+            whatsappStoriesInstance = new WhatsAppStories();
+            window.whatsappStoriesInstance = whatsappStoriesInstance;
+            
+            console.log('WhatsApp stories initialized successfully');
+        }
+    } catch (error) {
+        console.error('Error initializing WhatsApp stories:', error);
+    }
+}
+
+// Initialize WhatsApp stories on posts page
+if (window.location.pathname.includes('posts.html')) {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            initializeWhatsAppStories();
+        }, 1000);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     setupLogout();
     
@@ -2454,6 +2967,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 window.streamManager = streamManager;
 window.videoGridInstance = videoGridInstance;
+window.whatsappStoriesInstance = whatsappStoriesInstance;
 
 window.openVideoModal = openVideoModal;
 window.navigateToUserProfile = navigateToUserProfile;
