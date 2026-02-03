@@ -34,17 +34,16 @@ const firebaseConfig = {
     appId: "1:423286263327:web:17f0caf843dc349c144f2a"
 };
 
-// Cloudinary configuration - REPLACE WITH YOUR CREDENTIALS
+// Cloudinary configuration
 const CLOUDINARY_CLOUD_NAME = "ddtdqrh1b";
 const CLOUDINARY_UPLOAD_PRESET = "profile-pictures";
 
-// Initialize Firebase - FIXED
+// Initialize Firebase
 let app;
 let auth;
 let db;
 
 try {
-    // Check if Firebase app is already initialized
     if (!window.firebaseApps) {
         window.firebaseApps = {};
     }
@@ -54,19 +53,15 @@ try {
     if (!window.firebaseApps[appName]) {
         app = initializeApp(firebaseConfig, appName);
         window.firebaseApps[appName] = app;
-        console.log('Firebase app initialized successfully');
     } else {
         app = window.firebaseApps[appName];
-        console.log('Using existing Firebase app');
     }
     
-    // Initialize auth and firestore
     auth = getAuth(app);
     db = getFirestore(app);
     
 } catch (error) {
     console.error('Error initializing Firebase:', error);
-    // Create fallback dummy objects to prevent crashes
     app = { name: 'DEFAULT', options: {} };
     auth = { currentUser: null };
     db = {};
@@ -86,15 +81,14 @@ let stickerCreatorVars = {
     imageFile: null
 };
 
-// Track sent sticker IDs to prevent duplicates
 const sentStickerIds = new Set();
-let isStickerSending = false; // Flag to prevent multiple sticker sends
+let isStickerSending = false;
+let stickerMessageInterceptorActive = false;
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     loadStickerStyles();
     
-    // Set up auth state listener - with error handling
     if (auth && typeof onAuthStateChanged === 'function') {
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -102,20 +96,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 initializeFeatures();
             } else {
                 currentUser = null;
-                // If not authenticated, still try to initialize basic features
                 try {
                     initializeBasicFeatures();
                 } catch (e) {
-                    console.log('User not authenticated, skipping Firebase features');
+                    console.log('User not authenticated');
                 }
             }
         }, (error) => {
             console.error('Auth state error:', error);
-            // Still try to initialize basic UI features
             initializeBasicFeatures();
         });
     } else {
-        console.log('Auth not available, initializing basic features');
+        console.log('Auth not available');
         initializeBasicFeatures();
     }
 });
@@ -123,14 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // Initialize basic UI features without Firebase
 function initializeBasicFeatures() {
     if (window.location.pathname.includes('chat.html')) {
-        // Still try to setup UI elements
         setTimeout(() => {
             try {
                 initProfilePictureNavigation();
                 loadStickerStyles();
-                addStickerButton(); // Add button but with limited functionality
+                addStickerButton();
                 setupStickerPickerEvents();
-                setupMessagePrevention(); // Setup prevention for sticker messages
+                setupStrictMessageInterceptor();
             } catch (e) {
                 console.log('Could not initialize all features:', e);
             }
@@ -140,7 +131,6 @@ function initializeBasicFeatures() {
 
 // Initialize features after auth
 function initializeFeatures() {
-    // Get chat partner ID from URL if on chat page
     if (window.location.pathname.includes('chat.html')) {
         const urlParams = new URLSearchParams(window.location.search);
         chatPartnerId = urlParams.get('id');
@@ -151,86 +141,74 @@ function initializeFeatures() {
     initStickerSystem();
     loadUserStickers();
     
-    // Set up sticker listener for chat page
     if (window.location.pathname.includes('chat.html') && chatPartnerId) {
         setTimeout(() => {
             setupStickerListener();
+            setupStrictMessageInterceptor();
             setupStickerMessageEnhancer();
-            setupMessagePrevention(); // CRITICAL: Setup message prevention
-            interceptSendButton(); // Intercept send button to handle stickers
         }, 2000);
     }
 }
 
-// Setup message prevention to stop stickers from being sent as text
-function setupMessagePrevention() {
-    console.log('Setting up message prevention...');
+// ============================================
+// CRITICAL FIX: STRICT MESSAGE INTERCEPTOR
+// ============================================
+function setupStrictMessageInterceptor() {
+    if (stickerMessageInterceptorActive) return;
     
-    // Method 1: Override the global sendMessage function if it exists
+    console.log('Setting up STRICT message interceptor...');
+    stickerMessageInterceptorActive = true;
+    
+    // 1. FIRST: Override the global sendMessage function IMMEDIATELY
     if (typeof window.sendMessage === 'function') {
-        console.log('Found sendMessage function, overriding...');
+        console.log('Intercepting sendMessage function...');
         const originalSendMessage = window.sendMessage;
         window.sendMessage = function(text, type = 'text') {
-            // Check if this is a sticker message that should be prevented
-            if (text && (text.includes('[STICKER]') || text.includes('sticker:'))) {
-                console.log('Preventing sticker text from being sent as regular message:', text);
-                return false; // Don't send
+            // BLOCK ANY sticker-related text from being sent as regular message
+            if (text && (text.includes('[STICKER]') || text.toLowerCase().includes('sticker'))) {
+                console.log('🚫 BLOCKED sticker text from sendMessage:', text.substring(0, 50));
+                return false;
             }
             return originalSendMessage.call(this, text, type);
         };
-        console.log('sendMessage function overridden successfully');
     }
     
-    // Method 2: Intercept the send button directly
-    function setupSendButtonInterception() {
-        const sendButton = document.getElementById('sendButton');
-        if (!sendButton) {
-            setTimeout(setupSendButtonInterception, 500);
-            return;
-        }
+    // 2. Intercept ALL send buttons
+    function interceptAllSendButtons() {
+        const sendButtons = document.querySelectorAll('#sendButton, button[onclick*="send"], .send-btn, .chat-send');
         
-        console.log('Found send button, setting up interception...');
-        
-        // Remove any existing event listeners first
-        const newSendButton = sendButton.cloneNode(true);
-        sendButton.parentNode.replaceChild(newSendButton, sendButton);
-        
-        // Add new click handler
-        newSendButton.addEventListener('click', function(e) {
-            const messageInput = document.getElementById('messageInput');
-            if (messageInput) {
-                const text = messageInput.value;
-                // Check if this is a sticker message
-                if (text && (text.includes('[STICKER]') || text.includes('sticker:'))) {
-                    console.log('Preventing sticker from send button:', text);
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    e.stopPropagation();
-                    messageInput.value = ''; // Clear the input
-                    return false;
-                }
-            }
+        sendButtons.forEach(button => {
+            // Clone and replace to remove existing event listeners
+            const newButton = button.cloneNode(true);
+            button.parentNode.replaceChild(newButton, button);
             
-            // Let the original handler run for normal messages
-            return true;
-        }, true); // Use capture phase to intercept early
-        
-        console.log('Send button interception set up');
+            // Add our strict interceptor
+            newButton.addEventListener('click', function(e) {
+                const messageInput = document.getElementById('messageInput');
+                if (messageInput) {
+                    const text = messageInput.value.trim();
+                    if (text && (text.includes('[STICKER]') || text.toLowerCase().includes('sticker'))) {
+                        console.log('🚫 BLOCKED sticker from send button click');
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        e.stopPropagation();
+                        messageInput.value = '';
+                        return false;
+                    }
+                }
+            }, true); // Use capture phase to run FIRST
+        });
     }
     
-    setupSendButtonInterception();
-    
-    // Method 3: Also intercept form submission if there's a form
-    const chatForm = document.querySelector('.chat-input-container form') || 
-                     document.querySelector('form[action*="send"]') ||
-                     document.querySelector('form');
-    if (chatForm) {
-        chatForm.addEventListener('submit', function(e) {
+    // 3. Intercept form submissions
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
             const messageInput = document.getElementById('messageInput');
             if (messageInput) {
-                const text = messageInput.value;
-                if (text && (text.includes('[STICKER]') || text.includes('sticker:'))) {
-                    console.log('Preventing sticker from form submission');
+                const text = messageInput.value.trim();
+                if (text && (text.includes('[STICKER]') || text.toLowerCase().includes('sticker'))) {
+                    console.log('🚫 BLOCKED sticker from form submit');
                     e.preventDefault();
                     e.stopImmediatePropagation();
                     messageInput.value = '';
@@ -238,55 +216,39 @@ function setupMessagePrevention() {
                 }
             }
         }, true);
-    }
+    });
     
-    console.log('Message prevention setup complete');
-}
-
-// Intercept the send button to handle stickers properly
-function interceptSendButton() {
-    const sendButton = document.getElementById('sendButton');
-    if (!sendButton) {
-        setTimeout(interceptSendButton, 1000);
-        return;
-    }
+    // 4. Monitor for new send buttons (dynamic content)
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.addedNodes.length) {
+                interceptAllSendButtons();
+            }
+        });
+    });
     
-    // Store original onclick
-    const originalOnClick = sendButton.onclick;
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
     
-    // Replace with our own handler
-    sendButton.onclick = function(e) {
-        // Check if we're in sticker mode
-        const messageInput = document.getElementById('messageInput');
-        if (messageInput && (messageInput.value.includes('[STICKER]') || messageInput.value.includes('sticker:'))) {
-            e.preventDefault();
-            e.stopPropagation();
-            messageInput.value = ''; // Clear sticker text
-            return false;
-        }
-        
-        // Otherwise, call original handler
-        if (originalOnClick) {
-            return originalOnClick.call(this, e);
-        }
-    };
+    // Initial interception
+    interceptAllSendButtons();
+    
+    console.log('✅ Strict message interceptor active');
 }
 
 // Setup sticker message enhancer
 function setupStickerMessageEnhancer() {
-    // Run immediately
     enhanceStickerMessages();
     
-    // Run periodically to catch new messages
-    setInterval(enhanceStickerMessages, 500);
+    setInterval(enhanceStickerMessages, 300);
     
-    // Also listen for DOM changes
     const messagesContainer = document.getElementById('chatMessages');
     if (messagesContainer) {
         const observer = new MutationObserver(() => {
             enhanceStickerMessages();
         });
-        
         observer.observe(messagesContainer, {
             childList: true,
             subtree: true
@@ -294,7 +256,7 @@ function setupStickerMessageEnhancer() {
     }
 }
 
-// Enhance sticker messages in chat
+// Enhance sticker messages - FIXED to prevent jumping
 function enhanceStickerMessages() {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) {
@@ -302,51 +264,37 @@ function enhanceStickerMessages() {
         return;
     }
     
-    // Find all messages
-    const messages = messagesContainer.querySelectorAll('.message');
+    const messages = messagesContainer.querySelectorAll('.message:not(.sticker-enhanced)');
     
     messages.forEach(message => {
-        // Skip if already enhanced
-        if (message.classList.contains('sticker-enhanced')) {
-            return;
-        }
-        
-        // Check if this is a sticker message by looking at the content
         const messageText = message.querySelector('p');
         if (!messageText) return;
         
-        // Check if message has sticker data attributes
-        const stickerData = extractStickerDataFromMessage(message);
+        const text = messageText.textContent || '';
         
+        // Check for sticker markers in the text
+        if (text.includes('[STICKER]')) {
+            // COMPLETELY REMOVE this text message - it shouldn't exist!
+            message.remove();
+            return;
+        }
+        
+        // Check for sticker data attributes
+        const stickerData = extractStickerDataFromMessage(message);
         if (stickerData) {
             createStickerDisplay(message, messageText, stickerData);
             message.classList.add('sticker-enhanced', 'sticker-message');
             
-            // Hide the text content if it's a sticker
-            const textContent = messageText.textContent || '';
-            if (textContent.includes('[STICKER]') || 
-                textContent.includes('sticker:')) {
-                messageText.style.display = 'none';
-            }
-        } else {
-            // Check if it's a sticker by text content and hide it
-            const textContent = messageText.textContent || '';
-            if (textContent.includes('[STICKER]') || textContent.includes('sticker:')) {
-                // This is likely a sticker that hasn't been enhanced yet
-                // Hide it temporarily until the real sticker loads
-                messageText.style.opacity = '0';
-                messageText.style.height = '0';
-                messageText.style.padding = '0';
-                messageText.style.margin = '0';
-                messageText.style.overflow = 'hidden';
-            }
+            // Fix CSS to prevent jumping
+            message.style.margin = '5px 0';
+            message.style.transition = 'none';
+            message.style.transform = 'none';
         }
     });
 }
 
 // Extract sticker data from message element
 function extractStickerDataFromMessage(message) {
-    // Check for explicit sticker data attributes
     if (message.dataset.stickerType || message.dataset.stickerId) {
         return {
             id: message.dataset.stickerId,
@@ -358,42 +306,16 @@ function extractStickerDataFromMessage(message) {
             isCustom: message.dataset.isCustom === 'true'
         };
     }
-    
-    // Check for message text that indicates it's a sticker
-    const messageText = message.querySelector('p');
-    if (!messageText) return null;
-    
-    const text = messageText.textContent || '';
-    
-    // Check if this message contains sticker indicator
-    if (text.includes('[STICKER]') && message.dataset.messageId) {
-        // This might be a sticker that hasn't been enhanced yet
-        // We'll need to check Firebase for the actual sticker data
-        return null;
-    }
-    
-    // If message has image URL in data attributes
-    if (message.dataset.imageUrl) {
-        return {
-            id: message.id || `sticker_${Date.now()}`,
-            name: 'Image Sticker',
-            type: 'image',
-            url: message.dataset.imageUrl,
-            text: text
-        };
-    }
-    
     return null;
 }
 
-// Create sticker display in chat
+// Create sticker display - FIXED positioning
 function createStickerDisplay(message, messageText, stickerData) {
-    // Create sticker display
     let stickerHTML = '';
     
     if (stickerData.type === 'image' && stickerData.url) {
         stickerHTML = `
-            <div class="sticker-message-content">
+            <div class="sticker-message-content" style="transition: none !important; transform: none !important;">
                 <div class="sticker-image-container">
                     <img src="${stickerData.url}" 
                          alt="${stickerData.name || 'Sticker'}" 
@@ -405,7 +327,7 @@ function createStickerDisplay(message, messageText, stickerData) {
         `;
     } else if (stickerData.type === 'text') {
         stickerHTML = `
-            <div class="sticker-message-content">
+            <div class="sticker-message-content" style="transition: none !important; transform: none !important;">
                 <div class="text-sticker-message">
                     <span class="sticker-emoji-large">${stickerData.emoji || '🎨'}</span>
                     ${stickerData.text ? `<span class="sticker-text-large">${stickerData.text}</span>` : ''}
@@ -413,15 +335,12 @@ function createStickerDisplay(message, messageText, stickerData) {
             </div>
         `;
     } else {
-        // Fallback to original text if no valid sticker data
         return;
     }
     
-    // Replace message content with sticker
     messageText.innerHTML = stickerHTML;
     messageText.classList.add('sticker-display');
     
-    // Style for sent vs received
     const content = messageText.querySelector('.sticker-message-content');
     if (message.classList.contains('sent')) {
         content.style.background = '#000000';
@@ -432,6 +351,10 @@ function createStickerDisplay(message, messageText, stickerData) {
         content.style.borderColor = '#e8e8e8';
         content.style.color = '#333';
     }
+    
+    // Prevent any animations that cause jumping
+    message.style.animation = 'none';
+    message.style.transition = 'none';
 }
 
 // Load user's custom stickers
@@ -474,7 +397,7 @@ function navigateToProfile() {
     }
 }
 
-// Initialize sticker system (WhatsApp/Telegram style)
+// Initialize sticker system
 function initStickerSystem() {
     if (window.location.pathname.includes('chat.html')) {
         addStickerButton();
@@ -482,7 +405,7 @@ function initStickerSystem() {
     }
 }
 
-// Add sticker button next to input (like WhatsApp/Telegram)
+// Add sticker button next to input
 function addStickerButton() {
     const chatInputContainer = document.querySelector('.chat-input-container');
     const messageInput = document.getElementById('messageInput');
@@ -493,13 +416,11 @@ function addStickerButton() {
         return;
     }
 
-    // Remove existing button if any
     const existingBtn = document.getElementById('stickerPickerBtn');
     if (existingBtn) {
         existingBtn.remove();
     }
 
-    // Create sticker button
     const stickerBtn = document.createElement('button');
     stickerBtn.id = 'stickerPickerBtn';
     stickerBtn.className = 'sticker-picker-btn';
@@ -508,18 +429,16 @@ function addStickerButton() {
     stickerBtn.type = 'button';
     stickerBtn.addEventListener('click', toggleStickerPicker);
 
-    // Insert button before send button
     if (sendButton) {
         chatInputContainer.insertBefore(stickerBtn, sendButton);
     } else {
         chatInputContainer.appendChild(stickerBtn);
     }
 
-    // Adjust input width
     messageInput.style.paddingRight = '50px';
 }
 
-// Create sticker picker panel (like WhatsApp/Telegram keyboard replacement)
+// Create sticker picker panel
 function createStickerPicker() {
     if (document.getElementById('stickerPickerPanel')) return;
 
@@ -541,7 +460,6 @@ function createStickerPicker() {
         <div class="sticker-content">
             <div class="tab-content active" id="my-stickers-tab">
                 <div class="sticker-grid" id="myStickersGrid">
-                    <!-- User's stickers will be loaded here -->
                     <div class="no-stickers" id="noStickersMessage">
                         <i class="fas fa-smile"></i>
                         <p>No stickers yet</p>
@@ -551,7 +469,6 @@ function createStickerPicker() {
             </div>
             <div class="tab-content" id="saved-stickers-tab">
                 <div class="sticker-grid" id="savedStickersGrid">
-                    <!-- Saved stickers will be loaded here -->
                     <div class="no-stickers">
                         <i class="fas fa-heart"></i>
                         <p>No saved stickers</p>
@@ -566,13 +483,11 @@ function createStickerPicker() {
         </div>
     `;
 
-    // Insert picker panel after chat container
     const chatContainer = document.querySelector('.chat-container') || 
                          document.querySelector('.chat-messages-container') ||
                          document.body;
     chatContainer.appendChild(pickerPanel);
 
-    // Setup event listeners
     setupStickerPickerEvents();
 }
 
@@ -587,12 +502,10 @@ function setupStickerPickerEvents() {
     const tabButtons = pickerPanel.querySelectorAll('.sticker-tab');
     const tabContents = pickerPanel.querySelectorAll('.tab-content');
 
-    // Close button
     if (closeBtn) {
         closeBtn.addEventListener('click', closeStickerPicker);
     }
 
-    // Create sticker buttons
     if (createBtn) {
         createBtn.addEventListener('click', openStickerCreator);
     }
@@ -600,16 +513,13 @@ function setupStickerPickerEvents() {
         createFirstBtn.addEventListener('click', openStickerCreator);
     }
 
-    // Tab switching
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
             const tabName = button.dataset.tab;
             
-            // Update active tab button
             tabButtons.forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
             
-            // Show active tab content
             tabContents.forEach(content => {
                 content.classList.remove('active');
                 if (content.id === `${tabName}-tab`) {
@@ -617,14 +527,12 @@ function setupStickerPickerEvents() {
                 }
             });
             
-            // Load saved stickers if switching to that tab
             if (tabName === 'saved-stickers') {
                 loadSavedStickers();
             }
         });
     });
 
-    // Click outside to close
     document.addEventListener('click', (e) => {
         if (stickerPickerOpen && 
             !pickerPanel.contains(e.target) && 
@@ -634,7 +542,7 @@ function setupStickerPickerEvents() {
     });
 }
 
-// Toggle sticker picker (show/hide like WhatsApp keyboard)
+// Toggle sticker picker
 function toggleStickerPicker(e) {
     if (e) {
         e.preventDefault();
@@ -648,27 +556,21 @@ function toggleStickerPicker(e) {
     }
 }
 
-// Open sticker picker (replaces keyboard)
+// Open sticker picker
 function openStickerPicker() {
     const pickerPanel = document.getElementById('stickerPickerPanel');
     const messageInput = document.getElementById('messageInput');
     
     if (!pickerPanel || !messageInput) return;
     
-    // Hide keyboard on mobile by blurring input
     messageInput.blur();
-    
-    // Show picker panel
     pickerPanel.style.display = 'block';
     
-    // Slide up animation
     setTimeout(() => {
         pickerPanel.classList.add('open');
     }, 10);
     
     stickerPickerOpen = true;
-    
-    // Update sticker display
     updateStickerPicker();
 }
 
@@ -678,7 +580,6 @@ function closeStickerPicker() {
     
     if (!pickerPanel) return;
     
-    // Slide down animation
     pickerPanel.classList.remove('open');
     
     setTimeout(() => {
@@ -687,7 +588,6 @@ function closeStickerPicker() {
     
     stickerPickerOpen = false;
     
-    // Focus back on input
     const messageInput = document.getElementById('messageInput');
     if (messageInput) {
         setTimeout(() => {
@@ -703,16 +603,13 @@ function updateStickerPicker() {
     
     if (!myStickersGrid) return;
     
-    // Clear existing stickers except the no stickers message
     const existingStickers = myStickersGrid.querySelectorAll('.sticker-item');
     existingStickers.forEach(sticker => sticker.remove());
     
-    // Show/hide no stickers message
     if (noStickersMessage) {
         noStickersMessage.style.display = userStickers.length > 0 ? 'none' : 'flex';
     }
     
-    // Add user's stickers
     userStickers.forEach((sticker, index) => {
         const stickerItem = createStickerElement(sticker, index);
         stickerItem.addEventListener('click', () => sendSticker(sticker));
@@ -746,7 +643,9 @@ function createStickerElement(sticker, index) {
     return stickerItem;
 }
 
-// Open sticker creator modal
+// ============================================
+// OPEN STICKER CREATOR - MISSING FUNCTION
+// ============================================
 function openStickerCreator() {
     closeStickerPicker();
     
@@ -1054,6 +953,37 @@ function setupStickerCreatorEvents(modal) {
     }
 }
 
+// Navigate between steps in sticker creator
+function goToStep(modal, step) {
+    modal.querySelectorAll('.creator-step').forEach(s => {
+        s.classList.remove('active');
+    });
+    
+    const stepElement = modal.querySelector(`#step${step}`);
+    if (stepElement) stepElement.classList.add('active');
+    
+    stickerCreatorVars.currentStep = step;
+    
+    const prevBtn = modal.querySelector('#prevBtn');
+    const nextBtn = modal.querySelector('#nextBtn');
+    const createBtn = modal.querySelector('#createBtn');
+    
+    if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-flex';
+    if (nextBtn) nextBtn.style.display = step === 3 ? 'none' : 'inline-flex';
+    if (createBtn) createBtn.style.display = step === 3 ? 'inline-flex' : 'none';
+}
+
+// Show create button in sticker creator
+function showCreateButton(modal) {
+    const prevBtn = modal.querySelector('#prevBtn');
+    const nextBtn = modal.querySelector('#nextBtn');
+    const createBtn = modal.querySelector('#createBtn');
+    
+    if (prevBtn) prevBtn.style.display = 'inline-flex';
+    if (nextBtn) nextBtn.style.display = 'none';
+    if (createBtn) createBtn.style.display = 'inline-flex';
+}
+
 // Handle image upload
 function handleImageUpload(file, modal) {
     if (!file.type.match('image.*')) {
@@ -1086,37 +1016,6 @@ function handleImageUpload(file, modal) {
     };
     
     reader.readAsDataURL(file);
-}
-
-// Navigate between steps
-function goToStep(modal, step) {
-    modal.querySelectorAll('.creator-step').forEach(s => {
-        s.classList.remove('active');
-    });
-    
-    const stepElement = modal.querySelector(`#step${step}`);
-    if (stepElement) stepElement.classList.add('active');
-    
-    stickerCreatorVars.currentStep = step;
-    
-    const prevBtn = modal.querySelector('#prevBtn');
-    const nextBtn = modal.querySelector('#nextBtn');
-    const createBtn = modal.querySelector('#createBtn');
-    
-    if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-flex';
-    if (nextBtn) nextBtn.style.display = step === 3 ? 'none' : 'inline-flex';
-    if (createBtn) createBtn.style.display = step === 3 ? 'inline-flex' : 'none';
-}
-
-// Show create button
-function showCreateButton(modal) {
-    const prevBtn = modal.querySelector('#prevBtn');
-    const nextBtn = modal.querySelector('#nextBtn');
-    const createBtn = modal.querySelector('#createBtn');
-    
-    if (prevBtn) prevBtn.style.display = 'inline-flex';
-    if (nextBtn) nextBtn.style.display = 'none';
-    if (createBtn) createBtn.style.display = 'inline-flex';
 }
 
 // Upload image to Cloudinary
@@ -1210,10 +1109,12 @@ async function saveStickerToFirebase(stickerData) {
     });
 }
 
-// Send sticker in chat - FIXED TO PREVENT DUPLICATE TEXT MESSAGES
+// ============================================
+// FIXED: Send sticker WITHOUT text message
+// ============================================
 async function sendSticker(sticker) {
     if (!currentUser || !chatPartnerId || !currentThreadId || !db) {
-        showNotification('Cannot send sticker - Firebase not available', 'error');
+        showNotification('Cannot send sticker', 'error');
         return;
     }
 
@@ -1233,15 +1134,14 @@ async function sendSticker(sticker) {
             return;
         }
 
-        // Generate a unique temporary ID for this sticker
+        // Generate a unique temporary ID
         const tempStickerId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Add to sent sticker tracking
         sentStickerIds.add(tempStickerId);
 
+        // Create sticker message data - Use ONLY [STICKER] marker
         const messageData = {
             senderId: currentUser.uid,
-            text: `[STICKER] ${sticker.name}`, // Use a clear marker
+            text: `[STICKER]`, // ONLY this marker, no sticker text!
             stickerId: sticker.id,
             stickerName: sticker.name,
             stickerType: sticker.type,
@@ -1256,8 +1156,9 @@ async function sendSticker(sticker) {
             tempId: tempStickerId
         };
 
-        console.log('Sending sticker message to Firebase:', messageData);
+        console.log('Sending sticker to Firebase (NO TEXT CONTENT):', messageData);
 
+        // Send to Firebase
         const docRef = await addDoc(collection(db, 'conversations', currentThreadId, 'messages'), messageData);
         
         // Update conversation
@@ -1272,12 +1173,11 @@ async function sendSticker(sticker) {
         }, { merge: true });
 
         closeStickerPicker();
-        showNotification('Sticker sent!', 'success');
         
-        // Immediately add sticker to chat display with temporary ID
+        // IMMEDIATELY display sticker in chat
         addStickerToChatDisplay(sticker, true, tempStickerId);
         
-        // Clear any text in the input that might trigger regular message sending
+        // CRITICAL: Clear any input text to prevent regular message sending
         const messageInput = document.getElementById('messageInput');
         if (messageInput) {
             messageInput.value = '';
@@ -1291,14 +1191,14 @@ async function sendSticker(sticker) {
     }
 }
 
-// Add sticker to chat display immediately
+// Add sticker to chat display - FIXED positioning
 function addStickerToChatDisplay(sticker, isSent = true, tempId = null) {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
     
     // Create sticker message element
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+    messageDiv.className = `message ${isSent ? 'sent' : 'received'} sticker-message sticker-enhanced`;
     messageDiv.dataset.stickerId = sticker.id;
     messageDiv.dataset.stickerName = sticker.name;
     messageDiv.dataset.stickerType = sticker.type;
@@ -1311,15 +1211,25 @@ function addStickerToChatDisplay(sticker, isSent = true, tempId = null) {
         messageDiv.dataset.tempId = tempId;
     }
     
+    // FIXED: Add inline styles to prevent jumping
+    messageDiv.style.cssText = `
+        margin: 5px 0 !important;
+        transition: none !important;
+        animation: none !important;
+        transform: none !important;
+        opacity: 1 !important;
+        position: relative !important;
+    `;
+    
     // Create a paragraph for the message
     const messageText = document.createElement('p');
-    messageText.className = 'sticker-message';
+    messageText.className = 'sticker-display';
     
     let stickerHTML = '';
     
     if (sticker.type === 'image' && sticker.url) {
         stickerHTML = `
-            <div class="sticker-message-content">
+            <div class="sticker-message-content" style="transition: none !important; transform: none !important;">
                 <div class="sticker-image-container">
                     <img src="${sticker.url}" 
                          alt="${sticker.name || 'Sticker'}" 
@@ -1331,7 +1241,7 @@ function addStickerToChatDisplay(sticker, isSent = true, tempId = null) {
         `;
     } else if (sticker.type === 'text') {
         stickerHTML = `
-            <div class="sticker-message-content">
+            <div class="sticker-message-content" style="transition: none !important; transform: none !important;">
                 <div class="text-sticker-message">
                     <span class="sticker-emoji-large">${sticker.emoji || '🎨'}</span>
                     ${sticker.text ? `<span class="sticker-text-large">${sticker.text}</span>` : ''}
@@ -1339,10 +1249,7 @@ function addStickerToChatDisplay(sticker, isSent = true, tempId = null) {
             </div>
         `;
     } else {
-        // Fallback
-        stickerHTML = `
-            <span>${sticker.name}</span>
-        `;
+        stickerHTML = `<span>${sticker.name}</span>`;
     }
     
     messageText.innerHTML = stickerHTML;
@@ -1368,12 +1275,8 @@ function addStickerToChatDisplay(sticker, isSent = true, tempId = null) {
     timeSpan.textContent = 'Just now';
     messageDiv.appendChild(timeSpan);
     
-    // Add to chat
+    // Add to chat - APPEND at the end
     messagesContainer.appendChild(messageDiv);
-    
-    // Mark as enhanced
-    messageDiv.classList.add('sticker-enhanced', 'sticker-message');
-    messageText.classList.add('sticker-display');
     
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -1405,7 +1308,6 @@ async function deductChatPoint() {
                 chatPoints: currentPoints - 1
             });
             
-            // Update display if function exists
             if (window.updateChatPointsDisplay) {
                 window.updateChatPointsDisplay();
             }
@@ -1439,25 +1341,18 @@ function setupStickerListener() {
                 const messageId = change.doc.id;
                 
                 if (message.type === 'sticker' || message.text?.includes('[STICKER]')) {
-                    // Check if this is our own message that was just sent
                     const isOwnMessage = message.senderId === currentUser.uid;
                     
                     if (isOwnMessage && message.tempId) {
-                        // Check if we already displayed this sticker
                         if (sentStickerIds.has(message.tempId)) {
-                            // Remove from tracking set so we don't display it again
                             sentStickerIds.delete(message.tempId);
-                            
-                            // Find and update the existing sticker with the real message ID
                             updateExistingStickerWithMessageId(message.tempId, messageId);
-                            return; // Skip, we already displayed it
+                            return;
                         }
                     }
                     
-                    // Display sticker in chat
                     displayReceivedSticker(message, isOwnMessage, messageId);
                     
-                    // Auto-save received stickers to user's collection (only if from others)
                     if (!isOwnMessage) {
                         saveReceivedSticker(message);
                     }
@@ -1472,10 +1367,8 @@ function updateExistingStickerWithMessageId(tempId, messageId) {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
     
-    // Find the sticker with the temp ID
     const existingSticker = messagesContainer.querySelector(`[data-temp-id="${tempId}"]`);
     if (existingSticker) {
-        // Update with the real message ID
         existingSticker.dataset.messageId = messageId;
         delete existingSticker.dataset.tempId;
     }
@@ -1517,7 +1410,6 @@ async function saveReceivedSticker(message) {
             savedStickers: arrayUnion(stickerData)
         });
 
-        // Show notification
         showNotification(`Saved "${message.stickerName}" sticker`, 'info');
     } catch (error) {
         console.error('Error saving received sticker:', error);
@@ -1546,7 +1438,6 @@ function updateSavedStickersDisplay(savedStickers) {
     const savedStickersGrid = document.getElementById('savedStickersGrid');
     if (!savedStickersGrid) return;
     
-    // Clear existing stickers
     savedStickersGrid.innerHTML = '';
     
     if (savedStickers.length === 0) {
@@ -1559,7 +1450,6 @@ function updateSavedStickersDisplay(savedStickers) {
         return;
     }
     
-    // Add saved stickers
     savedStickers.forEach(sticker => {
         const stickerItem = createStickerElement(sticker);
         stickerItem.classList.add('saved');
@@ -1593,7 +1483,6 @@ if (typeof showNotification === 'undefined') {
             setTimeout(() => notification.remove(), 300);
         }, 3000);
         
-        // Add CSS for animations if not present
         if (!document.getElementById('notification-styles')) {
             const style = document.createElement('style');
             style.id = 'notification-styles';
@@ -1612,12 +1501,12 @@ if (typeof showNotification === 'undefined') {
     };
 }
 
-// Load sticker styles
+// Load sticker styles - ADDED FIXED STYLES
 function loadStickerStyles() {
     if (document.getElementById('sticker-styles')) return;
 
     const styles = `
-        /* Sticker Picker Styles - WhatsApp/Telegram Style */
+        /* Sticker Picker Styles */
         .sticker-picker-btn {
             background: linear-gradient(135deg, #FF6B8B 0%, #FF8E53 100%);
             border: none;
@@ -1664,6 +1553,166 @@ function loadStickerStyles() {
             transform: translateY(0);
         }
         
+        /* CRITICAL FIX: Sticker Message Styles - NO JUMPING */
+        .message.sticker-message {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 5px !important;
+            max-width: 200px;
+            margin: 5px 0 !important;
+            transition: none !important;
+            animation: none !important;
+            transform: none !important;
+            opacity: 1 !important;
+            position: relative !important;
+        }
+        
+        .message.sticker-message.sent {
+            margin-left: auto !important;
+            margin-right: 10px !important;
+            float: right !important;
+            clear: both !important;
+        }
+        
+        .message.sticker-message.received {
+            margin-left: 10px !important;
+            margin-right: auto !important;
+            float: left !important;
+            clear: both !important;
+        }
+        
+        .sticker-message-content {
+            display: inline-block;
+            border-radius: 18px;
+            padding: 12px;
+            border: 2px solid #e8e8e8;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 200px;
+            background: white;
+            transition: none !important;
+            transform: none !important;
+        }
+        
+        /* Sent stickers - BLACK background */
+        .message.sent .sticker-message-content {
+            background: #000000 !important;
+            border-color: #333333;
+            color: white;
+        }
+        
+        /* Received stickers - White background */
+        .message.received .sticker-message-content {
+            background: white !important;
+            border-color: #e8e8e8;
+            color: #333;
+        }
+        
+        .sticker-image-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 0 auto;
+        }
+        
+        .sticker-message-image {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            object-fit: cover;
+            display: block;
+            background: #f5f5f5;
+        }
+        
+        /* Text overlay on image */
+        .sticker-text-on-image {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            color: white;
+            padding: 6px 10px;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 600;
+            margin: 0 10px;
+            word-break: break-word;
+            z-index: 2;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 8px rgba(0, 0, 0, 0.6),
+                0 0 15px rgba(0, 0, 0, 0.4);
+            background: transparent !important;
+            -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.7);
+        }
+        
+        .message.sent .sticker-text-on-image {
+            color: white;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 8px rgba(0, 0, 0, 0.6),
+                0 0 15px rgba(0, 0, 0, 0.4);
+        }
+        
+        .message.received .sticker-text-on-image {
+            color: white;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 8px rgba(0, 0, 0, 0.6),
+                0 0 15px rgba(0, 0, 0, 0.4);
+        }
+        
+        .text-sticker-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            min-height: 120px;
+        }
+        
+        .sticker-emoji-large {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        
+        .sticker-text-large {
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            word-break: break-word;
+            max-width: 180px;
+            line-height: 1.4;
+            background: transparent !important;
+        }
+        
+        .message.sent .sticker-text-large {
+            color: white;
+        }
+        
+        .message.received .sticker-text-large {
+            color: #333;
+        }
+        
+        .sticker-display p {
+            display: none;
+        }
+        
+        .message-time {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            margin-top: 8px;
+            opacity: 0.8;
+            display: block !important;
+        }
+        
+        .message.received .message-time {
+            color: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Additional styles for sticker picker... */
         .sticker-picker-header {
             display: flex;
             justify-content: space-between;
@@ -1903,154 +1952,6 @@ function loadStickerStyles() {
         .close-sticker-picker:hover {
             background: #e0e0e0;
             transform: scale(1.05);
-        }
-
-        /* Sticker Message Display Styles - WhatsApp/Telegram Style */
-        .message.sticker-message {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            padding: 5px !important;
-            max-width: 200px;
-            margin: 10px 0;
-        }
-        
-        .message.sticker-message.sent {
-            margin-left: auto;
-            margin-right: 10px;
-        }
-        
-        .message.sticker-message.received {
-            margin-left: 10px;
-            margin-right: auto;
-        }
-        
-        .sticker-message-content {
-            display: inline-block;
-            border-radius: 18px;
-            padding: 12px;
-            border: 2px solid #e8e8e8;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: all 0.2s ease;
-            text-align: center;
-            max-width: 200px;
-            background: white;
-        }
-        
-        /* Sent stickers - BLACK background */
-        .message.sent .sticker-message-content {
-            background: #000000 !important;
-            border-color: #333333;
-            color: white;
-        }
-        
-        /* Received stickers - White background */
-        .message.received .sticker-message-content {
-            background: white !important;
-            border-color: #e8e8e8;
-            color: #333;
-        }
-        
-        .sticker-image-container {
-            position: relative;
-            width: 150px;
-            height: 150px;
-            margin: 0 auto;
-        }
-        
-        .sticker-message-image {
-            width: 100%;
-            height: 100%;
-            border-radius: 10px;
-            object-fit: cover;
-            display: block;
-            background: #f5f5f5;
-        }
-        
-        /* Text overlay on image - TRANSPARENT BACKGROUND */
-        .sticker-text-on-image {
-            position: absolute;
-            top: 10px;
-            left: 0;
-            right: 0;
-            color: white;
-            padding: 6px 10px;
-            font-size: 14px;
-            text-align: center;
-            font-weight: 600;
-            margin: 0 10px;
-            word-break: break-word;
-            z-index: 2;
-            text-shadow: 
-                1px 1px 3px rgba(0, 0, 0, 0.8),
-                0 0 8px rgba(0, 0, 0, 0.6),
-                0 0 15px rgba(0, 0, 0, 0.4);
-            background: transparent !important;
-            -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.7);
-        }
-        
-        .message.sent .sticker-text-on-image {
-            color: white;
-            text-shadow: 
-                1px 1px 3px rgba(0, 0, 0, 0.8),
-                0 0 8px rgba(0, 0, 0, 0.6),
-                0 0 15px rgba(0, 0, 0, 0.4);
-        }
-        
-        .message.received .sticker-text-on-image {
-            color: white;
-            text-shadow: 
-                1px 1px 3px rgba(0, 0, 0, 0.8),
-                0 0 8px rgba(0, 0, 0, 0.6),
-                0 0 15px rgba(0, 0, 0, 0.4);
-        }
-        
-        .text-sticker-message {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 15px;
-            min-height: 120px;
-        }
-        
-        .sticker-emoji-large {
-            font-size: 3rem;
-            margin-bottom: 10px;
-        }
-        
-        .sticker-text-large {
-            font-size: 16px;
-            font-weight: 600;
-            text-align: center;
-            word-break: break-word;
-            max-width: 180px;
-            line-height: 1.4;
-            background: transparent !important;
-        }
-        
-        .message.sent .sticker-text-large {
-            color: white;
-        }
-        
-        .message.received .sticker-text-large {
-            color: #333;
-        }
-        
-        .sticker-display p {
-            display: none;
-        }
-        
-        .message-time {
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.7);
-            text-align: center;
-            margin-top: 8px;
-            opacity: 0.8;
-        }
-        
-        .message.received .message-time {
-            color: rgba(0, 0, 0, 0.5);
         }
 
         /* Sticker Creator Modal */
