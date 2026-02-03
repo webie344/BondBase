@@ -21,7 +21,9 @@ import {
     query,
     orderBy,
     limit,
-    arrayUnion
+    arrayUnion,
+    getDocs,
+    Timestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -83,7 +85,14 @@ let stickerCreatorVars = {
 
 const sentStickerIds = new Set();
 let isStickerSending = false;
-let stickerMessageInterceptorActive = false;
+let stickerListenerUnsubscribe = null;
+
+// CRITICAL: Flag to prevent main chat system from processing stickers
+window.isStickerMessage = false;
+
+// Message tracking to prevent duplicates
+const displayedMessageIds = new Set();
+let isLoadingMessages = false;
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -121,7 +130,7 @@ function initializeBasicFeatures() {
                 loadStickerStyles();
                 addStickerButton();
                 setupStickerPickerEvents();
-                setupStrictMessageInterceptor();
+                interceptMainChatSystem();
             } catch (e) {
                 console.log('Could not initialize all features:', e);
             }
@@ -143,106 +152,476 @@ function initializeFeatures() {
     
     if (window.location.pathname.includes('chat.html') && chatPartnerId) {
         setTimeout(() => {
+            interceptMainChatSystem();
+            loadAllMessagesInOrder(); // FIXED: Load ALL messages in order
             setupStickerListener();
-            setupStrictMessageInterceptor();
             setupStickerMessageEnhancer();
-        }, 2000);
+        }, 1500); // Increased delay to ensure main chat system is ready
     }
 }
 
 // ============================================
-// CRITICAL FIX: STRICT MESSAGE INTERCEPTOR
+// FIXED: Load ALL messages (both sticker and text) in correct order
 // ============================================
-function setupStrictMessageInterceptor() {
-    if (stickerMessageInterceptorActive) return;
+async function loadAllMessagesInOrder() {
+    if (!currentUser || !chatPartnerId || !currentThreadId || !db) {
+        console.log('Cannot load messages: missing required data');
+        return;
+    }
+
+    if (isLoadingMessages) {
+        console.log('Already loading messages, skipping...');
+        return;
+    }
+
+    isLoadingMessages = true;
     
-    console.log('Setting up STRICT message interceptor...');
-    stickerMessageInterceptorActive = true;
+    try {
+        console.log('Loading ALL messages for thread:', currentThreadId);
+        
+        const messagesQuery = query(
+            collection(db, 'conversations', currentThreadId, 'messages'),
+            orderBy('timestamp', 'asc'), // Changed to asc for chronological order
+            limit(150) // Increased limit
+        );
+
+        const querySnapshot = await getDocs(messagesQuery);
+        const allMessages = [];
+        
+        // First, collect all messages
+        querySnapshot.forEach((doc) => {
+            const message = doc.data();
+            message.id = doc.id;
+            message.firestoreId = doc.id;
+            
+            // Convert timestamp
+            let timestamp = null;
+            if (message.timestamp && message.timestamp.toDate) {
+                timestamp = message.timestamp.toDate();
+            } else if (message.timestamp && message.timestamp.seconds) {
+                timestamp = new Date(message.timestamp.seconds * 1000);
+            } else if (message.createdAt) {
+                timestamp = new Date(message.createdAt);
+            } else {
+                timestamp = new Date(); // Fallback
+            }
+            
+            message.timestampValue = timestamp.getTime();
+            message.timestampObj = timestamp;
+            
+            allMessages.push(message);
+        });
+
+        console.log(`Found ${allMessages.length} total messages`);
+        
+        // Sort by timestamp in ASCENDING order (oldest first)
+        allMessages.sort((a, b) => a.timestampValue - b.timestampValue);
+        
+        // Clear existing messages first
+        const messagesContainer = document.getElementById('chatMessages');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
+            displayedMessageIds.clear();
+        }
+        
+        // Display all messages in correct order
+        allMessages.forEach(message => {
+            if (displayedMessageIds.has(message.id)) {
+                return; // Skip already displayed messages
+            }
+            
+            if (message.type === 'sticker' || 
+                message.text === '[STICKER-IGNORE]' || 
+                message.text === '[STICKER]' ||
+                message.stickerId ||
+                message.isSticker) {
+                // This is a sticker message
+                displayStickerFromDatabase(message);
+            } else if (message.text && 
+                      !message.text.includes('[STICKER]') && 
+                      message.text !== '[STICKER-IGNORE]') {
+                // This is a regular text message
+                if (typeof window.displayMessage === 'function') {
+                    // Let the main chat system handle it
+                    window.displayMessage(message, message.senderId === currentUser.uid);
+                } else {
+                    displayTextMessageFromDatabase(message);
+                }
+            }
+            
+            displayedMessageIds.add(message.id);
+        });
+        
+        // Scroll to bottom after loading
+        setTimeout(() => {
+            const messagesContainer = document.getElementById('chatMessages');
+            if (messagesContainer) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }, 100);
+
+    } catch (error) {
+        console.error('Error loading messages:', error);
+    } finally {
+        isLoadingMessages = false;
+    }
+}
+
+// Display text message from database (fallback)
+function displayTextMessageFromDatabase(message) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) {
+        setTimeout(() => displayTextMessageFromDatabase(message), 500);
+        return;
+    }
+
+    const isSent = message.senderId === currentUser.uid;
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+    messageDiv.dataset.messageId = message.id;
     
-    // 1. FIRST: Override the global sendMessage function IMMEDIATELY
-    if (typeof window.sendMessage === 'function') {
-        console.log('Intercepting sendMessage function...');
-        const originalSendMessage = window.sendMessage;
-        window.sendMessage = function(text, type = 'text') {
-            // BLOCK ANY sticker-related text from being sent as regular message
-            if (text && (text.includes('[STICKER]') || text.toLowerCase().includes('sticker'))) {
-                console.log('🚫 BLOCKED sticker text from sendMessage:', text.substring(0, 50));
+    const p = document.createElement('p');
+    p.textContent = message.text || '';
+    messageDiv.appendChild(p);
+    
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'message-time';
+    
+    if (message.timestampObj) {
+        timeSpan.textContent = formatTime(message.timestampObj);
+    } else if (message.timestamp && message.timestamp.toDate) {
+        timeSpan.textContent = formatTime(message.timestamp.toDate());
+    } else {
+        timeSpan.textContent = 'Earlier';
+    }
+    
+    messageDiv.appendChild(timeSpan);
+    
+    messagesContainer.appendChild(messageDiv);
+}
+
+// Display sticker from database data
+function displayStickerFromDatabase(message) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) {
+        setTimeout(() => displayStickerFromDatabase(message), 500);
+        return;
+    }
+
+    // Check if this sticker is already displayed
+    if (displayedMessageIds.has(message.id)) {
+        return;
+    }
+
+    const stickerData = {
+        id: message.stickerId || message.id,
+        name: message.stickerName || 'Sticker',
+        type: message.stickerType || 'text',
+        url: message.stickerUrl || '',
+        emoji: message.stickerEmoji || '',
+        text: message.stickerText || ''
+    };
+
+    const isSent = message.senderId === currentUser.uid;
+    
+    // Create pure sticker element
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isSent ? 'sent' : 'received'} sticker-message sticker-enhanced`;
+    messageDiv.dataset.messageId = message.id;
+    messageDiv.dataset.stickerId = stickerData.id;
+    messageDiv.dataset.stickerName = stickerData.name;
+    messageDiv.dataset.stickerType = stickerData.type;
+    messageDiv.dataset.stickerUrl = stickerData.url || '';
+    messageDiv.dataset.stickerEmoji = stickerData.emoji || '';
+    messageDiv.dataset.stickerText = stickerData.text || '';
+    messageDiv.dataset.isCustom = 'true';
+    messageDiv.dataset.type = 'sticker';
+    messageDiv.dataset.timestamp = message.timestampValue || Date.now();
+    
+    // Inline styles
+    messageDiv.style.cssText = `
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 5px !important;
+        margin: 5px 0 !important;
+        max-width: 200px !important;
+        display: block !important;
+        clear: both !important;
+        float: ${isSent ? 'right' : 'left'} !important;
+        margin-${isSent ? 'right' : 'left'}: 10px !important;
+        animation: fadeIn 0.3s ease !important;
+    `;
+    
+    let stickerHTML = '';
+    
+    if (stickerData.type === 'image' && stickerData.url) {
+        stickerHTML = `
+            <div class="sticker-message-content">
+                <div class="sticker-image-container">
+                    <img src="${stickerData.url}" 
+                         alt="${stickerData.name || 'Sticker'}" 
+                         class="sticker-message-image"
+                         onerror="this.onerror=null;this.src='https://via.placeholder.com/150/FF6B8B/FFFFFF?text=Sticker'">
+                    ${stickerData.text ? `<div class="sticker-text-on-image">${stickerData.text}</div>` : ''}
+                </div>
+            </div>
+        `;
+    } else if (stickerData.type === 'text') {
+        stickerHTML = `
+            <div class="sticker-message-content">
+                <div class="text-sticker-message">
+                    <span class="sticker-emoji-large">${stickerData.emoji || '🎨'}</span>
+                    ${stickerData.text ? `<span class="sticker-text-large">${stickerData.text}</span>` : ''}
+                </div>
+            </div>
+        `;
+    } else {
+        return;
+    }
+    
+    const stickerContainer = document.createElement('div');
+    stickerContainer.className = 'sticker-display-container';
+    stickerContainer.innerHTML = stickerHTML;
+    
+    const content = stickerContainer.querySelector('.sticker-message-content');
+    if (content) {
+        if (isSent) {
+            content.style.background = '#000000';
+            content.style.borderColor = '#333333';
+            content.style.color = 'white';
+        } else {
+            content.style.background = 'white';
+            content.style.borderColor = '#e8e8e8';
+            content.style.color = '#333';
+        }
+    }
+    
+    messageDiv.appendChild(stickerContainer);
+    
+    // Add timestamp
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'message-time';
+    
+    if (message.timestampObj) {
+        timeSpan.textContent = formatTime(message.timestampObj);
+    } else if (message.timestamp && message.timestamp.toDate) {
+        timeSpan.textContent = formatTime(message.timestamp.toDate());
+    } else {
+        timeSpan.textContent = 'Earlier';
+    }
+    
+    messageDiv.appendChild(timeSpan);
+    
+    // Insert in correct position based on timestamp
+    insertMessageInOrder(messagesContainer, messageDiv, message.timestampValue || Date.now());
+    
+    displayedMessageIds.add(message.id);
+}
+
+// Insert message in chronological order
+function insertMessageInOrder(container, messageElement, timestamp) {
+    const allMessages = container.querySelectorAll('.message');
+    let inserted = false;
+    
+    // Convert NodeList to Array for easier manipulation
+    const messagesArray = Array.from(allMessages);
+    
+    // Find the correct position
+    for (let i = 0; i < messagesArray.length; i++) {
+        const existingMsg = messagesArray[i];
+        const existingTimestamp = parseInt(existingMsg.dataset.timestamp) || 0;
+        
+        if (timestamp < existingTimestamp) {
+            container.insertBefore(messageElement, existingMsg);
+            inserted = true;
+            break;
+        }
+    }
+    
+    // If not inserted, append to end
+    if (!inserted) {
+        container.appendChild(messageElement);
+    }
+    
+    // Re-arrange all messages to ensure proper float clearing
+    setTimeout(() => {
+        arrangeMessages(container);
+    }, 10);
+}
+
+// Arrange messages to prevent float issues
+function arrangeMessages(container) {
+    const messages = container.querySelectorAll('.message');
+    let lastSender = null;
+    let lastTimestamp = 0;
+    
+    messages.forEach((msg, index) => {
+        const isSticker = msg.classList.contains('sticker-message');
+        const isSent = msg.classList.contains('sent');
+        const currentTimestamp = parseInt(msg.dataset.timestamp) || 0;
+        
+        // Add clear: both if sender changes or time gap is large
+        if (lastSender !== null && lastSender !== isSent) {
+            msg.style.clear = 'both';
+        } else if (currentTimestamp - lastTimestamp > 300000) { // 5 minutes gap
+            msg.style.clear = 'both';
+        }
+        
+        // Add margin for better separation
+        if (index > 0) {
+            const prevMsg = messages[index - 1];
+            const prevIsSticker = prevMsg.classList.contains('sticker-message');
+            const prevIsSent = prevMsg.classList.contains('sent');
+            
+            if (prevIsSent !== isSent || prevIsSticker !== isSticker) {
+                msg.style.marginTop = '15px';
+            } else {
+                msg.style.marginTop = '3px';
+            }
+        }
+        
+        lastSender = isSent;
+        lastTimestamp = currentTimestamp;
+    });
+}
+
+// Format time for display
+function formatTime(date) {
+    if (!(date instanceof Date)) {
+        date = new Date(date);
+    }
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return date.toLocaleDateString();
+}
+
+// ============================================
+// CRITICAL: Intercept the main chat system
+// ============================================
+function interceptMainChatSystem() {
+    if (!window.location.pathname.includes('chat.html')) return;
+    
+    console.log('Intercepting main chat system...');
+    
+    // Method 1: Intercept the send button
+    const originalSendFunction = window.sendMessage;
+    if (typeof originalSendFunction === 'function') {
+        window.sendMessage = function() {
+            if (window.isStickerMessage) {
+                console.log('Blocked main send function for sticker');
                 return false;
             }
-            return originalSendMessage.call(this, text, type);
+            return originalSendFunction.apply(this, arguments);
         };
+        console.log('Intercepted sendMessage function');
     }
     
-    // 2. Intercept ALL send buttons
-    function interceptAllSendButtons() {
-        const sendButtons = document.querySelectorAll('#sendButton, button[onclick*="send"], .send-btn, .chat-send');
-        
-        sendButtons.forEach(button => {
-            // Clone and replace to remove existing event listeners
-            const newButton = button.cloneNode(true);
-            button.parentNode.replaceChild(newButton, button);
+    // Method 2: Intercept message display function
+    if (typeof window.displayMessage === 'function') {
+        const originalDisplayMessage = window.displayMessage;
+        window.displayMessage = function(messageData, isSent) {
+            if (messageData.type === 'sticker' || 
+                messageData.text === '[STICKER]' || 
+                messageData.text === '[STICKER-IGNORE]' ||
+                messageData.stickerId ||
+                messageData.isSticker) {
+                console.log('Blocked displayMessage for sticker');
+                return null;
+            }
             
-            // Add our strict interceptor
-            newButton.addEventListener('click', function(e) {
-                const messageInput = document.getElementById('messageInput');
-                if (messageInput) {
-                    const text = messageInput.value.trim();
-                    if (text && (text.includes('[STICKER]') || text.toLowerCase().includes('sticker'))) {
-                        console.log('🚫 BLOCKED sticker from send button click');
-                        e.preventDefault();
-                        e.stopImmediatePropagation();
-                        e.stopPropagation();
-                        messageInput.value = '';
-                        return false;
-                    }
+            // Check if already displayed
+            if (messageData.id && displayedMessageIds.has(messageData.id)) {
+                return null;
+            }
+            
+            const result = originalDisplayMessage.apply(this, arguments);
+            
+            if (messageData.id) {
+                displayedMessageIds.add(messageData.id);
+            }
+            
+            // Re-arrange messages after new one is added
+            setTimeout(() => {
+                const container = document.getElementById('chatMessages');
+                if (container) {
+                    arrangeMessages(container);
                 }
-            }, true); // Use capture phase to run FIRST
-        });
+            }, 100);
+            
+            return result;
+        };
+        console.log('Intercepted displayMessage function');
     }
     
-    // 3. Intercept form submissions
-    const forms = document.querySelectorAll('form');
-    forms.forEach(form => {
-        form.addEventListener('submit', function(e) {
-            const messageInput = document.getElementById('messageInput');
-            if (messageInput) {
-                const text = messageInput.value.trim();
-                if (text && (text.includes('[STICKER]') || text.toLowerCase().includes('sticker'))) {
-                    console.log('🚫 BLOCKED sticker from form submit');
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    messageInput.value = '';
-                    return false;
+    // Method 3: Intercept the send button click directly
+    const sendButton = document.getElementById('sendButton');
+    if (sendButton) {
+        const originalClick = sendButton.onclick;
+        sendButton.onclick = function(e) {
+            if (window.isStickerMessage) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                console.log('Blocked send button click for sticker');
+                return false;
+            }
+            if (originalClick) return originalClick.call(this, e);
+        };
+        console.log('Intercepted send button click');
+    }
+    
+    // Method 4: Listen for any message additions and remove sticker text bubbles
+    const messagesContainer = document.getElementById('chatMessages');
+    if (messagesContainer) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.addedNodes.length) {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1 && node.classList && 
+                            (node.classList.contains('message') || node.classList.contains('chat-message'))) {
+                            
+                            // Check if this is a text bubble for a sticker
+                            const messageText = node.querySelector('p');
+                            if (messageText && (messageText.textContent === '[STICKER]' || 
+                                                messageText.textContent === '[STICKER-IGNORE]' ||
+                                                messageText.textContent.includes('[STICKER]'))) {
+                                console.log('Removing duplicate sticker text bubble');
+                                node.style.display = 'none';
+                                setTimeout(() => node.remove(), 50);
+                            }
+                            
+                            // Re-arrange messages when new ones are added
+                            setTimeout(() => {
+                                arrangeMessages(messagesContainer);
+                            }, 50);
+                        }
+                    });
                 }
-            }
-        }, true);
-    });
-    
-    // 4. Monitor for new send buttons (dynamic content)
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.addedNodes.length) {
-                interceptAllSendButtons();
-            }
+            });
         });
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-    
-    // Initial interception
-    interceptAllSendButtons();
-    
-    console.log('✅ Strict message interceptor active');
+        
+        observer.observe(messagesContainer, { childList: true, subtree: true });
+        console.log('Set up observer for duplicate message removal');
+    }
 }
 
 // Setup sticker message enhancer
 function setupStickerMessageEnhancer() {
     enhanceStickerMessages();
     
-    setInterval(enhanceStickerMessages, 300);
+    // Run enhancement every 500ms
+    setInterval(enhanceStickerMessages, 500);
     
     const messagesContainer = document.getElementById('chatMessages');
     if (messagesContainer) {
@@ -256,7 +635,7 @@ function setupStickerMessageEnhancer() {
     }
 }
 
-// Enhance sticker messages - FIXED to prevent jumping
+// Enhance sticker messages
 function enhanceStickerMessages() {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) {
@@ -274,8 +653,8 @@ function enhanceStickerMessages() {
         
         // Check for sticker markers in the text
         if (text.includes('[STICKER]')) {
-            // COMPLETELY REMOVE this text message - it shouldn't exist!
-            message.remove();
+            message.style.display = 'none';
+            setTimeout(() => message.remove(), 100);
             return;
         }
         
@@ -285,12 +664,15 @@ function enhanceStickerMessages() {
             createStickerDisplay(message, messageText, stickerData);
             message.classList.add('sticker-enhanced', 'sticker-message');
             
-            // Fix CSS to prevent jumping
-            message.style.margin = '5px 0';
-            message.style.transition = 'none';
-            message.style.transform = 'none';
+            // Add timestamp data attribute
+            if (!message.dataset.timestamp) {
+                message.dataset.timestamp = Date.now();
+            }
         }
     });
+    
+    // Re-arrange messages after enhancements
+    arrangeMessages(messagesContainer);
 }
 
 // Extract sticker data from message element
@@ -309,13 +691,13 @@ function extractStickerDataFromMessage(message) {
     return null;
 }
 
-// Create sticker display - FIXED positioning
+// Create sticker display
 function createStickerDisplay(message, messageText, stickerData) {
     let stickerHTML = '';
     
     if (stickerData.type === 'image' && stickerData.url) {
         stickerHTML = `
-            <div class="sticker-message-content" style="transition: none !important; transform: none !important;">
+            <div class="sticker-message-content">
                 <div class="sticker-image-container">
                     <img src="${stickerData.url}" 
                          alt="${stickerData.name || 'Sticker'}" 
@@ -327,7 +709,7 @@ function createStickerDisplay(message, messageText, stickerData) {
         `;
     } else if (stickerData.type === 'text') {
         stickerHTML = `
-            <div class="sticker-message-content" style="transition: none !important; transform: none !important;">
+            <div class="sticker-message-content">
                 <div class="text-sticker-message">
                     <span class="sticker-emoji-large">${stickerData.emoji || '🎨'}</span>
                     ${stickerData.text ? `<span class="sticker-text-large">${stickerData.text}</span>` : ''}
@@ -338,6 +720,7 @@ function createStickerDisplay(message, messageText, stickerData) {
         return;
     }
     
+    messageText.innerHTML = '';
     messageText.innerHTML = stickerHTML;
     messageText.classList.add('sticker-display');
     
@@ -351,10 +734,6 @@ function createStickerDisplay(message, messageText, stickerData) {
         content.style.borderColor = '#e8e8e8';
         content.style.color = '#333';
     }
-    
-    // Prevent any animations that cause jumping
-    message.style.animation = 'none';
-    message.style.transition = 'none';
 }
 
 // Load user's custom stickers
@@ -612,7 +991,13 @@ function updateStickerPicker() {
     
     userStickers.forEach((sticker, index) => {
         const stickerItem = createStickerElement(sticker, index);
-        stickerItem.addEventListener('click', () => sendSticker(sticker));
+        stickerItem.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            window.isStickerMessage = true;
+            setTimeout(() => sendSticker(sticker), 10);
+        }, true);
         myStickersGrid.appendChild(stickerItem);
     });
 }
@@ -643,13 +1028,10 @@ function createStickerElement(sticker, index) {
     return stickerItem;
 }
 
-// ============================================
-// OPEN STICKER CREATOR - MISSING FUNCTION
-// ============================================
+// Open sticker creator
 function openStickerCreator() {
     closeStickerPicker();
     
-    // Reset creator variables
     stickerCreatorVars = {
         currentStep: 1,
         stickerType: '',
@@ -658,7 +1040,6 @@ function openStickerCreator() {
         imageFile: null
     };
 
-    // Create creator modal
     const modal = document.createElement('div');
     modal.id = 'stickerCreatorModal';
     modal.className = 'sticker-creator-modal';
@@ -670,23 +1051,18 @@ function openStickerCreator() {
             </div>
             
             <div class="sticker-creator-body">
-                <!-- Step 1: Choose type -->
                 <div class="creator-step active" id="step1">
                     <h4>Choose Sticker Type</h4>
                     <div class="type-options">
                         <div class="type-option" data-type="image">
-                            <div class="type-icon">
-                                <i class="fas fa-image"></i>
-                            </div>
+                            <div class="type-icon"><i class="fas fa-image"></i></div>
                             <div class="type-info">
                                 <h5>Photo Sticker</h5>
                                 <p>Upload a photo and add text</p>
                             </div>
                         </div>
                         <div class="type-option" data-type="text">
-                            <div class="type-icon">
-                                <i class="fas fa-font"></i>
-                            </div>
+                            <div class="type-icon"><i class="fas fa-font"></i></div>
                             <div class="type-info">
                                 <h5>Text Sticker</h5>
                                 <p>Create with emoji and text</p>
@@ -695,7 +1071,6 @@ function openStickerCreator() {
                     </div>
                 </div>
                 
-                <!-- Step 2: Image upload -->
                 <div class="creator-step" id="step2">
                     <h4>Upload Photo</h4>
                     <div class="upload-area" id="uploadArea">
@@ -706,35 +1081,26 @@ function openStickerCreator() {
                     </div>
                     <div class="image-preview" id="imagePreview" style="display: none;">
                         <img id="previewImage" src="" alt="Preview">
-                        <button class="remove-image" id="removeImage">
-                            <i class="fas fa-times"></i>
-                        </button>
+                        <button class="remove-image" id="removeImage"><i class="fas fa-times"></i></button>
                     </div>
                     
                     <div class="form-group">
                         <label for="stickerName">Sticker Name</label>
-                        <input type="text" id="stickerName" 
-                               placeholder="My Awesome Sticker" 
-                               maxlength="20">
+                        <input type="text" id="stickerName" placeholder="My Awesome Sticker" maxlength="20">
                     </div>
                     
                     <div class="form-group">
                         <label for="stickerText">Add Text (Optional)</label>
-                        <input type="text" id="stickerText" 
-                               placeholder="Add text to your sticker" 
-                               maxlength="30">
+                        <input type="text" id="stickerText" placeholder="Add text to your sticker" maxlength="30">
                     </div>
                 </div>
                 
-                <!-- Step 3: Text sticker -->
                 <div class="creator-step" id="step3">
                     <h4>Create Text Sticker</h4>
                     
                     <div class="form-group">
                         <label for="textStickerName">Sticker Name</label>
-                        <input type="text" id="textStickerName" 
-                               placeholder="My Text Sticker" 
-                               maxlength="20">
+                        <input type="text" id="textStickerName" placeholder="My Text Sticker" maxlength="20">
                     </div>
                     
                     <div class="form-group">
@@ -757,9 +1123,7 @@ function openStickerCreator() {
                     
                     <div class="form-group">
                         <label for="textStickerText">Sticker Text</label>
-                        <input type="text" id="textStickerText" 
-                               placeholder="Enter your text" 
-                               maxlength="40">
+                        <input type="text" id="textStickerText" placeholder="Enter your text" maxlength="40">
                     </div>
                     
                     <div class="preview-area">
@@ -770,7 +1134,6 @@ function openStickerCreator() {
                     </div>
                 </div>
                 
-                <!-- Navigation buttons -->
                 <div class="creator-navigation">
                     <button class="nav-btn prev-btn" id="prevBtn" style="display: none;">
                         <i class="fas fa-arrow-left"></i> Back
@@ -788,8 +1151,6 @@ function openStickerCreator() {
 
     document.body.appendChild(modal);
     modal.style.display = 'flex';
-
-    // Setup event listeners for creator
     setupStickerCreatorEvents(modal);
 }
 
@@ -811,13 +1172,11 @@ function setupStickerCreatorEvents(modal) {
     const stickerNameInput = modal.querySelector('#stickerName');
     const textStickerNameInput = modal.querySelector('#textStickerName');
 
-    // Close modal
     closeBtn.addEventListener('click', () => modal.remove());
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.remove();
     });
 
-    // Type selection
     typeOptions.forEach(option => {
         option.addEventListener('click', () => {
             typeOptions.forEach(opt => opt.classList.remove('selected'));
@@ -827,13 +1186,10 @@ function setupStickerCreatorEvents(modal) {
         });
     });
 
-    // Next button
     nextBtn.addEventListener('click', () => {
         if (stickerCreatorVars.currentStep === 1 && stickerCreatorVars.stickerType) {
-            // Go to step 2 or 3 based on type
             goToStep(modal, stickerCreatorVars.stickerType === 'image' ? 2 : 3);
         } else if (stickerCreatorVars.currentStep === 2) {
-            // Validate image sticker
             const stickerName = stickerNameInput?.value.trim();
             if (!stickerName) {
                 showNotification('Please enter a sticker name', 'error');
@@ -845,7 +1201,6 @@ function setupStickerCreatorEvents(modal) {
             }
             showCreateButton(modal);
         } else if (stickerCreatorVars.currentStep === 3) {
-            // Validate text sticker
             const stickerName = textStickerNameInput?.value.trim();
             const text = textStickerText?.value.trim();
             if (!stickerName) {
@@ -860,14 +1215,12 @@ function setupStickerCreatorEvents(modal) {
         }
     });
 
-    // Previous button
     prevBtn.addEventListener('click', () => {
         if (stickerCreatorVars.currentStep === 2 || stickerCreatorVars.currentStep === 3) {
             goToStep(modal, 1);
         }
     });
 
-    // Create button
     createBtn.addEventListener('click', async () => {
         createBtn.disabled = true;
         createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
@@ -894,7 +1247,6 @@ function setupStickerCreatorEvents(modal) {
         }
     });
 
-    // Image upload
     if (uploadArea && imageUpload) {
         uploadArea.addEventListener('click', () => imageUpload.click());
         uploadArea.addEventListener('dragover', (e) => {
@@ -919,7 +1271,6 @@ function setupStickerCreatorEvents(modal) {
         });
     }
 
-    // Remove image
     if (removeImageBtn) {
         removeImageBtn.addEventListener('click', () => {
             stickerCreatorVars.imageFile = null;
@@ -930,7 +1281,6 @@ function setupStickerCreatorEvents(modal) {
         });
     }
 
-    // Emoji selection
     if (emojiElements.length > 0) {
         emojiElements.forEach(emoji => {
             emoji.addEventListener('click', () => {
@@ -940,12 +1290,10 @@ function setupStickerCreatorEvents(modal) {
                 if (previewEmoji) previewEmoji.textContent = stickerCreatorVars.selectedEmoji;
             });
         });
-        // Select first emoji by default
         emojiElements[0].classList.add('selected');
         stickerCreatorVars.selectedEmoji = emojiElements[0].dataset.emoji;
     }
 
-    // Text sticker preview
     if (textStickerText && previewText) {
         textStickerText.addEventListener('input', () => {
             previewText.textContent = textStickerText.value || 'Your Text Here';
@@ -953,15 +1301,11 @@ function setupStickerCreatorEvents(modal) {
     }
 }
 
-// Navigate between steps in sticker creator
+// Navigate between steps
 function goToStep(modal, step) {
-    modal.querySelectorAll('.creator-step').forEach(s => {
-        s.classList.remove('active');
-    });
-    
+    modal.querySelectorAll('.creator-step').forEach(s => s.classList.remove('active'));
     const stepElement = modal.querySelector(`#step${step}`);
     if (stepElement) stepElement.classList.add('active');
-    
     stickerCreatorVars.currentStep = step;
     
     const prevBtn = modal.querySelector('#prevBtn');
@@ -973,7 +1317,7 @@ function goToStep(modal, step) {
     if (createBtn) createBtn.style.display = step === 3 ? 'inline-flex' : 'none';
 }
 
-// Show create button in sticker creator
+// Show create button
 function showCreateButton(modal) {
     const prevBtn = modal.querySelector('#prevBtn');
     const nextBtn = modal.querySelector('#nextBtn');
@@ -1066,7 +1410,6 @@ async function createImageSticker(modal) {
         throw new Error('No image file selected');
     }
     
-    // Upload to Cloudinary
     const imageUrl = await uploadToCloudinary(stickerCreatorVars.imageFile);
     
     return {
@@ -1110,7 +1453,7 @@ async function saveStickerToFirebase(stickerData) {
 }
 
 // ============================================
-// FIXED: Send sticker WITHOUT text message
+// ULTIMATE FIX: Send sticker - ONE MESSAGE ONLY
 // ============================================
 async function sendSticker(sticker) {
     if (!currentUser || !chatPartnerId || !currentThreadId || !db) {
@@ -1118,30 +1461,30 @@ async function sendSticker(sticker) {
         return;
     }
 
-    // Prevent multiple clicks
     if (isStickerSending) {
         console.log('Sticker already sending, please wait...');
         return;
     }
 
     isStickerSending = true;
+    window.isStickerMessage = true;
 
     try {
         // Check chat points
         const hasPoints = await deductChatPoint();
         if (!hasPoints) {
             isStickerSending = false;
+            window.isStickerMessage = false;
             return;
         }
 
-        // Generate a unique temporary ID
         const tempStickerId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        sentStickerIds.add(tempStickerId);
-
-        // Create sticker message data - Use ONLY [STICKER] marker
+        const messageId = generateMessageId();
+        
+        // Create sticker message
         const messageData = {
             senderId: currentUser.uid,
-            text: `[STICKER]`, // ONLY this marker, no sticker text!
+            text: '[STICKER-IGNORE]',
             stickerId: sticker.id,
             stickerName: sticker.name,
             stickerType: sticker.type,
@@ -1152,14 +1495,17 @@ async function sendSticker(sticker) {
             timestamp: serverTimestamp(),
             type: 'sticker',
             isCustom: true,
-            messageId: generateMessageId(),
-            tempId: tempStickerId
+            messageId: messageId,
+            tempId: tempStickerId,
+            isSticker: true,
+            createdAt: Date.now()
         };
 
-        console.log('Sending sticker to Firebase (NO TEXT CONTENT):', messageData);
+        console.log('Sending sticker to Firebase:', messageData);
 
         // Send to Firebase
         const docRef = await addDoc(collection(db, 'conversations', currentThreadId, 'messages'), messageData);
+        const firestoreId = docRef.id;
         
         // Update conversation
         await setDoc(doc(db, 'conversations', currentThreadId), {
@@ -1172,31 +1518,43 @@ async function sendSticker(sticker) {
             updatedAt: serverTimestamp()
         }, { merge: true });
 
+        // Display sticker IMMEDIATELY with the REAL message ID
+        displayStickerImmediately(sticker, true, firestoreId, Date.now());
+        
         closeStickerPicker();
         
-        // IMMEDIATELY display sticker in chat
-        addStickerToChatDisplay(sticker, true, tempStickerId);
-        
-        // CRITICAL: Clear any input text to prevent regular message sending
-        const messageInput = document.getElementById('messageInput');
-        if (messageInput) {
-            messageInput.value = '';
-        }
+        showNotification('Sticker sent!', 'success');
         
     } catch (error) {
         console.error('Error sending sticker:', error);
         showNotification('Error sending sticker', 'error');
     } finally {
-        isStickerSending = false;
+        setTimeout(() => {
+            isStickerSending = false;
+            window.isStickerMessage = false;
+        }, 1000);
     }
 }
 
-// Add sticker to chat display - FIXED positioning
-function addStickerToChatDisplay(sticker, isSent = true, tempId = null) {
+// Display sticker immediately
+function displayStickerImmediately(sticker, isSent = true, messageId = null, timestamp = null) {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
     
-    // Create sticker message element
+    // Remove any duplicate text bubbles
+    const existingTextBubbles = messagesContainer.querySelectorAll('.message p');
+    existingTextBubbles.forEach(bubble => {
+        if (bubble.textContent === '[STICKER-IGNORE]' || 
+            bubble.textContent === '[STICKER]') {
+            const messageDiv = bubble.closest('.message');
+            if (messageDiv) {
+                messageDiv.style.display = 'none';
+                setTimeout(() => messageDiv.remove(), 50);
+            }
+        }
+    });
+    
+    // Create pure sticker element
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isSent ? 'sent' : 'received'} sticker-message sticker-enhanced`;
     messageDiv.dataset.stickerId = sticker.id;
@@ -1207,29 +1565,32 @@ function addStickerToChatDisplay(sticker, isSent = true, tempId = null) {
     messageDiv.dataset.stickerText = sticker.text || '';
     messageDiv.dataset.isCustom = 'true';
     messageDiv.dataset.type = 'sticker';
-    if (tempId) {
-        messageDiv.dataset.tempId = tempId;
+    messageDiv.dataset.timestamp = timestamp || Date.now();
+    
+    if (messageId) {
+        messageDiv.dataset.messageId = messageId;
+        displayedMessageIds.add(messageId);
     }
     
-    // FIXED: Add inline styles to prevent jumping
     messageDiv.style.cssText = `
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 5px !important;
         margin: 5px 0 !important;
-        transition: none !important;
-        animation: none !important;
-        transform: none !important;
-        opacity: 1 !important;
-        position: relative !important;
+        max-width: 200px !important;
+        display: block !important;
+        clear: both !important;
+        float: ${isSent ? 'right' : 'left'} !important;
+        margin-${isSent ? 'right' : 'left'}: 10px !important;
+        animation: fadeIn 0.3s ease !important;
     `;
-    
-    // Create a paragraph for the message
-    const messageText = document.createElement('p');
-    messageText.className = 'sticker-display';
     
     let stickerHTML = '';
     
     if (sticker.type === 'image' && sticker.url) {
         stickerHTML = `
-            <div class="sticker-message-content" style="transition: none !important; transform: none !important;">
+            <div class="sticker-message-content">
                 <div class="sticker-image-container">
                     <img src="${sticker.url}" 
                          alt="${sticker.name || 'Sticker'}" 
@@ -1241,45 +1602,60 @@ function addStickerToChatDisplay(sticker, isSent = true, tempId = null) {
         `;
     } else if (sticker.type === 'text') {
         stickerHTML = `
-            <div class="sticker-message-content" style="transition: none !important; transform: none !important;">
+            <div class="sticker-message-content">
                 <div class="text-sticker-message">
                     <span class="sticker-emoji-large">${sticker.emoji || '🎨'}</span>
                     ${sticker.text ? `<span class="sticker-text-large">${sticker.text}</span>` : ''}
                 </div>
             </div>
         `;
-    } else {
-        stickerHTML = `<span>${sticker.name}</span>`;
     }
     
-    messageText.innerHTML = stickerHTML;
+    const stickerContainer = document.createElement('div');
+    stickerContainer.className = 'sticker-display-container';
+    stickerContainer.innerHTML = stickerHTML;
     
-    // Style for sent vs received
-    const content = messageText.querySelector('.sticker-message-content');
-    if (isSent) {
-        content.style.background = '#000000';
-        content.style.borderColor = '#333333';
-        content.style.color = 'white';
-    } else {
-        content.style.background = 'white';
-        content.style.borderColor = '#e8e8e8';
-        content.style.color = '#333';
+    const content = stickerContainer.querySelector('.sticker-message-content');
+    if (content) {
+        if (isSent) {
+            content.style.background = '#000000';
+            content.style.borderColor = '#333333';
+            content.style.color = 'white';
+        } else {
+            content.style.background = 'white';
+            content.style.borderColor = '#e8e8e8';
+            content.style.color = '#333';
+        }
     }
     
-    // Add to message div
-    messageDiv.appendChild(messageText);
+    messageDiv.appendChild(stickerContainer);
     
-    // Add timestamp
     const timeSpan = document.createElement('span');
     timeSpan.className = 'message-time';
     timeSpan.textContent = 'Just now';
     messageDiv.appendChild(timeSpan);
     
-    // Add to chat - APPEND at the end
-    messagesContainer.appendChild(messageDiv);
+    // Insert in correct position
+    insertMessageInOrder(messagesContainer, messageDiv, timestamp || Date.now());
     
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Remove any duplicate text bubbles
+    setTimeout(() => {
+        const allMessages = messagesContainer.querySelectorAll('.message');
+        allMessages.forEach(msg => {
+            const textElement = msg.querySelector('p');
+            if (textElement && (textElement.textContent === '[STICKER-IGNORE]' || 
+                               textElement.textContent === '[STICKER]')) {
+                msg.style.display = 'none';
+                setTimeout(() => msg.remove(), 50);
+            }
+        });
+        
+        // Re-arrange messages
+        arrangeMessages(messagesContainer);
+    }, 100);
 }
 
 // Generate unique message ID
@@ -1334,26 +1710,48 @@ function setupStickerListener() {
         limit(50)
     );
 
-    onSnapshot(messagesQuery, (snapshot) => {
+    if (stickerListenerUnsubscribe) {
+        stickerListenerUnsubscribe();
+    }
+
+    stickerListenerUnsubscribe = onSnapshot(messagesQuery, (snapshot) => {
         snapshot.docChanges().forEach(change => {
             if (change.type === 'added') {
                 const message = change.doc.data();
                 const messageId = change.doc.id;
                 
-                if (message.type === 'sticker' || message.text?.includes('[STICKER]')) {
+                if (displayedMessageIds.has(messageId)) {
+                    return; // Already displayed
+                }
+                
+                if (message.type === 'sticker' || message.text === '[STICKER-IGNORE]' || message.isSticker) {
                     const isOwnMessage = message.senderId === currentUser.uid;
                     
                     if (isOwnMessage && message.tempId) {
                         if (sentStickerIds.has(message.tempId)) {
                             sentStickerIds.delete(message.tempId);
-                            updateExistingStickerWithMessageId(message.tempId, messageId);
+                            updateExistingStickerWithMessageId(message.tempId, messageId, message);
                             return;
                         }
                     }
                     
-                    displayReceivedSticker(message, isOwnMessage, messageId);
-                    
                     if (!isOwnMessage) {
+                        const stickerData = {
+                            id: message.stickerId,
+                            name: message.stickerName,
+                            type: message.stickerType,
+                            url: message.stickerUrl,
+                            emoji: message.stickerEmoji,
+                            text: message.stickerText
+                        };
+                        
+                        const fullMessage = {
+                            ...message,
+                            id: messageId,
+                            timestampValue: message.createdAt || Date.now()
+                        };
+                        
+                        displayStickerFromDatabase(fullMessage);
                         saveReceivedSticker(message);
                     }
                 }
@@ -1363,7 +1761,7 @@ function setupStickerListener() {
 }
 
 // Update existing sticker with the real message ID
-function updateExistingStickerWithMessageId(tempId, messageId) {
+function updateExistingStickerWithMessageId(tempId, messageId, message) {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
     
@@ -1371,21 +1769,13 @@ function updateExistingStickerWithMessageId(tempId, messageId) {
     if (existingSticker) {
         existingSticker.dataset.messageId = messageId;
         delete existingSticker.dataset.tempId;
+        
+        if (message.createdAt) {
+            existingSticker.dataset.timestamp = message.createdAt;
+        }
+        
+        displayedMessageIds.add(messageId);
     }
-}
-
-// Display received sticker
-function displayReceivedSticker(message, isOwnMessage = false, messageId = null) {
-    const stickerData = {
-        id: message.stickerId,
-        name: message.stickerName,
-        type: message.stickerType,
-        url: message.stickerUrl,
-        emoji: message.stickerEmoji,
-        text: message.stickerText
-    };
-    
-    addStickerToChatDisplay(stickerData, isOwnMessage, message.tempId || messageId);
 }
 
 // Save received sticker automatically
@@ -1453,7 +1843,13 @@ function updateSavedStickersDisplay(savedStickers) {
     savedStickers.forEach(sticker => {
         const stickerItem = createStickerElement(sticker);
         stickerItem.classList.add('saved');
-        stickerItem.addEventListener('click', () => sendSticker(sticker));
+        stickerItem.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            window.isStickerMessage = true;
+            setTimeout(() => sendSticker(sticker), 10);
+        }, true);
         savedStickersGrid.appendChild(stickerItem);
     });
 }
@@ -1501,7 +1897,7 @@ if (typeof showNotification === 'undefined') {
     };
 }
 
-// Load sticker styles - ADDED FIXED STYLES
+// Load COMPLETE sticker styles
 function loadStickerStyles() {
     if (document.getElementById('sticker-styles')) return;
 
@@ -1553,166 +1949,6 @@ function loadStickerStyles() {
             transform: translateY(0);
         }
         
-        /* CRITICAL FIX: Sticker Message Styles - NO JUMPING */
-        .message.sticker-message {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            padding: 5px !important;
-            max-width: 200px;
-            margin: 5px 0 !important;
-            transition: none !important;
-            animation: none !important;
-            transform: none !important;
-            opacity: 1 !important;
-            position: relative !important;
-        }
-        
-        .message.sticker-message.sent {
-            margin-left: auto !important;
-            margin-right: 10px !important;
-            float: right !important;
-            clear: both !important;
-        }
-        
-        .message.sticker-message.received {
-            margin-left: 10px !important;
-            margin-right: auto !important;
-            float: left !important;
-            clear: both !important;
-        }
-        
-        .sticker-message-content {
-            display: inline-block;
-            border-radius: 18px;
-            padding: 12px;
-            border: 2px solid #e8e8e8;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 200px;
-            background: white;
-            transition: none !important;
-            transform: none !important;
-        }
-        
-        /* Sent stickers - BLACK background */
-        .message.sent .sticker-message-content {
-            background: #000000 !important;
-            border-color: #333333;
-            color: white;
-        }
-        
-        /* Received stickers - White background */
-        .message.received .sticker-message-content {
-            background: white !important;
-            border-color: #e8e8e8;
-            color: #333;
-        }
-        
-        .sticker-image-container {
-            position: relative;
-            width: 150px;
-            height: 150px;
-            margin: 0 auto;
-        }
-        
-        .sticker-message-image {
-            width: 100%;
-            height: 100%;
-            border-radius: 10px;
-            object-fit: cover;
-            display: block;
-            background: #f5f5f5;
-        }
-        
-        /* Text overlay on image */
-        .sticker-text-on-image {
-            position: absolute;
-            top: 10px;
-            left: 0;
-            right: 0;
-            color: white;
-            padding: 6px 10px;
-            font-size: 14px;
-            text-align: center;
-            font-weight: 600;
-            margin: 0 10px;
-            word-break: break-word;
-            z-index: 2;
-            text-shadow: 
-                1px 1px 3px rgba(0, 0, 0, 0.8),
-                0 0 8px rgba(0, 0, 0, 0.6),
-                0 0 15px rgba(0, 0, 0, 0.4);
-            background: transparent !important;
-            -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.7);
-        }
-        
-        .message.sent .sticker-text-on-image {
-            color: white;
-            text-shadow: 
-                1px 1px 3px rgba(0, 0, 0, 0.8),
-                0 0 8px rgba(0, 0, 0, 0.6),
-                0 0 15px rgba(0, 0, 0, 0.4);
-        }
-        
-        .message.received .sticker-text-on-image {
-            color: white;
-            text-shadow: 
-                1px 1px 3px rgba(0, 0, 0, 0.8),
-                0 0 8px rgba(0, 0, 0, 0.6),
-                0 0 15px rgba(0, 0, 0, 0.4);
-        }
-        
-        .text-sticker-message {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 15px;
-            min-height: 120px;
-        }
-        
-        .sticker-emoji-large {
-            font-size: 3rem;
-            margin-bottom: 10px;
-        }
-        
-        .sticker-text-large {
-            font-size: 16px;
-            font-weight: 600;
-            text-align: center;
-            word-break: break-word;
-            max-width: 180px;
-            line-height: 1.4;
-            background: transparent !important;
-        }
-        
-        .message.sent .sticker-text-large {
-            color: white;
-        }
-        
-        .message.received .sticker-text-large {
-            color: #333;
-        }
-        
-        .sticker-display p {
-            display: none;
-        }
-        
-        .message-time {
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.7);
-            text-align: center;
-            margin-top: 8px;
-            opacity: 0.8;
-            display: block !important;
-        }
-        
-        .message.received .message-time {
-            color: rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Additional styles for sticker picker... */
         .sticker-picker-header {
             display: flex;
             justify-content: space-between;
@@ -1954,7 +2190,149 @@ function loadStickerStyles() {
             transform: scale(1.05);
         }
 
-        /* Sticker Creator Modal */
+        /* STICKER MESSAGE STYLES - NO TEXT BUBBLES */
+        .sticker-display-container {
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        .message.sticker-message {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 5px !important;
+            margin: 5px 0 !important;
+            max-width: 200px !important;
+            display: block !important;
+            clear: both !important;
+            float: none !important;
+            animation: fadeIn 0.3s ease !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .message.sticker-message.sent {
+            float: right !important;
+            margin-right: 10px !important;
+        }
+        
+        .message.sticker-message.received {
+            float: left !important;
+            margin-left: 10px !important;
+        }
+        
+        .sticker-message-content {
+            display: inline-block;
+            border-radius: 18px;
+            padding: 12px;
+            border: 2px solid #e8e8e8;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 200px;
+            background: white;
+        }
+        
+        .message.sent .sticker-message-content {
+            background: #000000 !important;
+            border-color: #333333;
+            color: white;
+        }
+        
+        .message.received .sticker-message-content {
+            background: white !important;
+            border-color: #e8e8e8;
+            color: #333;
+        }
+        
+        .sticker-image-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 0 auto;
+        }
+        
+        .sticker-message-image {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            object-fit: cover;
+            display: block;
+            background: #f5f5f5;
+        }
+        
+        .sticker-text-on-image {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            color: white;
+            padding: 6px 10px;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 600;
+            margin: 0 10px;
+            word-break: break-word;
+            z-index: 2;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 8px rgba(0, 0, 0, 0.6),
+                0 0 15px rgba(0, 0, 0, 0.4);
+            background: transparent !important;
+            -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.7);
+        }
+        
+        .text-sticker-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            min-height: 120px;
+        }
+        
+        .sticker-emoji-large {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        
+        .sticker-text-large {
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            word-break: break-word;
+            max-width: 180px;
+            line-height: 1.4;
+            background: transparent !important;
+        }
+        
+        .message.sent .sticker-text-large {
+            color: white;
+        }
+        
+        .message.received .sticker-text-large {
+            color: #333;
+        }
+        
+        .message-time {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            margin-top: 8px;
+            opacity: 0.8;
+            display: block !important;
+        }
+        
+        .message.received .message-time {
+            color: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Animation for fade in */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Sticker Creator Modal Styles */
         .sticker-creator-modal {
             display: none;
             position: fixed;
@@ -2311,6 +2689,9 @@ function loadStickerStyles() {
 // Clean up when page unloads
 window.addEventListener('beforeunload', () => {
     closeStickerPicker();
+    if (stickerListenerUnsubscribe) {
+        stickerListenerUnsubscribe();
+    }
 });
 
 // Make functions available globally
@@ -2320,13 +2701,3 @@ window.stickerFunctions = {
     loadUserStickers,
     loadSavedStickers
 };
-
-// Export for module usage if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        firebaseConfig,
-        initializeFeatures,
-        loadUserStickers,
-        sendSticker
-    };
-}
