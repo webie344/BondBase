@@ -90,6 +90,101 @@
             width: 100%;
         }
 
+/* MODERN MESSAGES LIST STYLING - TikTok/WhatsApp Style */
+
+/* Remove all padding from the messages list container */
+.messages-list-container {
+    padding: 0 !important;
+}
+
+/* Remove padding from messages list itself */
+#messagesList {
+    padding: 0 !important;
+}
+
+/* TikTok/WhatsApp style message cards - edge to edge */
+.message-card {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px !important; /* Only left/right padding */
+    margin: 0 !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Remove the last border from the last message card */
+.message-card:last-child {
+    border-bottom: none !important;
+}
+
+/* Add a subtle hover effect that covers full width */
+.message-card:hover {
+    background-color: rgba(179, 0, 75, 0.05) !important;
+}
+
+/* Avatar styling */
+.message-card img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 12px;
+}
+
+.message-content {
+    flex: 1;
+    overflow: hidden;
+    min-width: 0; /* Allow text truncation */
+}
+
+.message-content h3 {
+    margin: 0 0 4px 0;
+    font-size: 1rem;
+    font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.message-time {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    white-space: nowrap;
+    margin-left: 8px;
+}
+
+.message-content p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.unread-count {
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    margin-left: 8px;
+}
+
+.no-messages {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
         /* Back button */
         .back-button {
             display: flex;
