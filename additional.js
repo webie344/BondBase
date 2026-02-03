@@ -1,5 +1,5 @@
-// Additional features for Dating Connect App - PROFESSIONAL STICKERS VERSION
-// Profile picture navigation, animation library, and animated stickers
+// Additional features for Dating Connect App - STICKER CREATION VERSION
+// Profile picture navigation and custom sticker creation like WhatsApp/Telegram
 
 import { 
     getAuth,
@@ -18,10 +18,11 @@ import {
     updateDoc,
     query,
     orderBy,
-    limit
+    limit,
+    arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Firebase configuration (same as your app.js)
+// Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
     authDomain: "dating-connect.firebaseapp.com",
@@ -30,6 +31,10 @@ const firebaseConfig = {
     messagingSenderId: "1062172180210",
     appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
 };
+
+// Cloudinary configuration - REPLACE WITH YOUR CREDENTIALS
+const CLOUDINARY_CLOUD_NAME = "YOUR_CLOUDINARY_CLOUD_NAME";
+const CLOUDINARY_UPLOAD_PRESET = "dating_connect_stickers";
 
 // Initialize Firebase
 const app = window.app || (() => {
@@ -43,54 +48,23 @@ const app = window.app || (() => {
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// REAL-LIFE ANIMATIONS - WhatsApp style
-const ANIMATION_EMOJIS = [
-    { emoji: '❤️', name: 'heart_love', animation: 'heartLove' },
-    { emoji: '😊', name: 'smile_blush', animation: 'smileBlush' },
-    { emoji: '😂', name: 'laughing', animation: 'laughingTears' },
-    { emoji: '😍', name: 'heart_eyes', animation: 'heartEyes' },
-    { emoji: '🤗', name: 'hugging', animation: 'huggingFace' },
-    { emoji: '😘', name: 'kiss_heart', animation: 'kissHeart' },
-    { emoji: '🥰', name: 'smiling_hearts', animation: 'smilingHearts' },
-    { emoji: '😇', name: 'angel_halo', animation: 'angelHalo' },
-    { emoji: '🤩', name: 'star_struck', animation: 'starStruck' },
-    { emoji: '🥺', name: 'pleading_face', animation: 'pleadingFace' },
-    { emoji: '🤭', name: 'hand_mouth', animation: 'handOverMouth' },
-    { emoji: '🙏', name: 'praying_hands', animation: 'prayingHands' }
-];
-
-// PROFESSIONAL ANIMATED STICKERS - Real-life expressions
-const ANIMATED_STICKERS = [
-    { name: 'love_heart', emoji: '❤️', animation: 'loveHeart', type: 'sticker' },
-    { name: 'wink_kiss', emoji: '😉💋', animation: 'winkKiss', type: 'sticker' },
-    { name: 'happy_dance', emoji: '💃😄', animation: 'happyDance', type: 'sticker' },
-    { name: 'thinking_face', emoji: '🤔💭', animation: 'thinkingFace', type: 'sticker' },
-    { name: 'coffee_love', emoji: '☕❤️', animation: 'coffeeLove', type: 'sticker' },
-    { name: 'music_vibes', emoji: '🎵🎶', animation: 'musicVibes', type: 'sticker' },
-    { name: 'thumbs_up', emoji: '👍👌', animation: 'thumbsUp', type: 'sticker' },
-    { name: 'rainbow_heart', emoji: '🌈❤️', animation: 'rainbowHeart', type: 'sticker' },
-    { name: 'night_sky', emoji: '🌙✨', animation: 'nightSky', type: 'sticker' },
-    { name: 'camera_flash', emoji: '📸✨', animation: 'cameraFlash', type: 'sticker' },
-    { name: 'gift_heart', emoji: '🎁❤️', animation: 'giftHeart', type: 'sticker' },
-    { name: 'message_bubble', emoji: '💬💭', animation: 'messageBubble', type: 'sticker' }
-];
-
 // Global variables
-let animationLibraryOpen = false;
-let userHasPremium = false;
 let currentUser = null;
 let chatPartnerId = null;
-let playedAnimations = new Set();
-let animationListenerUnsubscribe = null;
-let lastProcessedMessageTime = 0;
 let currentThreadId = null;
+let userStickers = [];
+let stickerPickerOpen = false;
+let stickerCreatorVars = {
+    currentStep: 1,
+    stickerType: '',
+    selectedImage: null,
+    selectedEmoji: '😊',
+    imageFile: null
+};
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    loadAnimationStyles();
-    
-    // Load played animations from localStorage
-    loadPlayedAnimations();
+    loadStickerStyles();
     
     // Set up auth state listener
     onAuthStateChanged(auth, (user) => {
@@ -99,47 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
             initializeFeatures();
         } else {
             currentUser = null;
-            cleanupAnimationListener();
-            playedAnimations.clear();
         }
     });
 });
-
-// Load played animations from localStorage
-function loadPlayedAnimations() {
-    try {
-        const stored = localStorage.getItem('playedAnimations');
-        if (stored) {
-            const data = JSON.parse(stored);
-            playedAnimations = new Set(data.animations || []);
-            lastProcessedMessageTime = data.lastProcessedTime || 0;
-        }
-    } catch (error) {
-        console.error('Error loading played animations:', error);
-    }
-}
-
-// Save played animations to localStorage
-function savePlayedAnimations() {
-    try {
-        const data = {
-            animations: Array.from(playedAnimations),
-            lastProcessedTime: lastProcessedMessageTime,
-            timestamp: Date.now()
-        };
-        localStorage.setItem('playedAnimations', JSON.stringify(data));
-    } catch (error) {
-        console.error('Error saving played animations:', error);
-    }
-}
-
-// Clean up animation listener
-function cleanupAnimationListener() {
-    if (animationListenerUnsubscribe) {
-        animationListenerUnsubscribe();
-        animationListenerUnsubscribe = null;
-    }
-}
 
 // Initialize features after auth
 function initializeFeatures() {
@@ -151,14 +87,170 @@ function initializeFeatures() {
     }
     
     initProfilePictureNavigation();
-    initAnimationLibrary();
-    checkPremiumStatus();
+    initStickerSystem();
+    loadUserStickers();
     
-    // Set up animation listener for chat page
+    // Set up sticker listener for chat page
     if (window.location.pathname.includes('chat.html') && chatPartnerId) {
         setTimeout(() => {
-            setupAnimationListener();
+            setupStickerListener();
+            setupStickerMessageEnhancer();
         }, 2000);
+    }
+}
+
+// Setup sticker message enhancer
+function setupStickerMessageEnhancer() {
+    // Run immediately
+    enhanceStickerMessages();
+    
+    // Run periodically to catch new messages
+    setInterval(enhanceStickerMessages, 500);
+    
+    // Also listen for DOM changes
+    const messagesContainer = document.getElementById('chatMessages');
+    if (messagesContainer) {
+        const observer = new MutationObserver(() => {
+            enhanceStickerMessages();
+        });
+        
+        observer.observe(messagesContainer, {
+            childList: true,
+            subtree: true
+        });
+    }
+}
+
+// Enhance sticker messages in chat
+function enhanceStickerMessages() {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) {
+        setTimeout(enhanceStickerMessages, 1000);
+        return;
+    }
+    
+    // Find all messages
+    const messages = messagesContainer.querySelectorAll('.message');
+    
+    messages.forEach(message => {
+        // Skip if already enhanced
+        if (message.classList.contains('sticker-enhanced')) {
+            return;
+        }
+        
+        // Check if this is a sticker message by looking at the content
+        const messageText = message.querySelector('p');
+        if (!messageText) return;
+        
+        const textContent = messageText.textContent || '';
+        
+        // Check if message has sticker data attributes
+        const stickerData = extractStickerDataFromMessage(message);
+        
+        if (stickerData) {
+            createStickerDisplay(message, messageText, stickerData);
+            message.classList.add('sticker-enhanced', 'sticker-message');
+        }
+    });
+}
+
+// Extract sticker data from message element
+function extractStickerDataFromMessage(message) {
+    // Check for explicit sticker data attributes
+    if (message.dataset.stickerType || message.dataset.stickerId) {
+        return {
+            id: message.dataset.stickerId,
+            name: message.dataset.stickerName || 'Sticker',
+            type: message.dataset.stickerType || 'text',
+            url: message.dataset.stickerUrl || '',
+            emoji: message.dataset.stickerEmoji || '',
+            text: message.dataset.stickerText || '',
+            isCustom: message.dataset.isCustom === 'true'
+        };
+    }
+    
+    // Check for message text that indicates it's a sticker
+    const messageText = message.querySelector('p');
+    if (!messageText) return null;
+    
+    const text = messageText.textContent || '';
+    
+    // If message has image URL in data attributes
+    if (message.dataset.imageUrl) {
+        return {
+            id: message.id || `sticker_${Date.now()}`,
+            name: 'Image Sticker',
+            type: 'image',
+            url: message.dataset.imageUrl,
+            text: text
+        };
+    }
+    
+    return null;
+}
+
+// Create sticker display in chat
+function createStickerDisplay(message, messageText, stickerData) {
+    // Create sticker display
+    let stickerHTML = '';
+    
+    if (stickerData.type === 'image' && stickerData.url) {
+        stickerHTML = `
+            <div class="sticker-message-content">
+                <div class="sticker-image-container">
+                    <img src="${stickerData.url}" 
+                         alt="${stickerData.name || 'Sticker'}" 
+                         class="sticker-message-image"
+                         onerror="this.onerror=null;this.src='https://via.placeholder.com/150/FF6B8B/FFFFFF?text=Sticker'">
+                    ${stickerData.text ? `<div class="sticker-text-on-image">${stickerData.text}</div>` : ''}
+                </div>
+            </div>
+        `;
+    } else if (stickerData.type === 'text') {
+        stickerHTML = `
+            <div class="sticker-message-content">
+                <div class="text-sticker-message">
+                    <span class="sticker-emoji-large">${stickerData.emoji || '🎨'}</span>
+                    ${stickerData.text ? `<span class="sticker-text-large">${stickerData.text}</span>` : ''}
+                </div>
+            </div>
+        `;
+    } else {
+        // Fallback to original text if no valid sticker data
+        return;
+    }
+    
+    // Replace message content with sticker
+    messageText.innerHTML = stickerHTML;
+    messageText.classList.add('sticker-display');
+    
+    // Style for sent vs received
+    const content = messageText.querySelector('.sticker-message-content');
+    if (message.classList.contains('sent')) {
+        content.style.background = '#000000';
+        content.style.borderColor = '#333333';
+        content.style.color = 'white';
+    } else {
+        content.style.background = 'white';
+        content.style.borderColor = '#e8e8e8';
+        content.style.color = '#333';
+    }
+}
+
+// Load user's custom stickers
+async function loadUserStickers() {
+    if (!currentUser) return;
+    
+    try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+            userStickers = userSnap.data().stickers || [];
+            updateStickerPicker();
+        }
+    } catch (error) {
+        console.error('Error loading user stickers:', error);
     }
 }
 
@@ -185,129 +277,133 @@ function navigateToProfile() {
     }
 }
 
-// Initialize animation library with improved button placement
-function initAnimationLibrary() {
+// Initialize sticker system (WhatsApp/Telegram style)
+function initStickerSystem() {
     if (window.location.pathname.includes('chat.html')) {
-        addAnimationLibraryButton();
-        createAnimationLibraryModal();
-        setupInputFocusHandling();
+        addStickerButton();
+        createStickerPicker();
     }
 }
 
-// Add animation library button with proper positioning
-function addAnimationLibraryButton() {
+// Add sticker button next to input (like WhatsApp/Telegram)
+function addStickerButton() {
     const chatInputContainer = document.querySelector('.chat-input-container');
-    if (!chatInputContainer) {
-        setTimeout(addAnimationLibraryButton, 1000);
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    
+    if (!chatInputContainer || !messageInput) {
+        setTimeout(addStickerButton, 1000);
         return;
     }
 
     // Remove existing button if any
-    const existingBtn = document.getElementById('animationLibraryBtn');
+    const existingBtn = document.getElementById('stickerPickerBtn');
     if (existingBtn) {
         existingBtn.remove();
     }
 
-    const animationBtn = document.createElement('button');
-    animationBtn.id = 'animationLibraryBtn';
-    animationBtn.className = 'animation-btn';
-    animationBtn.innerHTML = '<i class="fas fa-smile"></i>';
-    animationBtn.title = 'Expressions & Stickers';
-    animationBtn.addEventListener('click', toggleAnimationLibrary);
+    // Create sticker button
+    const stickerBtn = document.createElement('button');
+    stickerBtn.id = 'stickerPickerBtn';
+    stickerBtn.className = 'sticker-picker-btn';
+    stickerBtn.innerHTML = '<i class="fas fa-smile"></i>';
+    stickerBtn.title = 'Stickers';
+    stickerBtn.type = 'button';
+    stickerBtn.addEventListener('click', toggleStickerPicker);
 
-    // Insert at the beginning of the chat input container
-    const messageInput = document.getElementById('messageInput');
-    if (messageInput && messageInput.parentNode === chatInputContainer) {
-        chatInputContainer.insertBefore(animationBtn, messageInput);
+    // Insert button before send button
+    if (sendButton) {
+        chatInputContainer.insertBefore(stickerBtn, sendButton);
     } else {
-        chatInputContainer.insertBefore(animationBtn, chatInputContainer.firstChild);
+        chatInputContainer.appendChild(stickerBtn);
     }
+
+    // Adjust input width
+    messageInput.style.paddingRight = '50px';
 }
 
-// Set up input focus handling for responsive width
-function setupInputFocusHandling() {
-    const messageInput = document.getElementById('messageInput');
-    const animationBtn = document.getElementById('animationLibraryBtn');
+// Create sticker picker panel (like WhatsApp/Telegram keyboard replacement)
+function createStickerPicker() {
+    if (document.getElementById('stickerPickerPanel')) return;
+
+    const pickerPanel = document.createElement('div');
+    pickerPanel.id = 'stickerPickerPanel';
+    pickerPanel.className = 'sticker-picker-panel';
     
-    if (!messageInput || !animationBtn) {
-        setTimeout(setupInputFocusHandling, 1000);
-        return;
-    }
-
-    // Add focus event to hide animation button
-    messageInput.addEventListener('focus', () => {
-        animationBtn.style.display = 'none';
-        // Expand input width when focused
-        messageInput.style.width = 'calc(100% - 100px)';
-    });
-
-    // Add blur event to show animation button
-    messageInput.addEventListener('blur', () => {
-        setTimeout(() => {
-            animationBtn.style.display = 'flex';
-            // Shrink input width when not focused
-            messageInput.style.width = 'calc(100% - 150px)';
-        }, 100);
-    });
-
-    // Initial setup
-    animationBtn.style.display = 'flex';
-    messageInput.style.width = 'calc(100% - 150px)';
-    messageInput.style.transition = 'width 0.3s ease';
-}
-
-// Create animation library modal with stickers section
-function createAnimationLibraryModal() {
-    if (document.getElementById('animationLibraryModal')) return;
-
-    const modal = document.createElement('div');
-    modal.id = 'animationLibraryModal';
-    modal.className = 'animation-modal';
-    modal.innerHTML = `
-        <div class="animation-modal-content">
-            <div class="animation-modal-header">
-                <h3>Expressions & Stickers</h3>
-                <button class="close-animation-modal">&times;</button>
-            </div>
-            <div class="animation-tabs">
-                <button class="tab-button active" data-tab="animations">Reactions</button>
-                <button class="tab-button" data-tab="stickers">Stickers</button>
-            </div>
-            <div class="tab-content">
-                <div class="tab-pane active" id="animations-tab">
-                    <div class="animation-grid">
-                        ${ANIMATION_EMOJIS.map(anim => `
-                            <div class="animation-item" data-type="animation" data-animation="${anim.animation}">
-                                <span class="animation-emoji">${anim.emoji}</span>
-                                <span class="animation-name">${anim.name.replace('_', ' ')}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="tab-pane" id="stickers-tab">
-                    <div class="sticker-grid">
-                        ${ANIMATED_STICKERS.map(sticker => `
-                            <div class="sticker-item" data-type="sticker" data-sticker="${sticker.animation}">
-                                <div class="sticker-emoji ${sticker.animation}">${sticker.emoji}</div>
-                                <span class="sticker-name">${sticker.name.replace('_', ' ')}</span>
-                            </div>
-                        `).join('')}
+    pickerPanel.innerHTML = `
+        <div class="sticker-picker-header">
+            <h4>My Stickers</h4>
+            <button class="create-sticker-btn" id="createStickerBtn">
+                <i class="fas fa-plus"></i> Create
+            </button>
+        </div>
+        <div class="sticker-tabs">
+            <button class="sticker-tab active" data-tab="my-stickers">My Stickers</button>
+            <button class="sticker-tab" data-tab="saved-stickers">Saved</button>
+        </div>
+        <div class="sticker-content">
+            <div class="tab-content active" id="my-stickers-tab">
+                <div class="sticker-grid" id="myStickersGrid">
+                    <!-- User's stickers will be loaded here -->
+                    <div class="no-stickers" id="noStickersMessage">
+                        <i class="fas fa-smile"></i>
+                        <p>No stickers yet</p>
+                        <button class="create-first-sticker">Create your first sticker</button>
                     </div>
                 </div>
             </div>
-            <div class="animation-premium-notice" id="premiumNotice" style="display: none;">
-                <i class="fas fa-crown"></i>
-                <p>Premium feature: Upgrade to send animations & stickers</p>
+            <div class="tab-content" id="saved-stickers-tab">
+                <div class="sticker-grid" id="savedStickersGrid">
+                    <!-- Saved stickers will be loaded here -->
+                    <div class="no-stickers">
+                        <i class="fas fa-heart"></i>
+                        <p>No saved stickers</p>
+                    </div>
+                </div>
             </div>
+        </div>
+        <div class="sticker-picker-footer">
+            <button class="close-sticker-picker">
+                <i class="fas fa-times"></i> Close
+            </button>
         </div>
     `;
 
-    document.body.appendChild(modal);
+    // Insert picker panel after chat container
+    const chatContainer = document.querySelector('.chat-container') || 
+                         document.querySelector('.chat-messages-container') ||
+                         document.body;
+    chatContainer.appendChild(pickerPanel);
 
-    // Tab functionality
-    const tabButtons = modal.querySelectorAll('.tab-button');
-    const tabPanes = modal.querySelectorAll('.tab-pane');
+    // Setup event listeners
+    setupStickerPickerEvents();
+}
+
+// Setup sticker picker event listeners
+function setupStickerPickerEvents() {
+    const pickerPanel = document.getElementById('stickerPickerPanel');
+    if (!pickerPanel) return;
     
+    const closeBtn = pickerPanel.querySelector('.close-sticker-picker');
+    const createBtn = pickerPanel.querySelector('#createStickerBtn');
+    const createFirstBtn = pickerPanel.querySelector('.create-first-sticker');
+    const tabButtons = pickerPanel.querySelectorAll('.sticker-tab');
+    const tabContents = pickerPanel.querySelectorAll('.tab-content');
+
+    // Close button
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeStickerPicker);
+    }
+
+    // Create sticker buttons
+    if (createBtn) {
+        createBtn.addEventListener('click', openStickerCreator);
+    }
+    if (createFirstBtn) {
+        createFirstBtn.addEventListener('click', openStickerCreator);
+    }
+
+    // Tab switching
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
             const tabName = button.dataset.tab;
@@ -316,167 +412,616 @@ function createAnimationLibraryModal() {
             tabButtons.forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
             
-            // Show active tab pane
-            tabPanes.forEach(pane => pane.classList.remove('active'));
-            document.getElementById(`${tabName}-tab`).classList.add('active');
+            // Show active tab content
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === `${tabName}-tab`) {
+                    content.classList.add('active');
+                }
+            });
+            
+            // Load saved stickers if switching to that tab
+            if (tabName === 'saved-stickers') {
+                loadSavedStickers();
+            }
         });
     });
 
-    modal.querySelector('.close-animation-modal').addEventListener('click', closeAnimationLibrary);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeAnimationLibrary();
-    });
-
-    // Animation items
-    const animationItems = modal.querySelectorAll('.animation-item');
-    animationItems.forEach(item => {
-        item.addEventListener('click', () => selectAnimation(item.dataset.animation));
-    });
-
-    // Sticker items
-    const stickerItems = modal.querySelectorAll('.sticker-item');
-    stickerItems.forEach(item => {
-        item.addEventListener('click', () => selectSticker(item.dataset.sticker));
+    // Click outside to close
+    document.addEventListener('click', (e) => {
+        if (stickerPickerOpen && 
+            !pickerPanel.contains(e.target) && 
+            !e.target.closest('#stickerPickerBtn')) {
+            closeStickerPicker();
+        }
     });
 }
 
-// Toggle animation library
-function toggleAnimationLibrary() {
-    const modal = document.getElementById('animationLibraryModal');
-    if (!modal) return;
-
-    if (animationLibraryOpen) {
-        closeAnimationLibrary();
+// Toggle sticker picker (show/hide like WhatsApp keyboard)
+function toggleStickerPicker(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    if (stickerPickerOpen) {
+        closeStickerPicker();
     } else {
-        openAnimationLibrary();
+        openStickerPicker();
     }
 }
 
-// Open animation library
-function openAnimationLibrary() {
-    const modal = document.getElementById('animationLibraryModal');
-    if (!modal) return;
-
-    modal.style.display = 'block';
-    animationLibraryOpen = true;
-
-    const premiumNotice = document.getElementById('premiumNotice');
-    if (premiumNotice) {
-        premiumNotice.style.display = userHasPremium ? 'none' : 'flex';
-    }
-
-    const animationItems = document.querySelectorAll('.animation-item');
-    const stickerItems = document.querySelectorAll('.sticker-item');
+// Open sticker picker (replaces keyboard)
+function openStickerPicker() {
+    const pickerPanel = document.getElementById('stickerPickerPanel');
+    const messageInput = document.getElementById('messageInput');
     
-    animationItems.forEach(item => {
-        if (!userHasPremium) {
-            item.classList.add('premium-locked');
-        } else {
-            item.classList.remove('premium-locked');
+    if (!pickerPanel || !messageInput) return;
+    
+    // Hide keyboard on mobile by blurring input
+    messageInput.blur();
+    
+    // Show picker panel
+    pickerPanel.style.display = 'block';
+    
+    // Slide up animation
+    setTimeout(() => {
+        pickerPanel.classList.add('open');
+    }, 10);
+    
+    stickerPickerOpen = true;
+    
+    // Update sticker display
+    updateStickerPicker();
+}
+
+// Close sticker picker
+function closeStickerPicker() {
+    const pickerPanel = document.getElementById('stickerPickerPanel');
+    
+    if (!pickerPanel) return;
+    
+    // Slide down animation
+    pickerPanel.classList.remove('open');
+    
+    setTimeout(() => {
+        pickerPanel.style.display = 'none';
+    }, 300);
+    
+    stickerPickerOpen = false;
+    
+    // Focus back on input
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) {
+        setTimeout(() => {
+            messageInput.focus();
+        }, 350);
+    }
+}
+
+// Update sticker picker with user's stickers
+function updateStickerPicker() {
+    const myStickersGrid = document.getElementById('myStickersGrid');
+    const noStickersMessage = document.getElementById('noStickersMessage');
+    
+    if (!myStickersGrid) return;
+    
+    // Clear existing stickers except the no stickers message
+    const existingStickers = myStickersGrid.querySelectorAll('.sticker-item');
+    existingStickers.forEach(sticker => sticker.remove());
+    
+    // Show/hide no stickers message
+    if (noStickersMessage) {
+        noStickersMessage.style.display = userStickers.length > 0 ? 'none' : 'flex';
+    }
+    
+    // Add user's stickers
+    userStickers.forEach((sticker, index) => {
+        const stickerItem = createStickerElement(sticker, index);
+        stickerItem.addEventListener('click', () => sendSticker(sticker));
+        myStickersGrid.appendChild(stickerItem);
+    });
+}
+
+// Create sticker element
+function createStickerElement(sticker, index) {
+    const stickerItem = document.createElement('div');
+    stickerItem.className = 'sticker-item';
+    stickerItem.dataset.stickerId = sticker.id;
+    stickerItem.dataset.stickerIndex = index;
+    
+    if (sticker.type === 'image') {
+        stickerItem.innerHTML = `
+            <div class="sticker-item-image-container">
+                <img src="${sticker.url}" alt="${sticker.name || 'Custom Sticker'}" class="sticker-image">
+                ${sticker.text ? `<div class="sticker-text-on-item">${sticker.text}</div>` : ''}
+            </div>
+        `;
+    } else {
+        stickerItem.innerHTML = `
+            <div class="text-sticker">
+                <span class="sticker-emoji">${sticker.emoji || '🎨'}</span>
+                ${sticker.text ? `<span class="sticker-text">${sticker.text}</span>` : ''}
+            </div>
+        `;
+    }
+    
+    return stickerItem;
+}
+
+// Open sticker creator modal
+function openStickerCreator() {
+    closeStickerPicker();
+    
+    // Reset creator variables
+    stickerCreatorVars = {
+        currentStep: 1,
+        stickerType: '',
+        selectedImage: null,
+        selectedEmoji: '😊',
+        imageFile: null
+    };
+
+    // Create creator modal
+    const modal = document.createElement('div');
+    modal.id = 'stickerCreatorModal';
+    modal.className = 'sticker-creator-modal';
+    modal.innerHTML = `
+        <div class="sticker-creator-content">
+            <div class="sticker-creator-header">
+                <h3><i class="fas fa-plus-circle"></i> Create New Sticker</h3>
+                <button class="close-creator">&times;</button>
+            </div>
+            
+            <div class="sticker-creator-body">
+                <!-- Step 1: Choose type -->
+                <div class="creator-step active" id="step1">
+                    <h4>Choose Sticker Type</h4>
+                    <div class="type-options">
+                        <div class="type-option" data-type="image">
+                            <div class="type-icon">
+                                <i class="fas fa-image"></i>
+                            </div>
+                            <div class="type-info">
+                                <h5>Photo Sticker</h5>
+                                <p>Upload a photo and add text</p>
+                            </div>
+                        </div>
+                        <div class="type-option" data-type="text">
+                            <div class="type-icon">
+                                <i class="fas fa-font"></i>
+                            </div>
+                            <div class="type-info">
+                                <h5>Text Sticker</h5>
+                                <p>Create with emoji and text</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Image upload -->
+                <div class="creator-step" id="step2">
+                    <h4>Upload Photo</h4>
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Click to upload or drag & drop</p>
+                        <p class="upload-hint">Max size: 5MB • PNG, JPG, GIF</p>
+                        <input type="file" id="imageUpload" accept="image/*" hidden>
+                    </div>
+                    <div class="image-preview" id="imagePreview" style="display: none;">
+                        <img id="previewImage" src="" alt="Preview">
+                        <button class="remove-image" id="removeImage">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="stickerName">Sticker Name</label>
+                        <input type="text" id="stickerName" 
+                               placeholder="My Awesome Sticker" 
+                               maxlength="20">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="stickerText">Add Text (Optional)</label>
+                        <input type="text" id="stickerText" 
+                               placeholder="Add text to your sticker" 
+                               maxlength="30">
+                    </div>
+                </div>
+                
+                <!-- Step 3: Text sticker -->
+                <div class="creator-step" id="step3">
+                    <h4>Create Text Sticker</h4>
+                    
+                    <div class="form-group">
+                        <label for="textStickerName">Sticker Name</label>
+                        <input type="text" id="textStickerName" 
+                               placeholder="My Text Sticker" 
+                               maxlength="20">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Choose Emoji</label>
+                        <div class="emoji-grid">
+                            <span class="emoji" data-emoji="😊">😊</span>
+                            <span class="emoji" data-emoji="❤️">❤️</span>
+                            <span class="emoji" data-emoji="😂">😂</span>
+                            <span class="emoji" data-emoji="😍">😍</span>
+                            <span class="emoji" data-emoji="🥰">🥰</span>
+                            <span class="emoji" data-emoji="😎">😎</span>
+                            <span class="emoji" data-emoji="🤔">🤔</span>
+                            <span class="emoji" data-emoji="🎉">🎉</span>
+                            <span class="emoji" data-emoji="🔥">🔥</span>
+                            <span class="emoji" data-emoji="💯">💯</span>
+                            <span class="emoji" data-emoji="✨">✨</span>
+                            <span class="emoji" data-emoji="🌟">🌟</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="textStickerText">Sticker Text</label>
+                        <input type="text" id="textStickerText" 
+                               placeholder="Enter your text" 
+                               maxlength="40">
+                    </div>
+                    
+                    <div class="preview-area">
+                        <div class="text-sticker-preview" id="textStickerPreview">
+                            <span class="preview-emoji">😊</span>
+                            <span class="preview-text">Your Text Here</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Navigation buttons -->
+                <div class="creator-navigation">
+                    <button class="nav-btn prev-btn" id="prevBtn" style="display: none;">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <button class="nav-btn next-btn" id="nextBtn">
+                        Next <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button class="nav-btn create-btn" id="createBtn" style="display: none;">
+                        <i class="fas fa-check"></i> Create Sticker
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+
+    // Setup event listeners for creator
+    setupStickerCreatorEvents(modal);
+}
+
+// Setup sticker creator event listeners
+function setupStickerCreatorEvents(modal) {
+    const closeBtn = modal.querySelector('.close-creator');
+    const typeOptions = modal.querySelectorAll('.type-option');
+    const nextBtn = modal.querySelector('#nextBtn');
+    const prevBtn = modal.querySelector('#prevBtn');
+    const createBtn = modal.querySelector('#createBtn');
+    const uploadArea = modal.querySelector('#uploadArea');
+    const imageUpload = modal.querySelector('#imageUpload');
+    const removeImageBtn = modal.querySelector('#removeImage');
+    const emojiElements = modal.querySelectorAll('.emoji');
+    const textPreview = modal.querySelector('#textStickerPreview');
+    const previewEmoji = textPreview?.querySelector('.preview-emoji');
+    const previewText = textPreview?.querySelector('.preview-text');
+    const textStickerText = modal.querySelector('#textStickerText');
+    const stickerNameInput = modal.querySelector('#stickerName');
+    const textStickerNameInput = modal.querySelector('#textStickerName');
+
+    // Close modal
+    closeBtn.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+
+    // Type selection
+    typeOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            typeOptions.forEach(opt => opt.classList.remove('selected'));
+            option.classList.add('selected');
+            stickerCreatorVars.stickerType = option.dataset.type;
+            nextBtn.disabled = false;
+        });
+    });
+
+    // Next button
+    nextBtn.addEventListener('click', () => {
+        if (stickerCreatorVars.currentStep === 1 && stickerCreatorVars.stickerType) {
+            // Go to step 2 or 3 based on type
+            goToStep(modal, stickerCreatorVars.stickerType === 'image' ? 2 : 3);
+        } else if (stickerCreatorVars.currentStep === 2) {
+            // Validate image sticker
+            const stickerName = stickerNameInput?.value.trim();
+            if (!stickerName) {
+                showNotification('Please enter a sticker name', 'error');
+                return;
+            }
+            if (!stickerCreatorVars.imageFile) {
+                showNotification('Please upload an image', 'error');
+                return;
+            }
+            showCreateButton(modal);
+        } else if (stickerCreatorVars.currentStep === 3) {
+            // Validate text sticker
+            const stickerName = textStickerNameInput?.value.trim();
+            const text = textStickerText?.value.trim();
+            if (!stickerName) {
+                showNotification('Please enter a sticker name', 'error');
+                return;
+            }
+            if (!text) {
+                showNotification('Please enter sticker text', 'error');
+                return;
+            }
+            showCreateButton(modal);
         }
     });
-    
-    stickerItems.forEach(item => {
-        if (!userHasPremium) {
-            item.classList.add('premium-locked');
-        } else {
-            item.classList.remove('premium-locked');
+
+    // Previous button
+    prevBtn.addEventListener('click', () => {
+        if (stickerCreatorVars.currentStep === 2 || stickerCreatorVars.currentStep === 3) {
+            goToStep(modal, 1);
         }
     });
-}
 
-// Close animation library
-function closeAnimationLibrary() {
-    const modal = document.getElementById('animationLibraryModal');
-    if (!modal) return;
-
-    modal.style.display = 'none';
-    animationLibraryOpen = false;
-}
-
-// Select animation
-async function selectAnimation(animationType) {
-    if (!userHasPremium) {
-        showNotification('Premium feature: Upgrade to send animations', 'warning');
-        return;
-    }
-
-    try {
-        const animationData = ANIMATION_EMOJIS.find(anim => anim.animation === animationType);
-        if (!animationData) return;
-
-        await sendAnimationMessage(animationData);
-        closeAnimationLibrary();
-        showNotification('Reaction sent!', 'success');
-    } catch (error) {
-        showNotification('Error sending animation', 'error');
-    }
-}
-
-// Select sticker
-async function selectSticker(stickerType) {
-    if (!userHasPremium) {
-        showNotification('Premium feature: Upgrade to send stickers', 'warning');
-        return;
-    }
-
-    try {
-        const stickerData = ANIMATED_STICKERS.find(sticker => sticker.animation === stickerType);
-        if (!stickerData) return;
-
-        await sendStickerMessage(stickerData);
-        closeAnimationLibrary();
-        showNotification('Sticker sent!', 'success');
-    } catch (error) {
-        showNotification('Error sending sticker', 'error');
-    }
-}
-
-// Send animation message
-async function sendAnimationMessage(animationData) {
-    if (!currentUser || !chatPartnerId || !currentThreadId) {
-        return;
-    }
-
-    try {
-        const messageData = {
-            senderId: currentUser.uid,
-            text: `Sent ${animationData.name.replace('_', ' ')} reaction`,
-            animation: animationData.animation,
-            emoji: animationData.emoji,
-            animationName: animationData.name,
-            read: false,
-            timestamp: serverTimestamp(),
-            type: 'animation',
-            messageId: generateMessageId()
-        };
-
-        const docRef = await addDoc(collection(db, 'conversations', currentThreadId, 'messages'), messageData);
+    // Create button
+    createBtn.addEventListener('click', async () => {
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
         
-        // Update conversation
-        await setDoc(doc(db, 'conversations', currentThreadId), {
-            participants: [currentUser.uid, chatPartnerId],
-            lastMessage: {
-                text: `Sent ${animationData.name.replace('_', ' ')} reaction`,
-                senderId: currentUser.uid,
-                timestamp: serverTimestamp()
-            },
-            updatedAt: serverTimestamp()
-        }, { merge: true });
+        try {
+            let stickerData;
+            
+            if (stickerCreatorVars.stickerType === 'image') {
+                stickerData = await createImageSticker(modal);
+            } else {
+                stickerData = await createTextSticker(modal);
+            }
+            
+            await saveStickerToFirebase(stickerData);
+            
+            showNotification('Sticker created successfully!', 'success');
+            modal.remove();
+            loadUserStickers();
+        } catch (error) {
+            console.error('Error creating sticker:', error);
+            showNotification('Error creating sticker. Please try again.', 'error');
+            createBtn.disabled = false;
+            createBtn.innerHTML = '<i class="fas fa-check"></i> Create Sticker';
+        }
+    });
 
-    } catch (error) {
-        throw error;
+    // Image upload
+    if (uploadArea && imageUpload) {
+        uploadArea.addEventListener('click', () => imageUpload.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleImageUpload(e.dataTransfer.files[0], modal);
+            }
+        });
+
+        imageUpload.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleImageUpload(e.target.files[0], modal);
+            }
+        });
+    }
+
+    // Remove image
+    if (removeImageBtn) {
+        removeImageBtn.addEventListener('click', () => {
+            stickerCreatorVars.imageFile = null;
+            const imagePreview = modal.querySelector('#imagePreview');
+            if (imagePreview) imagePreview.style.display = 'none';
+            if (uploadArea) uploadArea.style.display = 'flex';
+            nextBtn.disabled = true;
+        });
+    }
+
+    // Emoji selection
+    if (emojiElements.length > 0) {
+        emojiElements.forEach(emoji => {
+            emoji.addEventListener('click', () => {
+                emojiElements.forEach(e => e.classList.remove('selected'));
+                emoji.classList.add('selected');
+                stickerCreatorVars.selectedEmoji = emoji.dataset.emoji;
+                if (previewEmoji) previewEmoji.textContent = stickerCreatorVars.selectedEmoji;
+            });
+        });
+        // Select first emoji by default
+        emojiElements[0].classList.add('selected');
+        stickerCreatorVars.selectedEmoji = emojiElements[0].dataset.emoji;
+    }
+
+    // Text sticker preview
+    if (textStickerText && previewText) {
+        textStickerText.addEventListener('input', () => {
+            previewText.textContent = textStickerText.value || 'Your Text Here';
+        });
     }
 }
 
-// Send sticker message
-async function sendStickerMessage(stickerData) {
+// Handle image upload
+function handleImageUpload(file, modal) {
+    if (!file.type.match('image.*')) {
+        showNotification('Please upload an image file (PNG, JPG, GIF)', 'error');
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+        showNotification('Image must be less than 5MB', 'error');
+        return;
+    }
+    
+    stickerCreatorVars.imageFile = file;
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+        const preview = modal.querySelector('#previewImage');
+        const imagePreview = modal.querySelector('#imagePreview');
+        const uploadArea = modal.querySelector('#uploadArea');
+        const nextBtn = modal.querySelector('#nextBtn');
+        
+        if (preview) preview.src = e.target.result;
+        if (imagePreview) imagePreview.style.display = 'block';
+        if (uploadArea) uploadArea.style.display = 'none';
+        if (nextBtn) nextBtn.disabled = false;
+    };
+    
+    reader.onerror = () => {
+        showNotification('Error reading image file', 'error');
+    };
+    
+    reader.readAsDataURL(file);
+}
+
+// Navigate between steps
+function goToStep(modal, step) {
+    modal.querySelectorAll('.creator-step').forEach(s => {
+        s.classList.remove('active');
+    });
+    
+    const stepElement = modal.querySelector(`#step${step}`);
+    if (stepElement) stepElement.classList.add('active');
+    
+    stickerCreatorVars.currentStep = step;
+    
+    const prevBtn = modal.querySelector('#prevBtn');
+    const nextBtn = modal.querySelector('#nextBtn');
+    const createBtn = modal.querySelector('#createBtn');
+    
+    if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-flex';
+    if (nextBtn) nextBtn.style.display = step === 3 ? 'none' : 'inline-flex';
+    if (createBtn) createBtn.style.display = step === 3 ? 'inline-flex' : 'none';
+}
+
+// Show create button
+function showCreateButton(modal) {
+    const prevBtn = modal.querySelector('#prevBtn');
+    const nextBtn = modal.querySelector('#nextBtn');
+    const createBtn = modal.querySelector('#createBtn');
+    
+    if (prevBtn) prevBtn.style.display = 'inline-flex';
+    if (nextBtn) nextBtn.style.display = 'none';
+    if (createBtn) createBtn.style.display = 'inline-flex';
+}
+
+// Upload image to Cloudinary
+async function uploadToCloudinary(imageFile) {
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+        throw new Error('Cloudinary configuration missing');
+    }
+    
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', imageFile);
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        formData.append('folder', 'dating_connect/stickers');
+        
+        fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.secure_url) {
+                resolve(data.secure_url);
+            } else {
+                reject(new Error('Upload failed: No URL returned'));
+            }
+        })
+        .catch(error => {
+            console.error('Cloudinary upload error:', error);
+            reject(error);
+        });
+    });
+}
+
+// Create image sticker data
+async function createImageSticker(modal) {
+    const stickerNameInput = modal.querySelector('#stickerName');
+    const stickerTextInput = modal.querySelector('#stickerText');
+    
+    const stickerName = stickerNameInput ? stickerNameInput.value.trim() : '';
+    const stickerText = stickerTextInput ? stickerTextInput.value.trim() : '';
+    
+    if (!stickerCreatorVars.imageFile) {
+        throw new Error('No image file selected');
+    }
+    
+    // Upload to Cloudinary
+    const imageUrl = await uploadToCloudinary(stickerCreatorVars.imageFile);
+    
+    return {
+        id: `sticker_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: stickerName,
+        type: 'image',
+        text: stickerText,
+        url: imageUrl,
+        createdAt: Date.now(),
+        createdBy: currentUser.uid
+    };
+}
+
+// Create text sticker data
+async function createTextSticker(modal) {
+    const stickerNameInput = modal.querySelector('#textStickerName');
+    const stickerTextInput = modal.querySelector('#textStickerText');
+    
+    const stickerName = stickerNameInput ? stickerNameInput.value.trim() : '';
+    const stickerText = stickerTextInput ? stickerTextInput.value.trim() : '';
+    
+    return {
+        id: `sticker_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: stickerName,
+        type: 'text',
+        text: stickerText,
+        emoji: stickerCreatorVars.selectedEmoji,
+        createdAt: Date.now(),
+        createdBy: currentUser.uid
+    };
+}
+
+// Save sticker to Firebase
+async function saveStickerToFirebase(stickerData) {
+    if (!currentUser) throw new Error('User not authenticated');
+
+    const userRef = doc(db, 'users', currentUser.uid);
+    await updateDoc(userRef, {
+        stickers: arrayUnion(stickerData)
+    });
+}
+
+// Send sticker in chat
+async function sendSticker(sticker) {
     if (!currentUser || !chatPartnerId || !currentThreadId) {
+        showNotification('Cannot send sticker', 'error');
         return;
     }
 
     try {
-        // Check if user has chat points
+        // Check chat points
         const hasPoints = await deductChatPoint();
         if (!hasPoints) {
             return;
@@ -484,13 +1029,17 @@ async function sendStickerMessage(stickerData) {
 
         const messageData = {
             senderId: currentUser.uid,
-            text: stickerData.emoji,
-            sticker: stickerData.animation,
-            emoji: stickerData.emoji,
-            stickerName: stickerData.name,
+            text: sticker.text || sticker.emoji || sticker.name,
+            stickerId: sticker.id,
+            stickerName: sticker.name,
+            stickerType: sticker.type,
+            stickerUrl: sticker.url || '',
+            stickerEmoji: sticker.emoji || '',
+            stickerText: sticker.text || '',
             read: false,
             timestamp: serverTimestamp(),
             type: 'sticker',
+            isCustom: true,
             messageId: generateMessageId()
         };
 
@@ -500,19 +1049,116 @@ async function sendStickerMessage(stickerData) {
         await setDoc(doc(db, 'conversations', currentThreadId), {
             participants: [currentUser.uid, chatPartnerId],
             lastMessage: {
-                text: `Sent ${stickerData.name.replace('_', ' ')} sticker`,
+                text: `Sent ${sticker.name} sticker`,
                 senderId: currentUser.uid,
                 timestamp: serverTimestamp()
             },
             updatedAt: serverTimestamp()
         }, { merge: true });
 
+        closeStickerPicker();
+        showNotification('Sticker sent!', 'success');
+        
+        // Immediately add sticker to chat display
+        addStickerToChatDisplay(sticker, true, docRef.id);
     } catch (error) {
-        throw error;
+        console.error('Error sending sticker:', error);
+        showNotification('Error sending sticker', 'error');
     }
 }
 
-// Deduct chat points function
+// Add sticker to chat display immediately
+function addStickerToChatDisplay(sticker, isSent = true, messageId = null) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) return;
+    
+    // Create sticker message element
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+    messageDiv.dataset.stickerId = sticker.id;
+    messageDiv.dataset.stickerName = sticker.name;
+    messageDiv.dataset.stickerType = sticker.type;
+    messageDiv.dataset.stickerUrl = sticker.url || '';
+    messageDiv.dataset.stickerEmoji = sticker.emoji || '';
+    messageDiv.dataset.stickerText = sticker.text || '';
+    messageDiv.dataset.isCustom = 'true';
+    messageDiv.dataset.type = 'sticker';
+    if (messageId) messageDiv.dataset.messageId = messageId;
+    
+    // Create a paragraph for the message
+    const messageText = document.createElement('p');
+    messageText.className = 'sticker-message';
+    
+    let stickerHTML = '';
+    
+    if (sticker.type === 'image' && sticker.url) {
+        stickerHTML = `
+            <div class="sticker-message-content">
+                <div class="sticker-image-container">
+                    <img src="${sticker.url}" 
+                         alt="${sticker.name || 'Sticker'}" 
+                         class="sticker-message-image"
+                         onerror="this.onerror=null;this.src='https://via.placeholder.com/150/FF6B8B/FFFFFF?text=Sticker'">
+                    ${sticker.text ? `<div class="sticker-text-on-image">${sticker.text}</div>` : ''}
+                </div>
+            </div>
+        `;
+    } else if (sticker.type === 'text') {
+        stickerHTML = `
+            <div class="sticker-message-content">
+                <div class="text-sticker-message">
+                    <span class="sticker-emoji-large">${sticker.emoji || '🎨'}</span>
+                    ${sticker.text ? `<span class="sticker-text-large">${sticker.text}</span>` : ''}
+                </div>
+            </div>
+        `;
+    } else {
+        // Fallback
+        stickerHTML = `
+            <span>${sticker.name}</span>
+        `;
+    }
+    
+    messageText.innerHTML = stickerHTML;
+    
+    // Style for sent vs received
+    const content = messageText.querySelector('.sticker-message-content');
+    if (isSent) {
+        content.style.background = '#000000';
+        content.style.borderColor = '#333333';
+        content.style.color = 'white';
+    } else {
+        content.style.background = 'white';
+        content.style.borderColor = '#e8e8e8';
+        content.style.color = '#333';
+    }
+    
+    // Add to message div
+    messageDiv.appendChild(messageText);
+    
+    // Add timestamp
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'message-time';
+    timeSpan.textContent = 'Just now';
+    messageDiv.appendChild(timeSpan);
+    
+    // Add to chat
+    messagesContainer.appendChild(messageDiv);
+    
+    // Mark as enhanced
+    messageDiv.classList.add('sticker-enhanced', 'sticker-message');
+    messageText.classList.add('sticker-display');
+    
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Generate unique message ID
+function generateMessageId() {
+    return 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Deduct chat points
 async function deductChatPoint() {
     if (!currentUser) return false;
     
@@ -521,10 +1167,11 @@ async function deductChatPoint() {
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-            const currentPoints = userSnap.data().chatPoints || 0;
+            const userData = userSnap.data();
+            const currentPoints = userData.chatPoints || 0;
             
             if (currentPoints <= 0) {
-                showNotification('You have no chat points left. Please purchase more to continue chatting.', 'warning');
+                showNotification('You have no chat points left. Please purchase more.', 'warning');
                 return false;
             }
             
@@ -532,12 +1179,7 @@ async function deductChatPoint() {
                 chatPoints: currentPoints - 1
             });
             
-            // Update the global variable that your app.js uses
-            if (window.userChatPoints !== undefined) {
-                window.userChatPoints = currentPoints - 1;
-            }
-            
-            // Update display if the function exists
+            // Update display if function exists
             if (window.updateChatPointsDisplay) {
                 window.updateChatPointsDisplay();
             }
@@ -546,160 +1188,40 @@ async function deductChatPoint() {
         }
         return false;
     } catch (error) {
+        console.error('Error deducting chat points:', error);
+        showNotification('Error processing payment', 'error');
         return false;
     }
 }
 
-// Generate unique message ID for tracking
-function generateMessageId() {
-    return 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-// Check premium status for unlimited chat points
-async function checkPremiumStatus() {
-    if (!currentUser) return;
-
-    try {
-        const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists()) {
-            const userData = userSnap.data();
-            userHasPremium = (userData.paymentHistory && 
-                userData.paymentHistory.some(payment => 
-                    (payment.plan === 'lifetime' && payment.status === 'approved') ||
-                    (userData.chatPoints >= 9999)
-                ));
-            
-            addPremiumBadges();
-        }
-    } catch (error) {
-        console.error('Error checking premium status:', error);
-    }
-}
-
-// Add premium badges to any user with unlimited plan
-async function addPremiumBadges() {
-    if (window.location.pathname.includes('mingle.html')) {
-        setTimeout(async () => {
-            const profileCards = document.querySelectorAll('.profile-card');
-            for (const card of profileCards) {
-                const profileId = card.dataset.profileId;
-                if (profileId) {
-                    try {
-                        const userRef = doc(db, 'users', profileId);
-                        const userSnap = await getDoc(userRef);
-                        
-                        if (userSnap.exists()) {
-                            const userData = userSnap.data();
-                            const isPremium = userData.paymentHistory && 
-                                userData.paymentHistory.some(payment => 
-                                    (payment.plan === 'lifetime' && payment.status === 'approved') ||
-                                    (userData.chatPoints >= 9999)
-                                );
-                            
-                            if (isPremium && !card.querySelector('.premium-badge')) {
-                                const premiumBadge = document.createElement('div');
-                                premiumBadge.className = 'premium-badge';
-                                premiumBadge.innerHTML = '<i class="fas fa-crown"></i> PREMIUM';
-                                card.appendChild(premiumBadge);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error adding premium badge:', error);
-                    }
-                }
-            }
-        }, 1000);
-    }
-
-    if (window.location.pathname.includes('profile.html')) {
-        setTimeout(async () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const profileId = urlParams.get('id');
-            
-            if (profileId) {
-                try {
-                    const userRef = doc(db, 'users', profileId);
-                    const userSnap = await getDoc(userRef);
-                    
-                    if (userSnap.exists()) {
-                        const userData = userSnap.data();
-                        const isPremium = userData.paymentHistory && 
-                            userData.paymentHistory.some(payment => 
-                                (payment.plan === 'lifetime' && payment.status === 'approved') ||
-                                (userData.chatPoints >= 9999)
-                            );
-                        
-                        if (isPremium) {
-                            const profileHeader = document.querySelector('.profile-header') || 
-                                                document.querySelector('.profile-info') ||
-                                                document.querySelector('.profile-details');
-                            if (profileHeader && !profileHeader.querySelector('.premium-badge')) {
-                                const premiumBadge = document.createElement('div');
-                                premiumBadge.className = 'premium-badge';
-                                premiumBadge.innerHTML = '<i class="fas fa-crown"></i> PREMIUM MEMBER';
-                                profileHeader.appendChild(premiumBadge);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error adding profile premium badge:', error);
-                }
-            }
-        }, 1000);
-    }
-}
-
-// Setup animation listener with read status marking
-function setupAnimationListener() {
+// Setup sticker listener for received stickers
+function setupStickerListener() {
     if (!currentUser || !chatPartnerId || !currentThreadId) {
         return;
     }
 
-    // Clean up existing listener
-    cleanupAnimationListener();
-    
     const messagesQuery = query(
         collection(db, 'conversations', currentThreadId, 'messages'),
         orderBy('timestamp', 'desc'),
         limit(50)
     );
-    
-    animationListenerUnsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+
+    onSnapshot(messagesQuery, (snapshot) => {
         snapshot.docChanges().forEach(change => {
             if (change.type === 'added') {
                 const message = change.doc.data();
                 const messageId = change.doc.id;
-                const messageTime = message.timestamp?.toMillis?.() || Date.now();
                 
-                // Process animation and sticker messages
-                if ((message.type === 'animation' || message.type === 'sticker') && 
-                    message.senderId !== currentUser.uid &&
-                    messageTime > lastProcessedMessageTime) {
+                if (message.type === 'sticker') {
+                    // Check if this is our own message that was just sent
+                    const isOwnMessage = message.senderId === currentUser.uid;
                     
-                    const animationId = message.messageId || 
-                                      `${message.senderId}_${message.animation || message.sticker}_${messageTime}`;
+                    // Display sticker in chat
+                    displayReceivedSticker(message, isOwnMessage, messageId);
                     
-                    // Check if we've already played this animation
-                    if (!playedAnimations.has(animationId)) {
-                        // Mark as played
-                        playedAnimations.add(animationId);
-                        lastProcessedMessageTime = Math.max(lastProcessedMessageTime, messageTime);
-                        savePlayedAnimations();
-                        
-                        // MARK MESSAGE AS READ in Firestore if it's from partner
-                        if (message.senderId !== currentUser.uid) {
-                            markMessageAsRead(messageId);
-                        }
-                        
-                        // Trigger the animation or sticker
-                        if (message.type === 'animation') {
-                            triggerAnimation(message.animation);
-                            showNotification(`${message.emoji} ${message.animationName} received!`, 'info');
-                        } else if (message.type === 'sticker') {
-                            showNotification(`${message.emoji} ${message.stickerName} sticker received!`, 'info');
-                        }
+                    // Auto-save received stickers to user's collection (only if from others)
+                    if (!isOwnMessage) {
+                        saveReceivedSticker(message);
                     }
                 }
             }
@@ -707,702 +1229,96 @@ function setupAnimationListener() {
     });
 }
 
-// Enhanced sticker display that works with app.js
-function enhanceStickerDisplay() {
-    const messagesContainer = document.getElementById('chatMessages');
-    if (!messagesContainer) return;
-
-    // Find all messages
-    const messages = messagesContainer.querySelectorAll('.message');
+// Display received sticker
+function displayReceivedSticker(message, isOwnMessage = false, messageId = null) {
+    const stickerData = {
+        id: message.stickerId,
+        name: message.stickerName,
+        type: message.stickerType,
+        url: message.stickerUrl,
+        emoji: message.stickerEmoji,
+        text: message.stickerText
+    };
     
-    messages.forEach(message => {
-        const messageText = message.querySelector('p');
-        if (messageText && !messageText.classList.contains('sticker-enhanced')) {
-            const text = messageText.textContent;
-            
-            // Check if this message contains any of our sticker emojis
-            ANIMATED_STICKERS.forEach(sticker => {
-                if (text.includes(sticker.emoji)) {
-                    // Mark as enhanced to prevent duplicate processing
-                    messageText.classList.add('sticker-enhanced');
-                    
-                    // Add sticker classes
-                    messageText.classList.add('message-sticker', sticker.animation);
-                    message.classList.add('sticker-message');
-                    
-                    // Add data attribute for easier CSS targeting
-                    message.setAttribute('data-message-type', 'sticker');
-                    
-                    // Apply styles
-                    messageText.style.display = 'inline-block';
-                    messageText.style.textAlign = 'center';
-                    messageText.style.margin = '5px 0';
-                    
-                    // Positioning
-                    if (message.classList.contains('sent')) {
-                        messageText.style.marginLeft = 'auto';
-                        messageText.style.marginRight = '10px';
-                    } else if (message.classList.contains('received')) {
-                        messageText.style.marginLeft = '10px';
-                        messageText.style.marginRight = 'auto';
-                    }
-                }
-            });
-        }
-    });
+    addStickerToChatDisplay(stickerData, isOwnMessage, messageId);
 }
 
-// Mark message as read in Firestore
-async function markMessageAsRead(messageId) {
-    if (!currentThreadId || !messageId) return;
+// Save received sticker automatically
+async function saveReceivedSticker(message) {
+    if (!currentUser || message.isCustom !== true) return;
     
     try {
-        const messageRef = doc(db, 'conversations', currentThreadId, 'messages', messageId);
-        await updateDoc(messageRef, {
-            read: true
+        const stickerData = {
+            id: message.stickerId,
+            name: message.stickerName,
+            type: message.stickerType,
+            text: message.stickerText || '',
+            emoji: message.stickerEmoji || '',
+            url: message.stickerUrl || '',
+            createdAt: Date.now(),
+            createdBy: message.senderId,
+            savedFrom: message.senderId
+        };
+
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, {
+            savedStickers: arrayUnion(stickerData)
         });
+
+        // Show notification
+        showNotification(`Saved "${message.stickerName}" sticker`, 'info');
     } catch (error) {
-        console.error('Error marking message as read:', error);
+        console.error('Error saving received sticker:', error);
     }
 }
 
-// Trigger animation based on type
-function triggerAnimation(animationType) {
-    const effectContainer = document.createElement('div');
-    effectContainer.className = 'animation-effect';
-    document.body.appendChild(effectContainer);
-
-    switch(animationType) {
-        case 'heartLove': createHeartLove(effectContainer); break;
-        case 'smileBlush': createSmileBlush(effectContainer); break;
-        case 'laughingTears': createLaughingTears(effectContainer); break;
-        case 'heartEyes': createHeartEyes(effectContainer); break;
-        case 'huggingFace': createHuggingFace(effectContainer); break;
-        case 'kissHeart': createKissHeart(effectContainer); break;
-        case 'smilingHearts': createSmilingHearts(effectContainer); break;
-        case 'angelHalo': createAngelHalo(effectContainer); break;
-        case 'starStruck': createStarStruck(effectContainer); break;
-        case 'pleadingFace': createPleadingFace(effectContainer); break;
-        case 'handOverMouth': createHandOverMouth(effectContainer); break;
-        case 'prayingHands': createPrayingHands(effectContainer); break;
-        default: createHeartLove(effectContainer);
-    }
-
-    setTimeout(() => {
-        if (effectContainer.parentNode) {
-            effectContainer.parentNode.removeChild(effectContainer);
+// Load saved stickers
+async function loadSavedStickers() {
+    if (!currentUser) return;
+    
+    try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+            const savedStickers = userSnap.data().savedStickers || [];
+            updateSavedStickersDisplay(savedStickers);
         }
-    }, 4000);
-}
-
-// REAL-LIFE ANIMATION FUNCTIONS
-function createHeartLove(container) {
-    for (let i = 0; i < 20; i++) {
-        setTimeout(() => {
-            const heart = document.createElement('div');
-            heart.className = 'heart';
-            heart.innerHTML = '❤️';
-            heart.style.left = Math.random() * 100 + 'vw';
-            heart.style.fontSize = (Math.random() * 25 + 20) + 'px';
-            heart.style.animationDuration = (Math.random() * 2 + 3) + 's';
-            container.appendChild(heart);
-        }, i * 150);
+    } catch (error) {
+        console.error('Error loading saved stickers:', error);
     }
 }
 
-function createSmileBlush(container) {
-    for (let i = 0; i < 15; i++) {
-        setTimeout(() => {
-            const smile = document.createElement('div');
-            smile.className = 'smile';
-            smile.innerHTML = '😊';
-            smile.style.left = Math.random() * 100 + 'vw';
-            smile.style.fontSize = (Math.random() * 20 + 25) + 'px';
-            smile.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
-            container.appendChild(smile);
-        }, i * 200);
+// Update saved stickers display
+function updateSavedStickersDisplay(savedStickers) {
+    const savedStickersGrid = document.getElementById('savedStickersGrid');
+    if (!savedStickersGrid) return;
+    
+    // Clear existing stickers
+    savedStickersGrid.innerHTML = '';
+    
+    if (savedStickers.length === 0) {
+        savedStickersGrid.innerHTML = `
+            <div class="no-stickers">
+                <i class="fas fa-heart"></i>
+                <p>No saved stickers</p>
+            </div>
+        `;
+        return;
     }
+    
+    // Add saved stickers
+    savedStickers.forEach(sticker => {
+        const stickerItem = createStickerElement(sticker);
+        stickerItem.classList.add('saved');
+        stickerItem.addEventListener('click', () => sendSticker(sticker));
+        savedStickersGrid.appendChild(stickerItem);
+    });
 }
 
-function createLaughingTears(container) {
-    for (let i = 0; i < 12; i++) {
-        setTimeout(() => {
-            const laugh = document.createElement('div');
-            laugh.className = 'laugh';
-            laugh.innerHTML = '😂';
-            laugh.style.left = Math.random() * 100 + 'vw';
-            laugh.style.fontSize = (Math.random() * 20 + 30) + 'px';
-            laugh.style.animationDuration = (Math.random() * 2 + 2) + 's';
-            container.appendChild(laugh);
-        }, i * 250);
-    }
-}
-
-function createHeartEyes(container) {
-    for (let i = 0; i < 18; i++) {
-        setTimeout(() => {
-            const heartEye = document.createElement('div');
-            heartEye.className = 'heart-eye';
-            heartEye.innerHTML = '😍';
-            heartEye.style.left = Math.random() * 100 + 'vw';
-            heartEye.style.fontSize = (Math.random() * 20 + 25) + 'px';
-            heartEye.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
-            container.appendChild(heartEye);
-        }, i * 180);
-    }
-}
-
-function createHuggingFace(container) {
-    for (let i = 0; i < 16; i++) {
-        setTimeout(() => {
-            const hug = document.createElement('div');
-            hug.className = 'hug';
-            hug.innerHTML = '🤗';
-            hug.style.left = Math.random() * 100 + 'vw';
-            hug.style.fontSize = (Math.random() * 20 + 28) + 'px';
-            hug.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
-            container.appendChild(hug);
-        }, i * 220);
-    }
-}
-
-function createKissHeart(container) {
-    for (let i = 0; i < 20; i++) {
-        setTimeout(() => {
-            const kiss = document.createElement('div');
-            kiss.className = 'kiss';
-            kiss.innerHTML = '😘';
-            kiss.style.left = Math.random() * 100 + 'vw';
-            kiss.style.fontSize = (Math.random() * 20 + 22) + 'px';
-            kiss.style.animationDuration = (Math.random() * 1 + 2) + 's';
-            container.appendChild(kiss);
-        }, i * 150);
-    }
-}
-
-function createSmilingHearts(container) {
-    for (let i = 0; i < 25; i++) {
-        setTimeout(() => {
-            const smileHeart = document.createElement('div');
-            smileHeart.className = 'smile-heart';
-            smileHeart.innerHTML = '🥰';
-            smileHeart.style.left = Math.random() * 100 + 'vw';
-            smileHeart.style.fontSize = (Math.random() * 20 + 20) + 'px';
-            smileHeart.style.animationDuration = (Math.random() * 2 + 2) + 's';
-            container.appendChild(smileHeart);
-        }, i * 120);
-    }
-}
-
-function createAngelHalo(container) {
-    for (let i = 0; i < 15; i++) {
-        setTimeout(() => {
-            const angel = document.createElement('div');
-            angel.className = 'angel';
-            angel.innerHTML = '😇';
-            angel.style.left = Math.random() * 100 + 'vw';
-            angel.style.fontSize = (Math.random() * 20 + 24) + 'px';
-            angel.style.animationDuration = (Math.random() * 2 + 3) + 's';
-            container.appendChild(angel);
-        }, i * 200);
-    }
-}
-
-function createStarStruck(container) {
-    for (let i = 0; i < 30; i++) {
-        setTimeout(() => {
-            const star = document.createElement('div');
-            star.className = 'star';
-            star.innerHTML = '🤩';
-            star.style.left = Math.random() * 100 + 'vw';
-            star.style.fontSize = (Math.random() * 15 + 20) + 'px';
-            star.style.animationDuration = (Math.random() * 1 + 2) + 's';
-            container.appendChild(star);
-        }, i * 100);
-    }
-}
-
-function createPleadingFace(container) {
-    for (let i = 0; i < 18; i++) {
-        setTimeout(() => {
-            const plead = document.createElement('div');
-            plead.className = 'plead';
-            plead.innerHTML = '🥺';
-            plead.style.left = Math.random() * 100 + 'vw';
-            plead.style.fontSize = (Math.random() * 20 + 22) + 'px';
-            plead.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
-            container.appendChild(plead);
-        }, i * 180);
-    }
-}
-
-function createHandOverMouth(container) {
-    for (let i = 0; i < 15; i++) {
-        setTimeout(() => {
-            const hand = document.createElement('div');
-            hand.className = 'hand';
-            hand.innerHTML = '🤭';
-            hand.style.left = Math.random() * 100 + 'vw';
-            hand.style.fontSize = (Math.random() * 20 + 25) + 'px';
-            hand.style.animationDuration = (Math.random() * 2 + 2) + 's';
-            container.appendChild(hand);
-        }, i * 200);
-    }
-}
-
-function createPrayingHands(container) {
-    for (let i = 0; i < 12; i++) {
-        setTimeout(() => {
-            const pray = document.createElement('div');
-            pray.className = 'pray';
-            pray.innerHTML = '🙏';
-            pray.style.left = Math.random() * 100 + 'vw';
-            pray.style.fontSize = (Math.random() * 20 + 28) + 'px';
-            pray.style.animationDuration = (Math.random() * 2 + 3) + 's';
-            container.appendChild(pray);
-        }, i * 250);
-    }
-}
-
-// Load animation styles with improved design
-function loadAnimationStyles() {
-    if (document.getElementById('animation-styles')) return;
-
-    const styles = `
-        /* Animation Library Styles - PROFESSIONAL DESIGN */
-        .chat-input-container {
-            transition: all 0.3s ease;
-        }
-        
-        .animation-btn {
-            background: linear-gradient(135deg, #FF6B8B 0%, #FF8E53 100%);
-            border: none;
-            border-radius: 50%;
-            width: 35px;
-            height: 35px;
-            color: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            flex-shrink: 0;
-            margin: 0 5px;
-        }
-        
-        .animation-btn:hover { 
-            background: linear-gradient(135deg, #FF8E53 0%, #FF6B8B 100%);
-            transform: scale(1.1); 
-            box-shadow: 0 5px 15px rgba(255, 107, 139, 0.4);
-        }
-        
-        #messageInput {
-            transition: width 0.3s ease;
-            flex: 1;
-        }
-        
-        .animation-modal { 
-            display: none; 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(0,0,0,0.8); 
-            z-index: 10000; 
-        }
-        
-        .animation-modal-content { 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%,-50%); 
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-            border-radius: 20px; 
-            width: 90%; 
-            max-width: 500px; 
-            max-height: 80vh; 
-            overflow: hidden; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            border: 2px solid #FF6B8B;
-        }
-        
-        .animation-modal-header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 20px; 
-            border-bottom: 1px solid #e8e8e8; 
-            background: linear-gradient(135deg, #FF6B8B 0%, #FF8E53 100%);
-            color: white; 
-        }
-        
-        .animation-modal-header h3 { 
-            margin: 0; 
-            font-size: 1.2rem; 
-            font-weight: 600;
-        }
-        
-        .close-animation-modal { 
-            background: none; 
-            border: none; 
-            color: white; 
-            font-size: 24px; 
-            cursor: pointer; 
-            padding: 0; 
-            width: 30px; 
-            height: 30px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-        }
-        
-        .animation-tabs {
-            display: flex;
-            border-bottom: 1px solid #e8e8e8;
-            background: #f8f9fa;
-        }
-        
-        .tab-button {
-            flex: 1;
-            padding: 12px 20px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            color: #6c757d;
-            transition: all 0.3s ease;
-        }
-        
-        .tab-button.active {
-            color: #FF6B8B;
-            border-bottom: 2px solid #FF6B8B;
-            background: white;
-        }
-        
-        .tab-content {
-            max-height: 400px;
-            overflow-y: auto;
-            background: white;
-        }
-        
-        .tab-pane {
-            display: none;
-            padding: 20px;
-        }
-        
-        .tab-pane.active {
-            display: block;
-        }
-        
-        .animation-grid, .sticker-grid { 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            gap: 15px; 
-        }
-        
-        .animation-item, .sticker-item { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            padding: 20px 10px; 
-            border-radius: 15px; 
-            cursor: pointer; 
-            transition: all 0.3s ease; 
-            border: 2px solid transparent; 
-            position: relative; 
-            background: #f8f9fa;
-        }
-        
-        .animation-item:hover, .sticker-item:hover { 
-            background: #FF6B8B15; 
-            transform: translateY(-5px); 
-            border-color: #FF6B8B;
-            box-shadow: 0 10px 20px rgba(255, 107, 139, 0.15);
-        }
-        
-        .animation-item.premium-locked, .sticker-item.premium-locked { 
-            opacity: 0.5; 
-            cursor: not-allowed; 
-        }
-        
-        .animation-item.premium-locked::after, .sticker-item.premium-locked::after { 
-            content: '👑'; 
-            position: absolute; 
-            top: 5px; 
-            right: 5px; 
-            font-size: 12px; 
-        }
-        
-        .animation-emoji { 
-            font-size: 2.5rem; 
-            margin-bottom: 10px; 
-        }
-        
-        .sticker-emoji {
-            font-size: 3rem;
-            margin-bottom: 10px;
-            transition: all 0.3s ease;
-        }
-        
-        .animation-name, .sticker-name { 
-            font-size: 0.85rem; 
-            text-align: center; 
-            text-transform: capitalize; 
-            color: #495057; 
-            font-weight: 500;
-        }
-        
-        .animation-premium-notice { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 10px; 
-            padding: 15px; 
-            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-            border-top: 1px solid #f6d365; 
-            color: #000; 
-            font-weight: bold;
-        }
-        
-        .animation-premium-notice i { 
-            color: #ffd700; 
-        }
-        
-        .premium-badge { 
-            background: linear-gradient(45deg, #FF6B8B, #FF8E53); 
-            color: white; 
-            padding: 8px 15px; 
-            border-radius: 20px; 
-            font-size: 12px; 
-            font-weight: 600; 
-            display: inline-flex; 
-            align-items: center; 
-            gap: 5px; 
-            margin: 10px; 
-            box-shadow: 0 2px 10px rgba(255, 107, 139, 0.4); 
-            z-index: 100; 
-        }
-
-        /* Sticker Animations in Library */
-        .sticker-item .loveHeart { animation: loveHeartAnim 2s infinite; }
-        .sticker-item .winkKiss { animation: winkKissAnim 2s infinite; }
-        .sticker-item .happyDance { animation: happyDanceAnim 2s infinite; }
-        .sticker-item .thinkingFace { animation: thinkingFaceAnim 2s infinite; }
-        .sticker-item .coffeeLove { animation: coffeeLoveAnim 3s infinite linear; }
-        .sticker-item .musicVibes { animation: musicVibesAnim 2s infinite; }
-        .sticker-item .thumbsUp { animation: thumbsUpAnim 1.5s infinite; }
-        .sticker-item .rainbowHeart { animation: rainbowHeartAnim 2s infinite; }
-        .sticker-item .nightSky { animation: nightSkyAnim 2s infinite; }
-        .sticker-item .cameraFlash { animation: cameraFlashAnim 2s infinite; }
-        .sticker-item .giftHeart { animation: giftHeartAnim 2s infinite; }
-        .sticker-item .messageBubble { animation: messageBubbleAnim 2s infinite; }
-
-        /* Sticker Animation Keyframes - REAL LIFE THEME */
-        @keyframes loveHeartAnim {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-        }
-        
-        @keyframes winkKissAnim {
-            0%, 100% { transform: rotate(0deg) scale(1); }
-            50% { transform: rotate(-10deg) scale(1.1); }
-        }
-        
-        @keyframes happyDanceAnim {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            25% { transform: translateY(-10px) rotate(-5deg); }
-            75% { transform: translateY(-10px) rotate(5deg); }
-        }
-        
-        @keyframes thinkingFaceAnim {
-            0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(-5deg); }
-            75% { transform: rotate(5deg); }
-        }
-        
-        @keyframes coffeeLoveAnim {
-            0% { transform: rotateY(0deg) scale(1); }
-            50% { transform: rotateY(180deg) scale(1.1); }
-            100% { transform: rotateY(360deg) scale(1); }
-        }
-        
-        @keyframes musicVibesAnim {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-5px) scale(1.1); }
-        }
-        
-        @keyframes thumbsUpAnim {
-            0%, 100% { transform: scale(1) rotate(0deg); }
-            50% { transform: scale(1.2) rotate(5deg); }
-        }
-        
-        @keyframes rainbowHeartAnim {
-            0%, 100% { transform: scale(1); filter: brightness(1); }
-            50% { transform: scale(1.1); filter: brightness(1.2); }
-        }
-        
-        @keyframes nightSkyAnim {
-            0%, 100% { transform: rotate(0deg) scale(1); }
-            50% { transform: rotate(10deg) scale(1.1); }
-        }
-        
-        @keyframes cameraFlashAnim {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.8; }
-        }
-        
-        @keyframes giftHeartAnim {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-10px) scale(1.1); }
-        }
-        
-        @keyframes messageBubbleAnim {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-
-        /* Sticker Message Styles - PROFESSIONAL WHATSAPP STYLE */
-        .message-sticker {
-            background: white !important;
-            border-radius: 18px !important;
-            padding: 15px 20px !important;
-            margin: 10px 0 !important;
-            display: inline-block !important;
-            max-width: 200px !important;
-            text-align: center !important;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
-            border: 2px solid #FF6B8B !important;
-            font-size: 2.5rem !important;
-            animation-duration: 2s !important;
-            animation-iteration-count: infinite !important;
-            animation-timing-function: ease-in-out !important;
-        }
-
-        /* Sent sticker messages */
-        .message.sent .message-sticker {
-            background: linear-gradient(135deg, #FF6B8B, #FF8E53) !important;
-            border: 2px solid #FF8E53 !important;
-            margin-left: auto !important;
-            margin-right: 15px !important;
-            color: white !important;
-        }
-
-        /* Received sticker messages */
-        .message.received .message-sticker {
-            background: white !important;
-            border: 2px solid #e8e8e8 !important;
-            margin-left: 15px !important;
-            margin-right: auto !important;
-        }
-
-        /* Sticker message hover effects */
-        .message-sticker:hover {
-            transform: scale(1.05) !important;
-            transition: transform 0.2s ease !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-        }
-
-        /* Sticker animations */
-        .message-sticker.loveHeart { animation-name: loveHeartAnim !important; }
-        .message-sticker.winkKiss { animation-name: winkKissAnim !important; }
-        .message-sticker.happyDance { animation-name: happyDanceAnim !important; }
-        .message-sticker.thinkingFace { animation-name: thinkingFaceAnim !important; }
-        .message-sticker.coffeeLove { animation-name: coffeeLoveAnim !important; }
-        .message-sticker.musicVibes { animation-name: musicVibesAnim !important; }
-        .message-sticker.thumbsUp { animation-name: thumbsUpAnim !important; }
-        .message-sticker.rainbowHeart { animation-name: rainbowHeartAnim !important; }
-        .message-sticker.nightSky { animation-name: nightSkyAnim !important; }
-        .message-sticker.cameraFlash { animation-name: cameraFlashAnim !important; }
-        .message-sticker.giftHeart { animation-name: giftHeartAnim !important; }
-        .message-sticker.messageBubble { animation-name: messageBubbleAnim !important; }
-
-        /* Sticker message timestamp styling */
-        .message.sticker-message .message-time {
-            color: #6c757d !important;
-            font-size: 11px !important;
-            margin-top: 8px !important;
-            text-align: center !important;
-            width: 100% !important;
-        }
-
-        /* Animation Elements - REAL LIFE THEME */
-        .animation-effect { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            pointer-events: none; 
-            z-index: 9999; 
-        }
-        
-        .heart, .smile, .laugh, .heart-eye, .hug, .kiss, .smile-heart, .angel, .star, .plead, .hand, .pray { 
-            position: absolute; 
-            font-size: 24px; 
-            animation: floatAnim 3s ease-in-out forwards; 
-            pointer-events: none;
-        }
-        
-        /* Animation Keyframes - REAL LIFE THEME */
-        @keyframes floatAnim {
-            0% { 
-                transform: translateY(100vh) rotate(0deg) scale(0); 
-                opacity: 1; 
-            }
-            50% { 
-                transform: translateY(50vh) rotate(180deg) scale(1); 
-                opacity: 1; 
-            }
-            100% { 
-                transform: translateY(-100px) rotate(360deg) scale(0); 
-                opacity: 0; 
-            }
-        }
-        
-        /* Mobile responsiveness for stickers */
-        @media (max-width: 768px) {
-            .message-sticker {
-                max-width: 160px !important;
-                padding: 12px 15px !important;
-                font-size: 2rem !important;
-            }
-            
-            .message.sent .message-sticker {
-                margin-right: 8px !important;
-            }
-            
-            .message.received .message-sticker {
-                margin-left: 8px !important;
-            }
-        }
-
-        /* Ensure stickers stand out in the message flow */
-        .message.sticker-message {
-            margin: 15px 0 !important;
-            padding: 8px 0 !important;
-        }
-
-        /* Remove any default message backgrounds for stickers */
-        .message:has(.message-sticker) {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-        }
-    `;
-
-    const styleSheet = document.createElement('style');
-    styleSheet.id = 'animation-styles';
-    styleSheet.textContent = styles;
-    document.head.appendChild(styleSheet);
-}
-
-// Simple notification function if showNotification doesn't exist
+// Simple notification function
 if (typeof showNotification === 'undefined') {
     window.showNotification = function(message, type = 'info') {
-        // Create a simple notification
         const notification = document.createElement('div');
         notification.style.cssText = `
             position: fixed;
@@ -1424,38 +1340,830 @@ if (typeof showNotification === 'undefined') {
             notification.style.animation = 'slideOut 0.3s ease';
             setTimeout(() => notification.remove(), 300);
         }, 3000);
+        
+        // Add CSS for animations if not present
+        if (!document.getElementById('notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'notification-styles';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
     };
 }
 
-// Enhanced sticker display that runs periodically to catch new messages
-function setupStickerEnhancer() {
-    // Run immediately
-    enhanceStickerDisplay();
-    
-    // Run every 2 seconds to catch new messages
-    setInterval(enhanceStickerDisplay, 2000);
-    
-    // Also run when new messages are added to the DOM
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.addedNodes.length > 0) {
-                enhanceStickerDisplay();
-            }
-        });
-    });
-    
-    const messagesContainer = document.getElementById('chatMessages');
-    if (messagesContainer) {
-        observer.observe(messagesContainer, { childList: true, subtree: true });
-    }
-}
+// Load sticker styles
+function loadStickerStyles() {
+    if (document.getElementById('sticker-styles')) return;
 
-// Initialize sticker enhancer when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(setupStickerEnhancer, 3000);
-});
+    const styles = `
+        /* Sticker Picker Styles - WhatsApp/Telegram Style */
+        .sticker-picker-btn {
+            background: linear-gradient(135deg, #FF6B8B 0%, #FF8E53 100%);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            margin-left: 10px;
+            position: absolute;
+            right: 60px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+        }
+        
+        .sticker-picker-btn:hover {
+            background: linear-gradient(135deg, #FF8E53 0%, #FF6B8B 100%);
+            transform: translateY(-50%) scale(1.1);
+            box-shadow: 0 5px 15px rgba(255, 107, 139, 0.4);
+        }
+        
+        .sticker-picker-panel {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 70vh;
+            background: white;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .sticker-picker-panel.open {
+            transform: translateY(0);
+        }
+        
+        .sticker-picker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e8e8e8;
+            background: white;
+            border-radius: 20px 20px 0 0;
+        }
+        
+        .sticker-picker-header h4 {
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+        }
+        
+        .create-sticker-btn {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .create-sticker-btn:hover {
+            background: linear-gradient(135deg, #45a049, #4CAF50);
+            transform: scale(1.05);
+        }
+        
+        .sticker-tabs {
+            display: flex;
+            border-bottom: 1px solid #e8e8e8;
+            background: #f8f9fa;
+        }
+        
+        .sticker-tab {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .sticker-tab.active {
+            color: #FF6B8B;
+        }
+        
+        .sticker-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(135deg, #FF6B8B, #FF8E53);
+            border-radius: 3px 3px 0 0;
+        }
+        
+        .sticker-content {
+            height: calc(100% - 120px);
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .sticker-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            padding: 10px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .sticker-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 12px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .sticker-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+        }
+        
+        .sticker-item {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            background: white;
+            border: 2px solid #e8e8e8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .sticker-item:hover {
+            transform: scale(1.05);
+            border-color: #FF6B8B;
+            box-shadow: 0 5px 15px rgba(255, 107, 139, 0.2);
+        }
+        
+        .sticker-item-image-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        .sticker-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 5px;
+        }
+        
+        .sticker-text-on-item {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 8px;
+            font-size: 11px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .text-sticker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .sticker-emoji {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+        }
+        
+        .sticker-text {
+            font-size: 12px;
+            text-align: center;
+            color: #333;
+            font-weight: 500;
+            word-break: break-word;
+            max-width: 100%;
+        }
+        
+        .no-stickers {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+            color: #666;
+        }
+        
+        .no-stickers i {
+            font-size: 48px;
+            color: #FF6B8B;
+            margin-bottom: 15px;
+            opacity: 0.7;
+        }
+        
+        .no-stickers p {
+            margin: 0 0 15px 0;
+            font-size: 16px;
+        }
+        
+        .create-first-sticker {
+            background: linear-gradient(135deg, #FF6B8B, #FF8E53);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .create-first-sticker:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(255, 107, 139, 0.3);
+        }
+        
+        .sticker-picker-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e8e8e8;
+            text-align: center;
+        }
+        
+        .close-sticker-picker {
+            background: #f0f0f0;
+            color: #333;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .close-sticker-picker:hover {
+            background: #e0e0e0;
+            transform: scale(1.05);
+        }
+
+        /* Sticker Message Display Styles - WhatsApp/Telegram Style */
+        .message.sticker-message {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 5px !important;
+            max-width: 200px;
+            margin: 10px 0;
+        }
+        
+        .message.sticker-message.sent {
+            margin-left: auto;
+            margin-right: 10px;
+        }
+        
+        .message.sticker-message.received {
+            margin-left: 10px;
+            margin-right: auto;
+        }
+        
+        .sticker-message-content {
+            display: inline-block;
+            border-radius: 18px;
+            padding: 12px;
+            border: 2px solid #e8e8e8;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            text-align: center;
+            max-width: 200px;
+            background: white;
+        }
+        
+        /* Sent stickers - BLACK background */
+        .message.sent .sticker-message-content {
+            background: #000000 !important;
+            border-color: #333333;
+            color: white;
+        }
+        
+        /* Received stickers - White background */
+        .message.received .sticker-message-content {
+            background: white !important;
+            border-color: #e8e8e8;
+            color: #333;
+        }
+        
+        .sticker-image-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 0 auto;
+        }
+        
+        .sticker-message-image {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            object-fit: cover;
+            display: block;
+            background: #f5f5f5;
+        }
+        
+        /* Text overlay on image - TRANSPARENT BACKGROUND */
+        .sticker-text-on-image {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            color: white;
+            padding: 6px 10px;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 600;
+            margin: 0 10px;
+            word-break: break-word;
+            z-index: 2;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 8px rgba(0, 0, 0, 0.6),
+                0 0 15px rgba(0, 0, 0, 0.4);
+            background: transparent !important;
+            -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.7);
+        }
+        
+        .message.sent .sticker-text-on-image {
+            color: white;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 8px rgba(0, 0, 0, 0.6),
+                0 0 15px rgba(0, 0, 0, 0.4);
+        }
+        
+        .message.received .sticker-text-on-image {
+            color: white;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 8px rgba(0, 0, 0, 0.6),
+                0 0 15px rgba(0, 0, 0, 0.4);
+        }
+        
+        .text-sticker-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            min-height: 120px;
+        }
+        
+        .sticker-emoji-large {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        
+        .sticker-text-large {
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            word-break: break-word;
+            max-width: 180px;
+            line-height: 1.4;
+            background: transparent !important;
+        }
+        
+        .message.sent .sticker-text-large {
+            color: white;
+        }
+        
+        .message.received .sticker-text-large {
+            color: #333;
+        }
+        
+        .sticker-display p {
+            display: none;
+        }
+        
+        .message-time {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            margin-top: 8px;
+            opacity: 0.8;
+        }
+        
+        .message.received .message-time {
+            color: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Sticker Creator Modal */
+        .sticker-creator-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1001;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sticker-creator-content {
+            background: white;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .sticker-creator-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #FF6B8B, #FF8E53);
+            color: white;
+        }
+        
+        .sticker-creator-header h3 {
+            margin: 0;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .close-creator {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sticker-creator-body {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        
+        .creator-step {
+            display: none;
+        }
+        
+        .creator-step.active {
+            display: block;
+        }
+        
+        .creator-step h4 {
+            margin: 0 0 20px 0;
+            color: #333;
+            text-align: center;
+            font-size: 18px;
+        }
+        
+        .type-options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .type-option {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            border: 2px solid #e8e8e8;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .type-option:hover {
+            border-color: #FF6B8B;
+            background: #fff5f7;
+        }
+        
+        .type-option.selected {
+            border-color: #FF6B8B;
+            background: linear-gradient(135deg, #fff5f7, #fffaf5);
+            box-shadow: 0 5px 15px rgba(255, 107, 139, 0.1);
+        }
+        
+        .type-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #FF6B8B, #FF8E53);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            color: white;
+            font-size: 24px;
+        }
+        
+        .type-info h5 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+        
+        .type-info p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .upload-area {
+            border: 2px dashed #FF6B8B;
+            border-radius: 15px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+            background: #fff5f7;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area.dragover {
+            background: #ffeef2;
+            border-color: #FF8E53;
+        }
+        
+        .upload-area i {
+            font-size: 48px;
+            color: #FF6B8B;
+            margin-bottom: 15px;
+        }
+        
+        .upload-area p {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+        
+        .upload-hint {
+            color: #666 !important;
+            font-size: 12px !important;
+        }
+        
+        .image-preview {
+            position: relative;
+            margin-bottom: 20px;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        
+        .image-preview img {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            background: #f8f9fa;
+        }
+        
+        .remove-image {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #FF6B8B;
+            box-shadow: 0 0 0 3px rgba(255, 107, 139, 0.1);
+        }
+        
+        .emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .emoji {
+            font-size: 24px;
+            text-align: center;
+            padding: 10px;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .emoji:hover {
+            border-color: #FF6B8B;
+            background: #fff5f7;
+        }
+        
+        .emoji.selected {
+            border-color: #FF6B8B;
+            background: linear-gradient(135deg, #FF6B8B, #FF8E53);
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .preview-area {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+        
+        .text-sticker-preview {
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px 30px;
+            background: white;
+            border: 2px solid #FF6B8B;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(255, 107, 139, 0.1);
+        }
+        
+        .preview-emoji {
+            font-size: 3rem;
+        }
+        
+        .preview-text {
+            font-size: 1.2rem;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .creator-navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e8e8e8;
+        }
+        
+        .nav-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .prev-btn {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .prev-btn:hover {
+            background: #e0e0e0;
+        }
+        
+        .next-btn {
+            background: linear-gradient(135deg, #FF6B8B, #FF8E53);
+            color: white;
+        }
+        
+        .next-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #FF8E53, #FF6B8B);
+            transform: scale(1.05);
+        }
+        
+        .next-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .create-btn {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+        
+        .create-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #45a049, #4CAF50);
+            transform: scale(1.05);
+        }
+        
+        .create-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Animation for notifications */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    `;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.id = 'sticker-styles';
+    styleSheet.textContent = styles;
+    document.head.appendChild(styleSheet);
+}
 
 // Clean up when page unloads
 window.addEventListener('beforeunload', () => {
-    cleanupAnimationListener();
+    closeStickerPicker();
 });
+
+// Make functions available globally
+window.stickerFunctions = {
+    openStickerPicker,
+    closeStickerPicker,
+    loadUserStickers,
+    loadSavedStickers
+};
