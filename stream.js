@@ -24,6 +24,47 @@ import {
     signOut 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+// Supported video formats for validation
+const SUPPORTED_VIDEO_FORMATS = [
+    'video/mp4',
+    'video/webm',
+    'video/ogg',
+    'video/quicktime',
+    'video/x-msvideo',
+    'video/x-matroska',
+    'video/x-flv',
+    'video/3gpp',
+    'video/3gpp2',
+    'video/x-m4v',
+    'video/mpeg'
+];
+
+// Supported file extensions
+const SUPPORTED_EXTENSIONS = [
+    '.mp4',
+    '.webm',
+    '.ogv',
+    '.mov',
+    '.avi',
+    '.mkv',
+    '.flv',
+    '.3gp',
+    '.3g2',
+    '.m4v',
+    '.mpg',
+    '.mpeg'
+];
+
+// Problematic formats that may need conversion
+const PROBLEMATIC_FORMATS = [
+    'video/x-msvideo',  // AVI
+    'video/x-flv',      // FLV
+    'video/x-matroska', // MKV
+    'video/quicktime',  // MOV (some codecs)
+    'video/3gpp',       // 3GP
+    'video/3gpp2'       // 3G2
+];
+
 // Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyC8_PEsfTOr-gJ8P1MoXobOAfqwTVqEZWo",
@@ -1257,14 +1298,21 @@ class StreamManager {
             return;
         }
 
-        const modalCommentInput = document.getElementById('modalCommentInput');
-        if (modalCommentInput) {
-            modalCommentInput.value = `@${userName} `;
-            modalCommentInput.focus();
-            modalCommentInput.setAttribute('data-reply-to', commentId);
-            modalCommentInput.setAttribute('data-reply-user-name', userName);
+        // Find the active comment input
+        let commentInput = null;
+        if (videoModalInstance && videoModalInstance.commentInput) {
+            commentInput = videoModalInstance.commentInput;
+        } else {
+            commentInput = document.querySelector('.comment-input');
+        }
+
+        if (commentInput) {
+            commentInput.value = `@${userName} `;
+            commentInput.focus();
+            commentInput.setAttribute('data-reply-to', commentId);
+            commentInput.setAttribute('data-reply-user-name', userName);
             
-            modalCommentInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            commentInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
 
@@ -1676,7 +1724,7 @@ class VideoGrid {
     }
 }
 
-// VIDEO MODAL CLASS
+// VIDEO MODAL CLASS - Fixed with working comments
 class VideoModal {
     constructor() {
         this.modal = null;
@@ -1688,11 +1736,17 @@ class VideoModal {
         this.isSwiping = false;
         this.startX = 0;
         this.currentX = 0;
+        this.commentsContainer = null;
         
         this.init();
     }
 
     init() {
+        this.createModal();
+        this.setupEventListeners();
+    }
+
+    createModal() {
         this.modal = document.createElement('div');
         this.modal.className = 'video-modal';
         this.modal.style.cssText = `
@@ -1841,33 +1895,62 @@ class VideoModal {
                     </button>
                 </div>
 
-                <div class="modal-add-comment" style="
-                    display: flex;
-                    gap: 10px;
-                    padding-top: 15px;
-                    border-top: 1px solid rgba(255,255,255,0.1);
-                ">
-                    <input type="text" id="modalCommentInput" placeholder="Add a comment..." style="
-                        flex: 1;
-                        background: rgba(255,255,255,0.1);
-                        border: none;
-                        color: white;
-                        padding: 12px 15px;
-                        border-radius: 25px;
-                        outline: none;
+                <!-- Comments Section -->
+                <div class="modal-comments-section" id="modalCommentsSection" style="display: none;">
+                    <div class="comments-header" style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 15px;
+                        padding-bottom: 10px;
+                        border-bottom: 1px solid rgba(255,255,255,0.1);
                     ">
-                    <button id="modalSendComment" style="
-                        background: #ff2d55;
-                        color: white;
-                        border: none;
-                        width: 44px;
-                        height: 44px;
-                        border-radius: 50%;
-                        cursor: pointer;
-                        font-size: 18px;
+                        <h4 style="margin: 0;">Comments</h4>
+                        <button id="closeCommentsBtn" style="
+                            background: none;
+                            border: none;
+                            color: #aaa;
+                            font-size: 20px;
+                            cursor: pointer;
+                        ">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="comments-list" id="modalCommentsList" style="
+                        max-height: 200px;
+                        overflow-y: auto;
+                        margin-bottom: 15px;
+                    "></div>
+                    
+                    <div class="modal-add-comment" style="
+                        display: flex;
+                        gap: 10px;
+                        padding-top: 15px;
+                        border-top: 1px solid rgba(255,255,255,0.1);
                     ">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
+                        <input type="text" id="modalCommentInput" placeholder="Add a comment..." style="
+                            flex: 1;
+                            background: rgba(255,255,255,0.1);
+                            border: none;
+                            color: white;
+                            padding: 12px 15px;
+                            border-radius: 25px;
+                            outline: none;
+                        ">
+                        <button id="modalSendComment" style="
+                            background: #ff2d55;
+                            color: white;
+                            border: none;
+                            width: 44px;
+                            height: 44px;
+                            border-radius: 50%;
+                            cursor: pointer;
+                            font-size: 18px;
+                        ">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -1880,15 +1963,23 @@ class VideoModal {
         this.commentButton = this.modal.querySelector('#modalCommentBtn');
         this.sendCommentButton = this.modal.querySelector('#modalSendComment');
         this.commentInput = this.modal.querySelector('#modalCommentInput');
+        this.closeCommentsBtn = this.modal.querySelector('#closeCommentsBtn');
+        this.commentsSection = this.modal.querySelector('#modalCommentsSection');
+        this.commentsList = this.modal.querySelector('#modalCommentsList');
         this.progressFill = this.modal.querySelector('.modal-progress-fill');
         this.videoContainer = this.modal.querySelector('.modal-video-container');
         this.leftIndicator = this.modal.querySelector('.swipe-indicator.left');
         this.rightIndicator = this.modal.querySelector('.swipe-indicator.right');
 
+        this.commentsContainer = this.commentsList;
+    }
+
+    setupEventListeners() {
         this.closeButton.addEventListener('click', () => this.close());
         this.likeButton.addEventListener('click', () => this.handleLike());
-        this.commentButton.addEventListener('click', () => this.openCommentsModal());
+        this.commentButton.addEventListener('click', () => this.toggleComments());
         this.sendCommentButton.addEventListener('click', () => this.handleAddComment());
+        this.closeCommentsBtn.addEventListener('click', () => this.toggleComments());
         this.commentInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.handleAddComment();
         });
@@ -2121,6 +2212,11 @@ class VideoModal {
         this.currentVideo = null;
         this.userVideos = [];
         this.currentIndex = 0;
+        
+        // Hide comments section when closing modal
+        if (this.commentsSection) {
+            this.commentsSection.style.display = 'none';
+        }
     }
 
     setupProgressBar() {
@@ -2136,6 +2232,27 @@ class VideoModal {
         this.progressFill.style.width = `${progress}%`;
     }
 
+    toggleComments() {
+        if (this.commentsSection.style.display === 'none') {
+            this.commentsSection.style.display = 'block';
+            this.loadComments();
+        } else {
+            this.commentsSection.style.display = 'none';
+        }
+    }
+
+    async loadComments() {
+        if (!this.currentVideo || !this.commentsContainer) return;
+
+        this.commentsContainer.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #aaa;">
+                <i class="fas fa-spinner fa-spin"></i> Loading comments...
+            </div>
+        `;
+
+        await streamManager.loadComments(this.currentVideo.id, this.commentsContainer);
+    }
+
     async handleLike() {
         if (!this.currentVideo) return;
 
@@ -2144,7 +2261,9 @@ class VideoModal {
             if (result) {
                 this.updateLikeButton();
                 const likesElement = this.modal.querySelector('#modalVideoLikes span');
-                likesElement.textContent = result.likes;
+                if (likesElement) {
+                    likesElement.textContent = result.likes;
+                }
                 
                 if (videoGridInstance) {
                     videoGridInstance.renderGrid();
@@ -2152,23 +2271,6 @@ class VideoModal {
             }
         } catch (error) {
             console.error('Error liking video:', error);
-        }
-    }
-
-    openCommentsModal() {
-        const commentsModal = document.getElementById('commentsModal');
-        if (commentsModal) {
-            commentsModal.classList.add('active');
-            this.loadComments();
-        }
-    }
-
-    async loadComments() {
-        if (!this.currentVideo) return;
-
-        const commentsList = document.getElementById('modalCommentsList');
-        if (commentsList) {
-            await streamManager.loadComments(this.currentVideo.id, commentsList);
         }
     }
 
