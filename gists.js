@@ -1,4 +1,4 @@
-// gists.js - COMPLETE VERSION WITH WHATSAPP PREVIEWS - FIXED VERSION
+// gists.js - UPGRADED VERSION WITH USER ID GENERATION & COMMENTS PAGE
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -33,7 +33,7 @@ const firebaseConfig = {
     storageBucket: "usa-dating-23bc3.firebasestorage.app",
     messagingSenderId: "423286263327",
     appId: "1:423286263327:web:17f0caf843dc349c144f2a"
-  };
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -67,6 +67,56 @@ let lastVisibleGist = null;
 let isLoading = false;
 let currentlyPlayingAudio = null;
 let currentlyPlayingButton = null;
+
+// Generate user ID and avatar
+function generateUserId() {
+    // Generate a unique 8-character ID
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 6);
+    return `user_${timestamp}${random}`.toUpperCase();
+}
+
+// Generate Dicebear avatar for user ID
+function generateUserAvatar(userId) {
+    // Use userId as seed for consistent avatar
+    const style = DICEBEAR_AVATARS[Math.floor(Math.random() * DICEBEAR_AVATARS.length)];
+    return `https://api.dicebear.com/7.x/${style}/svg?seed=${userId}&backgroundColor=b6e3f4,c0aede,d1d4f9&radius=50`;
+}
+
+// Get or create user identity
+async function getUserIdentity() {
+    try {
+        // Check if user already has an ID in localStorage
+        let userId = localStorage.getItem('anonymousUserId');
+        let userAvatar = localStorage.getItem('anonymousUserAvatar');
+        
+        // If not, generate new ones
+        if (!userId) {
+            userId = generateUserId();
+            localStorage.setItem('anonymousUserId', userId);
+        }
+        
+        if (!userAvatar) {
+            userAvatar = generateUserAvatar(userId);
+            localStorage.setItem('anonymousUserAvatar', userAvatar);
+        }
+        
+        return {
+            id: userId,
+            avatar: userAvatar,
+            displayName: `Anonymous ${userId.substring(userId.length - 4)}` // Last 4 chars for display
+        };
+    } catch (error) {
+        console.error('Error getting user identity:', error);
+        // Fallback to random generation
+        const fallbackId = generateUserId();
+        return {
+            id: fallbackId,
+            avatar: getRandomAvatar(),
+            displayName: `Anonymous`
+        };
+    }
+}
 
 // Generate random Dicebear avatar URL
 function getRandomAvatar() {
@@ -247,6 +297,8 @@ document.addEventListener('DOMContentLoaded', function() {
             initGistPreviewPage();
         } else if (currentPage === 'gist-view') {
             initGistViewPage();
+        } else if (currentPage === 'comments') {
+            initCommentsPage();
         }
     });
 });
@@ -272,9 +324,13 @@ function initCreateGistPage() {
     const attachmentsContainer = document.getElementById('attachmentsContainer');
     const gistAvatar = document.getElementById('gistAvatar');
 
-    // Set random avatar
+    // Set user's avatar
     if (gistAvatar) {
-        gistAvatar.src = getRandomAvatar();
+        getUserIdentity().then(user => {
+            gistAvatar.src = user.avatar;
+        }).catch(() => {
+            gistAvatar.src = getRandomAvatar();
+        });
     }
 
     // Character counter
@@ -809,6 +865,7 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
     
     try {
         const shareId = Math.random().toString(36).substring(2, 15);
+        const userIdentity = await getUserIdentity();
         
         const gistData = {
             content: content || '',
@@ -820,7 +877,9 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
             reposts: 0,
             highlights: 0,
             authorId: currentUser.uid,
-            authorAvatar: getRandomAvatar(),
+            anonymousUserId: userIdentity.id, // Store the anonymous user ID
+            authorAvatar: userIdentity.avatar, // Store user's consistent avatar
+            authorDisplayName: userIdentity.displayName, // Store display name
             timestamp: serverTimestamp(),
             isAnonymous: true,
             createdAt: new Date().toISOString(),
@@ -1015,6 +1074,9 @@ function displayGist(gist) {
     
     const containsVoiceNote = gist.containsVoiceNote || gist.mediaType === 'audio' || gist.mediaType === 'both';
     
+    // Use display name if available, otherwise use Anonymous
+    const authorName = gist.authorDisplayName || `Anonymous${gist.anonymousUserId ? ' ' + gist.anonymousUserId.substring(gist.anonymousUserId.length - 4) : ''}`;
+    
     let mediaContent = '';
     
     if (gist.mediaType === 'both' && gist.mediaUrl && gist.secondMediaUrl) {
@@ -1077,7 +1139,7 @@ function displayGist(gist) {
                 ${repostIcon}
             </div>
             <div class="gist-info">
-                <span class="gist-author">Anonymous${isReposted ? ' (Reposted)' : ''}</span>
+                <span class="gist-author">${authorName}${isReposted ? ' (Reposted)' : ''}</span>
                 <span class="gist-time">${timeAgo}</span>
             </div>
         </div>
@@ -1130,7 +1192,9 @@ function displayGist(gist) {
     }
     
     if (commentBtn) {
-        commentBtn.addEventListener('click', () => openCommentsModal(gist.id));
+        commentBtn.addEventListener('click', () => {
+            window.location.href = `comments.html?gistId=${gist.id}`;
+        });
     }
     
     if (highlightBtn) {
@@ -1162,6 +1226,295 @@ function displayGist(gist) {
     
     gistsContainer.appendChild(gistElement);
 }
+
+function initCommentsPage() {
+    console.log('Initializing comments page');
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const gistId = urlParams.get('gistId');
+    
+    if (!gistId) {
+        window.location.href = 'gist.html';
+        return;
+    }
+    
+    const backBtn = document.getElementById('backBtn');
+    const commentForm = document.getElementById('commentForm');
+    const commentInput = document.getElementById('commentInput');
+    const submitCommentBtn = document.getElementById('submitCommentBtn');
+    const commentsList = document.getElementById('commentsList');
+    const gistContent = document.getElementById('gistContent');
+    
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            window.history.back();
+        });
+    }
+    
+    // Load the gist
+    loadGistForComments(gistId);
+    
+    // Load comments
+    loadCommentsForPage(gistId);
+    
+    // Handle comment submission
+    if (commentForm && commentInput && submitCommentBtn) {
+        commentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const commentText = commentInput.value.trim();
+            if (!commentText) {
+                showNotification('Please enter a comment', 'warning');
+                return;
+            }
+            
+            if (!currentUser) {
+                showNotification('Please login to comment', 'warning');
+                return;
+            }
+            
+            try {
+                submitCommentBtn.disabled = true;
+                submitCommentBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
+                
+                await postComment(gistId, commentText);
+                
+                commentInput.value = '';
+                await loadCommentsForPage(gistId);
+                
+                // Update comment count in main page if we came from there
+                updateCommentCount(gistId);
+                
+            } catch (error) {
+                console.error('Error posting comment:', error);
+                showNotification('Failed to post comment: ' + error.message, 'error');
+            } finally {
+                submitCommentBtn.disabled = false;
+                submitCommentBtn.innerHTML = 'Post';
+            }
+        });
+    }
+}
+
+async function loadGistForComments(gistId) {
+    try {
+        const gistRef = doc(db, 'gists', gistId);
+        const gistSnap = await getDoc(gistRef);
+        
+        if (!gistSnap.exists()) {
+            showNotification('Gist not found', 'error');
+            window.history.back();
+            return;
+        }
+        
+        const gist = { id: gistSnap.id, ...gistSnap.data() };
+        const gistContent = document.getElementById('gistContent');
+        
+        if (!gistContent) return;
+        
+        const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
+        const authorName = gist.authorDisplayName || `Anonymous${gist.anonymousUserId ? ' ' + gist.anonymousUserId.substring(gist.anonymousUserId.length - 4) : ''}`;
+        
+        let mediaContent = '';
+        if (gist.mediaType === 'image' && gist.mediaUrl) {
+            mediaContent = `
+                <div class="gist-media">
+                    <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image" 
+                         style="max-width: 100%; border-radius: 10px; margin-top: 10px;">
+                </div>
+            `;
+        } else if (gist.mediaType === 'both' && gist.secondMediaUrl) {
+            mediaContent = `
+                <div class="gist-media">
+                    <img src="${gist.secondMediaUrl}" alt="Gist image" class="gist-image" 
+                         style="max-width: 100%; border-radius: 10px; margin-top: 10px;">
+                    <div style="margin-top: 10px; color: #666; font-size: 14px;">
+                        <i class="fas fa-microphone"></i> Voice note included
+                    </div>
+                </div>
+            `;
+        } else if (gist.mediaType === 'audio' && gist.mediaUrl) {
+            mediaContent = `
+                <div class="gist-media">
+                    <div style="margin-top: 10px; color: #666; font-size: 14px;">
+                        <i class="fas fa-microphone"></i> Voice note included
+                    </div>
+                </div>
+            `;
+        }
+        
+        gistContent.innerHTML = `
+            <div class="gist-header" style="display: flex; align-items: center; margin-bottom: 15px;">
+                <img src="${gist.authorAvatar}" alt="Avatar" 
+                     style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #b3004b; margin-right: 15px;">
+                <div>
+                    <div style="font-weight: bold; font-size: 16px;">${authorName}</div>
+                    <div style="color: #666; font-size: 14px;">${timeAgo}</div>
+                </div>
+            </div>
+            
+            ${gist.content ? `
+                <div class="gist-text" style="font-size: 16px; line-height: 1.6; color: #333;">
+                    ${escapeHtml(gist.content)}
+                </div>
+            ` : ''}
+            
+            ${mediaContent}
+            
+            <div class="gist-stats" style="display: flex; justify-content: space-around; margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+                <div style="text-align: center;">
+                    <div style="font-size: 18px; font-weight: bold; color: #b3004b;">${gist.likes || 0}</div>
+                    <div style="font-size: 12px; color: #666;">Likes</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 18px; font-weight: bold; color: #b3004b;">${gist.comments || 0}</div>
+                    <div style="font-size: 12px; color: #666;">Comments</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 18px; font-weight: bold; color: #b3004b;">${gist.reposts || 0}</div>
+                    <div style="font-size: 12px; color: #666;">Shares</div>
+                </div>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error loading gist for comments:', error);
+        showNotification('Error loading gist', 'error');
+    }
+}
+
+async function loadCommentsForPage(gistId) {
+    const commentsList = document.getElementById('commentsList');
+    if (!commentsList) return;
+    
+    commentsList.innerHTML = `
+        <div class="loading-state">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p>Loading comments...</p>
+        </div>
+    `;
+    
+    try {
+        const commentsQuery = query(
+            collection(db, 'gists', gistId, 'comments'),
+            orderBy('timestamp', 'desc')
+        );
+        
+        const commentsSnap = await getDocs(commentsQuery);
+        
+        if (commentsSnap.empty) {
+            commentsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-comments fa-3x" style="color: #b3004b; margin-bottom: 15px;"></i>
+                    <h3 style="color: #333; margin-bottom: 10px;">No comments yet</h3>
+                    <p style="color: #666;">Be the first to comment!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        commentsList.innerHTML = '';
+        
+        commentsSnap.forEach((doc) => {
+            const comment = doc.data();
+            const commentElement = document.createElement('div');
+            commentElement.className = 'comment-item';
+            commentElement.style.cssText = `
+                display: flex;
+                padding: 15px;
+                border-bottom: 1px solid #eee;
+                background: white;
+                border-radius: 10px;
+                margin-bottom: 10px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            `;
+            
+            const timeAgo = comment.timestamp ? formatTime(comment.timestamp) : 'Just now';
+            
+            commentElement.innerHTML = `
+                <img src="${comment.authorAvatar || getRandomAvatar()}" alt="Avatar" 
+                     style="width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; border: 2px solid #b3004b;">
+                <div style="flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <div style="font-weight: bold; font-size: 14px; color: #333;">
+                            ${comment.authorDisplayName || 'Anonymous'}
+                        </div>
+                        <div style="font-size: 12px; color: #666;">${timeAgo}</div>
+                    </div>
+                    <div style="font-size: 14px; color: #333; line-height: 1.5;">
+                        ${escapeHtml(comment.content)}
+                    </div>
+                </div>
+            `;
+            commentsList.appendChild(commentElement);
+        });
+        
+    } catch (error) {
+        console.error('Error loading comments:', error);
+        commentsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle fa-3x" style="color: #dc3545; margin-bottom: 15px;"></i>
+                <h3 style="color: #333; margin-bottom: 10px;">Error loading comments</h3>
+                <p style="color: #666;">Please try again later.</p>
+            </div>
+        `;
+    }
+}
+
+async function postComment(gistId, content) {
+    if (!currentUser) {
+        throw new Error('User not logged in');
+    }
+    
+    try {
+        const userIdentity = await getUserIdentity();
+        
+        const commentData = {
+            content: content,
+            authorId: currentUser.uid,
+            anonymousUserId: userIdentity.id,
+            authorAvatar: userIdentity.avatar,
+            authorDisplayName: userIdentity.displayName,
+            timestamp: serverTimestamp(),
+            createdAt: new Date().toISOString()
+        };
+        
+        await addDoc(collection(db, 'gists', gistId, 'comments'), commentData);
+        
+        const gistRef = doc(db, 'gists', gistId);
+        await runTransaction(db, async (transaction) => {
+            const gistDoc = await transaction.get(gistRef);
+            if (!gistDoc.exists()) {
+                throw new Error('Gist not found');
+            }
+            
+            const currentComments = gistDoc.data().comments || 0;
+            transaction.update(gistRef, {
+                comments: currentComments + 1
+            });
+        });
+        
+        console.log('Comment posted successfully');
+        showNotification('Comment posted!', 'success');
+        
+    } catch (error) {
+        console.error('Error posting comment:', error);
+        throw error;
+    }
+}
+
+function updateCommentCount(gistId) {
+    // This function can be called to update the comment count in the main page
+    const commentBtn = document.querySelector(`[data-gist-id="${gistId}"] .comment-btn .action-count`);
+    if (commentBtn) {
+        const currentCount = parseInt(commentBtn.textContent) || 0;
+        commentBtn.textContent = currentCount + 1;
+    }
+}
+
+// Rest of the functions remain the same (shareGist, likeGist, etc.)
+// [All other functions from the original gists.js remain unchanged below]
+// For brevity, I'll continue with the rest of the functions...
 
 function initGistPreviewPage() {
     console.log('Initializing gist preview page');
@@ -1390,6 +1743,7 @@ function isCrawler() {
 function displayGistPreview(gist, container) {
     const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
     const isReposted = gist.repostedFrom || gist.originalPostId;
+    const authorName = gist.authorDisplayName || `Anonymous${gist.anonymousUserId ? ' ' + gist.anonymousUserId.substring(gist.anonymousUserId.length - 4) : ''}`;
     
     let mediaContent = '';
     
@@ -1433,7 +1787,7 @@ function displayGistPreview(gist, container) {
                 </div>
                 <div>
                     <div style="font-weight: bold; font-size: 18px; color: #333;">
-                        Anonymous${isReposted ? ' (Reposted)' : ''}
+                        ${authorName}${isReposted ? ' (Reposted)' : ''}
                     </div>
                     <div style="color: #666; font-size: 14px; margin-top: 5px;">
                         ${timeAgo}
@@ -1579,6 +1933,7 @@ async function loadGistForView(shareId) {
 function displayGistView(gist, container) {
     const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
     const isReposted = gist.repostedFrom || gist.originalPostId;
+    const authorName = gist.authorDisplayName || `Anonymous${gist.anonymousUserId ? ' ' + gist.anonymousUserId.substring(gist.anonymousUserId.length - 4) : ''}`;
     
     let mediaContent = '';
     
@@ -1641,7 +1996,7 @@ function displayGistView(gist, container) {
                 </div>
                 <div class="gist-info">
                     <div class="gist-author" style="font-weight: bold; font-size: 18px; color: #333;">
-                        Anonymous${isReposted ? ' (Reposted)' : ''}
+                        ${authorName}${isReposted ? ' (Reposted)' : ''}
                     </div>
                     <div class="gist-time" style="color: #666; font-size: 14px; margin-top: 5px;">
                         ${timeAgo}
@@ -2097,185 +2452,6 @@ async function checkIfGistHasVoiceNote(gistId) {
     }
 }
 
-function openCommentsModal(gistId) {
-    let modal = document.getElementById('commentsModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'commentsModal';
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 500px; height: 70vh; display: flex; flex-direction: column;">
-                <div class="modal-header">
-                    <h3>Comments</h3>
-                    <button class="modal-close">&times;</button>
-                </div>
-                <div class="comments-list" style="flex: 1; overflow-y: auto; padding: 20px;">
-                    <div class="loading-comments">Loading comments...</div>
-                </div>
-                <div class="comment-input-container" style="padding: 20px; border-top: 1px solid #eee;">
-                    <form id="commentForm" style="display: flex; gap: 10px;">
-                        <input type="text" id="commentInput" placeholder="Add a comment..." 
-                               style="flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px;">
-                        <button type="submit" id="commentSubmitBtn" 
-                                style="padding: 12px 20px; background: #b3004b; color: white; border: none; border-radius: 20px; cursor: pointer;">
-                            Post
-                        </button>
-                    </form>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    }
-    
-    modal.style.display = 'flex';
-    modal.dataset.currentGist = gistId;
-    
-    loadComments(gistId);
-    
-    const closeBtn = modal.querySelector('.modal-close');
-    const commentForm = document.getElementById('commentForm');
-    const commentInput = document.getElementById('commentInput');
-    const commentSubmitBtn = document.getElementById('commentSubmitBtn');
-    
-    const closeModal = () => {
-        modal.style.display = 'none';
-        commentForm.reset();
-    };
-    
-    closeBtn.onclick = closeModal;
-    
-    commentForm.onsubmit = async (e) => {
-        e.preventDefault();
-        const commentText = commentInput.value.trim();
-        if (!commentText) return;
-        
-        if (!currentUser) {
-            showNotification('Please login to comment', 'warning');
-            return;
-        }
-        
-        try {
-            commentSubmitBtn.disabled = true;
-            commentSubmitBtn.innerHTML = 'Posting...';
-            
-            await postComment(gistId, commentText);
-            
-            commentInput.value = '';
-            await loadComments(gistId);
-            
-            const commentBtn = document.querySelector(`[data-gist-id="${gistId}"] .comment-btn .action-count`);
-            if (commentBtn) {
-                const currentCount = parseInt(commentBtn.textContent) || 0;
-                commentBtn.textContent = currentCount + 1;
-            }
-            
-        } catch (error) {
-            console.error('Error posting comment:', error);
-            showNotification('Failed to post comment: ' + error.message, 'error');
-        } finally {
-            commentSubmitBtn.disabled = false;
-            commentSubmitBtn.innerHTML = 'Post';
-        }
-    };
-    
-    modal.onclick = (e) => {
-        if (e.target === modal) {
-            closeModal();
-        }
-    };
-}
-
-async function loadComments(gistId) {
-    const modal = document.getElementById('commentsModal');
-    if (!modal) return;
-    
-    const commentsList = modal.querySelector('.comments-list');
-    if (!commentsList) return;
-    
-    commentsList.innerHTML = '<div class="loading-comments">Loading comments...</div>';
-    
-    try {
-        const gistRef = doc(db, 'gists', gistId);
-        const gistSnap = await getDoc(gistRef);
-        
-        if (!gistSnap.exists()) {
-            commentsList.innerHTML = '<div class="loading-comments">Gist not found</div>';
-            return;
-        }
-        
-        const commentsQuery = query(
-            collection(db, 'gists', gistId, 'comments'),
-            orderBy('timestamp', 'desc')
-        );
-        
-        const commentsSnap = await getDocs(commentsQuery);
-        
-        if (commentsSnap.empty) {
-            commentsList.innerHTML = '<div class="loading-comments">No comments yet. Be the first!</div>';
-            return;
-        }
-        
-        commentsList.innerHTML = '';
-        
-        commentsSnap.forEach((doc) => {
-            const comment = doc.data();
-            const commentElement = document.createElement('div');
-            commentElement.className = 'comment-item';
-            commentElement.innerHTML = `
-                <img src="${comment.authorAvatar || getRandomAvatar()}" alt="Avatar" class="comment-avatar">
-                <div class="comment-content">
-                    <div class="comment-author">Anonymous</div>
-                    <div class="comment-text">${escapeHtml(comment.content)}</div>
-                    <div class="comment-time">${formatTime(comment.timestamp)}</div>
-                </div>
-            `;
-            commentsList.appendChild(commentElement);
-        });
-        
-    } catch (error) {
-        console.error('Error loading comments:', error);
-        commentsList.innerHTML = '<div class="loading-comments">Error loading comments</div>';
-    }
-}
-
-async function postComment(gistId, content) {
-    if (!currentUser) {
-        throw new Error('User not logged in');
-    }
-    
-    try {
-        const commentData = {
-            content: content,
-            authorId: currentUser.uid,
-            authorAvatar: getRandomAvatar(),
-            timestamp: serverTimestamp(),
-            createdAt: new Date().toISOString()
-        };
-        
-        await addDoc(collection(db, 'gists', gistId, 'comments'), commentData);
-        
-        const gistRef = doc(db, 'gists', gistId);
-        await runTransaction(db, async (transaction) => {
-            const gistDoc = await transaction.get(gistRef);
-            if (!gistDoc.exists()) {
-                throw new Error('Gist not found');
-            }
-            
-            const currentComments = gistDoc.data().comments || 0;
-            transaction.update(gistRef, {
-                comments: currentComments + 1
-            });
-        });
-        
-        console.log('Comment posted successfully');
-        showNotification('Comment posted!', 'success');
-        
-    } catch (error) {
-        console.error('Error posting comment:', error);
-        throw error;
-    }
-}
-
 async function likeGist(gistId, button) {
     if (!currentUser) {
         showNotification('Please login to like gists', 'warning');
@@ -2407,6 +2583,8 @@ async function repostGist(gistId, button = null) {
         
         showNotification('Reposting...', 'info');
         
+        const userIdentity = await getUserIdentity();
+        
         const repostData = {
             content: originalGist.content || '',
             mediaUrl: originalGist.mediaUrl || null,
@@ -2418,7 +2596,9 @@ async function repostGist(gistId, button = null) {
             reposts: 0,
             highlights: 0,
             authorId: currentUser.uid,
-            authorAvatar: getRandomAvatar(),
+            anonymousUserId: userIdentity.id,
+            authorAvatar: userIdentity.avatar,
+            authorDisplayName: userIdentity.displayName,
             timestamp: serverTimestamp(),
             isAnonymous: true,
             createdAt: new Date().toISOString(),

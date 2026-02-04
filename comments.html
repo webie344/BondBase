@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comments - Anonymous Gists</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .comments-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            min-height: 100vh;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        @media (min-width: 768px) {
+            .comments-container {
+                margin: 20px auto;
+                border-radius: 20px;
+                min-height: auto;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            }
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 20px;
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 10;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #b3004b;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 50%;
+            transition: background-color 0.3s;
+        }
+
+        .back-btn:hover {
+            background-color: #f5f5f5;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .gist-preview {
+            background: #f9f9f9;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid #eee;
+        }
+
+        .gist-preview .gist-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .gist-preview .gist-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid #b3004b;
+            margin-right: 15px;
+        }
+
+        .comments-list {
+            margin-bottom: 100px;
+        }
+
+        .comment-item {
+            display: flex;
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .comment-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #b3004b;
+            margin-right: 15px;
+        }
+
+        .comment-content {
+            flex: 1;
+        }
+
+        .comment-author {
+            font-weight: bold;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .comment-text {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.5;
+            margin-bottom: 5px;
+        }
+
+        .comment-time {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .comment-form-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px;
+            border-top: 1px solid #eee;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        @media (min-width: 768px) {
+            .comment-form-container {
+                position: relative;
+                border-top: none;
+                box-shadow: none;
+                padding: 20px 0;
+                margin-top: 20px;
+            }
+        }
+
+        #commentForm {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #commentInput {
+            flex: 1;
+            padding: 12px 20px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #commentInput:focus {
+            border-color: #b3004b;
+        }
+
+        #submitCommentBtn {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #b3004b 0%, #ff0066 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        #submitCommentBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(179, 0, 75, 0.3);
+        }
+
+        #submitCommentBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #666;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #666;
+        }
+
+        .loading-spinner {
+            margin-bottom: 15px;
+            color: #b3004b;
+        }
+
+        .gist-image {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .gist-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="comments-container">
+        <div class="header">
+            <button class="back-btn" id="backBtn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1>Comments</h1>
+            <div style="width: 40px;"></div> <!-- Spacer for alignment -->
+        </div>
+
+        <div id="gistContent" class="gist-preview">
+            <!-- Gist content will be loaded here -->
+        </div>
+
+        <div id="commentsList" class="comments-list">
+            <!-- Comments will be loaded here -->
+        </div>
+
+        <div class="comment-form-container">
+            <form id="commentForm">
+                <input type="text" id="commentInput" placeholder="Add a comment..." autocomplete="off">
+                <button type="submit" id="submitCommentBtn">Post</button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="gists.js"></script>
+</body>
+</html>
