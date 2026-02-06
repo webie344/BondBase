@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hashtag - Anonymous Gists</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #b3004b;
+            cursor: pointer;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            background: rgba(179, 0, 75, 0.1);
+        }
+
+        .hashtag-header-content {
+            flex: 1;
+        }
+
+        .hashtag-header-content h1 {
+            margin: 0 0 10px;
+            color: #333;
+            font-size: 28px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hashtag-name {
+            color: #b3004b;
+            background: rgba(179, 0, 75, 0.1);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .hashtag-stats {
+            display: flex;
+            gap: 30px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-count {
+            font-size: 24px;
+            font-weight: 700;
+            color: #b3004b;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .hashtag-description {
+            color: #666;
+            line-height: 1.6;
+            margin-top: 10px;
+            font-size: 15px;
+        }
+
+        .create-post-btn {
+            background: linear-gradient(135deg, #b3004b 0%, #8a0036 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+        }
+
+        .create-post-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(179, 0, 75, 0.2);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin: 30px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .gists-container {
+            display: grid;
+            gap: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .empty-state i {
+            font-size: 60px;
+            color: #b3004b;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            margin: 0 0 10px;
+            color: #333;
+            font-size: 22px;
+        }
+
+        .empty-state p {
+            color: #666;
+            margin-bottom: 25px;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .loading-state i {
+            font-size: 40px;
+            color: #b3004b;
+            margin-bottom: 20px;
+        }
+
+        .error-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 15px;
+            color: #dc3545;
+        }
+
+        .hashtag-follow-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .hashtag-follow-btn:hover {
+            background: #218838;
+        }
+
+        .hashtag-follow-btn.following {
+            background: #6c757d;
+        }
+
+        .hashtag-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .create-hashtag-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #b3004b 0%, #8a0036 100%);
+            color: white;
+            border: none;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(179, 0, 75, 0.3);
+            transition: all 0.3s;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .create-hashtag-btn:hover {
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 20px;
+                padding: 15px;
+            }
+            
+            .hashtag-info-row {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+            
+            .hashtag-stats {
+                justify-content: space-between;
+                gap: 10px;
+            }
+            
+            .hashtag-header-content h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="back-btn" id="backBtn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            
+            <div class="hashtag-header-content">
+                <h1>
+                    <i class="fas fa-hashtag"></i>
+                    <span id="hashtagDisplayName"></span>
+                </h1>
+                
+                <div class="hashtag-info-row">
+                    <div class="hashtag-stats">
+                        <div class="stat-item">
+                            <div class="stat-count" id="postsCount">0</div>
+                            <div class="stat-label">Posts</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-count" id="followersCount">0</div>
+                            <div class="stat-label">Followers</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-count" id="viewsCount">0</div>
+                            <div class="stat-label">Views</div>
+                        </div>
+                    </div>
+                    
+                    <button class="hashtag-follow-btn" id="followBtn">
+                        <i class="fas fa-plus"></i> Follow
+                    </button>
+                </div>
+                
+                <div class="hashtag-description" id="hashtagDescription">
+                    Loading description...
+                </div>
+            </div>
+            
+            <button class="create-post-btn" id="createPostBtn">
+                <i class="fas fa-plus"></i> Create Post
+            </button>
+        </div>
+        
+        <h2 class="section-title">Latest Posts</h2>
+        
+        <div id="hashtagPostsContainer">
+            <div class="loading-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading posts...</p>
+            </div>
+        </div>
+    </div>
+    
+    <button class="create-hashtag-btn" id="createHashtagBtn">
+        <i class="fas fa-hashtag"></i>
+    </button>
+    
+    <script src="gists.js" type="module"></script>
+</body>
+</html>

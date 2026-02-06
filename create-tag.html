@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Hashtag - Anonymous Gists</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #b3004b 0%, #8a0036 100%);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #333;
+            font-size: 15px;
+        }
+
+        .hashtag-input-container {
+            position: relative;
+        }
+
+        .hashtag-input-container input {
+            width: 100%;
+            padding: 16px 16px 16px 45px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s;
+            box-sizing: border-box;
+        }
+
+        .hashtag-input-container input:focus {
+            outline: none;
+            border-color: #b3004b;
+            box-shadow: 0 0 0 3px rgba(179, 0, 75, 0.1);
+        }
+
+        .hashtag-input-container .hashtag-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #b3004b;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .char-count {
+            text-align: right;
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .description-group textarea {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            resize: vertical;
+            min-height: 100px;
+            transition: all 0.3s;
+            box-sizing: border-box;
+        }
+
+        .description-group textarea:focus {
+            outline: none;
+            border-color: #b3004b;
+            box-shadow: 0 0 0 3px rgba(179, 0, 75, 0.1);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .form-actions button {
+            flex: 1;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .cancel-btn {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .cancel-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .create-btn {
+            background: linear-gradient(135deg, #b3004b 0%, #8a0036 100%);
+            color: white;
+        }
+
+        .create-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(179, 0, 75, 0.2);
+        }
+
+        .create-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .example-hashtags {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 25px;
+        }
+
+        .example-hashtags h3 {
+            margin: 0 0 15px;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .hashtag-examples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .hashtag-example {
+            background: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #b3004b;
+            border: 2px solid #b3004b;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .hashtag-example:hover {
+            background: #b3004b;
+            color: white;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .loading-spinner {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .loading-spinner i {
+            font-size: 30px;
+            color: #b3004b;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                border-radius: 15px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .form-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-hashtag"></i> Create New Hashtag</h1>
+            <p>Create a hashtag to organize and discover content</p>
+        </div>
+        
+        <div class="content">
+            <form id="createTagForm">
+                <div class="form-group">
+                    <label for="tagName">Hashtag Name</label>
+                    <div class="hashtag-input-container">
+                        <input type="text" id="tagName" placeholder="e.g., goodlife" maxlength="30">
+                        <div class="hashtag-icon">#</div>
+                    </div>
+                    <div class="char-count">
+                        <span id="charCount">0</span>/30 characters
+                    </div>
+                    <div class="error-message" id="nameError">
+                        Hashtag name is required and must be 2-30 characters
+                    </div>
+                </div>
+                
+                <div class="form-group description-group">
+                    <label for="tagDescription">Description (Optional)</label>
+                    <textarea id="tagDescription" placeholder="Describe what this hashtag is about..."></textarea>
+                </div>
+                
+                <div class="example-hashtags">
+                    <h3>Popular Examples</h3>
+                    <div class="hashtag-examples">
+                        <div class="hashtag-example" data-tag="goodlife">#goodlife</div>
+                        <div class="hashtag-example" data-tag="inspiration">#inspiration</div>
+                        <div class="hashtag-example" data-tag="mindfulness">#mindfulness</div>
+                        <div class="hashtag-example" data-tag="motivation">#motivation</div>
+                        <div class="hashtag-example" data-tag="wellness">#wellness</div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="cancel-btn" id="cancelBtn">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="create-btn" id="createBtn" disabled>
+                        <i class="fas fa-plus"></i> Create Hashtag
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Creating hashtag...</p>
+        </div>
+    </div>
+    
+    <script src="gists.js" type="module"></script>
+</body>
+</html>
