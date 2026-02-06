@@ -1,3 +1,4 @@
+// Firebase configuration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -23,9 +24,7 @@ import {
     orderBy,
     limit,
     arrayUnion,
-    arrayRemove,
-    startAfter,
-    getCountFromServer
+    arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -35,7 +34,7 @@ const firebaseConfig = {
     storageBucket: "usa-dating-23bc3.firebasestorage.app",
     messagingSenderId: "423286263327",
     appId: "1:423286263327:web:17f0caf843dc349c144f2a"
-  };
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -52,261 +51,133 @@ const cloudinaryConfig = {
 // Emoji reactions
 const EMOJI_REACTIONS = ['👍', '❤️', '🔥', '😘', '👎', '🤘', '💯'];
 
-// FIXED: IndexedDB for offline storage - Fixed initialization issues
+// NEW: IndexedDB for offline storage
 class IndexedDBCache {
     constructor() {
         this.dbName = 'DatingAppDB';
         this.dbVersion = 8;
         this.db = null;
-        this.initPromise = null; // Track initialization to prevent multiple calls
-        this.initialized = false;
     }
 
     async init() {
-        // If already initialized, return existing db
-        if (this.db) {
-            return this.db;
-        }
-        
-        // If initialization is in progress, return the promise
-        if (this.initPromise) {
-            return this.initPromise;
-        }
-        
-        // Start new initialization
-        this.initPromise = new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.dbVersion);
             
-            request.onerror = (event) => {
-                console.error('IndexedDB error:', request.error);
-                reject(request.error);
-                this.initPromise = null;
-            };
-            
-            request.onsuccess = (event) => {
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
                 this.db = request.result;
-                this.initialized = true;
-                
-                // Handle database close/abort events
-                this.db.onerror = (event) => {
-                    console.error('Database error:', event.target.error);
-                };
-                
                 resolve(this.db);
             };
             
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
-                const transaction = event.target.transaction;
                 
                 // Create object stores for different data types
                 if (!db.objectStoreNames.contains('profiles')) {
-                    const profileStore = db.createObjectStore('profiles', { keyPath: 'id' });
-                    profileStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+                    db.createObjectStore('profiles', { keyPath: 'id' });
                 }
-                
                 if (!db.objectStoreNames.contains('messages')) {
                     const messageStore = db.createObjectStore('messages', { keyPath: 'id' });
                     messageStore.createIndex('threadId', 'threadId', { unique: false });
                     messageStore.createIndex('timestamp', 'timestamp', { unique: false });
-                    messageStore.createIndex('threadId_timestamp', ['threadId', 'timestamp'], { unique: false });
                 }
-                
                 if (!db.objectStoreNames.contains('conversations')) {
-                    const conversationStore = db.createObjectStore('conversations', { keyPath: 'id' });
-                    conversationStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+                    db.createObjectStore('conversations', { keyPath: 'id' });
                 }
-                
                 if (!db.objectStoreNames.contains('userData')) {
                     db.createObjectStore('userData', { keyPath: 'id' });
                 }
-                
                 if (!db.objectStoreNames.contains('pendingMessages')) {
                     const pendingStore = db.createObjectStore('pendingMessages', { keyPath: 'id', autoIncrement: true });
                     pendingStore.createIndex('status', 'status', { unique: false });
-                    pendingStore.createIndex('threadId', 'threadId', { unique: false });
-                    pendingStore.createIndex('createdAt', 'createdAt', { unique: false });
                 }
             };
-            
-            request.onblocked = () => {
-                console.warn('IndexedDB upgrade blocked by other connections');
-                reject(new Error('Database upgrade blocked'));
-                this.initPromise = null;
-            };
         });
-        
-        return this.initPromise;
-    }
-
-    async close() {
-        if (this.db) {
-            this.db.close();
-            this.db = null;
-            this.initialized = false;
-            this.initPromise = null;
-        }
     }
 
     async set(storeName, data) {
-        try {
-            if (!this.db) {
-                await this.init();
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            
+            // Ensure the data has an 'id' property for object stores that require it
+            if (storeName !== 'pendingMessages' && !data.id) {
+                // Generate an ID for data that doesn't have one
+                if (data.userId) {
+                    data.id = data.userId;
+                } else if (data.uid) {
+                    data.id = data.uid;
+                } else {
+                    data.id = `${storeName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                }
             }
             
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readwrite');
-                const store = transaction.objectStore(storeName);
-                const request = store.put(data);
-                
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve(request.result);
-                
-                transaction.oncomplete = () => {
-                    // Transaction completed successfully
-                };
-                
-                transaction.onerror = () => {
-                    console.error('Transaction error:', transaction.error);
-                    reject(transaction.error);
-                };
-            });
-        } catch (error) {
-            console.error('Error in set operation:', error);
-            throw error;
-        }
+            const request = store.put(data);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+        });
     }
 
     async get(storeName, key) {
-        try {
-            if (!this.db) {
-                await this.init();
-            }
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
             
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readonly');
-                const store = transaction.objectStore(storeName);
-                const request = store.get(key);
-                
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve(request.result);
-            });
-        } catch (error) {
-            console.error('Error in get operation:', error);
-            return null;
-        }
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+        });
     }
 
-    async getAll(storeName, indexName = null, queryValue = null, range = null) {
-        try {
-            if (!this.db) {
-                await this.init();
+    async getAll(storeName, indexName = null, queryValue = null) {
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            let request;
+            
+            if (indexName && queryValue) {
+                const index = store.index(indexName);
+                request = index.getAll(queryValue);
+            } else {
+                request = store.getAll();
             }
             
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readonly');
-                const store = transaction.objectStore(storeName);
-                let request;
-                
-                if (indexName && queryValue !== undefined) {
-                    const index = store.index(indexName);
-                    request = range ? index.getAll(range) : index.getAll(queryValue);
-                } else if (indexName && range) {
-                    const index = store.index(indexName);
-                    request = index.getAll(range);
-                } else {
-                    request = store.getAll();
-                }
-                
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve(request.result || []);
-            });
-        } catch (error) {
-            console.error('Error in getAll operation:', error);
-            return [];
-        }
-    }
-
-    async getCount(storeName, indexName = null, queryValue = null) {
-        try {
-            if (!this.db) {
-                await this.init();
-            }
-            
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readonly');
-                const store = transaction.objectStore(storeName);
-                let request;
-                
-                if (indexName && queryValue !== undefined) {
-                    const index = store.index(indexName);
-                    request = index.count(queryValue);
-                } else {
-                    request = store.count();
-                }
-                
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve(request.result);
-            });
-        } catch (error) {
-            console.error('Error in getCount operation:', error);
-            return 0;
-        }
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result || []);
+        });
     }
 
     async delete(storeName, key) {
-        try {
-            if (!this.db) {
-                await this.init();
-            }
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.delete(key);
             
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readwrite');
-                const store = transaction.objectStore(storeName);
-                const request = store.delete(key);
-                
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve();
-            });
-        } catch (error) {
-            console.error('Error in delete operation:', error);
-            throw error;
-        }
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
     }
 
     async clear(storeName) {
-        try {
-            if (!this.db) {
-                await this.init();
-            }
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.clear();
             
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readwrite');
-                const store = transaction.objectStore(storeName);
-                const request = store.clear();
-                
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve();
-            });
-        } catch (error) {
-            console.error('Error in clear operation:', error);
-            throw error;
-        }
-    }
-
-    async clearAll() {
-        try {
-            if (!this.db) {
-                await this.init();
-            }
-            
-            const storeNames = Array.from(this.db.objectStoreNames);
-            const promises = storeNames.map(storeName => this.clear(storeName));
-            await Promise.all(promises);
-        } catch (error) {
-            console.error('Error in clearAll operation:', error);
-            throw error;
-        }
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
     }
 }
 
@@ -362,7 +233,7 @@ class EventManager {
 
 const eventManager = new EventManager();
 
-// FIXED: Enhanced Cache with IndexedDB support - Fixed initialization flow
+// NEW: Enhanced Cache with IndexedDB support
 class LocalCache {
     constructor() {
         this.cachePrefix = 'datingApp_';
@@ -377,15 +248,8 @@ class LocalCache {
 
     async init() {
         if (!this.indexedDBInitialized) {
-            try {
-                await this.indexedDB.init();
-                this.indexedDBInitialized = true;
-                console.log('IndexedDB cache initialized successfully');
-            } catch (error) {
-                console.error('Failed to initialize IndexedDB:', error);
-                // Continue without IndexedDB - app will still work
-                this.indexedDBInitialized = false;
-            }
+            await this.indexedDB.init();
+            this.indexedDBInitialized = true;
         }
     }
 
@@ -438,192 +302,94 @@ class LocalCache {
         }
     }
 
-    // IndexedDB methods for structured data
+    // NEW: IndexedDB methods for structured data
     async setProfiles(profiles) {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return;
-            
-            for (const profile of profiles) {
-                await this.indexedDB.set('profiles', {
-                    ...profile,
-                    cachedAt: Date.now()
-                });
-            }
-        } catch (error) {
-            console.error('Error setting profiles in IndexedDB:', error);
+        await this.init();
+        for (const profile of profiles) {
+            // Ensure profile has an id property
+            const profileWithId = {
+                id: profile.id || profile.userId || `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                ...profile
+            };
+            await this.indexedDB.set('profiles', profileWithId);
         }
     }
 
     async getProfiles() {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return [];
-            
-            return await this.indexedDB.getAll('profiles');
-        } catch (error) {
-            console.error('Error getting profiles from IndexedDB:', error);
-            return [];
-        }
+        await this.init();
+        return await this.indexedDB.getAll('profiles');
     }
 
     async setMessages(threadId, messages) {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return;
-            
-            const batch = [];
-            for (const message of messages) {
-                batch.push(this.indexedDB.set('messages', {
-                    ...message,
-                    threadId: threadId,
-                    storedAt: Date.now()
-                }));
-            }
-            
-            await Promise.all(batch);
-        } catch (error) {
-            console.error('Error setting messages in IndexedDB:', error);
+        await this.init();
+        for (const message of messages) {
+            // Ensure message has an id property
+            const messageWithId = {
+                id: message.id || `message_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                threadId: threadId,
+                storedAt: Date.now(),
+                ...message
+            };
+            await this.indexedDB.set('messages', messageWithId);
         }
     }
 
-    async getMessages(threadId, limit = 50) {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return [];
-            
-            // Get messages sorted by timestamp (newest first)
-            const allMessages = await this.indexedDB.getAll('messages', 'threadId', threadId);
-            
-            // Sort by timestamp descending (newest first)
-            return allMessages
-                .sort((a, b) => {
-                    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-                    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-                    return timeB - timeA;
-                })
-                .slice(0, limit);
-        } catch (error) {
-            console.error('Error getting messages from IndexedDB:', error);
-            return [];
-        }
+    async getMessages(threadId) {
+        await this.init();
+        return await this.indexedDB.getAll('messages', 'threadId', threadId);
     }
 
     async setConversations(conversations) {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return;
-            
-            for (const conversation of conversations) {
-                await this.indexedDB.set('conversations', {
-                    ...conversation,
-                    cachedAt: Date.now()
-                });
-            }
-        } catch (error) {
-            console.error('Error setting conversations in IndexedDB:', error);
+        await this.init();
+        for (const conversation of conversations) {
+            // Ensure conversation has an id property
+            const conversationWithId = {
+                id: conversation.id || `conversation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                ...conversation
+            };
+            await this.indexedDB.set('conversations', conversationWithId);
         }
     }
 
     async getConversations() {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return [];
-            
-            return await this.indexedDB.getAll('conversations');
-        } catch (error) {
-            console.error('Error getting conversations from IndexedDB:', error);
-            return [];
-        }
+        await this.init();
+        return await this.indexedDB.getAll('conversations');
     }
 
-    // Pending messages for offline support
+    // NEW: Pending messages for offline support
     async addPendingMessage(message) {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return null;
-            
-            return await this.indexedDB.set('pendingMessages', {
-                ...message,
-                status: 'pending',
-                createdAt: Date.now()
-            });
-        } catch (error) {
-            console.error('Error adding pending message to IndexedDB:', error);
-            return null;
-        }
+        await this.init();
+        // Pending messages use autoIncrement, so don't need to check for id
+        return await this.indexedDB.set('pendingMessages', {
+            ...message,
+            status: 'pending',
+            createdAt: Date.now()
+        });
     }
 
     async getPendingMessages() {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return [];
-            
-            return await this.indexedDB.getAll('pendingMessages', 'status', 'pending');
-        } catch (error) {
-            console.error('Error getting pending messages from IndexedDB:', error);
-            return [];
-        }
+        await this.init();
+        return await this.indexedDB.getAll('pendingMessages');
     }
 
     async removePendingMessage(id) {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return;
-            
-            return await this.indexedDB.delete('pendingMessages', id);
-        } catch (error) {
-            console.error('Error removing pending message from IndexedDB:', error);
-        }
+        await this.init();
+        return await this.indexedDB.delete('pendingMessages', id);
     }
 
     async updatePendingMessageStatus(id, status) {
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return;
-            
-            const message = await this.indexedDB.get('pendingMessages', id);
-            if (message) {
-                message.status = status;
-                message.updatedAt = Date.now();
-                await this.indexedDB.set('pendingMessages', message);
-            }
-        } catch (error) {
-            console.error('Error updating pending message status in IndexedDB:', error);
-        }
-    }
-
-    async clearOldData(maxAge = 7 * 24 * 60 * 60 * 1000) { // 7 days
-        try {
-            await this.init();
-            if (!this.indexedDBInitialized) return;
-            
-            const cutoff = Date.now() - maxAge;
-            
-            // Clear old messages
-            const allMessages = await this.indexedDB.getAll('messages');
-            const oldMessages = allMessages.filter(msg => msg.storedAt < cutoff);
-            
-            for (const msg of oldMessages) {
-                await this.indexedDB.delete('messages', msg.id);
-            }
-            
-            // Clear old pending messages
-            const allPending = await this.indexedDB.getAll('pendingMessages');
-            const oldPending = allPending.filter(msg => msg.createdAt < cutoff);
-            
-            for (const msg of oldPending) {
-                await this.indexedDB.delete('pendingMessages', msg.id);
-            }
-        } catch (error) {
-            console.error('Error clearing old data from IndexedDB:', error);
+        await this.init();
+        const message = await this.indexedDB.get('pendingMessages', id);
+        if (message) {
+            message.status = status;
+            await this.indexedDB.set('pendingMessages', message);
         }
     }
 }
 
 const cache = new LocalCache();
 
-// Service Worker Registration for offline functionality with proper error handling
+// NEW: Service Worker Registration for offline functionality with proper error handling
 async function registerServiceWorker() {
     // Only register in production environment (not local file protocol)
     if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
@@ -648,13 +414,15 @@ async function registerServiceWorker() {
             return null;
         }
     } else {
+        
         return null;
     }
 }
 
-// Enhanced offline support without Service Worker dependency
+// NEW: Enhanced offline support without Service Worker dependency
 function setupOfflineSupport() {
     // Use localStorage and IndexedDB for offline support
+    
     
     // Process pending messages when coming online
     window.addEventListener('online', async () => {
@@ -662,7 +430,7 @@ function setupOfflineSupport() {
     });
 }
 
-// Background Sync for offline messages
+// NEW: Background Sync for offline messages
 async function setupBackgroundSync() {
     if ('serviceWorker' in navigator && 'SyncManager' in window) {
         try {
@@ -696,12 +464,6 @@ let typingTimeout = null;
 let userChatPoints = 0;
 let globalMessageListener = null;
 
-// Chat pagination variables
-let chatMessagesLimit = 15;
-let chatMessagesLastVisible = null;
-let chatMessagesHasMore = true;
-let chatMessagesLoading = false;
-
 // Voice recording variables
 let mediaRecorder = null;
 let audioChunks = [];
@@ -721,29 +483,25 @@ const navToggle = document.getElementById('mobile-menu');
 const navMenu = document.querySelector('.nav-menu');
 const messageCountElements = document.querySelectorAll('.message-count');
 
-// Pre-load data for current page
+// NEW: Pre-load data for current page
 async function preloadPageData() {
     if (!currentUser) return;
 
     const page = window.location.pathname.split('/').pop().split('.')[0];
     
-    try {
-        switch(page) {
-            case 'mingle':
-                await preloadMingleData();
-                break;
-            case 'messages':
-                await preloadMessagesData();
-                break;
-            case 'chat':
-                await preloadChatData();
-                break;
-            case 'dashboard':
-                await preloadDashboardData();
-                break;
-        }
-    } catch (error) {
-        console.error('Error preloading page data:', error);
+    switch(page) {
+        case 'mingle':
+            await preloadMingleData();
+            break;
+        case 'messages':
+            await preloadMessagesData();
+            break;
+        case 'chat':
+            await preloadChatData();
+            break;
+        case 'dashboard':
+            await preloadDashboardData();
+            break;
     }
 }
 
@@ -753,7 +511,7 @@ async function preloadMingleData() {
     if (cachedProfiles && cachedProfiles.length > 0) {
         profiles = cachedProfiles;
         if (profiles.length > 0) {
-            showProfile(0);
+            displayProfilesGrid();
         }
     }
 }
@@ -797,14 +555,12 @@ async function preloadDashboardData() {
     }
 }
 
-// Process pending messages when coming online
+// NEW: Process pending messages when coming online
 async function processPendingMessages() {
     if (!isOnline || !currentUser) return;
 
     try {
         const pendingMessages = await cache.getPendingMessages();
-        console.log(`Processing ${pendingMessages.length} pending messages`);
-        
         for (const pendingMsg of pendingMessages) {
             if (pendingMsg.status === 'pending') {
                 try {
@@ -820,11 +576,9 @@ async function processPendingMessages() {
                     }
                     
                     await cache.removePendingMessage(pendingMsg.id);
-                    console.log('Successfully sent pending message:', pendingMsg.id);
                 } catch (error) {
                     console.error('Failed to send pending message:', error);
-                    // Update status to retry later
-                    await cache.updatePendingMessageStatus(pendingMsg.id, 'retry');
+                    // Keep it in pending for next retry
                 }
             }
         }
@@ -851,7 +605,7 @@ async function sendVideoMessageFromPending(pendingMsg) {
     }
 }
 
-// Optimistic UI updates with rollback support
+// NEW: Optimistic UI updates with rollback support
 class OptimisticUpdates {
     constructor() {
         this.pendingUpdates = new Map();
@@ -889,7 +643,7 @@ class OptimisticUpdates {
 
 const optimisticUpdates = new OptimisticUpdates();
 
-// Microphone pre-loading for faster voice recording
+// UPDATED: Microphone pre-loading for faster voice recording
 async function preloadMicrophonePermission() {
     try {
         if (navigator.permissions && navigator.permissions.query) {
@@ -944,7 +698,7 @@ function validateImageFile(file) {
     return true;
 }
 
-// Notification system with offline support
+// UPDATED: Notification system with offline support
 function showNotification(message, type = 'info', duration = 3000) {
     // Remove any existing notifications first
     const existingNotifications = document.querySelectorAll('.custom-notification');
@@ -1053,7 +807,7 @@ function getNotificationIcon(type) {
     }
 }
 
-// Enhanced network connectivity monitoring
+// UPDATED: Enhanced network connectivity monitoring
 function setupNetworkMonitoring() {
     window.addEventListener('online', handleNetworkOnline);
     window.addEventListener('offline', handleNetworkOffline);
@@ -1394,14 +1148,6 @@ async function handleLogout() {
 
 // UPDATED: DOM Content Loaded with Service Worker and preloading
 document.addEventListener('DOMContentLoaded', async () => {
-    // Initialize cache first
-    try {
-        await cache.init();
-        console.log('Cache initialized successfully');
-    } catch (error) {
-        console.error('Failed to initialize cache:', error);
-    }
-    
     // Try to register Service Worker (will fail gracefully if not supported)
     await registerServiceWorker();
     
@@ -1468,8 +1214,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             font-style: italic;
         }
         
-        .offline-indicator {
+        .instant-loading {
+            display: none;
             position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        
+        .offline-indicator {
+            position: ;
             top: 0;
             left: 0;
             right: 0;
@@ -1478,7 +1238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             text-align: center;
             padding: 10px;
             z-index: 10001;
-            font-size: 14px;
+            font-size: 5px;
             display: none;
         }
         
@@ -1575,7 +1335,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         .video-message {
-            max-width: 300px;
+            max-width: 100%;
             border-radius: 12px;
             overflow: hidden;
             position: relative;
@@ -1932,7 +1692,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         @media (max-width: 768px) {
             .video-message {
-                max-width: 300px;
+                max-width: 500px;
             }
             
             .video-message video {
@@ -1947,7 +1707,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         @media (max-width: 480px) {
             .video-message {
-                max-width: 300px;
+                max-width: 500px;
             }
             
             .video-message video {
@@ -1956,7 +1716,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             .message-image {
                 max-width: 200px;
-                max-height: 250px;
+                max-height: 300px;
             }
         }
 
@@ -2021,8 +1781,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         .online-status {
             bottom: 10px;
             right: 10px;
-            width: 9px;
-            height: 9px;
+            width: 3px;
+            height: 3px;
             border-radius: 50%;
             border: 2px solid white;
         }
@@ -2237,48 +1997,47 @@ document.addEventListener('DOMContentLoaded', async () => {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
         }
-        
-        /* Load More Button Styles */
-        .load-more-container {
-            display: flex;
-            justify-content: center;
-            padding: 15px;
-            margin: 10px 0;
+
+       .profile-grid-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
         }
-        
-        .load-more-btn {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 10px 20px;
-            font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+
+        .profile-grid-status.online {
+            background-color: #00FF00;
         }
-        
-        .load-more-btn:hover {
-            background: var(--accent-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+
+        .profile-grid-status.offline {
+            background-color: #9E9E9E;
         }
-        
-        .load-more-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
+
+        .no-profiles-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 16px;
         }
-        
-        .load-more-btn i {
-            font-size: 12px;
+
+
         }
     `;
     document.head.appendChild(style);
+
+    // Create instant loading overlay
+    const instantLoading = document.createElement('div');
+    instantLoading.className = 'instant-loading';
+    instantLoading.id = 'instantLoading';
+    instantLoading.innerHTML = `
+        <div class="dot-pulse"></div>
+        <p>Loading latest data...</p>
+    `;
+    document.body.appendChild(instantLoading);
 
     // Create reaction picker element
     const reactionPicker = document.createElement('div');
@@ -2365,7 +2124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     setTimeout(() => {
                         showMicrophonePermissionPopup();
                     }, 2000);
-                    }
+                }
                 
                 // Initialize page-specific functions after auth is confirmed
                 switch (currentPage) {
@@ -2438,7 +2197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
-// Listen for page visibility changes to handle cache refresh and background sync
+// NEW: Listen for page visibility changes to handle cache refresh and background sync
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && currentUser) {
         // Page became visible again, refresh data if needed
@@ -2873,31 +2632,7 @@ function showReplyPreview(message) {
     
     selectedMessageForReply = message.id;
     
-    // Get sender name - fixed to properly get the name
-    let senderName = 'Loading...';
-    if (message.senderId === currentUser.uid) {
-        senderName = 'You';
-    } else {
-        // Try to get partner name from chat header
-        const partnerNameElement = document.getElementById('chatPartnerName');
-        if (partnerNameElement) {
-            senderName = partnerNameElement.textContent || 'User';
-        } else {
-            // Fallback to cached partner data
-            const cachedPartner = cache.get(`partner_${chatPartnerId}`);
-            if (cachedPartner && cachedPartner.name) {
-                senderName = cachedPartner.name;
-            } else {
-                // Try to fetch from database
-                getPartnerName(chatPartnerId).then(name => {
-                    if (name) {
-                        replyPreviewName.textContent = name;
-                    }
-                });
-            }
-        }
-    }
-    
+    const senderName = message.senderId === currentUser.uid ? 'You' : document.getElementById('chatPartnerName').textContent;
     replyPreviewName.textContent = senderName;
     
     if (message.text) {
@@ -2918,20 +2653,6 @@ function showReplyPreview(message) {
     }
 }
 
-// Helper function to get partner name
-async function getPartnerName(partnerId) {
-    try {
-        const partnerRef = doc(db, 'users', partnerId);
-        const partnerSnap = await getDoc(partnerRef);
-        if (partnerSnap.exists()) {
-            return partnerSnap.data().name || 'User';
-        }
-    } catch (error) {
-        console.error('Error getting partner name:', error);
-    }
-    return 'User';
-}
-
 // Cancel reply
 function cancelReply() {
     const replyPreview = document.getElementById('replyPreview');
@@ -2941,7 +2662,7 @@ function cancelReply() {
     selectedMessageForReply = null;
 }
 
-// FIXED: Handle message long press for reactions - REMOVED restriction on replying to own messages
+// Handle message long press for reactions - FIXED TO PREVENT ACCIDENTAL ACTIVATION
 function setupMessageLongPress() {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
@@ -2949,7 +2670,7 @@ function setupMessageLongPress() {
     messagesContainer.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const messageElement = e.target.closest('.message');
-        if (messageElement) {
+        if (messageElement && messageElement.classList.contains('received')) {
             const messageId = messageElement.dataset.messageId;
             if (messageId) {
                 showReactionPicker(messageId, e.clientX, e.clientY);
@@ -2959,7 +2680,7 @@ function setupMessageLongPress() {
     
     messagesContainer.addEventListener('touchstart', (e) => {
         const messageElement = e.target.closest('.message');
-        if (messageElement) {
+        if (messageElement && messageElement.classList.contains('received')) {
             const messageId = messageElement.dataset.messageId;
             if (messageId) {
                 longPressTimer = setTimeout(() => {
@@ -2978,7 +2699,7 @@ function setupMessageLongPress() {
     });
 }
 
-// FIXED: Enhanced swipe functionality for reply - Optimized for performance
+// Enhanced swipe functionality for reply - FIXED TO PREVENT ACCIDENTAL ACTIVATION
 function setupMessageSwipe() {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
@@ -2991,26 +2712,6 @@ function setupMessageSwipe() {
     let swipeThreshold = 50;
     let tapThreshold = 10;
     let swipeStartTime = 0;
-    let animationFrameId = null;
-    
-    // Use requestAnimationFrame for smoother animations
-    function animateSwipe() {
-        if (!isSwiping || !currentElement) return;
-        
-        const diffX = currentX - startX;
-        const maxSwipe = 100;
-        const swipeDistance = Math.min(Math.max(diffX, 0), maxSwipe);
-        
-        currentElement.style.transform = `translateX(${swipeDistance}px)`;
-        
-        const swipeAction = currentElement.querySelector('.message-swipe-action');
-        if (swipeAction) {
-            const opacity = Math.min(Math.abs(swipeDistance) / maxSwipe, 1);
-            swipeAction.style.opacity = opacity;
-        }
-        
-        animationFrameId = requestAnimationFrame(animateSwipe);
-    }
     
     messagesContainer.addEventListener('touchstart', (e) => {
         if (e.target.closest('.voice-message-play-btn') || 
@@ -3022,7 +2723,7 @@ function setupMessageSwipe() {
         }
         
         const messageElement = e.target.closest('.message');
-        if (messageElement) {
+        if (messageElement && messageElement.classList.contains('received')) {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
             currentElement = messageElement;
@@ -3037,9 +2738,6 @@ function setupMessageSwipe() {
             }
             
             messageElement.style.transition = 'none';
-            
-            // Start animation loop
-            animationFrameId = requestAnimationFrame(animateSwipe);
         }
     });
     
@@ -3062,6 +2760,17 @@ function setupMessageSwipe() {
         }
         
         e.preventDefault();
+        
+        const maxSwipe = 100;
+        const swipeDistance = Math.min(Math.max(diffX, 0), maxSwipe);
+        
+        currentElement.style.transform = `translateX(${swipeDistance}px)`;
+        
+        const swipeAction = currentElement.querySelector('.message-swipe-action');
+        if (swipeAction) {
+            const opacity = Math.min(Math.abs(swipeDistance) / maxSwipe, 1);
+            swipeAction.style.opacity = opacity;
+        }
     });
     
     messagesContainer.addEventListener('touchend', (e) => {
@@ -3090,14 +2799,9 @@ function setupMessageSwipe() {
     });
     
     function resetSwipeState() {
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
-        }
-        
         if (!currentElement) return;
         
-        currentElement.style.transition = 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+        currentElement.style.transition = 'transform 0.3s ease';
         currentElement.style.transform = 'translateX(0)';
         
         const swipeAction = currentElement.querySelector('.message-swipe-action');
@@ -3114,12 +2818,12 @@ function setupMessageSwipe() {
             startX = 0;
             startY = 0;
             currentX = 0;
-        }, 200);
+        }, 300);
     }
     
     messagesContainer.addEventListener('click', (e) => {
         const messageElement = e.target.closest('.message');
-        if (messageElement) {
+        if (messageElement && messageElement.classList.contains('received')) {
             if (e.target.tagName === 'IMG' && e.target.classList.contains('message-image')) {
                 return;
             }
@@ -3748,69 +3452,7 @@ function createVideoPlayer(videoUrl, duration) {
     return container;
 }
 
-// FIXED: Enhanced getRepliedMessage function to find replied messages from multiple sources
-async function getRepliedMessage(messageId) {
-    // Try multiple cache sources
-    const cacheKey = `messages_${currentUser.uid}_${chatPartnerId}`;
-    const cachedMessages = cache.get(cacheKey) || [];
-    
-    let repliedMessage = cachedMessages.find(m => m.id === messageId);
-    
-    // If not found in cache, try to find it from currently displayed messages
-    if (!repliedMessage) {
-        const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
-        if (messageElement) {
-            // Extract basic information from DOM
-            repliedMessage = {
-                id: messageId,
-                senderId: messageElement.classList.contains('sent') ? currentUser.uid : chatPartnerId
-            };
-            
-            // Try to extract text content
-            const textElement = messageElement.querySelector('p');
-            if (textElement) {
-                repliedMessage.text = textElement.textContent;
-            }
-            
-            // Try to extract image
-            const imgElement = messageElement.querySelector('.message-image');
-            if (imgElement) {
-                repliedMessage.imageUrl = imgElement.src;
-            }
-            
-            // Try to extract audio
-            const voiceElement = messageElement.querySelector('.voice-message');
-            if (voiceElement) {
-                repliedMessage.audioUrl = 'audio';
-            }
-            
-            // Try to extract video
-            const videoElement = messageElement.querySelector('.video-message');
-            if (videoElement) {
-                repliedMessage.videoUrl = 'video';
-            }
-        }
-    }
-    
-    // If we found a message but don't have sender name, fetch it
-    if (repliedMessage && repliedMessage.senderId && !repliedMessage.senderName) {
-        if (repliedMessage.senderId === currentUser.uid) {
-            repliedMessage.senderName = 'You';
-        } else {
-            const partnerData = cache.get(`partner_${chatPartnerId}`);
-            if (partnerData && partnerData.name) {
-                repliedMessage.senderName = partnerData.name;
-            } else {
-                const name = await getPartnerName(chatPartnerId);
-                repliedMessage.senderName = name;
-            }
-        }
-    }
-    
-    return repliedMessage;
-}
-
-// FIXED: Display message function to properly handle replies and show them correctly
+// UPDATED: Display message function to handle image, voice, and video sending states with offline support
 function displayMessage(message, currentUserId) {
     const messagesContainer = document.getElementById('chatMessages');
     
@@ -3830,45 +3472,29 @@ function displayMessage(message, currentUserId) {
     
     let messageContent = '';
     
-    // FIXED: Add reply indicator if the message has a replyTo field
     if (message.replyTo) {
-        getRepliedMessage(message.replyTo).then(repliedMessage => {
-            if (repliedMessage) {
-                const senderName = repliedMessage.senderName || 
-                                 (repliedMessage.senderId === currentUserId ? 'You' : 
-                                  (document.getElementById('chatPartnerName')?.textContent || 'User'));
-                let previewText = '';
-                
-                if (repliedMessage.text) {
-                    previewText = repliedMessage.text.length > 50 ? 
-                        repliedMessage.text.substring(0, 50) + '...' : 
-                        repliedMessage.text;
-                } else if (repliedMessage.imageUrl) {
-                    previewText = '📷 Photo';
-                } else if (repliedMessage.audioUrl) {
-                    previewText = '🎤 Voice message';
-                } else if (repliedMessage.videoUrl) {
-                    previewText = '🎥 Video message';
-                }
-                
-                const replyIndicator = document.createElement('div');
-                replyIndicator.className = 'reply-indicator';
-                replyIndicator.innerHTML = `<i class="fas fa-reply"></i> Replying to ${senderName}`;
-                
-                const replyPreview = document.createElement('div');
-                replyPreview.className = 'reply-message-preview';
-                replyPreview.textContent = previewText;
-                
-                // Insert at the beginning of the message content
-                if (messageDiv.firstChild) {
-                    messageDiv.insertBefore(replyPreview, messageDiv.firstChild);
-                    messageDiv.insertBefore(replyIndicator, replyPreview);
-                } else {
-                    messageDiv.appendChild(replyIndicator);
-                    messageDiv.appendChild(replyPreview);
-                }
+        const repliedMessage = getRepliedMessage(message.replyTo);
+        if (repliedMessage) {
+            const senderName = repliedMessage.senderId === currentUserId ? 'You' : document.getElementById('chatPartnerName').textContent;
+            let previewText = '';
+            
+            if (repliedMessage.text) {
+                previewText = repliedMessage.text;
+            } else if (repliedMessage.imageUrl) {
+                previewText = '📷 Photo';
+            } else if (repliedMessage.audioUrl) {
+                previewText = '🎤 Voice message';
+            } else if (repliedMessage.videoUrl) {
+                previewText = '🎥 Video message';
             }
-        });
+            
+            messageContent += `
+                <div class="reply-indicator">
+                    <i class="fas fa-reply"></i> Replying to ${senderName}
+                </div>
+                <div class="reply-message-preview">${previewText}</div>
+            `;
+        }
     }
     
     if (message.imageUrl) {
@@ -4018,6 +3644,22 @@ function hideMessagesLoadingMessage() {
     }
 }
 
+// NEW: Show instant loading overlay
+function showInstantLoading() {
+    const instantLoading = document.getElementById('instantLoading');
+    if (instantLoading) {
+        instantLoading.style.display = 'flex';
+    }
+}
+
+// NEW: Hide instant loading overlay
+function hideInstantLoading() {
+    const instantLoading = document.getElementById('instantLoading');
+    if (instantLoading) {
+        instantLoading.style.display = 'none';
+    }
+}
+
 // Add this function to handle page cleanup
 function cleanupChatPage() {
     if (unsubscribeChat) {
@@ -4046,150 +3688,10 @@ function cleanupChatPage() {
     if (videoRecordingTimer) clearInterval(videoRecordingTimer);
     if (longPressTimer) clearTimeout(longPressTimer);
     
-    // Reset pagination variables
-    chatMessagesLastVisible = null;
-    chatMessagesHasMore = true;
-    chatMessagesLoading = false;
-    
     chatPartnerId = null;
 }
 
-// NEW: Function to load older messages
-async function loadOlderMessages() {
-    if (chatMessagesLoading || !chatMessagesHasMore || !currentUser || !chatPartnerId) {
-        return;
-    }
-    
-    chatMessagesLoading = true;
-    
-    try {
-        const threadId = [currentUser.uid, chatPartnerId].sort().join('_');
-        let messagesQuery = query(
-            collection(db, 'conversations', threadId, 'messages'),
-            orderBy('timestamp', 'desc'),
-            limit(chatMessagesLimit)
-        );
-        
-        if (chatMessagesLastVisible) {
-            messagesQuery = query(
-                collection(db, 'conversations', threadId, 'messages'),
-                orderBy('timestamp', 'desc'),
-                startAfter(chatMessagesLastVisible),
-                limit(chatMessagesLimit)
-            );
-        }
-        
-        const messagesSnap = await getDocs(messagesQuery);
-        
-        if (messagesSnap.empty) {
-            chatMessagesHasMore = false;
-            const loadMoreBtn = document.getElementById('loadMoreBtn');
-            if (loadMoreBtn) {
-                loadMoreBtn.style.display = 'none';
-            }
-            return;
-        }
-        
-        // Store the last visible document for next pagination
-        chatMessagesLastVisible = messagesSnap.docs[messagesSnap.docs.length - 1];
-        
-        const messages = [];
-        messagesSnap.forEach(doc => {
-            const messageData = doc.data();
-            const serializableMessage = {
-                id: doc.id,
-                ...messageData,
-                timestamp: messageData.timestamp ? 
-                    (messageData.timestamp.toDate ? messageData.timestamp.toDate().toISOString() : messageData.timestamp) 
-                    : new Date().toISOString()
-            };
-            messages.push(serializableMessage);
-        });
-        
-        // Reverse to get chronological order
-        messages.reverse();
-        
-        // Cache the messages
-        const cacheKey = `messages_${currentUser.uid}_${chatPartnerId}`;
-        const cachedMessages = cache.get(cacheKey) || [];
-        const allMessages = [...messages, ...cachedMessages];
-        cache.set(cacheKey, allMessages, 'short');
-        
-        // Display the older messages at the top
-        displayOlderMessages(messages, currentUser.uid);
-        
-        // Update the load more button
-        const loadMoreBtn = document.getElementById('loadMoreBtn');
-        if (loadMoreBtn) {
-            if (messagesSnap.docs.length < chatMessagesLimit) {
-                chatMessagesHasMore = false;
-                loadMoreBtn.style.display = 'none';
-            } else {
-                loadMoreBtn.disabled = false;
-                loadMoreBtn.innerHTML = '<i class="fas fa-chevron-up"></i> Load More Messages';
-            }
-        }
-        
-    } catch (error) {
-        logError(error, 'loading older messages');
-        showNotification('Error loading older messages', 'error');
-    } finally {
-        chatMessagesLoading = false;
-    }
-}
-
-// NEW: Function to display older messages at the top
-function displayOlderMessages(messages, currentUserId) {
-    const messagesContainer = document.getElementById('chatMessages');
-    
-    // Get the current scroll position and height
-    const scrollPosition = messagesContainer.scrollTop;
-    const containerHeight = messagesContainer.scrollHeight;
-    
-    // Add messages at the beginning
-    messages.forEach(message => {
-        const existingMessage = messagesContainer.querySelector(`[data-message-id="${message.id}"]`);
-        if (!existingMessage) {
-            displayMessage(message, currentUserId);
-        }
-    });
-    
-    // Move the messages to the beginning
-    messages.reverse().forEach(message => {
-        const messageElement = messagesContainer.querySelector(`[data-message-id="${message.id}"]`);
-        if (messageElement && messageElement.parentNode === messagesContainer) {
-            messagesContainer.insertBefore(messageElement, messagesContainer.firstChild);
-        }
-    });
-    
-    // Restore scroll position (adjusted for new content height)
-    const newContainerHeight = messagesContainer.scrollHeight;
-    const heightDifference = newContainerHeight - containerHeight;
-    messagesContainer.scrollTop = scrollPosition + heightDifference;
-}
-
-// NEW: Create load more button
-function createLoadMoreButton() {
-    const loadMoreContainer = document.createElement('div');
-    loadMoreContainer.className = 'load-more-container';
-    loadMoreContainer.id = 'loadMoreContainer';
-    
-    const loadMoreBtn = document.createElement('button');
-    loadMoreBtn.id = 'loadMoreBtn';
-    loadMoreBtn.className = 'load-more-btn';
-    loadMoreBtn.innerHTML = '<i class="fas fa-chevron-up"></i> Load More Messages';
-    
-    loadMoreBtn.addEventListener('click', async () => {
-        loadMoreBtn.disabled = true;
-        loadMoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-        await loadOlderMessages();
-    });
-    
-    loadMoreContainer.appendChild(loadMoreBtn);
-    return loadMoreContainer;
-}
-
-// FIXED: Chat messages loading with pagination
+// UPDATED: Chat messages loading with IndexedDB caching and offline support
 function loadChatMessages(userId, partnerId) {
     const messagesContainer = document.getElementById('chatMessages');
     
@@ -4199,114 +3701,90 @@ function loadChatMessages(userId, partnerId) {
     
     const threadId = [userId, partnerId].sort().join('_');
     
-    // Reset pagination variables
-    chatMessagesLastVisible = null;
-    chatMessagesHasMore = true;
-    chatMessagesLoading = false;
-    
     showChatLoadingMessage();
     
-    // Clear the messages container but keep the load more button if it exists
-    const existingLoadMoreBtn = document.getElementById('loadMoreBtn');
-    messagesContainer.innerHTML = '';
-    
-    // Add load more button at the top
-    const loadMoreContainer = createLoadMoreButton();
-    messagesContainer.appendChild(loadMoreContainer);
+    // NEW: Show instant loading for background sync
+    showInstantLoading();
     
     // Try to load cached messages first
     const cacheKey = `messages_${userId}_${partnerId}`;
     const cachedMessages = cache.get(cacheKey);
     
     if (cachedMessages && cachedMessages.length > 0) {
-        // Display only the latest 15 messages initially
-        const latestMessages = cachedMessages.slice(-chatMessagesLimit);
-        displayCachedMessages(latestMessages);
+        displayCachedMessages(cachedMessages);
     }
     
     // Also try IndexedDB
     cache.getMessages(threadId).then(messages => {
         if (messages && messages.length > 0 && (!cachedMessages || messages.length > cachedMessages.length)) {
-            const latestMessages = messages.slice(-chatMessagesLimit);
-            displayCachedMessages(latestMessages);
+            displayCachedMessages(messages);
         }
     });
     
     try {
-        // Load initial 15 messages in descending order
-        const initialQuery = query(
+        unsubscribeChat = onSnapshot(
             collection(db, 'conversations', threadId, 'messages'),
-            orderBy('timestamp', 'desc'),
-            limit(chatMessagesLimit)
-        );
-        
-        unsubscribeChat = onSnapshot(initialQuery, async (snapshot) => {
-            const messages = [];
-            let hasUnreadMessages = false;
-            
-            // Store the last visible document for pagination
-            if (snapshot.docs.length > 0) {
-                chatMessagesLastVisible = snapshot.docs[snapshot.docs.length - 1];
-            }
-            
-            snapshot.forEach(doc => {
-                const messageData = doc.data();
-                const serializableMessage = {
-                    id: doc.id,
-                    ...messageData,
-                    timestamp: messageData.timestamp ? 
-                        (messageData.timestamp.toDate ? messageData.timestamp.toDate().toISOString() : messageData.timestamp) 
-                        : new Date().toISOString()
-                };
-                messages.push(serializableMessage);
+            async (snapshot) => {
+                const messages = [];
+                let hasUnreadMessages = false;
                 
-                if (messageData.senderId === partnerId && !messageData.read) {
-                    hasUnreadMessages = true;
+                snapshot.forEach(doc => {
+                    const messageData = doc.data();
+                    const serializableMessage = {
+                        id: doc.id,
+                        ...messageData,
+                        timestamp: messageData.timestamp ? 
+                            (messageData.timestamp.toDate ? messageData.timestamp.toDate().toISOString() : messageData.timestamp) 
+                            : new Date().toISOString()
+                    };
+                    messages.push(serializableMessage);
+                    
+                    if (messageData.senderId === partnerId && !messageData.read) {
+                        hasUnreadMessages = true;
+                    }
+                });
+                
+                messages.sort((a, b) => {
+                    const timeA = new Date(a.timestamp).getTime();
+                    const timeB = new Date(b.timestamp).getTime();
+                    return timeA - timeB;
+                });
+                
+                cache.set(cacheKey, messages, 'short');
+                await cache.setMessages(threadId, messages);
+                
+                updateMessagesDisplay(messages, userId);
+                
+                if (hasUnreadMessages) {
+                    await markMessagesAsRead(threadId, partnerId, userId);
                 }
-            });
-            
-            // Reverse to get chronological order
-            messages.reverse();
-            
-            cache.set(cacheKey, messages, 'short');
-            await cache.setMessages(threadId, messages);
-            
-            updateMessagesDisplay(messages, userId);
-            
-            if (hasUnreadMessages) {
-                await markMessagesAsRead(threadId, partnerId, userId);
-            }
-            
-            // Check if there are more messages
-            if (snapshot.docs.length < chatMessagesLimit) {
-                chatMessagesHasMore = false;
-                const loadMoreBtn = document.getElementById('loadMoreBtn');
-                if (loadMoreBtn) {
-                    loadMoreBtn.style.display = 'none';
+                
+                setTimeout(() => {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }, 100);
+                
+                if (document.querySelector('#chatMessages .loading-message')) {
+                    hideChatLoadingMessage();
                 }
-            }
-            
-            setTimeout(() => {
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            }, 100);
-            
-            if (document.querySelector('#chatMessages .loading-message')) {
+                
+                // NEW: Hide instant loading after data is loaded
+                hideInstantLoading();
+                
+                refreshUnreadMessageCount();
+            },
+            (error) => {
+                logError(error, 'chat messages listener');
+                if (cachedMessages) {
+                    displayCachedMessages(cachedMessages);
+                }
                 hideChatLoadingMessage();
+                hideInstantLoading();
             }
-            
-            refreshUnreadMessageCount();
-        }, (error) => {
-            logError(error, 'chat messages listener');
-            if (cachedMessages) {
-                const latestMessages = cachedMessages.slice(-chatMessagesLimit);
-                displayCachedMessages(latestMessages);
-            }
-            hideChatLoadingMessage();
-        });
-        
+        );
     } catch (error) {
         logError(error, 'setting up chat messages listener');
         hideChatLoadingMessage();
+        hideInstantLoading();
     }
 }
 
@@ -4337,7 +3815,7 @@ async function markMessagesAsRead(threadId, partnerId, userId) {
     }
 }
 
-// FIXED: Updated message display function to prevent duplicates and handle replies
+// FIXED: Updated message display function to prevent duplicates
 function updateMessagesDisplay(newMessages, currentUserId) {
     const messagesContainer = document.getElementById('chatMessages');
     
@@ -4346,25 +3824,21 @@ function updateMessagesDisplay(newMessages, currentUserId) {
     
     hideChatLoadingMessage();
     
-    // Get all non-temp messages
     const existingMessages = messagesContainer.querySelectorAll('.message:not([data-message-id^="temp_"])');
+    if (existingMessages.length === 0 && newMessages.length > 0) {
+        messagesContainer.innerHTML = '';
+    }
     
-    // Remove existing non-temp messages (we'll re-add them with the new messages)
-    existingMessages.forEach(msg => {
-        if (!msg.dataset.messageId.startsWith('temp_')) {
-            msg.remove();
-        }
-    });
-    
-    // Add all new messages
     newMessages.forEach(message => {
         const existingMessage = messagesContainer.querySelector(`[data-message-id="${message.id}"]`);
         if (!existingMessage) {
             displayMessage(message, currentUserId);
+        } else {
+            updateExistingMessage(existingMessage, message, currentUserId);
         }
     });
     
-    if (newMessages.length === 0 && messagesContainer.children.length <= 1) {
+    if (newMessages.length === 0 && messagesContainer.children.length === 0) {
         const noMessagesDiv = document.createElement('div');
         noMessagesDiv.className = 'no-messages';
         noMessagesDiv.textContent = 'No messages yet. Start the conversation!';
@@ -4372,7 +3846,7 @@ function updateMessagesDisplay(newMessages, currentUserId) {
     }
 }
 
-// FIXED: Enhanced addMessage function to store replied message preview
+// UPDATED: Add message function with offline support and optimistic updates
 async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDuration = null, videoUrl = null, videoDuration = null) {
     if (!text && !imageUrl && !audioUrl && !videoUrl) return;
     
@@ -4390,28 +3864,8 @@ async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDu
             timestamp: serverTimestamp()
         };
         
-        // FIXED: Add replyTo field if replying to a message
         if (selectedMessageForReply) {
             messageData.replyTo = selectedMessageForReply;
-            
-            // Also store the replied message preview in the message
-            const repliedMessage = await getRepliedMessage(selectedMessageForReply);
-            if (repliedMessage) {
-                let previewContent = '';
-                if (repliedMessage.text) {
-                    previewContent = repliedMessage.text;
-                } else if (repliedMessage.imageUrl) {
-                    previewContent = 'Image';
-                } else if (repliedMessage.audioUrl) {
-                    previewContent = 'Voice message';
-                } else if (repliedMessage.videoUrl) {
-                    previewContent = 'Video message';
-                }
-                messageData.replyPreview = {
-                    senderId: repliedMessage.senderId,
-                    content: previewContent.substring(0, 100) // Limit preview length
-                };
-            }
         }
         
         const tempMessageId = 'temp_' + Date.now();
@@ -4420,27 +3874,6 @@ async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDu
             ...messageData,
             timestamp: new Date().toISOString()
         };
-        
-        // Add replyPreview to temp message as well
-        if (selectedMessageForReply && !tempMessage.replyPreview) {
-            const repliedMessage = await getRepliedMessage(selectedMessageForReply);
-            if (repliedMessage) {
-                let previewContent = '';
-                if (repliedMessage.text) {
-                    previewContent = repliedMessage.text;
-                } else if (repliedMessage.imageUrl) {
-                    previewContent = 'Image';
-                } else if (repliedMessage.audioUrl) {
-                    previewContent = 'Voice message';
-                } else if (repliedMessage.videoUrl) {
-                    previewContent = 'Video message';
-                }
-                tempMessage.replyPreview = {
-                    senderId: repliedMessage.senderId,
-                    content: previewContent.substring(0, 100)
-                };
-            }
-        }
         
         window.lastTempMessageId = tempMessageId;
         
@@ -4602,6 +4035,11 @@ function displayCachedMessages(messages) {
     setTimeout(() => {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }, 100);
+}
+
+function getRepliedMessage(messageId) {
+    const cachedMessages = cache.get(`messages_${currentUser.uid}_${chatPartnerId}`) || [];
+    return cachedMessages.find(m => m.id === messageId);
 }
 
 // UPDATED: Page Initialization Functions with preloading
@@ -5013,69 +4451,25 @@ function initAdminPage() {
     }
 }
 
-// UPDATED: Mingle page with preloading
+// UPDATED: Mingle page with grid layout
 function initMinglePage() {
-    const dislikeBtn = document.getElementById('dislikeBtn');
-    const likeBtn = document.getElementById('likeBtn');
-    const viewProfileBtn = document.getElementById('viewProfileBtn');
-    const chatBtn = document.getElementById('chatBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const dashboardBtn = document.getElementById('dashboardBtn');
+    const mingleGrid = document.getElementById('mingleGrid');
+
+    // Create grid container if it doesn't exist
+    if (!mingleGrid) {
+        const mainContent = document.querySelector('main') || document.querySelector('.container');
+        if (mainContent) {
+            const gridContainer = document.createElement('div');
+            gridContainer.id = 'mingleGrid';
+            gridContainer.className = 'mingle-grid';
+            mainContent.innerHTML = '';
+            mainContent.appendChild(gridContainer);
+        }
+    }
 
     loadProfiles();
-
-    if (dislikeBtn) {
-        eventManager.addListener(dislikeBtn, 'click', () => {
-            showNextProfile();
-        });
-    }
-
-    if (likeBtn) {
-        eventManager.addListener(likeBtn, 'click', async () => {
-            const currentProfile = profiles[currentProfileIndex];
-            if (currentProfile) {
-                try {
-                    await addDoc(collection(db, 'users', currentUser.uid, 'liked'), {
-                        userId: currentProfile.id,
-                        timestamp: serverTimestamp()
-                    });
-                    
-                    const profileRef = doc(db, 'users', currentProfile.id);
-                    const profileSnap = await getDoc(profileRef);
-                    
-                    if (profileSnap.exists()) {
-                        const currentLikes = profileSnap.data().likes || 0;
-                        await updateDoc(profileRef, {
-                            likes: currentLikes + 50
-                        });
-                    }
-                    
-                    showNextProfile();
-                } catch (error) {
-                    logError(error, 'liking profile');
-                    showNotification('Error liking profile. Please try again.', 'error');
-                }
-            }
-        });
-    }
-
-    if (viewProfileBtn) {
-        eventManager.addListener(viewProfileBtn, 'click', () => {
-            const currentProfile = profiles[currentProfileIndex];
-            if (currentProfile) {
-                window.location.href = `profile.html?id=${currentProfile.id}`;
-            }
-        });
-    }
-
-    if (chatBtn) {
-        eventManager.addListener(chatBtn, 'click', () => {
-            const currentProfile = profiles[currentProfileIndex];
-            if (currentProfile) {
-                window.location.href = `chat.html?id=${currentProfile.id}`;
-            }
-        });
-    }
 
     if (logoutBtn) {
         eventManager.addListener(logoutBtn, 'click', handleLogout);
@@ -5085,6 +4479,179 @@ function initMinglePage() {
         eventManager.addListener(dashboardBtn, 'click', () => {
             window.location.href = 'dashboard.html';
         });
+    }
+}
+
+// UPDATED: Load profiles with grid display
+async function loadProfiles(forceRefresh = false) {
+    if (!forceRefresh) {
+        const cachedProfiles = await cache.getProfiles();
+        if (cachedProfiles && cachedProfiles.length > 0) {
+            profiles = cachedProfiles;
+            shuffleProfiles();
+            if (profiles.length > 0) {
+                displayProfilesGrid();
+            } else {
+                showNoProfilesMessage();
+            }
+        }
+    }
+
+    try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('__name__', '!=', currentUser.uid));
+        const querySnapshot = await getDocs(q);
+        
+        profiles = [];
+        querySnapshot.forEach(doc => {
+            profiles.push({ id: doc.id, ...doc.data() });
+        });
+        
+        shuffleProfiles();
+        
+        cache.set('mingle_profiles', profiles, 'short');
+        await cache.setProfiles(profiles);
+        
+        if (profiles.length > 0) {
+            displayProfilesGrid();
+        } else {
+            showNoProfilesMessage();
+        }
+    } catch (error) {
+        logError(error, 'loading profiles');
+        if (profiles.length === 0) {
+            showNoProfilesMessage();
+        }
+    }
+}
+
+// NEW: Display profiles in grid format
+// NEW: Display profiles in grid format
+function displayProfilesGrid() {
+    const mingleGrid = document.getElementById('mingleGrid');
+    if (!mingleGrid) return;
+    
+    mingleGrid.innerHTML = '';
+    
+    if (profiles.length === 0) {
+        mingleGrid.innerHTML = '<div class="no-profiles-message">No profiles found. Check back later for new profiles.</div>';
+        return;
+    }
+    
+    profiles.forEach(profile => {
+        const profileCard = document.createElement('div');
+        profileCard.className = 'profile-grid-card';
+        
+        let ageLocation = '';
+        if (profile.age) ageLocation += `${profile.age}`;
+        if (profile.location) ageLocation += ageLocation ? ` • ${profile.location}` : profile.location;
+        
+        profileCard.innerHTML = `
+            <img src="${profile.profileImage || 'images-default-profile.jpg'}" 
+                 alt="${profile.name || 'Profile'}" 
+                 class="profile-grid-image">
+            <div class="profile-grid-status" id="grid-status-${profile.id}"></div>
+            <div class="profile-grid-content">
+                <h3 class="profile-grid-name">${profile.name || 'Unknown'}</h3>
+                <p class="profile-grid-details">${ageLocation}</p>
+                <p class="profile-grid-bio">${profile.bio || 'No bio available'}</p>
+                <div class="profile-grid-actions">
+                    <div class="profile-grid-likes">
+                        <i class="fas fa-heart"></i>
+                        <span>${profile.likes || 0}</span>
+                    </div>
+                    <button class="profile-grid-like-btn" data-profile-id="${profile.id}">
+                        <i class="fas fa-heart"></i> Like
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Add click event to profile image to navigate to profile page
+        const profileImage = profileCard.querySelector('.profile-grid-image');
+        profileImage.style.cursor = 'pointer';
+        eventManager.addListener(profileImage, 'click', () => {
+            window.location.href = `profile.html?id=${profile.id}`;
+        });
+        
+        // Add like button functionality
+        const likeBtn = profileCard.querySelector('.profile-grid-like-btn');
+        eventManager.addListener(likeBtn, 'click', async (e) => {
+            e.stopPropagation();
+            await handleGridLike(profile.id, likeBtn);
+        });
+        
+        mingleGrid.appendChild(profileCard);
+        
+        // Setup online status for this profile
+        setupOnlineStatusListener(profile.id, `grid-status-${profile.id}`);
+    });
+}
+
+
+// NEW: Handle like in grid view
+async function handleGridLike(profileId, likeButton) {
+    if (!currentUser) {
+        showNotification('Please log in to like profiles', 'error');
+        return;
+    }
+
+    try {
+        const likedRef = collection(db, 'users', currentUser.uid, 'liked');
+        const likedQuery = query(likedRef, where('userId', '==', profileId));
+        const likedSnap = await getDocs(likedQuery);
+        
+        if (!likedSnap.empty) {
+            showNotification('You already liked this profile!', 'info');
+            return;
+        }
+
+        await addDoc(collection(db, 'users', currentUser.uid, 'liked'), {
+            userId: profileId,
+            timestamp: serverTimestamp(),
+            likedAt: new Date().toISOString()
+        });
+        
+        const profileRef = doc(db, 'users', profileId);
+        const profileSnap = await getDoc(profileRef);
+        
+        if (profileSnap.exists()) {
+            const currentLikes = profileSnap.data().likes || 0;
+            await updateDoc(profileRef, {
+                likes: currentLikes + 1,
+                updatedAt: serverTimestamp()
+            });
+            
+            // Update the like count display
+            const likesElement = likeButton.parentElement.querySelector('.profile-grid-likes span');
+            if (likesElement) {
+                likesElement.textContent = currentLikes + 1;
+            }
+        }
+        
+        likeButton.innerHTML = '<i class="fas fa-heart"></i> Liked';
+        likeButton.classList.add('liked');
+        likeButton.disabled = true;
+        
+        showNotification('Profile liked successfully!', 'success');
+        
+    } catch (error) {
+        logError(error, 'liking profile from grid');
+        showNotification('Error liking profile. Please try again.', 'error');
+    }
+}
+
+function shuffleProfiles() {
+    for (let i = profiles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [profiles[i], profiles[j]] = [profiles[j], profiles[i]];
+    }
+}
+
+function showNoProfilesMessage() {
+    const mingleGrid = document.getElementById('mingleGrid');
+    if (mingleGrid) {
+        mingleGrid.innerHTML = '<div class="no-profiles-message">No profiles found. Check back later for new profiles.</div>';
     }
 }
 
@@ -5452,7 +5019,7 @@ function initAccountPage() {
     }
 }
 
-// FIXED: Chat page initialization - REMOVED restrictions on replying to own messages
+// UPDATED: Chat page initialization with optimized voice recording, image sending, and offline support
 function initChatPage() {
     const backToMessages = document.getElementById('backToMessages');
     const messageInput = document.getElementById('messageInput');
@@ -5766,104 +5333,6 @@ function updateAccountPage(userData) {
     }
 }
 
-// UPDATED: Load profiles with IndexedDB caching
-async function loadProfiles(forceRefresh = false) {
-    if (!forceRefresh) {
-        const cachedProfiles = await cache.getProfiles();
-        if (cachedProfiles && cachedProfiles.length > 0) {
-            profiles = cachedProfiles;
-            shuffleProfiles();
-            if (profiles.length > 0) {
-                showProfile(0);
-            } else {
-                showNoProfilesMessage();
-            }
-        }
-    }
-
-    try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('__name__', '!=', currentUser.uid));
-        const querySnapshot = await getDocs(q);
-        
-        profiles = [];
-        querySnapshot.forEach(doc => {
-            profiles.push({ id: doc.id, ...doc.data() });
-        });
-        
-        shuffleProfiles();
-        
-        cache.set('mingle_profiles', profiles, 'short');
-        await cache.setProfiles(profiles);
-        
-        if (profiles.length > 0) {
-            showProfile(0);
-        } else {
-            showNoProfilesMessage();
-        }
-    } catch (error) {
-        logError(error, 'loading profiles');
-        if (profiles.length === 0) {
-            showNoProfilesMessage();
-        }
-    }
-}
-
-function shuffleProfiles() {
-    for (let i = profiles.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [profiles[i], profiles[j]] = [profiles[j], profiles[i]];
-    }
-}
-
-function showNoProfilesMessage() {
-    document.getElementById('currentProfileImage').src = 'images/default-profile.jpg';
-    document.getElementById('profileName').textContent = 'No profiles found';
-    document.getElementById('profileAgeLocation').textContent = '';
-    document.getElementById('profileBio').textContent = 'Check back later for new profiles';
-}
-
-function showProfile(index) {
-    if (index >= 0 && index < profiles.length) {
-        currentProfileIndex = index;
-        const profile = profiles[index];
-        
-        document.getElementById('currentProfileImage').src = profile.profileImage || 'images-default-profile.jpg';
-        document.getElementById('profileName').textContent = profile.name || 'Unknown';
-        
-        let ageLocation = '';
-        if (profile.age) ageLocation += `${profile.age} • `;
-        if (profile.location) ageLocation += profile.location;
-        document.getElementById('profileAgeLocation').textContent = ageLocation;
-        
-        document.getElementById('profileBio').textContent = profile.bio || 'No bio available';
-        document.getElementById('likeCount').textContent = profile.likes || 0;
-        
-        updateProfileOnlineStatus(profile.id);
-    }
-}
-
-function updateProfileOnlineStatus(userId) {
-    const statusRef = doc(db, 'status', userId);
-    
-    onSnapshot(statusRef, (doc) => {
-        const status = doc.data()?.state || 'offline';
-        const statusIndicator = document.getElementById('profileStatusIndicator');
-        
-        if (statusIndicator) {
-            statusIndicator.className = `online-status ${status}`;
-        }
-    });
-}
-
-function showNextProfile() {
-    if (currentProfileIndex < profiles.length - 1) {
-        showProfile(currentProfileIndex + 1);
-    } else {
-        showNoProfilesMessage();
-    }
-}
-
 // UPDATED: Load profile data with caching
 async function loadProfileData(profileId) {
     const cachedProfile = cache.get(`profile_${profileId}`);
@@ -5884,6 +5353,10 @@ async function loadProfileData(profileId) {
             const likedQuery = query(likedRef, where('userId', '==', profileId));
             const likedSnap = await getDocs(likedQuery);
             
+            if (!likedSnap.empty) {
+                document.getElementById('likeProfileBtn').innerHTML = '<i class="fas fa-heart"></i> Liked';
+                document.getElementById('likeProfileBtn').classList.add('liked');
+            }
             
             setupOnlineStatusListener(profileId);
         } else {
@@ -5910,7 +5383,8 @@ function displayProfileData(profileData) {
         document.getElementById('viewProfileLocation').textContent = '';
     }
     
-    
+    document.getElementById('viewProfileBio').textContent = profileData.bio || 'No bio available';
+    document.getElementById('viewLikeCount').textContent = profileData.likes || 0;
     
     const interestsContainer = document.getElementById('interestsContainer');
     interestsContainer.innerHTML = '';
