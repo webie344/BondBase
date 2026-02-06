@@ -1,5 +1,4 @@
-// groups.js - Enhanced with IndexedDB caching and instant loading - FIXED VERSION
-
+// groups.js - Enhanced with IndexedDB caching and instant loading - FIXED RENDERING
 import { 
     getFirestore, 
     collection, 
@@ -23,7 +22,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 
 // Use the SAME Firebase config as your gamers.js
 const firebaseConfig = {
-apiKey: "AIzaSyC8_PEsfTOr-gJ8P1MoXobOAfqwTVqEZWo",
+    apiKey: "AIzaSyC8_PEsfTOr-gJ8P1MoXobOAfqwTVqEZWo",
     authDomain: "usa-dating-23bc3.firebaseapp.com",
     projectId: "usa-dating-23bc3",
     storageBucket: "usa-dating-23bc3.firebasestorage.app",
@@ -35,7 +34,7 @@ apiKey: "AIzaSyC8_PEsfTOr-gJ8P1MoXobOAfqwTVqEZWo",
 class GroupsIndexedDBCache {
     constructor() {
         this.dbName = 'GroupsAppDB';
-        this.dbVersion = 3; // Increased version to handle schema changes
+        this.dbVersion = 3;
         this.db = null;
         this.initialized = false;
     }
@@ -74,12 +73,6 @@ class GroupsIndexedDBCache {
                     db.createObjectStore('userProfiles', { keyPath: 'userId' });
                     console.log('Created userProfiles store');
                 }
-                
-                if (!db.objectStoreNames.contains('userMembership')) {
-                    const membershipStore = db.createObjectStore('userMembership', { keyPath: 'id' });
-                    membershipStore.createIndex('userId_groupId', ['userId', 'groupId'], { unique: true });
-                    console.log('Created userMembership store');
-                }
             };
         });
     }
@@ -107,14 +100,6 @@ class GroupsIndexedDBCache {
                 
                 request.onsuccess = () => {
                     resolve(request.result);
-                };
-                
-                transaction.oncomplete = () => {
-                    // Transaction completed successfully
-                };
-                
-                transaction.onerror = (event) => {
-                    console.error(`Transaction error for ${storeName}:`, event.target.error);
                 };
             });
         } catch (error) {
@@ -255,10 +240,23 @@ class GroupsInstantLoadingSystem {
                 
                 // Load cached groups
                 const cachedGroups = await this.cache.getAll('groups');
+                
+                // IMPORTANT: Remove cache-specific fields and ensure we have proper group objects
                 this.appData.groups = cachedGroups.map(item => {
-                    // Remove cache-specific fields before using
                     const { lastUpdated, ...groupData } = item;
-                    return groupData;
+                    return {
+                        ...groupData,
+                        // Ensure required fields exist
+                        id: groupData.id || '',
+                        name: groupData.name || 'Unnamed Group',
+                        description: groupData.description || '',
+                        category: groupData.category || 'General',
+                        privacy: groupData.privacy || 'public',
+                        memberCount: groupData.memberCount || 0,
+                        maxMembers: groupData.maxMembers || 1000,
+                        topics: groupData.topics || [],
+                        rules: groupData.rules || []
+                    };
                 });
                 
                 console.log(`⚡ Instant loaded ${this.appData.groups.length} groups from cache in ${Date.now() - preloadStartTime}ms`);
@@ -279,7 +277,13 @@ class GroupsInstantLoadingSystem {
         if (this.hasRenderedFromCache) return;
         
         const groupsGridElement = document.getElementById('groupsGrid');
-        if (!groupsGridElement) return;
+        if (!groupsGridElement) {
+            console.error('❌ groupsGrid element not found!');
+            this.showDarkError('Cannot find groups container. Please refresh the page.');
+            return;
+        }
+        
+        console.log('⚡ Attempting to render from cache, groups count:', this.appData.groups.length);
         
         if (this.appData.groups.length > 0) {
             console.log('⚡ Rendering groups instantly from cache...');
@@ -288,33 +292,49 @@ class GroupsInstantLoadingSystem {
             // Clear any existing content
             groupsGridElement.innerHTML = '';
             
-            // Show cached data immediately
-            const groups = this.appData.groups.slice(0, 20); // Show first 20 for instant load
+            // Show cached data immediately - limit to 15 for better performance
+            const groups = this.appData.groups.slice(0, 15);
             
+            console.log('Creating cards for', groups.length, 'groups');
+            
+            let cardsCreated = 0;
             groups.forEach(group => {
-                const card = this.createGroupCard(group);
-                if (card) {
-                    groupsGridElement.appendChild(card);
+                try {
+                    // Validate group data before creating card
+                    if (!group.id || !group.name) {
+                        console.warn('Skipping invalid group:', group);
+                        return;
+                    }
+                    
+                    const card = this.createGroupCard(group);
+                    if (card) {
+                        groupsGridElement.appendChild(card);
+                        cardsCreated++;
+                    }
+                } catch (error) {
+                    console.error('Error creating card for group:', group.id, error);
                 }
             });
+            
+            console.log(`✅ Created ${cardsCreated} group cards from cache`);
             
             // Setup event listeners
             setTimeout(() => this.setupGroupCardListeners(), 100);
             
-            console.log('✅ Groups instant render complete');
         } else {
-            // Show loading state
-            this.showLoading();
+            // Show dark theme loading state
+            console.log('No cached groups found, showing loading state');
+            this.showDarkLoading();
         }
     }
 
     startBackgroundRefresh() {
         // Wait a bit before first refresh
         setTimeout(async () => {
-            await this.refreshGroups(true); // Silent refresh
+            await this.refreshGroups(true);
         }, 1000);
         
-        // Schedule periodic refresh every 60 seconds (less frequent than gamers)
+        // Schedule periodic refresh every 60 seconds
         setInterval(async () => {
             if (document.visibilityState === 'visible' && this.isOnline() && !this.isRefreshing) {
                 await this.refreshGroups(true);
@@ -330,7 +350,7 @@ class GroupsInstantLoadingSystem {
             console.log('🔄 Refreshing groups...');
             
             if (!silent) {
-                this.showLoading();
+                this.showDarkLoading();
             }
             
             const groups = await this.fetchFreshGroups();
@@ -353,7 +373,7 @@ class GroupsInstantLoadingSystem {
         } catch (error) {
             console.error('Error refreshing groups:', error);
             if (!silent) {
-                this.showError('Failed to refresh groups. Using cached data.');
+                this.showDarkError('Failed to refresh groups. Using cached data.');
             }
         } finally {
             this.isRefreshing = false;
@@ -381,7 +401,15 @@ class GroupsInstantLoadingSystem {
                 const group = { 
                     id: doc.id, 
                     ...data,
-                    // Handle Firebase timestamps
+                    // Ensure all required fields exist
+                    name: data.name || 'Unnamed Group',
+                    description: data.description || '',
+                    category: data.category || 'General',
+                    privacy: data.privacy || 'public',
+                    memberCount: data.memberCount || 0,
+                    maxMembers: data.maxMembers || 1000,
+                    topics: data.topics || [],
+                    rules: data.rules || [],
                     createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
                     updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
                     lastActivity: data.lastActivity?.toDate?.() || data.lastActivity || new Date()
@@ -398,13 +426,18 @@ class GroupsInstantLoadingSystem {
 
     createGroupCard(group) {
         try {
+            // Validate required fields
+            if (!group.id || !group.name) {
+                console.error('Cannot create card: missing required fields', group);
+                return null;
+            }
+            
             const groupCard = document.createElement('div');
             groupCard.className = 'group-card';
             groupCard.dataset.groupId = group.id;
             
             const avatar = this.generateGroupAvatar(group);
             
-            // Format member count
             const memberCount = group.memberCount || 0;
             const maxMembers = group.maxMembers || 1000;
             
@@ -414,11 +447,11 @@ class GroupsInstantLoadingSystem {
                         <img src="${avatar}" alt="${group.name}" class="group-avatar" 
                              onerror="this.onerror=null; this.src='https://api.dicebear.com/7.x/avataaars/svg?seed=group';">
                         <div class="group-title-section">
-                            <h3 class="group-name">${group.name}</h3>
-                            <span class="group-category">${group.category || 'General'}</span>
+                            <h3 class="group-name">${this.escapeHtml(group.name)}</h3>
+                            <span class="group-category">${this.escapeHtml(group.category || 'General')}</span>
                         </div>
                     </div>
-                    <p class="group-description">${group.description || 'No description'}</p>
+                    <p class="group-description">${this.escapeHtml(group.description || 'No description')}</p>
                     <div class="group-meta">
                         <span class="group-members">
                             <svg class="feather" style="width: 14px; height: 14px; margin-right: 4px;">
@@ -445,7 +478,7 @@ class GroupsInstantLoadingSystem {
                         <h4 class="section-title">Discussion Topics</h4>
                         <div class="topics-list">
                             ${(group.topics || []).slice(0, 3).map(topic => 
-                                `<span class="topic-tag">${topic}</span>`
+                                `<span class="topic-tag">${this.escapeHtml(topic)}</span>`
                             ).join('')}
                             ${(group.topics || []).length > 3 ? 
                                 `<span class="topic-tag">+${(group.topics || []).length - 3} more</span>` : ''
@@ -461,7 +494,7 @@ class GroupsInstantLoadingSystem {
                                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                                         <polyline points="22 4 12 14.01 9 11.01"></polyline>
                                     </svg>
-                                    <span>${rule}</span>
+                                    <span>${this.escapeHtml(rule)}</span>
                                 </li>`
                             ).join('')}
                             ${(group.rules || []).length > 2 ? 
@@ -491,17 +524,28 @@ class GroupsInstantLoadingSystem {
         }
     }
 
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     generateGroupAvatar(group) {
         if (group.photoUrl) {
             return group.photoUrl;
         }
-        const seed = encodeURIComponent(group.name);
+        const seed = encodeURIComponent(group.name || 'group');
         return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=gradientLinear`;
     }
 
     renderGroups(groups) {
         const groupsGridElement = document.getElementById('groupsGrid');
-        if (!groupsGridElement) return;
+        if (!groupsGridElement) {
+            console.error('❌ Cannot render: groupsGrid element not found');
+            return;
+        }
+        
+        console.log('Rendering', groups.length, 'groups');
         
         if (groups.length === 0) {
             groupsGridElement.innerHTML = this.getEmptyStateHTML();
@@ -509,12 +553,26 @@ class GroupsInstantLoadingSystem {
         }
         
         groupsGridElement.innerHTML = '';
-        groups.slice(0, 50).forEach(group => { // Limit to 50 groups for performance
-            const card = this.createGroupCard(group);
-            if (card) {
-                groupsGridElement.appendChild(card);
+        
+        let cardsCreated = 0;
+        groups.slice(0, 30).forEach(group => { // Limit to 30 groups for performance
+            try {
+                if (!group.id || !group.name) {
+                    console.warn('Skipping invalid group:', group);
+                    return;
+                }
+                
+                const card = this.createGroupCard(group);
+                if (card) {
+                    groupsGridElement.appendChild(card);
+                    cardsCreated++;
+                }
+            } catch (error) {
+                console.error('Error creating card for group:', group.id, error);
             }
         });
+        
+        console.log(`✅ Rendered ${cardsCreated} group cards`);
         
         this.setupGroupCardListeners();
     }
@@ -525,7 +583,7 @@ class GroupsInstantLoadingSystem {
         
         // Get existing group cards
         const existingItems = Array.from(groupsGridElement.children);
-        const updatedIds = new Set(newGroups.slice(0, 50).map(g => g.id));
+        const updatedIds = new Set(newGroups.slice(0, 30).map(g => g.id));
         
         // Remove items that are no longer in the list
         existingItems.forEach(item => {
@@ -535,8 +593,8 @@ class GroupsInstantLoadingSystem {
             }
         });
         
-        // Update or add items (limit to first 50)
-        newGroups.slice(0, 50).forEach((group, index) => {
+        // Update or add items (limit to first 30)
+        newGroups.slice(0, 30).forEach((group, index) => {
             const existingItem = groupsGridElement.querySelector(`[data-group-id="${group.id}"]`);
             if (existingItem) {
                 // Check if needs update
@@ -566,14 +624,16 @@ class GroupsInstantLoadingSystem {
     }
 
     setupGroupCardListeners() {
+        // Remove and re-add listeners to avoid duplicates
         document.querySelectorAll('.join-btn').forEach(btn => {
-            // Remove existing listeners to avoid duplicates
             btn.replaceWith(btn.cloneNode(true));
         });
         
         document.querySelectorAll('.join-btn').forEach(btn => {
             btn.addEventListener('click', this.handleJoinGroup.bind(this));
         });
+        
+        console.log('Group card listeners setup');
     }
 
     async handleJoinGroup(e) {
@@ -585,15 +645,12 @@ class GroupsInstantLoadingSystem {
             return;
         }
         
-        console.log('Join button clicked for group:', groupId);
-        
         if (!this.currentUserId) {
             this.showNotification('Please login to join groups', 'warning');
             window.location.href = 'login.html';
             return;
         }
         
-        // Check if user profile is complete
         const userProfile = await this.cache.getUserProfile(this.currentUserId);
         const needsSetup = !userProfile || !userProfile.displayName || !userProfile.avatar;
         
@@ -614,7 +671,6 @@ class GroupsInstantLoadingSystem {
                 Joining...
             `;
             
-            // Call the global join function
             await window.joinGroup(groupId);
             
             button.innerHTML = `
@@ -626,7 +682,6 @@ class GroupsInstantLoadingSystem {
             button.className = 'join-btn success';
             button.disabled = true;
             
-            console.log('Group joined successfully, redirecting...');
             setTimeout(() => {
                 window.location.href = `group.html?id=${groupId}`;
             }, 1000);
@@ -642,14 +697,14 @@ class GroupsInstantLoadingSystem {
     getEmptyStateHTML() {
         return `
             <div class="no-groups">
-                <svg class="feather" style="width: 48px; height: 48px; margin-bottom: 16px;">
+                <svg class="feather" style="width: 48px; height: 48px; margin-bottom: 16px; color: #888;">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                 </svg>
-                <h3>No Groups Found</h3>
-                <p>Be the first to create a group!</p>
+                <h3 style="color: #e0e0e0; margin: 16px 0 8px;">No Groups Found</h3>
+                <p style="color: #888;">Be the first to create a group!</p>
                 <button id="createFirstGroupBtn" class="primary-btn" style="margin-top: 16px;">
                     Create Your First Group
                 </button>
@@ -657,66 +712,177 @@ class GroupsInstantLoadingSystem {
         `;
     }
 
-    showLoading() {
+    showDarkLoading() {
         const groupsGridElement = document.getElementById('groupsGrid');
-        if (!groupsGridElement) return;
+        if (!groupsGridElement) {
+            console.error('Cannot show loading: groupsGrid not found');
+            return;
+        }
         
         groupsGridElement.innerHTML = `
-            <div class="loading-card">
-                <div class="loading-avatar"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 60%"></div>
-                    <div class="loading-line" style="width: 80%"></div>
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line" style="width: 50%"></div>
+            <div class="loading-card dark">
+                <div class="loading-avatar dark"></div>
+                <div class="loading-content dark">
+                    <div class="loading-line dark" style="width: 60%"></div>
+                    <div class="loading-line dark" style="width: 80%"></div>
+                    <div class="loading-line dark" style="width: 70%"></div>
+                    <div class="loading-line dark" style="width: 50%"></div>
                 </div>
             </div>
-            <div class="loading-card">
-                <div class="loading-avatar"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 60%"></div>
-                    <div class="loading-line" style="width: 80%"></div>
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line" style="width: 50%"></div>
+            <div class="loading-card dark">
+                <div class="loading-avatar dark"></div>
+                <div class="loading-content dark">
+                    <div class="loading-line dark" style="width: 60%"></div>
+                    <div class="loading-line dark" style="width: 80%"></div>
+                    <div class="loading-line dark" style="width: 70%"></div>
+                    <div class="loading-line dark" style="width: 50%"></div>
                 </div>
             </div>
-            <div class="loading-card">
-                <div class="loading-avatar"></div>
-                <div class="loading-content">
-                    <div class="loading-line" style="width: 60%"></div>
-                    <div class="loading-line" style="width: 80%"></div>
-                    <div class="loading-line" style="width: 70%"></div>
-                    <div class="loading-line" style="width: 50%"></div>
+            <div class="loading-card dark">
+                <div class="loading-avatar dark"></div>
+                <div class="loading-content dark">
+                    <div class="loading-line dark" style="width: 60%"></div>
+                    <div class="loading-line dark" style="width: 80%"></div>
+                    <div class="loading-line dark" style="width: 70%"></div>
+                    <div class="loading-line dark" style="width: 50%"></div>
                 </div>
             </div>
         `;
+        
+        this.addDarkLoadingStyles();
     }
 
-    showError(message) {
+    showDarkError(message) {
         const groupsGridElement = document.getElementById('groupsGrid');
         if (!groupsGridElement) return;
         
         groupsGridElement.innerHTML = `
-            <div class="error-state">
-                <svg class="feather" style="width: 48px; height: 48px; margin-bottom: 16px;">
+            <div class="error-state dark">
+                <svg class="feather" style="width: 48px; height: 48px; margin-bottom: 16px; color: #ff6b6b;">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="12" y1="8" x2="12" y2="12"></line>
                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                <h3>Error Loading Groups</h3>
-                <p>${message}</p>
-                <button onclick="window.location.reload()" class="primary-btn" style="margin-top: 16px;">
+                <h3 style="color: #e0e0e0; margin: 16px 0 8px;">Error Loading Groups</h3>
+                <p style="color: #888;">${message}</p>
+                <button onclick="window.location.reload()" class="primary-btn dark" style="margin-top: 16px;">
                     Try Again
                 </button>
-                <button onclick="window.location.href='index.html'" class="secondary-btn" style="margin-top: 8px;">
+                <button onclick="window.location.href='index.html'" class="secondary-btn dark" style="margin-top: 8px;">
                     Go Home
                 </button>
             </div>
         `;
+        
+        this.addDarkLoadingStyles();
+    }
+
+    addDarkLoadingStyles() {
+        if (document.getElementById('dark-loading-styles')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'dark-loading-styles';
+        style.textContent = `
+            .loading-card.dark {
+                background: #1e1e1e;
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 16px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                display: flex;
+                gap: 12px;
+                animation: fadeIn 0.3s ease;
+                border: 1px solid #333;
+            }
+            
+            .loading-avatar.dark {
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
+                background-size: 200% 100%;
+                animation: darkLoading 1.5s infinite;
+            }
+            
+            .loading-content.dark {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .loading-line.dark {
+                height: 12px;
+                border-radius: 6px;
+                background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
+                background-size: 200% 100%;
+                animation: darkLoading 1.5s infinite;
+            }
+            
+            @keyframes darkLoading {
+                0% { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+            }
+            
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            .primary-btn.dark {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background 0.3s;
+            }
+            
+            .primary-btn.dark:hover {
+                background: linear-gradient(135deg, #5a6fd8 0%, #6a4290 100%);
+            }
+            
+            .secondary-btn.dark {
+                background: #2d2d2d;
+                color: #e0e0e0;
+                border: 1px solid #444;
+                padding: 10px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background 0.3s;
+            }
+            
+            .secondary-btn.dark:hover {
+                background: #3d3d3d;
+            }
+            
+            .error-state.dark, .no-groups {
+                text-align: center;
+                padding: 40px 20px;
+                color: #888;
+                grid-column: 1 / -1;
+            }
+            
+            .feather {
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                fill: none;
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     showNotification(message, type = 'info') {
-        // Remove existing notifications
         const existingNotifications = document.querySelectorAll('.custom-notification');
         existingNotifications.forEach(notification => notification.remove());
         
@@ -752,6 +918,27 @@ class GroupsInstantLoadingSystem {
             notification.style.animation = 'slideOut 0.3s ease';
             setTimeout(() => notification.remove(), 300);
         }, 3000);
+        
+        this.addNotificationStyles();
+    }
+
+    addNotificationStyles() {
+        if (document.getElementById('notification-animations')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'notification-animations';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     setCurrentUserId(userId) {
@@ -764,7 +951,6 @@ class GroupsInstantLoadingSystem {
 }
 
 // ==================== GLOBAL FIREBASE INITIALIZATION ====================
-// Check if Firebase is already initialized (by gamers.js)
 if (!window.firebaseApp) {
     try {
         console.log('Initializing Firebase for groups...');
@@ -772,10 +958,6 @@ if (!window.firebaseApp) {
         console.log('Firebase initialized successfully');
     } catch (error) {
         console.error('Firebase initialization failed:', error);
-        // If initialization fails, try to use existing app
-        if (window.firebaseApp) {
-            console.log('Using existing Firebase app');
-        }
     }
 } else {
     console.log('Firebase already initialized, using existing app');
@@ -823,7 +1005,6 @@ class GroupsManager {
         try {
             console.log('Loading user profile for:', userId);
             
-            // Try to load from cache first
             const cachedProfile = await this.groupsLoader.cache.getUserProfile(userId);
             if (cachedProfile) {
                 this.currentUser = {
@@ -838,7 +1019,6 @@ class GroupsManager {
                 return;
             }
             
-            // Load from Firestore
             if (!window.firebaseApp) {
                 console.error('Firebase not initialized for user profile');
                 return;
@@ -859,7 +1039,6 @@ class GroupsManager {
                     profileComplete: userData.displayName && userData.avatar ? true : false
                 };
                 
-                // Cache the profile
                 await this.groupsLoader.cache.setUserProfile(userId, userData);
                 console.log('User profile loaded from Firestore:', this.currentUser.name);
             } else {
@@ -885,7 +1064,7 @@ class GroupsManager {
             return false;
         }
         
-        return true; // Always check on join
+        return true;
     }
 
     initializePage() {
@@ -912,7 +1091,6 @@ window.joinGroup = async function(groupId) {
     
     const db = getFirestore(window.firebaseApp);
     
-    // Get user profile
     const userRef = doc(db, 'group_users', user.uid);
     const userSnap = await getDoc(userRef);
     
@@ -922,7 +1100,6 @@ window.joinGroup = async function(groupId) {
     
     const userData = userSnap.data();
     
-    // Check group
     const groupRef = doc(db, 'groups', groupId);
     const groupSnap = await getDoc(groupRef);
     
@@ -932,11 +1109,10 @@ window.joinGroup = async function(groupId) {
     
     const group = groupSnap.data();
     
-    // Check if already a member
     const memberRef = doc(db, 'groups', groupId, 'members', user.uid);
     const memberSnap = await getDoc(memberRef);
     if (memberSnap.exists()) {
-        return true; // Already a member
+        return true;
     }
     
     if (group.memberCount >= group.maxMembers) {
@@ -974,9 +1150,6 @@ const groupsManager = new GroupsManager();
 async function initGroupsPage() {
     console.log('initGroupsPage called');
     
-    // Add loading styles if not already added
-    addStyles();
-    
     const createGroupBtn = document.getElementById('createGroupBtn');
     const searchInput = document.getElementById('groupSearch');
     
@@ -1013,7 +1186,7 @@ async function initGroupsPage() {
         });
     }
     
-    // Setup create first group button (if in empty state)
+    // Setup create first group button
     setTimeout(() => {
         const createFirstGroupBtn = document.getElementById('createFirstGroupBtn');
         if (createFirstGroupBtn) {
@@ -1057,115 +1230,6 @@ function filterGroups(searchTerm) {
     groupsManager.groupsLoader.renderGroups(filtered);
 }
 
-function addStyles() {
-    if (document.getElementById('groups-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'groups-styles';
-    style.textContent = `
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-        
-        @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-        
-        .join-btn.success {
-            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
-            cursor: default;
-        }
-        
-        .loading-card {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            display: flex;
-            gap: 12px;
-            animation: fadeIn 0.3s ease;
-        }
-        
-        .loading-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-        
-        .loading-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        .loading-line {
-            height: 12px;
-            border-radius: 6px;
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-        
-        .error-state, .no-groups {
-            text-align: center;
-            padding: 40px 20px;
-            color: #666;
-            grid-column: 1 / -1;
-        }
-        
-        .error-state h3, .no-groups h3 {
-            margin: 16px 0 8px;
-            color: #333;
-        }
-        
-        .secondary-btn {
-            background: #f0f0f0;
-            color: #333;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s;
-        }
-        
-        .secondary-btn:hover {
-            background: #e0e0e0;
-        }
-        
-        .feather {
-            stroke: currentColor;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-            fill: none;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    `;
-    document.head.appendChild(style);
-}
-
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -1182,24 +1246,17 @@ function debounce(func, wait) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM Content Loaded - groups.js with instant loading');
     
-    // Add styles
-    addStyles();
-    
-    // Check if we're on groups page
     if (window.location.pathname.includes('groups.html')) {
-        // Initialize the page
         setTimeout(() => {
             initGroupsPage();
         }, 100);
     }
 });
 
-// Also check if page is already loaded when script loads
 if (document.readyState === 'loading') {
     console.log('Document still loading');
 } else {
     console.log('Document already loaded');
-    // Initialize if page is already loaded
     if (window.location.pathname.includes('groups.html')) {
         setTimeout(() => {
             initGroupsPage();
