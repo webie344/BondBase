@@ -20,13 +20,14 @@ import {
 
 // Use the same Firebase config from your app.js
 const firebaseConfig = {
-    apiKey: "AIzaSyC9uL_BX14Z6rRpgG4MT9Tca1opJl8EviQ",
-    authDomain: "dating-connect.firebaseapp.com",
-    projectId: "dating-connect",
-    storageBucket: "dating-connect.appspot.com",
-    messagingSenderId: "1062172180210",
-    appId: "1:1062172180210:web:0c9b3c1578a5dbae58da6b"
-};
+    apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
+    authDomain: "crypto-6517d.firebaseapp.com",
+    projectId: "crypto-6517d",
+    storageBucket: "crypto-6517d.firebasestorage.app",
+    messagingSenderId: "60263975159",
+    appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
+  };
+
 
 class ButtonEventsManager {
     constructor() {

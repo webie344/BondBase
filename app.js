@@ -28,13 +28,14 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyC8_PEsfTOr-gJ8P1MoXobOAfqwTVqEZWo",
-    authDomain: "usa-dating-23bc3.firebaseapp.com",
-    projectId: "usa-dating-23bc3",
-    storageBucket: "usa-dating-23bc3.firebasestorage.app",
-    messagingSenderId: "423286263327",
-    appId: "1:423286263327:web:17f0caf843dc349c144f2a"
-};
+    apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
+    authDomain: "crypto-6517d.firebaseapp.com",
+    projectId: "crypto-6517d",
+    storageBucket: "crypto-6517d.firebasestorage.app",
+    messagingSenderId: "60263975159",
+    appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
+  };
+
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -4656,9 +4657,7 @@ function showNoProfilesMessage() {
 }
 
 function initProfilePage() {
-    const backToMingle = document.getElementById('backToMingle');
-    const messageProfileBtn = document.getElementById('messageProfileBtn');
-    const likeProfileBtn = document.getElementById('likeProfileBtn');
+    
     const logoutBtn = document.getElementById('logoutBtn');
     const dashboardBtn = document.getElementById('dashboardBtn');
     const thumbnails = document.querySelectorAll('.thumbnail');
@@ -4686,55 +4685,7 @@ function initProfilePage() {
         });
     });
 
-    if (backToMingle) {
-        eventManager.addListener(backToMingle, 'click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Back to mingle clicked');
-            window.location.href = 'mingle.html';
-        });
-    } else {
-        console.error('Back to mingle button not found');
-    }
 
-    if (messageProfileBtn) {
-        eventManager.addListener(messageProfileBtn, 'click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Message profile clicked');
-            
-            const urlParams = new URLSearchParams(window.location.search);
-            const profileId = urlParams.get('id');
-            
-            if (profileId) {
-                window.location.href = `chat.html?id=${profileId}`;
-            } else {
-                showNotification('Cannot message this profile', 'error');
-            }
-        });
-    } else {
-        console.error('Message profile button not found');
-    }
-
-    if (likeProfileBtn) {
-        eventManager.addListener(likeProfileBtn, 'click', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Like profile clicked');
-            
-            await handleLikeProfile(likeProfileBtn);
-        });
-    } else {
-        console.error('Like profile button not found');
-    }
-
-    if (logoutBtn) {
-        eventManager.addListener(logoutBtn, 'click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleLogout();
-        });
-    }
 
     if (dashboardBtn) {
         eventManager.addListener(dashboardBtn, 'click', (e) => {
@@ -4746,62 +4697,8 @@ function initProfilePage() {
 }
 
 // Handle like profile function
-async function handleLikeProfile(likeButton) {
-    const profileIdToLike = window.currentProfileId;
-    
-    if (!profileIdToLike) {
-        showNotification('Cannot like this profile', 'error');
-        return;
-    }
 
-    if (!currentUser) {
-        showNotification('Please log in to like profiles', 'error');
-        return;
-    }
 
-    try {
-        const likedRef = collection(db, 'users', currentUser.uid, 'liked');
-        const likedQuery = query(likedRef, where('userId', '==', profileIdToLike));
-        const likedSnap = await getDocs(likedQuery);
-        
-        if (!likedSnap.empty) {
-            showNotification('You already liked this profile!', 'info');
-            return;
-        }
-
-        await addDoc(collection(db, 'users', currentUser.uid, 'liked'), {
-            userId: profileIdToLike,
-            timestamp: serverTimestamp(),
-            likedAt: new Date().toISOString()
-        });
-        
-        const profileRef = doc(db, 'users', profileIdToLike);
-        const profileSnap = await getDoc(profileRef);
-        
-        if (profileSnap.exists()) {
-            const currentLikes = profileSnap.data().likes || 0;
-            await updateDoc(profileRef, {
-                likes: currentLikes + 1,
-                updatedAt: serverTimestamp()
-            });
-            
-            const likeCountElement = document.getElementById('viewLikeCount');
-            if (likeCountElement) {
-                likeCountElement.textContent = currentLikes + 1;
-            }
-        }
-        
-        likeButton.innerHTML = '<i class="fas fa-heart"></i> Liked';
-        likeButton.classList.add('liked');
-        likeButton.disabled = true;
-        
-        showNotification('Profile liked successfully!', 'success');
-        
-    } catch (error) {
-        logError(error, 'liking profile from profile page');
-        showNotification('Error liking profile. Please try again.', 'error');
-    }
-}
 
 function initAccountPage() {
     const profileImageUpload = document.getElementById('profileImageUpload');
@@ -5383,8 +5280,6 @@ function displayProfileData(profileData) {
         document.getElementById('viewProfileLocation').textContent = '';
     }
     
-    document.getElementById('viewProfileBio').textContent = profileData.bio || 'No bio available';
-    document.getElementById('viewLikeCount').textContent = profileData.likes || 0;
     
     const interestsContainer = document.getElementById('interestsContainer');
     interestsContainer.innerHTML = '';
