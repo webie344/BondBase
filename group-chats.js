@@ -3432,7 +3432,7 @@ class GroupChat {
             const groupRef = doc(collection(db, 'groups'));
             
             const inviteCode = this.generateInviteCode();
-            const inviteLink = `https://bondlydatingweb.vercel.app/join.html?code=${inviteCode}`;
+            const inviteLink = `https://bond-base.vercel.app/join.html?code=${inviteCode}`;
             
             let photoUrl = null;
             if (photoFile) {
