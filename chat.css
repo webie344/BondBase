@@ -1093,13 +1093,47 @@
     -webkit-backdrop-filter: blur(5px);
 }
 
+/* Add background image for light themes */
+[data-theme="sunlight-bliss"] .chat-container,
+[data-theme="ocean-breeze"] .chat-container,
+[data-theme="lavender-dream"] .chat-container,
+[data-theme="mint-fresh"] .chat-container,
+[data-theme="peach-blossom"] .chat-container,
+[data-theme="cotton-candy"] .chat-container,
+[data-theme="vanilla-cream"] .chat-container,
+[data-theme="sky-blue"] .chat-container,
+[data-theme="lemon-zest"] .chat-container {
+    background-image: url('light.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-blend-mode: overlay;
+    background-color: rgba(255, 255, 255, 0.9);
+}
+
+/* Darken the chat messages area for better readability on light backgrounds */
+[data-theme="sunlight-bliss"] .chat-messages,
+[data-theme="ocean-breeze"] .chat-messages,
+[data-theme="lavender-dream"] .chat-messages,
+[data-theme="mint-fresh"] .chat-messages,
+[data-theme="peach-blossom"] .chat-messages,
+[data-theme="cotton-candy"] .chat-messages,
+[data-theme="vanilla-cream"] .chat-messages,
+[data-theme="sky-blue"] .chat-messages,
+[data-theme="lemon-zest"] .chat-messages {
+    background-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* Chat Header - Use secondary color (opposite of white) */
 .chat-header {
     display: flex;
     align-items: center;
     padding: 12px 16px;
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
-    background-color: var(--background-color);
+    background-color: var(--secondary-color) !important; /* Force secondary color */
     border-bottom: 1px solid var(--border-color);
     width: 100%;
     max-width: 800px;
@@ -1111,13 +1145,33 @@
     transition: var(--transition);
 }
 
+/* Specifically for light themes, use accent color for header */
+[data-theme="sunlight-bliss"] .chat-header,
+[data-theme="ocean-breeze"] .chat-header,
+[data-theme="lavender-dream"] .chat-header,
+[data-theme="mint-fresh"] .chat-header,
+[data-theme="peach-blossom"] .chat-header,
+[data-theme="cotton-candy"] .chat-header,
+[data-theme="vanilla-cream"] .chat-header,
+[data-theme="sky-blue"] .chat-header,
+[data-theme="lemon-zest"] .chat-header {
+    background-color: var(--accent-color) !important;
+    color: white !important;
+}
+
+/* Ensure text is visible on dark headers */
+.chat-header .chat-partner-details h3,
+.chat-header .chat-partner-details p {
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
 .back-btn {
     background: none;
     border: none;
     font-size: 1.2rem;
     margin-right: 1rem;
     cursor: pointer;
-    color: var(--text-color);
+    color: rgba(255, 255, 255, 0.95);
     padding: 8px;
     border-radius: 50%;
     transition: var(--transition);
@@ -1146,13 +1200,13 @@
 .chat-partner-details h3 {
     font-size: 16px;
     font-weight: 600;
-    color: var(--text-color);
+    color: rgba(255, 255, 255, 0.95);
     margin-bottom: 2px;
 }
 
 .chat-partner-details p {
     font-size: 13px;
-    color: var(--text-light);
+    color: rgba(255, 255, 255, 0.8);
 }
 
 /* Messages - WhatsApp/Telegram Style Spacing */
