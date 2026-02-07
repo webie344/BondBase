@@ -1133,7 +1133,7 @@
     padding: 12px 16px;
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
-    background-color: var(--secondary-color) !important; /* Force secondary color */
+     /* Force secondary color */
     border-bottom: 1px solid var(--border-color);
     width: 100%;
     max-width: 800px;
@@ -1155,7 +1155,7 @@
 [data-theme="vanilla-cream"] .chat-header,
 [data-theme="sky-blue"] .chat-header,
 [data-theme="lemon-zest"] .chat-header {
-    background-color: var(--accent-color) !important;
+    
     color: white !important;
 }
 
