@@ -1,4 +1,5 @@
-// groups.js - Enhanced with IndexedDB caching and instant loading - FIXED RENDERING
+// groups.js - DIRECT COPY OF GAMERS.JS INSTANT LOADING SYSTEM
+
 import { 
     getFirestore, 
     collection, 
@@ -30,38 +31,29 @@ const firebaseConfig = {
     appId: "1:423286263327:web:17f0caf843dc349c144f2a"
 };
 
-// ==================== INDEXEDDB CACHE SYSTEM FOR GROUPS ====================
+// ==================== EXACT COPY OF GAMERS.JS INDEXEDDB SYSTEM ====================
 class GroupsIndexedDBCache {
     constructor() {
-        this.dbName = 'GroupsAppDB';
-        this.dbVersion = 3;
+        this.dbName = 'GamersAppDB';
+        this.dbVersion = 4;
         this.db = null;
-        this.initialized = false;
     }
 
     async init() {
-        if (this.initialized && this.db) return this.db;
-        
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.dbVersion);
             
-            request.onerror = (event) => {
-                console.error('IndexedDB open error:', event.target.error);
-                reject(event.target.error);
-            };
-            
-            request.onsuccess = (event) => {
-                this.db = event.target.result;
-                this.initialized = true;
-                console.log('IndexedDB for groups initialized successfully');
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                this.db = request.result;
+                console.log('Groups IndexedDB initialized successfully');
                 resolve(this.db);
             };
             
             request.onupgradeneeded = (event) => {
-                console.log('IndexedDB upgrade needed for groups, version:', event.newVersion);
                 const db = event.target.result;
                 
-                // Create object stores if they don't exist
+                // Create object stores - EXACTLY like gamers.js
                 if (!db.objectStoreNames.contains('groups')) {
                     const groupsStore = db.createObjectStore('groups', { keyPath: 'id' });
                     groupsStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
@@ -69,161 +61,104 @@ class GroupsIndexedDBCache {
                     console.log('Created groups store');
                 }
                 
-                if (!db.objectStoreNames.contains('userProfiles')) {
-                    db.createObjectStore('userProfiles', { keyPath: 'userId' });
-                    console.log('Created userProfiles store');
+                if (!db.objectStoreNames.contains('groupUserProfiles')) {
+                    db.createObjectStore('groupUserProfiles', { keyPath: 'userId' });
+                    console.log('Created groupUserProfiles store');
+                }
+                
+                if (!db.objectStoreNames.contains('groupMembership')) {
+                    const membershipStore = db.createObjectStore('groupMembership', { keyPath: 'id' });
+                    membershipStore.createIndex('userId_groupId', ['userId', 'groupId'], { unique: true });
+                    console.log('Created groupMembership store');
                 }
             };
         });
     }
 
     async set(storeName, data) {
-        try {
-            if (!this.db) await this.init();
-            
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readwrite');
-                const store = transaction.objectStore(storeName);
-                
-                // Ensure we have required fields
-                const itemToStore = {
-                    ...data,
-                    lastUpdated: Date.now()
-                };
-                
-                const request = store.put(itemToStore);
-                
-                request.onerror = (event) => {
-                    console.error(`Error storing in ${storeName}:`, event.target.error);
-                    reject(event.target.error);
-                };
-                
-                request.onsuccess = () => {
-                    resolve(request.result);
-                };
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put({
+                ...data,
+                lastUpdated: Date.now()
             });
-        } catch (error) {
-            console.error('Error in set method:', error);
-            throw error;
-        }
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+        });
     }
 
     async get(storeName, key) {
-        try {
-            if (!this.db) await this.init();
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
             
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readonly');
-                const store = transaction.objectStore(storeName);
-                const request = store.get(key);
-                
-                request.onerror = (event) => reject(event.target.error);
-                request.onsuccess = () => {
-                    const result = request.result;
-                    // Check if data is expired (5 minutes)
-                    if (result && Date.now() - result.lastUpdated < 5 * 60 * 1000) {
-                        resolve(result);
-                    } else {
-                        resolve(null); // Data expired or not found
-                    }
-                };
-            });
-        } catch (error) {
-            console.error('Error in get method:', error);
-            return null;
-        }
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                const result = request.result;
+                if (result && Date.now() - result.lastUpdated < 5 * 60 * 1000) {
+                    resolve(result);
+                } else {
+                    resolve(null);
+                }
+            };
+        });
     }
 
     async getAll(storeName) {
-        try {
-            if (!this.db) await this.init();
+        if (!this.db) await this.init();
+        
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.getAll();
             
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readonly');
-                const store = transaction.objectStore(storeName);
-                const request = store.getAll();
-                
-                request.onerror = (event) => reject(event.target.error);
-                request.onsuccess = () => {
-                    const results = request.result || [];
-                    // Filter out expired items (5 minutes)
-                    const validResults = results.filter(item => {
-                        if (!item || !item.lastUpdated) return false;
-                        return Date.now() - item.lastUpdated < 5 * 60 * 1000;
-                    });
-                    resolve(validResults);
-                };
-            });
-        } catch (error) {
-            console.error('Error in getAll method:', error);
-            return [];
-        }
-    }
-
-    async clear(storeName) {
-        try {
-            if (!this.db) await this.init();
-            
-            return new Promise((resolve, reject) => {
-                const transaction = this.db.transaction([storeName], 'readwrite');
-                const store = transaction.objectStore(storeName);
-                const request = store.clear();
-                
-                request.onerror = (event) => reject(event.target.error);
-                request.onsuccess = () => resolve();
-            });
-        } catch (error) {
-            console.error('Error clearing store:', error);
-        }
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                const results = request.result || [];
+                const validResults = results.filter(item => {
+                    if (!item || !item.lastUpdated) return false;
+                    return Date.now() - item.lastUpdated < 5 * 60 * 1000;
+                });
+                resolve(validResults);
+            };
+        });
     }
 
     async setGroups(groups) {
-        try {
-            await this.init();
-            
-            // Clear existing groups first
-            await this.clear('groups');
-            
-            // Add new groups in batches to avoid transaction issues
-            const batchSize = 20;
-            for (let i = 0; i < groups.length; i += batchSize) {
-                const batch = groups.slice(i, i + batchSize);
-                await Promise.all(
-                    batch.map(group => this.set('groups', group))
-                );
-            }
-            
-            console.log(`Cached ${groups.length} groups in IndexedDB`);
-        } catch (error) {
-            console.error('Error caching groups:', error);
+        await this.init();
+        for (const group of groups) {
+            await this.set('groups', {
+                ...group,
+                lastUpdated: Date.now()
+            });
         }
+        console.log(`✅ Cached ${groups.length} groups in IndexedDB`);
     }
 
-    async getUserProfile(userId) {
-        return this.get('userProfiles', userId);
-    }
-
-    async setUserProfile(userId, profile) {
-        return this.set('userProfiles', { userId, ...profile });
+    async getGroups() {
+        await this.init();
+        return await this.getAll('groups');
     }
 }
 
-// ==================== INSTANT LOADING SYSTEM ====================
+// ==================== EXACT COPY OF GAMERS.JS INSTANT LOADING ====================
 class GroupsInstantLoadingSystem {
     constructor() {
         this.appData = {
             groups: [],
             userProfiles: {},
-            userMembership: {}
+            membership: {}
         };
         this.isInitialized = false;
         this.initPromise = null;
         this.hasRenderedFromCache = false;
-        this.currentUserId = null;
-        this.isRefreshing = false;
-        
-        // Initialize cache system
-        this.cache = new GroupsIndexedDBCache();
     }
 
     async initialize() {
@@ -235,29 +170,12 @@ class GroupsInstantLoadingSystem {
             const preloadStartTime = Date.now();
             
             try {
-                // Initialize cache
-                await this.cache.init();
+                // Load from IndexedDB cache immediately (instant)
+                await this.initIndexedDB();
                 
-                // Load cached groups
-                const cachedGroups = await this.cache.getAll('groups');
-                
-                // IMPORTANT: Remove cache-specific fields and ensure we have proper group objects
-                this.appData.groups = cachedGroups.map(item => {
-                    const { lastUpdated, ...groupData } = item;
-                    return {
-                        ...groupData,
-                        // Ensure required fields exist
-                        id: groupData.id || '',
-                        name: groupData.name || 'Unnamed Group',
-                        description: groupData.description || '',
-                        category: groupData.category || 'General',
-                        privacy: groupData.privacy || 'public',
-                        memberCount: groupData.memberCount || 0,
-                        maxMembers: groupData.maxMembers || 1000,
-                        topics: groupData.topics || [],
-                        rules: groupData.rules || []
-                    };
-                });
+                // Load all cached groups
+                const groups = await this.loadAllGroups();
+                this.appData.groups = groups;
                 
                 console.log(`⚡ Instant loaded ${this.appData.groups.length} groups from cache in ${Date.now() - preloadStartTime}ms`);
                 
@@ -273,279 +191,173 @@ class GroupsInstantLoadingSystem {
         return this.initPromise;
     }
 
+    async initIndexedDB() {
+        this.cache = new GroupsIndexedDBCache();
+        await this.cache.init();
+    }
+
+    async loadAllGroups() {
+        try {
+            const allGroups = await this.cache.getGroups();
+            return allGroups.map(group => {
+                const { lastUpdated, ...groupData } = group;
+                return groupData;
+            });
+        } catch (error) {
+            console.log('Could not load groups from cache:', error);
+            return [];
+        }
+    }
+
     renderInstantly() {
         if (this.hasRenderedFromCache) return;
         
         const groupsGridElement = document.getElementById('groupsGrid');
         if (!groupsGridElement) {
-            console.error('❌ groupsGrid element not found!');
-            this.showDarkError('Cannot find groups container. Please refresh the page.');
+            console.error('Cannot find #groupsGrid element');
             return;
         }
         
-        console.log('⚡ Attempting to render from cache, groups count:', this.appData.groups.length);
+        console.log(`🔄 Checking ${this.appData.groups.length} cached groups...`);
         
         if (this.appData.groups.length > 0) {
-            console.log('⚡ Rendering groups instantly from cache...');
+            console.log('⚡ Rendering instantly from cache...');
             this.hasRenderedFromCache = true;
             
             // Clear any existing content
             groupsGridElement.innerHTML = '';
             
-            // Show cached data immediately - limit to 15 for better performance
-            const groups = this.appData.groups.slice(0, 15);
+            // Show cached data immediately (first 15 groups)
+            const groupsToShow = this.appData.groups.slice(0, 15);
             
-            console.log('Creating cards for', groups.length, 'groups');
-            
-            let cardsCreated = 0;
-            groups.forEach(group => {
-                try {
-                    // Validate group data before creating card
-                    if (!group.id || !group.name) {
-                        console.warn('Skipping invalid group:', group);
-                        return;
-                    }
-                    
-                    const card = this.createGroupCard(group);
-                    if (card) {
-                        groupsGridElement.appendChild(card);
-                        cardsCreated++;
-                    }
-                } catch (error) {
-                    console.error('Error creating card for group:', group.id, error);
+            groupsToShow.forEach(group => {
+                const card = this.createGroupCard(group);
+                if (card) {
+                    groupsGridElement.appendChild(card);
                 }
             });
             
-            console.log(`✅ Created ${cardsCreated} group cards from cache`);
-            
             // Setup event listeners
-            setTimeout(() => this.setupGroupCardListeners(), 100);
+            this.setupGroupCardListeners();
+            
+            console.log(`✅ Instant render complete (${groupsToShow.length} groups)`);
+            
+            // Add more if we have them (lazy load)
+            if (this.appData.groups.length > 15) {
+                setTimeout(() => {
+                    const moreGroups = this.appData.groups.slice(15);
+                    moreGroups.forEach(group => {
+                        const card = this.createGroupCard(group);
+                        if (card) {
+                            groupsGridElement.appendChild(card);
+                        }
+                    });
+                    this.setupGroupCardListeners();
+                    console.log(`➕ Added ${moreGroups.length} more groups`);
+                }, 100);
+            }
             
         } else {
-            // Show dark theme loading state
-            console.log('No cached groups found, showing loading state');
-            this.showDarkLoading();
+            console.log('No cached groups found, showing loading...');
+            this.showLoading();
         }
     }
 
-    startBackgroundRefresh() {
-        // Wait a bit before first refresh
-        setTimeout(async () => {
-            await this.refreshGroups(true);
-        }, 1000);
+    showLoading() {
+        const groupsGridElement = document.getElementById('groupsGrid');
+        if (!groupsGridElement) return;
         
-        // Schedule periodic refresh every 60 seconds
-        setInterval(async () => {
-            if (document.visibilityState === 'visible' && this.isOnline() && !this.isRefreshing) {
-                await this.refreshGroups(true);
-            }
-        }, 60000);
+        // EXACTLY like gamers.js loading
+        groupsGridElement.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            groupsGridElement.appendChild(this.createLoadingGroupItem());
+        }
     }
 
-    async refreshGroups(silent = false) {
-        if (this.isRefreshing) return;
+    createLoadingGroupItem() {
+        const div = document.createElement('div');
+        div.className = 'group-item loading';
+        div.innerHTML = `
+            <div class="loading-avatar"></div>
+            <div class="loading-info">
+                <div class="loading-line" style="width: 60%"></div>
+                <div class="loading-line short"></div>
+                <div class="loading-line medium"></div>
+            </div>
+        `;
+        return div;
+    }
+
+    startBackgroundRefresh() {
+        // Refresh data in background after initial render
+        setTimeout(async () => {
+            console.log('🔄 Starting background refresh...');
+            await this.fetchFreshGroups(true); // Silent refresh
+            
+            // Schedule periodic refresh every 30 seconds
+            setInterval(async () => {
+                if (document.visibilityState === 'visible' && this.isOnline()) {
+                    await this.fetchFreshGroups(true); // Silent refresh
+                }
+            }, 30000);
+        }, 2000); // Wait 2 seconds before first refresh
+    }
+
+    async fetchFreshGroups(silentRefresh = false) {
+        console.log('🔄 Fetching fresh groups from Firebase...');
         
-        this.isRefreshing = true;
         try {
-            console.log('🔄 Refreshing groups...');
+            const db = getFirestore(window.firebaseApp);
+            const groupsRef = collection(db, 'groups');
+            const q = query(groupsRef, orderBy('lastActivity', 'desc'));
+            const querySnapshot = await getDocs(q);
             
-            if (!silent) {
-                this.showDarkLoading();
-            }
+            const groups = [];
+            querySnapshot.forEach(doc => {
+                try {
+                    const data = doc.data();
+                    const group = { 
+                        id: doc.id, 
+                        ...data,
+                        createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+                        updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
+                        lastActivity: data.lastActivity?.toDate?.() || data.lastActivity || new Date()
+                    };
+                    groups.push(group);
+                } catch (error) {
+                    console.error('Error processing group:', doc.id, error);
+                }
+            });
             
-            const groups = await this.fetchFreshGroups();
+            console.log(`✅ Loaded ${groups.length} fresh groups from Firebase`);
             
             // Update in-memory cache
             this.appData.groups = groups;
             
-            // Cache in IndexedDB (silently, don't await)
-            this.cache.setGroups(groups).catch(err => {
-                console.log('Background cache update failed:', err);
-            });
+            // Cache in IndexedDB
+            await this.cache.setGroups(groups);
             
-            // Update UI
-            if (!silent) {
+            // Update UI with fresh data
+            if (!silentRefresh || !this.hasRenderedFromCache) {
                 this.renderGroups(groups);
-            } else if (this.hasRenderedFromCache) {
+            } else {
                 this.smoothUpdateGroups(groups);
             }
             
+            return groups;
+            
         } catch (error) {
-            console.error('Error refreshing groups:', error);
-            if (!silent) {
-                this.showDarkError('Failed to refresh groups. Using cached data.');
+            console.error('❌ Error loading groups:', error);
+            if (!silentRefresh) {
+                this.showError(`Failed to load groups: ${error.message}`, true);
             }
-        } finally {
-            this.isRefreshing = false;
+            return [];
         }
-    }
-
-    async fetchFreshGroups() {
-        console.log('🐱 Fetching fresh groups from Firestore');
-        
-        // Check if Firebase is initialized
-        if (!window.firebaseApp) {
-            console.error('Firebase not initialized');
-            throw new Error('Firebase not initialized');
-        }
-        
-        const db = getFirestore(window.firebaseApp);
-        const groupsRef = collection(db, 'groups');
-        const q = query(groupsRef, orderBy('lastActivity', 'desc'));
-        const querySnapshot = await getDocs(q);
-        
-        const groups = [];
-        querySnapshot.forEach(doc => {
-            try {
-                const data = doc.data();
-                const group = { 
-                    id: doc.id, 
-                    ...data,
-                    // Ensure all required fields exist
-                    name: data.name || 'Unnamed Group',
-                    description: data.description || '',
-                    category: data.category || 'General',
-                    privacy: data.privacy || 'public',
-                    memberCount: data.memberCount || 0,
-                    maxMembers: data.maxMembers || 1000,
-                    topics: data.topics || [],
-                    rules: data.rules || [],
-                    createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
-                    updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
-                    lastActivity: data.lastActivity?.toDate?.() || data.lastActivity || new Date()
-                };
-                groups.push(group);
-            } catch (error) {
-                console.error('Error processing group:', doc.id, error);
-            }
-        });
-        
-        console.log(`✅ Loaded ${groups.length} fresh groups from Firebase`);
-        return groups;
-    }
-
-    createGroupCard(group) {
-        try {
-            // Validate required fields
-            if (!group.id || !group.name) {
-                console.error('Cannot create card: missing required fields', group);
-                return null;
-            }
-            
-            const groupCard = document.createElement('div');
-            groupCard.className = 'group-card';
-            groupCard.dataset.groupId = group.id;
-            
-            const avatar = this.generateGroupAvatar(group);
-            
-            const memberCount = group.memberCount || 0;
-            const maxMembers = group.maxMembers || 1000;
-            
-            groupCard.innerHTML = `
-                <div class="group-header">
-                    <div class="group-avatar-section">
-                        <img src="${avatar}" alt="${group.name}" class="group-avatar" 
-                             onerror="this.onerror=null; this.src='https://api.dicebear.com/7.x/avataaars/svg?seed=group';">
-                        <div class="group-title-section">
-                            <h3 class="group-name">${this.escapeHtml(group.name)}</h3>
-                            <span class="group-category">${this.escapeHtml(group.category || 'General')}</span>
-                        </div>
-                    </div>
-                    <p class="group-description">${this.escapeHtml(group.description || 'No description')}</p>
-                    <div class="group-meta">
-                        <span class="group-members">
-                            <svg class="feather" style="width: 14px; height: 14px; margin-right: 4px;">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="9" cy="7" r="4"></circle>
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                            </svg>
-                            ${memberCount} / ${maxMembers}
-                        </span>
-                        <span class="group-privacy">
-                            <svg class="feather" style="width: 14px; height: 14px; margin-right: 4px;">
-                                ${group.privacy === 'private' ? 
-                                    '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
-                                    '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
-                                }
-                            </svg>
-                            ${group.privacy === 'private' ? 'Private' : 'Public'}
-                        </span>
-                    </div>
-                </div>
-                <div class="group-content">
-                    <div class="group-topics">
-                        <h4 class="section-title">Discussion Topics</h4>
-                        <div class="topics-list">
-                            ${(group.topics || []).slice(0, 3).map(topic => 
-                                `<span class="topic-tag">${this.escapeHtml(topic)}</span>`
-                            ).join('')}
-                            ${(group.topics || []).length > 3 ? 
-                                `<span class="topic-tag">+${(group.topics || []).length - 3} more</span>` : ''
-                            }
-                        </div>
-                    </div>
-                    <div class="group-rules">
-                        <h4 class="section-title">Group Rules</h4>
-                        <ul class="rules-list">
-                            ${(group.rules || []).slice(0, 2).map(rule => 
-                                `<li class="rule-item">
-                                    <svg class="feather" style="width: 14px; height: 14px; margin-right: 8px;">
-                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                                    </svg>
-                                    <span>${this.escapeHtml(rule)}</span>
-                                </li>`
-                            ).join('')}
-                            ${(group.rules || []).length > 2 ? 
-                                `<li class="rule-item">
-                                    <svg class="feather" style="width: 14px; height: 14px; margin-right: 8px;">
-                                        <circle cx="12" cy="12" r="1"></circle>
-                                        <circle cx="19" cy="12" r="1"></circle>
-                                        <circle cx="5" cy="12" r="1"></circle>
-                                    </svg>
-                                    <span>${(group.rules || []).length - 2} more rules</span>
-                                </li>` : ''
-                            }
-                        </ul>
-                    </div>
-                </div>
-                <div class="group-actions">
-                    <button class="join-btn" data-group-id="${group.id}">
-                        Join Group
-                    </button>
-                </div>
-            `;
-            
-            return groupCard;
-        } catch (error) {
-            console.error('Error creating group card:', error);
-            return null;
-        }
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    generateGroupAvatar(group) {
-        if (group.photoUrl) {
-            return group.photoUrl;
-        }
-        const seed = encodeURIComponent(group.name || 'group');
-        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=00897b,00acc1,039be5,1e88e5,3949ab,43a047,5e35b1,7cb342,8e24aa,c0ca33,d81b60,e53935,f4511e,fb8c00,fdd835,ffb300,ffd5dc,ffdfbf,c0aede,d1d4f9,b6e3f4&backgroundType=gradientLinear`;
     }
 
     renderGroups(groups) {
         const groupsGridElement = document.getElementById('groupsGrid');
-        if (!groupsGridElement) {
-            console.error('❌ Cannot render: groupsGrid element not found');
-            return;
-        }
-        
-        console.log('Rendering', groups.length, 'groups');
+        if (!groupsGridElement) return;
         
         if (groups.length === 0) {
             groupsGridElement.innerHTML = this.getEmptyStateHTML();
@@ -553,37 +365,24 @@ class GroupsInstantLoadingSystem {
         }
         
         groupsGridElement.innerHTML = '';
-        
-        let cardsCreated = 0;
-        groups.slice(0, 30).forEach(group => { // Limit to 30 groups for performance
-            try {
-                if (!group.id || !group.name) {
-                    console.warn('Skipping invalid group:', group);
-                    return;
-                }
-                
-                const card = this.createGroupCard(group);
-                if (card) {
-                    groupsGridElement.appendChild(card);
-                    cardsCreated++;
-                }
-            } catch (error) {
-                console.error('Error creating card for group:', group.id, error);
+        groups.forEach(group => {
+            const card = this.createGroupCard(group);
+            if (card) {
+                groupsGridElement.appendChild(card);
             }
         });
         
-        console.log(`✅ Rendered ${cardsCreated} group cards`);
-        
         this.setupGroupCardListeners();
+        console.log(`✅ Rendered ${groups.length} groups`);
     }
 
     smoothUpdateGroups(newGroups) {
         const groupsGridElement = document.getElementById('groupsGrid');
         if (!groupsGridElement) return;
         
-        // Get existing group cards
+        // Get existing group items
         const existingItems = Array.from(groupsGridElement.children);
-        const updatedIds = new Set(newGroups.slice(0, 30).map(g => g.id));
+        const updatedIds = new Set(newGroups.map(g => g.id));
         
         // Remove items that are no longer in the list
         existingItems.forEach(item => {
@@ -593,20 +392,12 @@ class GroupsInstantLoadingSystem {
             }
         });
         
-        // Update or add items (limit to first 30)
-        newGroups.slice(0, 30).forEach((group, index) => {
+        // Update or add items
+        newGroups.forEach((group, index) => {
             const existingItem = groupsGridElement.querySelector(`[data-group-id="${group.id}"]`);
             if (existingItem) {
-                // Check if needs update
-                const currentMemberCount = existingItem.querySelector('.group-members')?.textContent;
-                const newMemberCount = `${group.memberCount || 0} / ${group.maxMembers || 1000}`;
-                
-                if (currentMemberCount !== newMemberCount) {
-                    const newItem = this.createGroupCard(group);
-                    if (newItem) {
-                        existingItem.replaceWith(newItem);
-                    }
-                }
+                // Update existing item if needed
+                this.updateGroupItem(existingItem, group);
             } else {
                 // Add new item
                 const newItem = this.createGroupCard(group);
@@ -623,49 +414,130 @@ class GroupsInstantLoadingSystem {
         this.setupGroupCardListeners();
     }
 
+    updateGroupItem(item, group) {
+        // Only update if data has changed significantly
+        const currentMemberCount = item.querySelector('.group-members')?.textContent;
+        const newMemberCount = `${group.memberCount || 0} / ${group.maxMembers || 1000}`;
+        
+        if (currentMemberCount !== newMemberCount) {
+            const newItem = this.createGroupCard(group);
+            item.replaceWith(newItem);
+        }
+    }
+
+    createGroupCard(group) {
+        const groupCard = document.createElement('div');
+        groupCard.className = 'group-card';
+        groupCard.dataset.groupId = group.id;
+        
+        const avatar = group.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.name)}&backgroundColor=667eea,764ba2`;
+        const isPrivate = group.privacy === 'private';
+        
+        groupCard.innerHTML = `
+            <div class="group-header">
+                <div class="group-avatar-section">
+                    <img src="${avatar}" alt="${group.name}" class="group-avatar" 
+                         onerror="this.onerror=null; this.src='https://api.dicebear.com/7.x/avataaars/svg?seed=group';">
+                    <div class="group-title-section">
+                        <h3 class="group-name">${group.name}</h3>
+                        <span class="group-category">${group.category || 'General'}</span>
+                    </div>
+                </div>
+                <p class="group-description">${group.description || 'No description available'}</p>
+                <div class="group-meta">
+                    <span class="group-members" title="${group.memberCount || 0} members">
+                        <svg class="feather" style="width: 14px; height: 14px; margin-right: 4px;">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        ${group.memberCount || 0} / ${group.maxMembers || 1000}
+                    </span>
+                    <span class="group-privacy" style="color: ${isPrivate ? '#ef4444' : '#10b981'};" title="${isPrivate ? 'Private Group' : 'Public Group'}">
+                        <svg class="feather" style="width: 14px; height: 14px; margin-right: 4px;">
+                            ${isPrivate ? 
+                                '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>' : 
+                                '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
+                            }
+                        </svg>
+                        ${isPrivate ? 'Private' : 'Public'}
+                    </span>
+                </div>
+            </div>
+            ${(group.topics && group.topics.length > 0) || (group.rules && group.rules.length > 0) ? `
+                <div class="group-content">
+                    ${group.topics && group.topics.length > 0 ? `
+                        <div class="group-topics">
+                            <h4 class="section-title">Topics</h4>
+                            <div class="topics-list">
+                                ${group.topics.slice(0, 3).map(topic => 
+                                    `<span class="topic-tag">${topic}</span>`
+                                ).join('')}
+                                ${group.topics.length > 3 ? 
+                                    `<span class="topic-tag">+${group.topics.length - 3}</span>` : ''
+                                }
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            ` : ''}
+            <div class="group-actions">
+                <button class="join-btn" data-group-id="${group.id}">
+                    <svg class="feather" style="width: 14px; height: 14px; margin-right: 8px;">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                        <line x1="23" y1="11" x2="17" y2="11"></line>
+                    </svg>
+                    Join Group
+                </button>
+            </div>
+        `;
+        
+        return groupCard;
+    }
+
     setupGroupCardListeners() {
-        // Remove and re-add listeners to avoid duplicates
         document.querySelectorAll('.join-btn').forEach(btn => {
-            btn.replaceWith(btn.cloneNode(true));
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleJoinGroup(e);
+            });
         });
         
-        document.querySelectorAll('.join-btn').forEach(btn => {
-            btn.addEventListener('click', this.handleJoinGroup.bind(this));
+        // Click event for group navigation
+        document.querySelectorAll('.group-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('.join-btn')) {
+                    const groupId = card.dataset.groupId;
+                    if (groupId) {
+                        window.location.href = `group.html?id=${groupId}`;
+                    }
+                }
+            });
         });
-        
-        console.log('Group card listeners setup');
     }
 
     async handleJoinGroup(e) {
         const button = e.target;
         const groupId = button.dataset.groupId;
         
-        if (!groupId) {
-            console.error('No group ID found on button');
-            return;
-        }
+        if (!groupId) return;
         
-        if (!this.currentUserId) {
+        const auth = getAuth(window.firebaseApp);
+        const user = auth.currentUser;
+        
+        if (!user) {
             this.showNotification('Please login to join groups', 'warning');
             window.location.href = 'login.html';
             return;
         }
         
-        const userProfile = await this.cache.getUserProfile(this.currentUserId);
-        const needsSetup = !userProfile || !userProfile.displayName || !userProfile.avatar;
-        
-        if (needsSetup) {
-            this.showNotification('Please complete your profile first', 'warning');
-            window.location.href = `set.html?id=${groupId}`;
-            return;
-        }
-        
         try {
-            const originalText = button.innerHTML;
-            
             button.disabled = true;
             button.innerHTML = `
-                <svg class="feather" style="animation: spin 1s linear infinite; width: 14px; height: 14px; margin-right: 8px;">
+                <svg class="feather spin" style="width: 14px; height: 14px; margin-right: 8px;">
                     <circle cx="12" cy="12" r="10" />
                 </svg>
                 Joining...
@@ -689,200 +561,67 @@ class GroupsInstantLoadingSystem {
         } catch (error) {
             console.error('Error joining group:', error);
             button.disabled = false;
-            button.textContent = 'Join Group';
-            this.showNotification(error.message || 'Failed to join group. Please try again.', 'error');
+            button.innerHTML = `
+                <svg class="feather" style="width: 14px; height: 14px; margin-right: 8px;">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="8.5" cy="7" r="4"></circle>
+                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                </svg>
+                Join Group
+            `;
+            this.showNotification(error.message || 'Failed to join group', 'error');
         }
     }
 
     getEmptyStateHTML() {
         return `
-            <div class="no-groups">
-                <svg class="feather" style="width: 48px; height: 48px; margin-bottom: 16px; color: #888;">
+            <div class="empty-state">
+                <svg class="feather" style="width: 48px; height: 48px;">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                 </svg>
-                <h3 style="color: #e0e0e0; margin: 16px 0 8px;">No Groups Found</h3>
-                <p style="color: #888;">Be the first to create a group!</p>
-                <button id="createFirstGroupBtn" class="primary-btn" style="margin-top: 16px;">
-                    Create Your First Group
-                </button>
+                <h3>No groups yet</h3>
+                <p>Be the first to create a group!</p>
             </div>
         `;
     }
 
-    showDarkLoading() {
-        const groupsGridElement = document.getElementById('groupsGrid');
-        if (!groupsGridElement) {
-            console.error('Cannot show loading: groupsGrid not found');
-            return;
-        }
-        
-        groupsGridElement.innerHTML = `
-            <div class="loading-card dark">
-                <div class="loading-avatar dark"></div>
-                <div class="loading-content dark">
-                    <div class="loading-line dark" style="width: 60%"></div>
-                    <div class="loading-line dark" style="width: 80%"></div>
-                    <div class="loading-line dark" style="width: 70%"></div>
-                    <div class="loading-line dark" style="width: 50%"></div>
-                </div>
-            </div>
-            <div class="loading-card dark">
-                <div class="loading-avatar dark"></div>
-                <div class="loading-content dark">
-                    <div class="loading-line dark" style="width: 60%"></div>
-                    <div class="loading-line dark" style="width: 80%"></div>
-                    <div class="loading-line dark" style="width: 70%"></div>
-                    <div class="loading-line dark" style="width: 50%"></div>
-                </div>
-            </div>
-            <div class="loading-card dark">
-                <div class="loading-avatar dark"></div>
-                <div class="loading-content dark">
-                    <div class="loading-line dark" style="width: 60%"></div>
-                    <div class="loading-line dark" style="width: 80%"></div>
-                    <div class="loading-line dark" style="width: 70%"></div>
-                    <div class="loading-line dark" style="width: 50%"></div>
-                </div>
-            </div>
-        `;
-        
-        this.addDarkLoadingStyles();
-    }
-
-    showDarkError(message) {
+    showError(message, showRefresh = true) {
         const groupsGridElement = document.getElementById('groupsGrid');
         if (!groupsGridElement) return;
         
         groupsGridElement.innerHTML = `
-            <div class="error-state dark">
-                <svg class="feather" style="width: 48px; height: 48px; margin-bottom: 16px; color: #ff6b6b;">
+            <div class="empty-state">
+                <svg class="feather" style="width: 48px; height: 48px;">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="12" y1="8" x2="12" y2="12"></line>
                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                <h3 style="color: #e0e0e0; margin: 16px 0 8px;">Error Loading Groups</h3>
-                <p style="color: #888;">${message}</p>
-                <button onclick="window.location.reload()" class="primary-btn dark" style="margin-top: 16px;">
-                    Try Again
-                </button>
-                <button onclick="window.location.href='index.html'" class="secondary-btn dark" style="margin-top: 8px;">
-                    Go Home
-                </button>
+                <h3>Error Loading</h3>
+                <p>${message}</p>
+                ${showRefresh ? `
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button onclick="location.reload()" style="
+                            background: #667eea;
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 20px;
+                            cursor: pointer;
+                        ">
+                            Refresh Page
+                        </button>
+                    </div>
+                ` : ''}
             </div>
         `;
-        
-        this.addDarkLoadingStyles();
-    }
-
-    addDarkLoadingStyles() {
-        if (document.getElementById('dark-loading-styles')) return;
-        
-        const style = document.createElement('style');
-        style.id = 'dark-loading-styles';
-        style.textContent = `
-            .loading-card.dark {
-                background: #1e1e1e;
-                border-radius: 12px;
-                padding: 16px;
-                margin-bottom: 16px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                display: flex;
-                gap: 12px;
-                animation: fadeIn 0.3s ease;
-                border: 1px solid #333;
-            }
-            
-            .loading-avatar.dark {
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
-                background-size: 200% 100%;
-                animation: darkLoading 1.5s infinite;
-            }
-            
-            .loading-content.dark {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-            
-            .loading-line.dark {
-                height: 12px;
-                border-radius: 6px;
-                background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
-                background-size: 200% 100%;
-                animation: darkLoading 1.5s infinite;
-            }
-            
-            @keyframes darkLoading {
-                0% { background-position: 200% 0; }
-                100% { background-position: -200% 0; }
-            }
-            
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-            
-            .primary-btn.dark {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 14px;
-                transition: background 0.3s;
-            }
-            
-            .primary-btn.dark:hover {
-                background: linear-gradient(135deg, #5a6fd8 0%, #6a4290 100%);
-            }
-            
-            .secondary-btn.dark {
-                background: #2d2d2d;
-                color: #e0e0e0;
-                border: 1px solid #444;
-                padding: 10px 20px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 14px;
-                transition: background 0.3s;
-            }
-            
-            .secondary-btn.dark:hover {
-                background: #3d3d3d;
-            }
-            
-            .error-state.dark, .no-groups {
-                text-align: center;
-                padding: 40px 20px;
-                color: #888;
-                grid-column: 1 / -1;
-            }
-            
-            .feather {
-                stroke: currentColor;
-                stroke-width: 2;
-                stroke-linecap: round;
-                stroke-linejoin: round;
-                fill: none;
-            }
-        `;
-        document.head.appendChild(style);
     }
 
     showNotification(message, type = 'info') {
+        // Copy from gamers.js
         const existingNotifications = document.querySelectorAll('.custom-notification');
         existingNotifications.forEach(notification => notification.remove());
         
@@ -908,7 +647,7 @@ class GroupsInstantLoadingSystem {
             align-items: center;
             gap: 10px;
             max-width: 400px;
-            font-family: 'Inter', sans-serif;
+            backdrop-filter: blur(10px);
         `;
         
         notification.innerHTML = `<span>${message}</span>`;
@@ -918,161 +657,10 @@ class GroupsInstantLoadingSystem {
             notification.style.animation = 'slideOut 0.3s ease';
             setTimeout(() => notification.remove(), 300);
         }, 3000);
-        
-        this.addNotificationStyles();
-    }
-
-    addNotificationStyles() {
-        if (document.getElementById('notification-animations')) return;
-        
-        const style = document.createElement('style');
-        style.id = 'notification-animations';
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            
-            @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    setCurrentUserId(userId) {
-        this.currentUserId = userId;
     }
 
     isOnline() {
         return navigator.onLine;
-    }
-}
-
-// ==================== GLOBAL FIREBASE INITIALIZATION ====================
-if (!window.firebaseApp) {
-    try {
-        console.log('Initializing Firebase for groups...');
-        window.firebaseApp = initializeApp(firebaseConfig);
-        console.log('Firebase initialized successfully');
-    } catch (error) {
-        console.error('Firebase initialization failed:', error);
-    }
-} else {
-    console.log('Firebase already initialized, using existing app');
-}
-
-// ==================== MAIN GROUPS MANAGER ====================
-class GroupsManager {
-    constructor() {
-        this.firebaseUser = null;
-        this.currentUser = null;
-        this.groupsLoader = new GroupsInstantLoadingSystem();
-        this.setupAuthListener();
-    }
-
-    setupAuthListener() {
-        if (!window.firebaseApp) {
-            console.error('Cannot setup auth listener: Firebase not initialized');
-            return;
-        }
-        
-        const auth = getAuth(window.firebaseApp);
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                this.firebaseUser = user;
-                console.log('User authenticated:', user.uid);
-                this.groupsLoader.setCurrentUserId(user.uid);
-                await this.loadUserProfile(user.uid);
-                this.initializePage();
-            } else {
-                this.firebaseUser = null;
-                this.currentUser = null;
-                this.groupsLoader.setCurrentUserId(null);
-                console.log('User logged out');
-                const currentPage = window.location.pathname.split('/').pop();
-                if (currentPage === 'groups.html') {
-                    window.location.href = 'login.html';
-                }
-            }
-        }, (error) => {
-            console.error('Auth state change error:', error);
-        });
-    }
-
-    async loadUserProfile(userId) {
-        try {
-            console.log('Loading user profile for:', userId);
-            
-            const cachedProfile = await this.groupsLoader.cache.getUserProfile(userId);
-            if (cachedProfile) {
-                this.currentUser = {
-                    id: userId,
-                    name: cachedProfile.displayName || 'User',
-                    avatar: cachedProfile.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
-                    bio: cachedProfile.bio || 'No bio available.',
-                    email: cachedProfile.email || '',
-                    profileComplete: cachedProfile.displayName && cachedProfile.avatar ? true : false
-                };
-                console.log('User profile loaded from cache:', this.currentUser.name);
-                return;
-            }
-            
-            if (!window.firebaseApp) {
-                console.error('Firebase not initialized for user profile');
-                return;
-            }
-            
-            const db = getFirestore(window.firebaseApp);
-            const userRef = doc(db, 'group_users', userId);
-            const userSnap = await getDoc(userRef);
-            
-            if (userSnap.exists()) {
-                const userData = userSnap.data();
-                this.currentUser = {
-                    id: userId,
-                    name: userData.displayName || 'User',
-                    avatar: userData.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
-                    bio: userData.bio || 'No bio available.',
-                    email: userData.email || '',
-                    profileComplete: userData.displayName && userData.avatar ? true : false
-                };
-                
-                await this.groupsLoader.cache.setUserProfile(userId, userData);
-                console.log('User profile loaded from Firestore:', this.currentUser.name);
-            } else {
-                this.currentUser = {
-                    id: userId,
-                    name: this.firebaseUser.email.split('@')[0] || 'User',
-                    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
-                    bio: '',
-                    email: this.firebaseUser.email,
-                    profileComplete: false
-                };
-                console.log('New user profile created');
-            }
-        } catch (error) {
-            console.error('Error loading user profile:', error);
-        }
-    }
-
-    async needsProfileSetup() {
-        if (!this.firebaseUser) return false;
-        
-        if (this.currentUser?.profileComplete) {
-            return false;
-        }
-        
-        return true;
-    }
-
-    initializePage() {
-        const currentPage = window.location.pathname.split('/').pop();
-        if (currentPage === 'groups.html') {
-            console.log('Initializing groups page');
-            initGroupsPage();
-        }
     }
 }
 
@@ -1091,6 +679,7 @@ window.joinGroup = async function(groupId) {
     
     const db = getFirestore(window.firebaseApp);
     
+    // Get user profile
     const userRef = doc(db, 'group_users', user.uid);
     const userSnap = await getDoc(userRef);
     
@@ -1100,6 +689,7 @@ window.joinGroup = async function(groupId) {
     
     const userData = userSnap.data();
     
+    // Check group
     const groupRef = doc(db, 'groups', groupId);
     const groupSnap = await getDoc(groupRef);
     
@@ -1109,10 +699,11 @@ window.joinGroup = async function(groupId) {
     
     const group = groupSnap.data();
     
+    // Check if already a member
     const memberRef = doc(db, 'groups', groupId, 'members', user.uid);
     const memberSnap = await getDoc(memberRef);
     if (memberSnap.exists()) {
-        return true;
+        return true; // Already a member
     }
     
     if (group.memberCount >= group.maxMembers) {
@@ -1143,91 +734,71 @@ window.joinGroup = async function(groupId) {
     return true;
 };
 
-// Create global instance
-const groupsManager = new GroupsManager();
+// ==================== INITIALIZATION ====================
+// Check if Firebase is already initialized (by gamers.js)
+if (!window.firebaseApp) {
+    try {
+        console.log('Initializing Firebase for groups...');
+        window.firebaseApp = initializeApp(firebaseConfig);
+        console.log('Firebase initialized successfully');
+    } catch (error) {
+        console.error('Firebase initialization failed:', error);
+    }
+} else {
+    console.log('Firebase already initialized, using existing app');
+}
 
-// ==================== PAGE INITIALIZATION ====================
+// Create global instant loader
+const instantLoader = new GroupsInstantLoadingSystem();
+
+// ==================== MAIN INITIALIZATION ====================
 async function initGroupsPage() {
-    console.log('initGroupsPage called');
+    console.log('🚀 Initializing groups page...');
     
-    const createGroupBtn = document.getElementById('createGroupBtn');
+    // Start instant loading IMMEDIATELY (before auth)
+    await instantLoader.initialize();
+    
+    // Render instantly
+    instantLoader.renderInstantly();
+    
+    // Setup search
     const searchInput = document.getElementById('groupSearch');
-    
-    // Start instant loading IMMEDIATELY
-    await groupsManager.groupsLoader.initialize();
-    
-    // Render instantly from cache
-    groupsManager.groupsLoader.renderInstantly();
-    
-    // Setup search functionality
     if (searchInput) {
         searchInput.addEventListener('input', debounce((e) => {
             const searchTerm = e.target.value.toLowerCase().trim();
-            filterGroups(searchTerm);
+            if (searchTerm) {
+                const filtered = instantLoader.appData.groups.filter(group => 
+                    group.name.toLowerCase().includes(searchTerm) ||
+                    group.description.toLowerCase().includes(searchTerm) ||
+                    group.category.toLowerCase().includes(searchTerm) ||
+                    (group.topics || []).some(topic => topic.toLowerCase().includes(searchTerm))
+                );
+                instantLoader.renderGroups(filtered);
+            } else {
+                instantLoader.renderGroups(instantLoader.appData.groups);
+            }
         }, 300));
     }
     
     // Setup create group button
+    const createGroupBtn = document.getElementById('createGroupBtn');
     if (createGroupBtn) {
-        createGroupBtn.addEventListener('click', async () => {
-            console.log('Create group button clicked');
-            if (!groupsManager.firebaseUser) {
+        createGroupBtn.addEventListener('click', () => {
+            const auth = getAuth(window.firebaseApp);
+            if (!auth.currentUser) {
                 window.location.href = 'login.html';
                 return;
             }
-            
-            const needsSetup = await groupsManager.needsProfileSetup();
-            console.log('Profile setup needed:', needsSetup);
-            if (needsSetup) {
-                window.location.href = 'set.html?returnTo=create-group';
-            } else {
-                window.location.href = 'create-group.html';
-            }
+            window.location.href = 'create-group.html';
         });
     }
     
-    // Setup create first group button
-    setTimeout(() => {
-        const createFirstGroupBtn = document.getElementById('createFirstGroupBtn');
-        if (createFirstGroupBtn) {
-            createFirstGroupBtn.addEventListener('click', () => {
-                if (createGroupBtn) {
-                    createGroupBtn.click();
-                }
-            });
-        }
-    }, 500);
-    
     // Start background refresh
     setTimeout(() => {
-        groupsManager.groupsLoader.startBackgroundRefresh();
+        instantLoader.startBackgroundRefresh();
     }, 1000);
     
-    console.log('Groups page initialized with instant loading');
-}
-
-function filterGroups(searchTerm) {
-    const groupsGridElement = document.getElementById('groupsGrid');
-    if (!groupsGridElement) return;
-    
-    const groups = groupsManager.groupsLoader.appData.groups;
-    
-    if (!searchTerm) {
-        groupsManager.groupsLoader.renderGroups(groups);
-        return;
-    }
-    
-    const filtered = groups.filter(group => {
-        return (
-            (group.name && group.name.toLowerCase().includes(searchTerm)) ||
-            (group.description && group.description.toLowerCase().includes(searchTerm)) ||
-            (group.category && group.category.toLowerCase().includes(searchTerm)) ||
-            (group.topics || []).some(topic => topic && topic.toLowerCase().includes(searchTerm))
-        );
-    });
-    
-    console.log(`Filtered to ${filtered.length} groups`);
-    groupsManager.groupsLoader.renderGroups(filtered);
+    console.log('✅ Groups page initialized with instant loading');
 }
 
 function debounce(func, wait) {
@@ -1242,26 +813,120 @@ function debounce(func, wait) {
     };
 }
 
-// ==================== DOM INITIALIZATION ====================
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM Content Loaded - groups.js with instant loading');
+// Add CSS styles
+function addStyles() {
+    if (document.getElementById('groups-styles')) return;
     
+    const style = document.createElement('style');
+    style.id = 'groups-styles';
+    style.textContent = `
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+        
+
+        
+        /* Loading styles - EXACTLY like gamers.js */
+        .group-item.loading {
+            background: #7a0034;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .loading-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        
+        .loading-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .loading-line {
+            height: 12px;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        
+        .loading-line.short {
+            width: 40%;
+        }
+        
+        .loading-line.medium {
+            width: 70%;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+            grid-column: 1 / -1;
+        }
+        
+        .empty-state h3 {
+            margin: 16px 0 8px;
+            color: #333;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// ==================== DOM INITIALIZATION ====================
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 DOM Content Loaded - groups.js');
+    
+    // Add styles
+    addStyles();
+    
+    // Check if we're on groups page
     if (window.location.pathname.includes('groups.html')) {
-        setTimeout(() => {
-            initGroupsPage();
-        }, 100);
+        // Initialize the page immediately
+        await initGroupsPage();
     }
 });
 
-if (document.readyState === 'loading') {
-    console.log('Document still loading');
-} else {
+// Also check if page is already loaded when script loads
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
     console.log('Document already loaded');
+    // Initialize if page is already loaded
     if (window.location.pathname.includes('groups.html')) {
-        setTimeout(() => {
-            initGroupsPage();
-        }, 100);
+        setTimeout(async () => {
+            await initGroupsPage();
+        }, 50);
     }
 }
 
-console.log('✅ groups.js loaded successfully - Instant loading with IndexedDB caching');
+console.log('✅ groups.js loaded successfully - EXACT COPY of gamers.js instant loading system');
