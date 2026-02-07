@@ -1093,7 +1093,7 @@
     -webkit-backdrop-filter: blur(5px);
 }
 
-/* Add background image for light themes */
+/* Add background image for light themes - using light.png */
 [data-theme="sunlight-bliss"] .chat-container,
 [data-theme="ocean-breeze"] .chat-container,
 [data-theme="lavender-dream"] .chat-container,
@@ -1107,23 +1107,6 @@
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
-    background-blend-mode: overlay;
-    
-}
-
-/* Darken the chat messages area for better readability on light backgrounds */
-[data-theme="sunlight-bliss"] .chat-messages,
-[data-theme="ocean-breeze"] .chat-messages,
-[data-theme="lavender-dream"] .chat-messages,
-[data-theme="mint-fresh"] .chat-messages,
-[data-theme="peach-blossom"] .chat-messages,
-[data-theme="cotton-candy"] .chat-messages,
-[data-theme="vanilla-cream"] .chat-messages,
-[data-theme="sky-blue"] .chat-messages,
-[data-theme="lemon-zest"] .chat-messages {
-    background-color: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
 }
 
 /* Chat Header - Use secondary color (opposite of white) */
@@ -1133,7 +1116,7 @@
     padding: 12px 16px;
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
-     /* Force secondary color */
+    background-color: var(--secondary-color) !important; /* Force secondary color */
     border-bottom: 1px solid var(--border-color);
     width: 100%;
     max-width: 800px;
@@ -1155,7 +1138,7 @@
 [data-theme="vanilla-cream"] .chat-header,
 [data-theme="sky-blue"] .chat-header,
 [data-theme="lemon-zest"] .chat-header {
-    
+    background-color: var(--accent-color) !important;
     color: white !important;
 }
 
