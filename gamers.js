@@ -224,7 +224,7 @@ class InstantLoadingSystem {
 class GamersIndexedDBCache {
     constructor() {
         this.dbName = 'GamersAppDB';
-        this.dbVersion = 3;
+        this.dbVersion = 8;
         this.db = null;
     }
 
