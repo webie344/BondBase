@@ -5,6 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BondBase - Anonymous Social Gaming</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Add Firebase SDKs -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged,
+            signInAnonymously
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC8_PEsfTOr-gJ8P1MoXobOAfqwTVqEZWo",
+            authDomain: "usa-dating-23bc3.firebaseapp.com",
+            projectId: "usa-dating-23bc3",
+            storageBucket: "usa-dating-23bc3.firebasestorage.app",
+            messagingSenderId: "423286263327",
+            appId: "1:423286263327:web:17f0caf843dc349c144f2a"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        
+        // Make auth available globally
+        window.auth = auth;
+        window.signInAnonymously = signInAnonymously;
+        window.onAuthStateChanged = onAuthStateChanged;
+    </script>
     <style>
         * {
             margin: 0;
@@ -124,6 +153,13 @@
             animation-play-state: paused;
         }
 
+        .get-started-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+            animation-play-state: paused;
+        }
+
         /* Keyframe animations */
         @keyframes float {
             0% {
@@ -186,6 +222,22 @@
             animation: float 20s infinite linear, glow 3s infinite ease-in-out;
         }
 
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         @media (max-width: 768px) {
             .app-name {
                 font-size: 48px;
@@ -239,7 +291,9 @@
         </div>
 
         <div class="button-container">
-            <button class="get-started-btn" id="getStartedBtn">GET STARTED</button>
+            <button class="get-started-btn" id="getStartedBtn">
+                <span id="buttonText">GET STARTED</span>
+            </button>
         </div>
     </div>
 
@@ -302,9 +356,67 @@
             }
         }
 
-        // Handle button click
-        document.getElementById('getStartedBtn').addEventListener('click', function() {
-            window.location.href = 'login.html';
+        // Handle button click - Automatic login
+        document.getElementById('getStartedBtn').addEventListener('click', async function() {
+            const button = this;
+            const buttonText = document.getElementById('buttonText');
+            
+            // Change button text and disable it
+            buttonText.innerHTML = '<span class="spinner"></span> LOGGING IN...';
+            button.disabled = true;
+            
+            try {
+                // Check if user is already logged in
+                if (window.auth && window.auth.currentUser) {
+                    // User is already logged in, redirect to mingle
+                    window.location.href = 'mingle.html';
+                    return;
+                }
+                
+                // Try to sign in anonymously
+                if (window.signInAnonymously && window.auth) {
+                    const userCredential = await signInAnonymously(window.auth);
+                    console.log('Anonymous user signed in:', userCredential.user.uid);
+                    
+                    // Redirect to mingle page
+                    window.location.href = 'mingle.html';
+                } else {
+                    // Fallback: redirect to login page if Firebase is not loaded
+                    window.location.href = 'login.html';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                
+                // Reset button state
+                buttonText.textContent = 'GET STARTED';
+                button.disabled = false;
+                
+                // Show error and redirect to login page as fallback
+                alert('Automatic login failed. Redirecting to login page...');
+                window.location.href = 'login.html';
+            }
+        });
+
+        // Check if user is already logged in on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            createFloatingIcons();
+            
+            // Check for existing auth state
+            if (window.onAuthStateChanged && window.auth) {
+                window.onAuthStateChanged(window.auth, (user) => {
+                    if (user) {
+                        // User is already logged in, update button text
+                        const buttonText = document.getElementById('buttonText');
+                        buttonText.textContent = 'GO TO APP';
+                        
+                        // Update button click handler for logged-in users
+                        const button = document.getElementById('getStartedBtn');
+                        button.addEventListener('click', () => {
+                            window.location.href = 'mingle.html';
+                        }, { once: true });
+                    }
+                });
+            }
         });
 
         // Add subtle color variation to button
