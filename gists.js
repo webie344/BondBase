@@ -1,4 +1,4 @@
-// gists.js - UPGRADED VERSION WITH HASHTAGS FUNCTIONALITY (NO INDEX REQUIRED)
+// gists.js - UPGRADED VERSION WITH HASHTAGS & MULTIPLE PHOTOS FUNCTIONALITY
 
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -64,7 +64,7 @@ let audioChunks = [];
 let recordingStartTime = null;
 let recordingTimer = null;
 let pendingAudioBlob = null;
-let pendingImageFile = null;
+let pendingImageFiles = [];
 let pendingMediaType = null;
 let lastVisibleGist = null;
 let isLoading = false;
@@ -72,6 +72,7 @@ let currentlyPlayingAudio = null;
 let currentlyPlayingButton = null;
 let availableHashtags = [];
 let currentHashtagId = null;
+let maxPhotos = 4;
 
 // Generate user ID and avatar
 function generateUserId() {
@@ -585,6 +586,8 @@ document.addEventListener('DOMContentLoaded', function() {
             initCreateTagPage();
         } else if (currentPage === 'hashtags') {
             initHashtagsPage();
+        } else if (currentPage === 'photos') {
+            initPhotosPage();
         }
     });
 });
@@ -1049,7 +1052,7 @@ function displayGistInHashtagPage(gist, container) {
     container.appendChild(gistElement);
 }
 
-// Initialize create gist page with hashtag support
+// Initialize create gist page with hashtag support and multiple photos
 function initCreateGistPage() {
     console.log('Initializing create gist page');
     
@@ -1127,8 +1130,8 @@ function initCreateGistPage() {
     // Image input change
     if (imageInput) {
         imageInput.addEventListener('change', (e) => {
-            if (e.target.files[0]) {
-                handleImageUpload(e.target.files[0]);
+            if (e.target.files && e.target.files.length > 0) {
+                handleMultipleImageUpload(Array.from(e.target.files));
             }
         });
     }
@@ -1136,8 +1139,8 @@ function initCreateGistPage() {
     // Both image input change
     if (bothImageInput) {
         bothImageInput.addEventListener('change', (e) => {
-            if (e.target.files[0]) {
-                handleImageUpload(e.target.files[0]);
+            if (e.target.files && e.target.files.length > 0) {
+                handleMultipleImageUpload(Array.from(e.target.files));
                 setTimeout(() => {
                     startVoiceRecording();
                 }, 100);
@@ -1197,6 +1200,156 @@ function initCreateGistPage() {
     updateSubmitButton();
     
     console.log('Create gist page initialized');
+}
+
+// Handle multiple image upload
+function handleMultipleImageUpload(files) {
+    if (!files || files.length === 0) return;
+    
+    // Filter only image files
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (imageFiles.length === 0) {
+        showNotification('Please select image files only', 'warning');
+        return;
+    }
+    
+    // Check if adding these files would exceed the limit
+    const remainingSlots = maxPhotos - pendingImageFiles.length;
+    if (imageFiles.length > remainingSlots) {
+        showNotification(`You can only upload up to ${maxPhotos} photos. You have ${pendingImageFiles.length} already selected.`, 'warning');
+        return;
+    }
+    
+    // Check each file size
+    for (const file of imageFiles) {
+        if (file.size > 10 * 1024 * 1024) {
+            showNotification(`${file.name} is too large (max 10MB)`, 'warning');
+            return;
+        }
+    }
+    
+    // Add files to pending list
+    pendingImageFiles.push(...imageFiles);
+    
+    // Show attachment previews
+    showMultipleAttachmentPreviews();
+    updateSubmitButton();
+}
+
+// Show multiple attachment previews
+function showMultipleAttachmentPreviews() {
+    const attachmentsContainer = document.getElementById('attachmentsContainer');
+    if (!attachmentsContainer) return;
+    
+    attachmentsContainer.style.display = 'block';
+    attachmentsContainer.innerHTML = '';
+    
+    // Create grid container
+    const gridContainer = document.createElement('div');
+    gridContainer.className = 'photos-grid';
+    gridContainer.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-bottom: 15px;
+    `;
+    
+    // Add each image preview
+    pendingImageFiles.forEach((file, index) => {
+        const previewContainer = document.createElement('div');
+        previewContainer.className = 'photo-preview-container';
+        previewContainer.style.cssText = `
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 10px;
+            overflow: hidden;
+        `;
+        
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.alt = `Preview ${index + 1}`;
+        img.style.cssText = `
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        `;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'photo-remove-btn';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.style.cssText = `
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        `;
+        
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeImageAtIndex(index);
+        });
+        
+        previewContainer.appendChild(img);
+        previewContainer.appendChild(removeBtn);
+        gridContainer.appendChild(previewContainer);
+    });
+    
+    // Add clear all button
+    const clearAllBtn = document.createElement('button');
+    clearAllBtn.className = 'clear-all-btn';
+    clearAllBtn.textContent = `Clear All (${pendingImageFiles.length} photos)`;
+    clearAllBtn.style.cssText = `
+        width: 100%;
+        padding: 10px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+        margin-top: 10px;
+    `;
+    
+    clearAllBtn.addEventListener('click', () => {
+        pendingImageFiles = [];
+        pendingMediaType = null;
+        resetMediaButtons();
+        attachmentsContainer.style.display = 'none';
+        updateSubmitButton();
+    });
+    
+    attachmentsContainer.appendChild(gridContainer);
+    attachmentsContainer.appendChild(clearAllBtn);
+}
+
+// Remove image at specific index
+function removeImageAtIndex(index) {
+    pendingImageFiles.splice(index, 1);
+    
+    if (pendingImageFiles.length === 0) {
+        const attachmentsContainer = document.getElementById('attachmentsContainer');
+        if (attachmentsContainer) {
+            attachmentsContainer.style.display = 'none';
+        }
+        pendingMediaType = null;
+        resetMediaButtons();
+    } else {
+        showMultipleAttachmentPreviews();
+    }
+    
+    updateSubmitButton();
 }
 
 function checkHashtagInput(text) {
@@ -1270,37 +1423,52 @@ async function submitGist() {
         let mediaUrl = null;
         let mediaType = null;
         let duration = null;
-        let secondMediaUrl = null;
+        let imageUrls = [];
         
-        if (pendingImageFile || pendingAudioBlob) {
+        if (pendingImageFiles.length > 0 || pendingAudioBlob) {
             showNotification('Uploading media...', 'info');
             
-            if (pendingMediaType === 'both' && pendingImageFile && pendingAudioBlob) {
-                console.log('Uploading both image and audio');
-                const imageUrl = await uploadImageToCloudinary(pendingImageFile);
-                const audioUrl = await uploadAudioToCloudinary(pendingAudioBlob);
+            // Upload multiple images
+            if (pendingImageFiles.length > 0) {
+                console.log(`Uploading ${pendingImageFiles.length} images`);
                 
-                mediaUrl = audioUrl;
-                secondMediaUrl = imageUrl;
-                mediaType = 'both';
-                duration = Math.floor((Date.now() - recordingStartTime) / 1000);
+                // Upload all images
+                const uploadPromises = pendingImageFiles.map(file => 
+                    uploadImageToCloudinary(file)
+                );
                 
-            } else if (pendingImageFile) {
-                console.log('Uploading image only');
-                mediaUrl = await uploadImageToCloudinary(pendingImageFile);
-                mediaType = 'image';
-                
-            } else if (pendingAudioBlob) {
-                console.log('Uploading audio only');
+                imageUrls = await Promise.all(uploadPromises);
+                console.log('All images uploaded:', imageUrls);
+            }
+            
+            // Handle audio if present
+            if (pendingAudioBlob) {
+                console.log('Uploading audio');
                 mediaUrl = await uploadAudioToCloudinary(pendingAudioBlob);
-                mediaType = 'audio';
+                mediaType = pendingMediaType;
                 duration = Math.floor((Date.now() - recordingStartTime) / 1000);
+            }
+            
+            // Set media type based on what we have
+            if (pendingImageFiles.length > 0 && pendingAudioBlob) {
+                mediaType = 'both';
+            } else if (pendingImageFiles.length > 0) {
+                mediaType = 'image';
+            } else if (pendingAudioBlob) {
+                mediaType = 'audio';
             }
         }
         
-        console.log('Creating gist with:', { content, mediaUrl, mediaType, duration, secondMediaUrl });
+        console.log('Creating gist with:', { 
+            content, 
+            mediaUrl, 
+            mediaType, 
+            duration, 
+            imageUrls,
+            imageCount: pendingImageFiles.length 
+        });
         
-        const gistId = await createGist(content, mediaUrl, mediaType, duration, secondMediaUrl);
+        const gistId = await createGist(content, mediaUrl, mediaType, duration, imageUrls);
         
         if (gistId) {
             // Extract and add hashtags
@@ -1311,8 +1479,9 @@ async function submitGist() {
             
             showNotification('Gist posted successfully!', 'success');
             
+            // Clear form
             if (gistContent) gistContent.value = '';
-            if (pendingImageFile) pendingImageFile = null;
+            pendingImageFiles = [];
             if (pendingAudioBlob) pendingAudioBlob = null;
             pendingMediaType = null;
             
@@ -1342,7 +1511,7 @@ async function submitGist() {
     }
 }
 
-async function createGist(content, mediaUrl = null, mediaType = null, duration = null, secondMediaUrl = null) {
+async function createGist(content, mediaUrl = null, mediaType = null, duration = null, imageUrls = []) {
     if (!currentUser) {
         showNotification('Please login to create gists', 'error');
         return null;
@@ -1384,9 +1553,17 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
             hashtagCount: hashtags.length
         };
         
-        if (mediaType === 'both' && secondMediaUrl) {
-            gistData.secondMediaUrl = secondMediaUrl;
-            gistData.mediaType = 'both';
+        // Handle multiple images
+        if (imageUrls.length > 0) {
+            gistData.imageUrls = imageUrls;
+            gistData.imageCount = imageUrls.length;
+            
+            // For backward compatibility
+            if (imageUrls.length === 1) {
+                gistData.secondMediaUrl = imageUrls[0];
+            } else {
+                gistData.mediaType = 'multiple_images';
+            }
         }
         
         console.log('Saving gist to Firestore:', gistData);
@@ -1401,205 +1578,9 @@ async function createGist(content, mediaUrl = null, mediaType = null, duration =
     }
 }
 
-// Update displayGist function to show hashtags
-function displayGist(gist) {
-    const gistsContainer = document.getElementById('gistsContainer');
-    if (!gistsContainer) return;
-    
-    const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
-    const isReposted = gist.repostedFrom || gist.originalPostId;
-    const avatarContainerStyle = isReposted ? 'style="border-color:#b3004b;background-color: #b3004b20;"' : '';
-    const repostIcon = isReposted ? '<div class="repost-icon"><i class="fas fa-retweet"></i></div>' : '';
-    
-    const containsVoiceNote = gist.containsVoiceNote || gist.mediaType === 'audio' || gist.mediaType === 'both';
-    
-    // Use display name if available, otherwise use Anonymous
-    const authorName = gist.authorDisplayName || `Anonymous${gist.anonymousUserId ? ' ' + gist.anonymousUserId.substring(gist.anonymousUserId.length - 4) : ''}`;
-    
-    let mediaContent = '';
-    
-    if (gist.mediaType === 'both' && gist.mediaUrl && gist.secondMediaUrl) {
-        const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
-        mediaContent = `
-            <div class="gist-media">
-                <img src="${gist.secondMediaUrl}" alt="Gist image" class="gist-image" 
-                     onerror="this.onerror=null; this.style.display='none';">
-                <div class="gist-voice-note" style="margin-top: 10px;">
-                    <button class="voice-play-btn" data-audio-url="${gist.mediaUrl}">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <div class="voice-waveform">
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                    </div>
-                    <span class="voice-duration">${duration}</span>
-                </div>
-            </div>
-        `;
-    } else if (gist.mediaType === 'image' && gist.mediaUrl) {
-        mediaContent = `
-            <div class="gist-media">
-                <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image" 
-                     onerror="this.onerror=null; this.style.display='none';">
-            </div>
-        `;
-    } else if (gist.mediaType === 'audio' && gist.mediaUrl) {
-        const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
-        mediaContent = `
-            <div class="gist-media">
-                <div class="gist-voice-note">
-                    <button class="voice-play-btn" data-audio-url="${gist.mediaUrl}">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <div class="voice-waveform">
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                    </div>
-                    <span class="voice-duration">${duration}</span>
-                </div>
-            </div>
-        `;
-    }
-    
-    // Show hashtags if any
-    let hashtagsContent = '';
-    if (gist.hashtags && gist.hashtags.length > 0) {
-        const hashtagList = gist.hashtags.slice(0, 5).map(tag => 
-            `<a href="hashtags.html?tag=${tag}" class="hashtag-link">#${tag}</a>`
-        ).join(' ');
-        hashtagsContent = `
-            <div class="gist-hashtags" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px;">
-                ${hashtagList}
-                ${gist.hashtags.length > 5 ? `<span class="more-hashtags" style="color: #666; font-size: 12px;">+${gist.hashtags.length - 5} more</span>` : ''}
-            </div>
-        `;
-    }
-    
-    const gistElement = document.createElement('div');
-    gistElement.className = 'gist-card';
-    gistElement.dataset.gistId = gist.id;
-    gistElement.innerHTML = `
-        <div class="gist-header">
-            <div class="gist-avatar-container" ${avatarContainerStyle}>
-                <img src="${gist.authorAvatar}" alt="Anonymous avatar" class="gist-avatar">
-                <div class="gist-avatar-pointer"></div>
-                ${repostIcon}
-            </div>
-            <div class="gist-info">
-                <span class="gist-author">${authorName}${isReposted ? ' (Reposted)' : ''}</span>
-                <span class="gist-time">${timeAgo}</span>
-            </div>
-        </div>
-        
-        <div class="gist-content">
-            ${gist.content ? `<div class="gist-text">${processHashtagsInText(escapeHtml(gist.content))}</div>` : ''}
-            ${hashtagsContent}
-            ${mediaContent}
-        </div>
-        
-        <div class="gist-actions">
-            <button class="gist-action-btn like-btn" data-gist-id="${gist.id}">
-                <i class="fas fa-heart"></i>
-                <span class="action-count">${gist.likes || 0}</span>
-            </button>
-            
-            <button class="gist-action-btn comment-btn" data-gist-id="${gist.id}">
-                <i class="fas fa-comment"></i>
-                <span class="action-count">${gist.comments || 0}</span>
-            </button>
-            
-            <button class="gist-action-btn highlight-btn" data-gist-id="${gist.id}">
-                <i class="fas fa-bookmark"></i>
-                <span class="action-count">${gist.highlights || 0}</span>
-            </button>
-            
-            <button class="gist-action-btn repost-btn" data-gist-id="${gist.id}" 
-                    ${containsVoiceNote ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-                <i class="fas fa-retweet"></i>
-                <span class="action-count">${gist.reposts || 0}</span>
-            </button>
-            
-            <button class="gist-action-btn share-btn" data-gist-id="${gist.id}">
-                <i class="fas fa-share"></i>
-            </button>
-        </div>
-    `;
-    
-    const likeBtn = gistElement.querySelector('.like-btn');
-    const commentBtn = gistElement.querySelector('.comment-btn');
-    const highlightBtn = gistElement.querySelector('.highlight-btn');
-    const repostBtn = gistElement.querySelector('.repost-btn');
-    const shareBtn = gistElement.querySelector('.share-btn');
-    const voicePlayBtn = gistElement.querySelector('.voice-play-btn');
-    
-    if (likeBtn) {
-        likeBtn.addEventListener('click', () => likeGist(gist.id, likeBtn));
-        if (currentUser && gist.likedBy && gist.likedBy.includes(currentUser.uid)) {
-            likeBtn.classList.add('liked');
-        }
-    }
-    
-    if (commentBtn) {
-        commentBtn.addEventListener('click', () => {
-            window.location.href = `comments.html?gistId=${gist.id}`;
-        });
-    }
-    
-    if (highlightBtn) {
-        highlightBtn.addEventListener('click', () => highlightGist(gist.id, highlightBtn));
-        if (currentUser && gist.highlightedBy && gist.highlightedBy.includes(currentUser.uid)) {
-            highlightBtn.classList.add('highlighted');
-        }
-    }
-    
-    if (repostBtn) {
-        if (!containsVoiceNote) {
-            repostBtn.addEventListener('click', () => repostGist(gist.id, repostBtn));
-        }
-        if (currentUser && gist.repostedBy && gist.repostedBy.includes(currentUser.uid)) {
-            repostBtn.classList.add('reposted');
-        }
-    }
-    
-    if (shareBtn) {
-        shareBtn.addEventListener('click', () => shareGist(gist.id, shareBtn));
-    }
-    
-    if (voicePlayBtn && gist.mediaUrl && (gist.mediaType === 'audio' || gist.mediaType === 'both')) {
-        voicePlayBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            playGistVoice(gist.mediaUrl, voicePlayBtn, gistElement.querySelector('.voice-waveform'));
-        });
-    }
-    
-    gistsContainer.appendChild(gistElement);
-}
-
 function resetMediaButtons() {
     const buttons = document.querySelectorAll('.media-option-btn');
     buttons.forEach(btn => btn.classList.remove('active'));
-}
-
-function handleImageUpload(file) {
-    if (!file.type.startsWith('image/')) {
-        showNotification('Please select an image file', 'warning');
-        return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-        showNotification('Image must be less than 10MB', 'warning');
-        return;
-    }
-
-    pendingImageFile = file;
-    showAttachmentPreview(file);
-    updateSubmitButton();
 }
 
 function showAttachmentPreview(file) {
@@ -1842,7 +1823,7 @@ function updateSubmitButton() {
     
     if (!submitBtn) return;
     
-    const hasMedia = pendingImageFile || pendingAudioBlob;
+    const hasMedia = pendingImageFiles.length > 0 || pendingAudioBlob;
     const hasText = gistContent && gistContent.value.trim().length > 0;
     
     // Enable button if there's either text OR media (or both)
@@ -2066,6 +2047,229 @@ async function loadGists(lastVisible = null, limitCount = 10) {
     } finally {
         isLoading = false;
     }
+}
+
+// Updated displayGist function to handle multiple photos
+function displayGist(gist) {
+    const gistsContainer = document.getElementById('gistsContainer');
+    if (!gistsContainer) return;
+    
+    const timeAgo = gist.timestamp ? formatTime(gist.timestamp) : 'Just now';
+    const isReposted = gist.repostedFrom || gist.originalPostId;
+    const avatarContainerStyle = isReposted ? 'style="border-color:#b3004b;background-color: #b3004b20;"' : '';
+    const repostIcon = isReposted ? '<div class="repost-icon"><i class="fas fa-retweet"></i></div>' : '';
+    
+    const containsVoiceNote = gist.containsVoiceNote || gist.mediaType === 'audio' || gist.mediaType === 'both';
+    
+    // Use display name if available, otherwise use Anonymous
+    const authorName = gist.authorDisplayName || `Anonymous${gist.anonymousUserId ? ' ' + gist.anonymousUserId.substring(gist.anonymousUserId.length - 4) : ''}`;
+    
+    let mediaContent = '';
+    
+    // Handle multiple images
+    if (gist.imageUrls && gist.imageUrls.length > 0) {
+        const imageUrls = gist.imageUrls;
+        
+        if (imageUrls.length === 1) {
+            // Single image
+            mediaContent = `
+                <div class="gist-media">
+                    <img src="${imageUrls[0]}" alt="Gist image" class="gist-image" 
+                         onclick="window.location.href='photos.html?gistId=${gist.id}'"
+                         style="cursor: pointer; max-width: 100%; border-radius: 10px; margin-top: 10px;">
+                </div>
+            `;
+        } else {
+            // Multiple images in grid
+            const gridClass = getGridClass(imageUrls.length);
+            mediaContent = `
+                <div class="gist-media">
+                    <div class="photos-grid-preview ${gridClass}" style="margin-top: 10px;">
+                        ${imageUrls.slice(0, 4).map((url, index) => `
+                            <div class="photo-grid-item" onclick="window.location.href='photos.html?gistId=${gist.id}'"
+                                 style="cursor: pointer; position: relative; overflow: hidden; border-radius: 8px;">
+                                <img src="${url}" alt="Photo ${index + 1}" 
+                                     style="width: 100%; height: 100%; object-fit: cover;">
+                                ${index === 3 && imageUrls.length > 4 ? `
+                                    <div class="more-photos-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; font-weight: bold;">
+                                        +${imageUrls.length - 4}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    } else if (gist.mediaType === 'both' && gist.mediaUrl && gist.secondMediaUrl) {
+        const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
+        mediaContent = `
+            <div class="gist-media">
+                <img src="${gist.secondMediaUrl}" alt="Gist image" class="gist-image" 
+                     onerror="this.onerror=null; this.style.display='none';">
+                <div class="gist-voice-note" style="margin-top: 10px;">
+                    <button class="voice-play-btn" data-audio-url="${gist.mediaUrl}">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <div class="voice-waveform">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                    <span class="voice-duration">${duration}</span>
+                </div>
+            </div>
+        `;
+    } else if (gist.mediaType === 'image' && gist.mediaUrl) {
+        mediaContent = `
+            <div class="gist-media">
+                <img src="${gist.mediaUrl}" alt="Gist image" class="gist-image" 
+                     onerror="this.onerror=null; this.style.display='none';">
+            </div>
+        `;
+    } else if (gist.mediaType === 'audio' && gist.mediaUrl) {
+        const duration = gist.duration ? formatDuration(gist.duration) : '0:00';
+        mediaContent = `
+            <div class="gist-media">
+                <div class="gist-voice-note">
+                    <button class="voice-play-btn" data-audio-url="${gist.mediaUrl}">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <div class="voice-waveform">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                    <span class="voice-duration">${duration}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Show hashtags if any
+    let hashtagsContent = '';
+    if (gist.hashtags && gist.hashtags.length > 0) {
+        const hashtagList = gist.hashtags.slice(0, 5).map(tag => 
+            `<a href="hashtags.html?tag=${tag}" class="hashtag-link">#${tag}</a>`
+        ).join(' ');
+        hashtagsContent = `
+            <div class="gist-hashtags" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px;">
+                ${hashtagList}
+                ${gist.hashtags.length > 5 ? `<span class="more-hashtags" style="color: #666; font-size: 12px;">+${gist.hashtags.length - 5} more</span>` : ''}
+            </div>
+        `;
+    }
+    
+    const gistElement = document.createElement('div');
+    gistElement.className = 'gist-card';
+    gistElement.dataset.gistId = gist.id;
+    gistElement.innerHTML = `
+        <div class="gist-header">
+            <div class="gist-avatar-container" ${avatarContainerStyle}>
+                <img src="${gist.authorAvatar}" alt="Anonymous avatar" class="gist-avatar">
+                <div class="gist-avatar-pointer"></div>
+                ${repostIcon}
+            </div>
+            <div class="gist-info">
+                <span class="gist-author">${authorName}${isReposted ? ' (Reposted)' : ''}</span>
+                <span class="gist-time">${timeAgo}</span>
+            </div>
+        </div>
+        
+        <div class="gist-content">
+            ${gist.content ? `<div class="gist-text">${processHashtagsInText(escapeHtml(gist.content))}</div>` : ''}
+            ${hashtagsContent}
+            ${mediaContent}
+        </div>
+        
+        <div class="gist-actions">
+            <button class="gist-action-btn like-btn" data-gist-id="${gist.id}">
+                <i class="fas fa-heart"></i>
+                <span class="action-count">${gist.likes || 0}</span>
+            </button>
+            
+            <button class="gist-action-btn comment-btn" data-gist-id="${gist.id}">
+                <i class="fas fa-comment"></i>
+                <span class="action-count">${gist.comments || 0}</span>
+            </button>
+            
+            <button class="gist-action-btn highlight-btn" data-gist-id="${gist.id}">
+                <i class="fas fa-bookmark"></i>
+                <span class="action-count">${gist.highlights || 0}</span>
+            </button>
+            
+            <button class="gist-action-btn repost-btn" data-gist-id="${gist.id}" 
+                    ${containsVoiceNote ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+                <i class="fas fa-retweet"></i>
+                <span class="action-count">${gist.reposts || 0}</span>
+            </button>
+            
+            <button class="gist-action-btn share-btn" data-gist-id="${gist.id}">
+                <i class="fas fa-share"></i>
+            </button>
+        </div>
+    `;
+    
+    const likeBtn = gistElement.querySelector('.like-btn');
+    const commentBtn = gistElement.querySelector('.comment-btn');
+    const highlightBtn = gistElement.querySelector('.highlight-btn');
+    const repostBtn = gistElement.querySelector('.repost-btn');
+    const shareBtn = gistElement.querySelector('.share-btn');
+    const voicePlayBtn = gistElement.querySelector('.voice-play-btn');
+    
+    if (likeBtn) {
+        likeBtn.addEventListener('click', () => likeGist(gist.id, likeBtn));
+        if (currentUser && gist.likedBy && gist.likedBy.includes(currentUser.uid)) {
+            likeBtn.classList.add('liked');
+        }
+    }
+    
+    if (commentBtn) {
+        commentBtn.addEventListener('click', () => {
+            window.location.href = `comments.html?gistId=${gist.id}`;
+        });
+    }
+    
+    if (highlightBtn) {
+        highlightBtn.addEventListener('click', () => highlightGist(gist.id, highlightBtn));
+        if (currentUser && gist.highlightedBy && gist.highlightedBy.includes(currentUser.uid)) {
+            highlightBtn.classList.add('highlighted');
+        }
+    }
+    
+    if (repostBtn) {
+        if (!containsVoiceNote) {
+            repostBtn.addEventListener('click', () => repostGist(gist.id, repostBtn));
+        }
+        if (currentUser && gist.repostedBy && gist.repostedBy.includes(currentUser.uid)) {
+            repostBtn.classList.add('reposted');
+        }
+    }
+    
+    if (shareBtn) {
+        shareBtn.addEventListener('click', () => shareGist(gist.id, shareBtn));
+    }
+    
+    if (voicePlayBtn && gist.mediaUrl && (gist.mediaType === 'audio' || gist.mediaType === 'both')) {
+        voicePlayBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            playGistVoice(gist.mediaUrl, voicePlayBtn, gistElement.querySelector('.voice-waveform'));
+        });
+    }
+    
+    gistsContainer.appendChild(gistElement);
+}
+
+// Helper function to determine grid class based on number of images
+function getGridClass(count) {
+    if (count === 1) return 'grid-1';
+    if (count === 2) return 'grid-2';
+    if (count === 3) return 'grid-3';
+    return 'grid-4'; // 4 or more
 }
 
 function initCommentsPage() {
@@ -3684,6 +3888,27 @@ function showNotification(message, type = 'info') {
                 background: #b3004b;
                 color: white;
             }
+            .photos-grid-preview {
+                display: grid;
+                gap: 5px;
+            }
+            .grid-1 {
+                grid-template-columns: 1fr;
+            }
+            .grid-2 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .grid-3 {
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(2, 1fr);
+            }
+            .grid-3 .photo-grid-item:first-child {
+                grid-column: span 2;
+            }
+            .grid-4 {
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(2, 1fr);
+            }
         `;
         document.head.appendChild(styles);
     }
@@ -3748,4 +3973,167 @@ async function generateShareIdsForAllGists() {
         console.error('Error generating share IDs:', error);
         showNotification('Error generating share links', 'error');
     }
+}
+
+// Initialize photos page
+function initPhotosPage() {
+    console.log('Initializing photos page');
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const gistId = urlParams.get('gistId');
+    
+    if (!gistId) {
+        window.location.href = 'gist.html';
+        return;
+    }
+    
+    const backBtn = document.getElementById('backBtn');
+    const photosContainer = document.getElementById('photosContainer');
+    
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            window.history.back();
+        });
+    }
+    
+    loadGistPhotos(gistId);
+}
+
+async function loadGistPhotos(gistId) {
+    const photosContainer = document.getElementById('photosContainer');
+    
+    if (!photosContainer) return;
+    
+    photosContainer.innerHTML = `
+        <div class="loading-state">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+            </div>
+            <p>Loading photos...</p>
+        </div>
+    `;
+    
+    try {
+        const gistRef = doc(db, 'gists', gistId);
+        const gistSnap = await getDoc(gistRef);
+        
+        if (!gistSnap.exists()) {
+            showNotification('Gist not found', 'error');
+            window.history.back();
+            return;
+        }
+        
+        const gist = gistSnap.data();
+        const imageUrls = gist.imageUrls || [];
+        
+        if (imageUrls.length === 0) {
+            photosContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-images fa-3x" style="color: #b3004b; margin-bottom: 15px;"></i>
+                    <h3 style="color: #333; margin-bottom: 10px;">No Photos Found</h3>
+                    <p style="color: #666;">This gist doesn't contain any photos.</p>
+                    <button onclick="window.history.back()" 
+                            style="margin-top: 20px; background: #b3004b; color: white; border: none; padding: 12px 25px; border-radius: 25px; cursor: pointer;">
+                        Go Back
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        // Display photos in columns
+        displayPhotosInColumns(imageUrls, photosContainer);
+        
+    } catch (error) {
+        console.error('Error loading photos:', error);
+        photosContainer.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle fa-3x" style="color: #dc3545; margin-bottom: 15px;"></i>
+                <h3 style="color: #333; margin-bottom: 10px;">Error Loading Photos</h3>
+                <p style="color: #666;">Please try again later.</p>
+                <button onclick="window.history.back()" 
+                        style="margin-top: 20px; background: #b3004b; color: white; border: none; padding: 12px 25px; border-radius: 25px; cursor: pointer;">
+                    Go Back
+                </button>
+            </div>
+        `;
+    }
+}
+
+function displayPhotosInColumns(imageUrls, container) {
+    container.innerHTML = '';
+    
+    // Create 3-column layout
+    const columnsContainer = document.createElement('div');
+    columnsContainer.className = 'photos-columns';
+    columnsContainer.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        padding: 10px;
+    `;
+    
+    // Distribute images across 3 columns
+    const columns = [[], [], []];
+    
+    imageUrls.forEach((url, index) => {
+        columns[index % 3].push(url);
+    });
+    
+    // Create column divs
+    for (let i = 0; i < 3; i++) {
+        const columnDiv = document.createElement('div');
+        columnDiv.className = `photo-column column-${i + 1}`;
+        columnDiv.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        `;
+        
+        columns[i].forEach(url => {
+            const photoItem = document.createElement('div');
+            photoItem.className = 'photo-item';
+            photoItem.style.cssText = `
+                position: relative;
+                border-radius: 12px;
+                overflow: hidden;
+                cursor: pointer;
+                transition: transform 0.3s;
+                aspect-ratio: 1;
+            `;
+            
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = 'Gist photo';
+            img.style.cssText = `
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            `;
+            
+            photoItem.appendChild(img);
+            columnDiv.appendChild(photoItem);
+        });
+        
+        columnsContainer.appendChild(columnDiv);
+    }
+    
+    container.appendChild(columnsContainer);
+    
+    // Add CSS for hover effects
+    const styles = document.createElement('style');
+    styles.textContent = `
+        .photo-item:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .photo-item img {
+            transition: transform 0.5s;
+        }
+        .photo-item:hover img {
+            transform: scale(1.05);
+        }
+    `;
+    document.head.appendChild(styles);
 }
