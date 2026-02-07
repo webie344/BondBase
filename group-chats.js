@@ -2959,7 +2959,7 @@ class GroupChat {
             }
 
             const newInviteCode = this.generateInviteCode();
-            const newInviteLink = `https://bondlydatingweb.vercel.app/join.html?code=${newInviteCode}`;
+            const newInviteLink = `https://bond-base.vercel.app/join.html?code=${newInviteCode}`;
 
             await updateDoc(groupRef, {
                 inviteCode: newInviteCode,
@@ -3001,7 +3001,7 @@ class GroupChat {
             }
             
             const inviteCode = this.generateInviteCode();
-            const inviteLink = `https://bondlydatingweb.vercel.app/join.html?code=${inviteCode}`;
+            const inviteLink = `https://bond-base.vercel.app/join.html?code=${inviteCode}`;
             
             await updateDoc(groupRef, {
                 inviteCode: inviteCode,
@@ -5480,25 +5480,6 @@ class GroupChat {
                 text-overflow: ellipsis;
                 white-space: nowrap;
             }
-            
-            .cancel-reply {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                color: white;
-                width: 24px;
-                height: 24px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                margin-left: 8px;
-                flex-shrink: 0;
-            }
-            
-            .cancel-reply:hover {
-                background: rgba(255, 255, 255, 0.3);
-            }
         `;
         
         if (!document.getElementById('reply-indicator-styles')) {
@@ -6266,7 +6247,7 @@ function initGroupPage() {
                 });
             }
             
-            // ADDED: Create copy invite link button for admin
+            // UPDATED: Create copy invite link button for everyone (not just admin)
             addInviteLinkButton();
             
             // ADDED: Add voice note button
@@ -6288,12 +6269,9 @@ function initGroupPage() {
         }
     }
     
-    // ADDED: Function to add copy invite link button for admin
+    // UPDATED: Function to add copy invite link button for everyone (both admin and non-admin)
     function addInviteLinkButton() {
-        if (!groupData || groupData.createdBy !== groupChat.firebaseUser.uid) {
-            return;
-        }
-        
+        // Don't check for admin status - show button for everyone
         let inviteContainer = document.getElementById('inviteLinkContainer');
         if (!inviteContainer) {
             inviteContainer = document.createElement('div');
