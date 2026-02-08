@@ -1,4 +1,5 @@
-// stream.js - Video Grid functionality with WhatsApp-style stories
+
+// stream.js - Video Streaming functionality with Cloudinary integration + Social Features
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getFirestore, 
@@ -24,47 +25,6 @@ import {
     signOut 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// Supported video formats for validation
-const SUPPORTED_VIDEO_FORMATS = [
-    'video/mp4',
-    'video/webm',
-    'video/ogg',
-    'video/quicktime',
-    'video/x-msvideo',
-    'video/x-matroska',
-    'video/x-flv',
-    'video/3gpp',
-    'video/3gpp2',
-    'video/x-m4v',
-    'video/mpeg'
-];
-
-// Supported file extensions
-const SUPPORTED_EXTENSIONS = [
-    '.mp4',
-    '.webm',
-    '.ogv',
-    '.mov',
-    '.avi',
-    '.mkv',
-    '.flv',
-    '.3gp',
-    '.3g2',
-    '.m4v',
-    '.mpg',
-    '.mpeg'
-];
-
-// Problematic formats that may need conversion
-const PROBLEMATIC_FORMATS = [
-    'video/x-msvideo',  // AVI
-    'video/x-flv',      // FLV
-    'video/x-matroska', // MKV
-    'video/quicktime',  // MOV (some codecs)
-    'video/3gpp',       // 3GP
-    'video/3gpp2'       // 3G2
-];
-
 // Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
@@ -74,7 +34,6 @@ const firebaseConfig = {
     messagingSenderId: "60263975159",
     appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
   };
-
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -95,17 +54,22 @@ let currentUser = null;
 let likedStreams = new Set();
 let viewedStreams = new Set();
 
-// Video Grid Instance
-let videoGridInstance = null;
+// TikTok Feed Instance
+let tiktokFeedInstance = null;
 
 // Video Modal Instance
 let videoModalInstance = null;
 
-// WhatsApp Stories Instance
-let whatsappStoriesInstance = null;
+// Rendering control
+let isRendering = false;
+let lastRenderTime = 0;
 
 // Comment tracking to prevent duplicates
 let activeCommentListeners = new Map();
+
+// Click tracking for double click detection
+let lastClickTime = 0;
+let clickTimeout = null;
 
 // Video cache manager
 const videoCache = {
@@ -119,23 +83,27 @@ const videoCache = {
         this.isCaching = true;
 
         try {
+            // Cache next 5 videos
             const endIndex = Math.min(startIndex + this.cacheSize, videos.length);
             const videosToCache = videos.slice(startIndex, endIndex);
 
             for (const video of videosToCache) {
                 if (!this.cachedVideos.has(video.id)) {
                     try {
+                        // Create video element for caching
                         const videoElement = document.createElement('video');
                         videoElement.src = video.videoUrl;
                         videoElement.preload = 'auto';
                         videoElement.crossOrigin = 'anonymous';
                         
+                        // Store in cache
                         this.cachedVideos.set(video.id, {
                             element: videoElement,
                             data: video,
                             loaded: false
                         });
 
+                        // Wait for video to load enough data
                         await new Promise((resolve) => {
                             videoElement.addEventListener('loadeddata', () => {
                                 this.cachedVideos.get(video.id).loaded = true;
@@ -147,6 +115,7 @@ const videoCache = {
                                 resolve();
                             });
 
+                            // Timeout after 10 seconds
                             setTimeout(resolve, 10000);
                         });
                     } catch (error) {
@@ -155,6 +124,7 @@ const videoCache = {
                 }
             }
 
+            // Remove old cached videos if cache is too large
             if (this.cachedVideos.size > this.cacheSize * 2) {
                 const keys = Array.from(this.cachedVideos.keys());
                 const videosToRemove = keys.slice(0, this.cacheSize);
@@ -190,516 +160,33 @@ const videoCache = {
     }
 };
 
-// WhatsApp Stories Class
-class WhatsAppStories {
-    constructor() {
-        this.storiesContainer = null;
-        this.storiesScroll = null;
-        this.stories = [];
-        this.userStories = new Map();
-        this.currentStoryIndex = 0;
-        this.currentUserIndex = 0;
-        this.isPlaying = false;
-        this.progressInterval = null;
-        this.storyDuration = 5000; // 5 seconds per story
-        
-        this.init();
-    }
+// Supported video formats
+const SUPPORTED_VIDEO_FORMATS = [
+    'video/mp4', 'video/quicktime', 'video/x-m4v', 'video/3gpp', 'video/3gpp2',
+    'video/mpeg', 'video/webm', 'video/ogg', 'video/x-msvideo', 'video/x-matroska',
+    'video/mp2t', 'video/h264', 'video/hevc', 'video/avi', 'video/x-flv',
+    'video/x-ms-wmv', 'video/x-ms-asf', 'video/mp4v-es', 'video/mj2',
+    'video/x-mpeg', 'video/mp2p', 'video/mp2t', 'video/MP2T'
+];
 
-    init() {
-        this.createStoriesContainer();
-        this.loadStories();
-        
-        // Listen for story updates
-        streamManager.listenToStreams((streams) => {
-            this.stories = this.groupStoriesByUser(streams);
-            this.renderStories();
-        }, 'all');
-    }
+// Supported file extensions
+const SUPPORTED_EXTENSIONS = [
+    '.mp4', '.mov', '.m4v', '.3gp', '.3g2', '.mpeg', '.mpg', '.webm', '.ogg',
+    '.avi', '.mkv', '.ts', '.mts', '.m2ts', '.flv', '.f4v', '.wmv', '.mpg', '.mpeg',
+    '.qt', '.mxf', '.m2v', '.m4p', '.m4b', '.mp2', '.mpv', '.mpe', '.m1v', '.m2p',
+    '.divx', '.xvid', '.vob', '.mod', '.tod', '.mts', '.m2t', '.m2ts'
+];
 
-    createStoriesContainer() {
-        // Check if stories section already exists
-        this.storiesContainer = document.querySelector('.stories-container');
-        
-        if (!this.storiesContainer) {
-            // Create the stories section if it doesn't exist
-            const postsHeader = document.querySelector('.posts-header');
-            if (!postsHeader) return;
-            
-            const storiesHTML = `
-                <div class="video-grid-section">
-                    <div class="stories-container">
-                        <div class="stories-scroll"></div>
-                        <button class="story-nav-btn story-prev" aria-label="Previous stories">
-                            <i class="fas fa-chevron-left"></i>
-                        </button>
-                        <button class="story-nav-btn story-next" aria-label="Next stories">
-                            <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            postsHeader.insertAdjacentHTML('afterend', storiesHTML);
-            
-            this.storiesContainer = document.querySelector('.stories-container');
-            this.storiesScroll = document.querySelector('.stories-scroll');
-            
-            // Add navigation buttons
-            this.setupNavigation();
-        } else {
-            this.storiesScroll = this.storiesContainer.querySelector('.stories-scroll');
-        }
-    }
-
-    setupNavigation() {
-        const prevBtn = document.querySelector('.story-prev');
-        const nextBtn = document.querySelector('.story-next');
-        
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => {
-                this.storiesScroll.scrollBy({
-                    left: -200,
-                    behavior: 'smooth'
-                });
-            });
-        }
-        
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => {
-                this.storiesScroll.scrollBy({
-                    left: 200,
-                    behavior: 'smooth'
-                });
-            });
-        }
-    }
-
-    groupStoriesByUser(streams) {
-        const userStories = new Map();
-        
-        // Group streams by user
-        streams.forEach(stream => {
-            if (!userStories.has(stream.authorId)) {
-                userStories.set(stream.authorId, {
-                    userId: stream.authorId,
-                    userName: stream.authorName,
-                    userImage: stream.authorImage || 'images-defaultse-profile.jpg',
-                    stories: []
-                });
-            }
-            
-            userStories.get(stream.authorId).stories.push({
-                id: stream.id,
-                thumbnail: getVideoThumbnail(stream),
-                videoUrl: stream.videoUrl,
-                headline: stream.headline,
-                createdAt: stream.createdAt,
-                viewed: viewedStreams.has(stream.id)
-            });
-        });
-        
-        // Sort stories within each user by creation date (newest first)
-        userStories.forEach(userStory => {
-            userStory.stories.sort((a, b) => {
-                const timeA = a.createdAt?.toDate?.()?.getTime() || new Date().getTime();
-                const timeB = b.createdAt?.toDate?.()?.getTime() || new Date().getTime();
-                return timeB - timeA;
-            });
-        });
-        
-        // Convert to array and sort users by most recent story
-        return Array.from(userStories.values()).sort((a, b) => {
-            const timeA = a.stories[0]?.createdAt?.toDate?.()?.getTime() || 0;
-            const timeB = b.stories[0]?.createdAt?.toDate?.()?.getTime() || 0;
-            return timeB - timeA;
-        });
-    }
-
-    async loadStories() {
-        try {
-            const streams = await streamManager.getStreams('all');
-            this.stories = this.groupStoriesByUser(streams);
-            this.renderStories();
-        } catch (error) {
-            console.error('Error loading stories:', error);
-        }
-    }
-
-    renderStories() {
-        if (!this.storiesScroll) return;
-        
-        if (this.stories.length === 0) {
-            this.storiesScroll.innerHTML = `
-                <div class="no-stories">
-                    <div class="no-stories-icon">
-                        <i class="fas fa-video-slash"></i>
-                    </div>
-                    <p class="no-stories-text">No videos yet</p>
-                    <a href="poststream.html" class="create-story-btn">
-                        <i class="fas fa-plus"></i> Create First Video
-                    </a>
-                </div>
-            `;
-            return;
-        }
-        
-        let html = '';
-        
-        // Add "Add Story" button for current user
-        if (currentUser) {
-            html += `
-                <div class="story-item add-story" onclick="window.location.href='poststream.html'">
-                    <div class="story-avatar-container">
-                        <div class="story-avatar add-story-avatar">
-                            <i class="fas fa-plus"></i>
-                        </div>
-                    </div>
-                    <span class="story-username">Add Video</span>
-                </div>
-            `;
-        }
-        
-        // Add user stories
-        this.stories.forEach((userStory, index) => {
-            const latestStory = userStory.stories[0];
-            const hasNewStories = userStory.stories.some(story => !story.viewed);
-            
-            html += `
-                <div class="story-item ${hasNewStories ? 'has-new' : 'viewed'}" 
-                     data-user-index="${index}"
-                     data-user-id="${userStory.userId}"
-                     onclick="whatsappStoriesInstance.openStoryViewer(${index})">
-                    <div class="story-avatar-container ${hasNewStories ? 'has-new' : ''}">
-                        <img src="${userStory.userImage}" 
-                             alt="${userStory.userName}"
-                             class="story-avatar"
-                             loading="lazy"
-                             onerror="this.src='images-defaultse-profile.jpg'">
-                    </div>
-                    <span class="story-username">${userStory.userName}</span>
-                </div>
-            `;
-        });
-        
-        this.storiesScroll.innerHTML = html;
-    }
-
-    openStoryViewer(userIndex) {
-        if (userIndex < 0 || userIndex >= this.stories.length) return;
-        
-        const userStory = this.stories[userIndex];
-        this.currentUserIndex = userIndex;
-        this.currentStoryIndex = 0;
-        
-        this.createStoryViewer();
-        this.showStoryViewer(userStory);
-        this.startStoryProgress();
-    }
-
-    createStoryViewer() {
-        // Remove existing viewer if any
-        const existingViewer = document.querySelector('.story-viewer-overlay');
-        if (existingViewer) existingViewer.remove();
-        
-        // Create story viewer overlay
-        const viewerHTML = `
-            <div class="story-viewer-overlay">
-                <div class="story-viewer-container">
-                    <div class="story-header">
-                        <div class="story-user-info">
-                            <img src="" alt="" class="story-viewer-avatar" id="storyViewerAvatar">
-                            <div class="story-viewer-info">
-                                <h3 id="storyViewerUsername"></h3>
-                                <span id="storyViewerTime"></span>
-                            </div>
-                        </div>
-                        <button class="story-close-btn" onclick="whatsappStoriesInstance.closeStoryViewer()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="story-progress-container">
-                        <div class="story-progress-bars" id="storyProgressBars"></div>
-                    </div>
-                    
-                    <div class="story-content">
-                        <video class="story-video" id="storyVideo" 
-                               playsinline webkit-playsinline 
-                               preload="auto" controls>
-                        </video>
-                        
-                        <div class="story-nav-area">
-                            <div class="story-prev-area" onclick="whatsappStoriesInstance.prevStory()"></div>
-                            <div class="story-next-area" onclick="whatsappStoriesInstance.nextStory()"></div>
-                        </div>
-                        
-                        <div class="story-actions">
-                            <button class="story-action-btn" onclick="whatsappStoriesInstance.handleStoryLike()">
-                                <i class="far fa-heart" id="storyLikeIcon"></i>
-                            </button>
-                            <button class="story-action-btn" onclick="whatsappStoriesInstance.openStoryComments()">
-                                <i class="far fa-comment"></i>
-                            </button>
-                            <button class="story-action-btn" onclick="whatsappStoriesInstance.shareStory()">
-                                <i class="fas fa-share"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="story-caption" id="storyCaption"></div>
-                </div>
-            </div>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', viewerHTML);
-        
-        // Setup video element
-        this.storyVideo = document.getElementById('storyVideo');
-        if (this.storyVideo) {
-            this.storyVideo.addEventListener('ended', () => this.nextStory());
-            this.storyVideo.addEventListener('click', () => this.nextStory());
-        }
-        
-        // Setup keyboard navigation
-        document.addEventListener('keydown', this.handleKeyDown.bind(this));
-    }
-
-    showStoryViewer(userStory) {
-        if (!userStory || !userStory.stories[this.currentStoryIndex]) return;
-        
-        const story = userStory.stories[this.currentStoryIndex];
-        
-        // Update user info
-        document.getElementById('storyViewerAvatar').src = userStory.userImage;
-        document.getElementById('storyViewerUsername').textContent = userStory.userName;
-        document.getElementById('storyViewerTime').textContent = formatTime(story.createdAt);
-        
-        // Update caption
-        document.getElementById('storyCaption').textContent = story.headline;
-        
-        // Update progress bars
-        this.updateProgressBars(userStory);
-        
-        // Load and play video
-        if (this.storyVideo) {
-            this.storyVideo.src = story.videoUrl;
-            this.storyVideo.load();
-            
-            this.storyVideo.play().catch(e => {
-                console.log('Auto-play prevented:', e);
-            });
-            
-            // Mark as viewed
-            if (!viewedStreams.has(story.id)) {
-                viewedStreams.add(story.id);
-                markStreamAsViewed(story.id);
-                
-                // Update UI
-                const storyItem = document.querySelector(`.story-item[data-user-id="${userStory.userId}"]`);
-                if (storyItem) {
-                    storyItem.classList.remove('has-new');
-                    storyItem.classList.add('viewed');
-                    storyItem.querySelector('.story-avatar-container').classList.remove('has-new');
-                }
-            }
-            
-            // Update like button
-            this.updateStoryLikeButton(story.id);
-        }
-    }
-
-    updateProgressBars(userStory) {
-        const progressContainer = document.getElementById('storyProgressBars');
-        if (!progressContainer) return;
-        
-        let html = '';
-        for (let i = 0; i < userStory.stories.length; i++) {
-            const isActive = i === this.currentStoryIndex;
-            const isViewed = i < this.currentStoryIndex || userStory.stories[i].viewed;
-            
-            html += `
-                <div class="story-progress">
-                    <div class="story-progress-bar ${isViewed ? 'viewed' : ''} ${isActive ? 'active' : ''}">
-                        <div class="story-progress-fill"></div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        progressContainer.innerHTML = html;
-    }
-
-    startStoryProgress() {
-        this.stopStoryProgress();
-        this.isPlaying = true;
-        
-        this.progressInterval = setInterval(() => {
-            this.updateActiveProgress();
-        }, 100);
-    }
-
-    stopStoryProgress() {
-        if (this.progressInterval) {
-            clearInterval(this.progressInterval);
-            this.progressInterval = null;
-        }
-        this.isPlaying = false;
-    }
-
-    updateActiveProgress() {
-        const progressBars = document.querySelectorAll('.story-progress-bar.active .story-progress-fill');
-        if (progressBars.length === 0) return;
-        
-        const progressFill = progressBars[0];
-        if (!this.storyVideo || !this.storyVideo.duration) return;
-        
-        const progressPercent = (this.storyVideo.currentTime / this.storyVideo.duration) * 100;
-        progressFill.style.width = `${progressPercent}%`;
-        
-        // Auto-advance when video ends
-        if (this.storyVideo.ended) {
-            this.nextStory();
-        }
-    }
-
-    nextStory() {
-        const currentUserStory = this.stories[this.currentUserIndex];
-        
-        if (this.currentStoryIndex < currentUserStory.stories.length - 1) {
-            // Next story in same user
-            this.currentStoryIndex++;
-            this.showStoryViewer(currentUserStory);
-            this.startStoryProgress();
-        } else if (this.currentUserIndex < this.stories.length - 1) {
-            // Next user
-            this.currentUserIndex++;
-            this.currentStoryIndex = 0;
-            this.showStoryViewer(this.stories[this.currentUserIndex]);
-            this.startStoryProgress();
-        } else {
-            // End of all stories
-            this.closeStoryViewer();
-        }
-    }
-
-    prevStory() {
-        if (this.currentStoryIndex > 0) {
-            // Previous story in same user
-            this.currentStoryIndex--;
-            this.showStoryViewer(this.stories[this.currentUserIndex]);
-            this.startStoryProgress();
-        } else if (this.currentUserIndex > 0) {
-            // Previous user
-            this.currentUserIndex--;
-            const prevUserStories = this.stories[this.currentUserIndex];
-            this.currentStoryIndex = prevUserStories.stories.length - 1;
-            this.showStoryViewer(prevUserStories);
-            this.startStoryProgress();
-        }
-    }
-
-    async handleStoryLike() {
-        if (!currentUser) {
-            alert('Please login to like videos');
-            return;
-        }
-        
-        const currentUserStory = this.stories[this.currentUserIndex];
-        const currentStory = currentUserStory.stories[this.currentStoryIndex];
-        
-        if (!currentStory) return;
-        
-        try {
-            const result = await streamManager.handleLike(currentStory.id);
-            if (result) {
-                this.updateStoryLikeButton(currentStory.id);
-            }
-        } catch (error) {
-            console.error('Error liking story:', error);
-        }
-    }
-
-    updateStoryLikeButton(storyId) {
-        const likeIcon = document.getElementById('storyLikeIcon');
-        if (!likeIcon) return;
-        
-        if (likedStreams.has(storyId)) {
-            likeIcon.className = 'fas fa-heart';
-            likeIcon.style.color = '#ff2d55';
-        } else {
-            likeIcon.className = 'far fa-heart';
-            likeIcon.style.color = 'white';
-        }
-    }
-
-    openStoryComments() {
-        const currentUserStory = this.stories[this.currentUserIndex];
-        const currentStory = currentUserStory.stories[this.currentStoryIndex];
-        
-        if (currentStory && videoModalInstance) {
-            videoModalInstance.open(currentStory.id, [currentStory], 0);
-        }
-    }
-
-    shareStory() {
-        const currentUserStory = this.stories[this.currentUserIndex];
-        const currentStory = currentUserStory.stories[this.currentStoryIndex];
-        
-        if (!currentStory) return;
-        
-        const shareUrl = `${window.location.origin}/stream.html?video=${currentStory.id}`;
-        const shareText = `Check out this video: ${currentStory.headline}`;
-        
-        if (navigator.share) {
-            navigator.share({
-                title: currentStory.headline,
-                text: shareText,
-                url: shareUrl
-            }).catch(console.error);
-        } else {
-            // Fallback: copy to clipboard
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                alert('Link copied to clipboard!');
-            });
-        }
-    }
-
-    handleKeyDown(e) {
-        if (!document.querySelector('.story-viewer-overlay')) return;
-        
-        switch(e.key) {
-            case 'ArrowRight':
-            case ' ':
-                e.preventDefault();
-                this.nextStory();
-                break;
-            case 'ArrowLeft':
-                e.preventDefault();
-                this.prevStory();
-                break;
-            case 'Escape':
-                e.preventDefault();
-                this.closeStoryViewer();
-                break;
-        }
-    }
-
-    closeStoryViewer() {
-        this.stopStoryProgress();
-        
-        const viewer = document.querySelector('.story-viewer-overlay');
-        if (viewer) viewer.remove();
-        
-        if (this.storyVideo) {
-            this.storyVideo.pause();
-            this.storyVideo.src = '';
-        }
-        
-        // Remove keyboard listeners
-        document.removeEventListener('keydown', this.handleKeyDown.bind(this));
-    }
-}
+// Problematic formats that often need conversion
+const PROBLEMATIC_FORMATS = [
+    'video/quicktime',
+    'video/x-msvideo',
+    'video/x-matroska',
+    'video/x-ms-wmv',
+    'video/x-flv',
+    'video/3gpp',
+    'video/3gpp2'
+];
 
 // Stream Manager Class with Cloudinary integration
 class StreamManager {
@@ -717,6 +204,7 @@ class StreamManager {
                 throw new Error('You must be logged in to create a stream');
             }
 
+            // Get user data
             const userRef = doc(db, 'users', currentUser.uid);
             const userSnap = await getDoc(userRef);
             
@@ -729,9 +217,13 @@ class StreamManager {
             let streamData = {};
 
             if (isLocalFile && videoData instanceof File) {
+                // Enhanced validation for downloaded videos
                 await this.validateVideoFile(videoData);
                 
+                // Upload to Cloudinary
                 const videoUrl = await this.uploadVideoToCloudinary(videoData);
+                
+                // Generate thumbnail URL from Cloudinary video
                 const thumbnailUrl = this.generateCloudinaryThumbnail(videoUrl);
                 
                 streamData = {
@@ -796,6 +288,7 @@ class StreamManager {
                 });
             });
 
+            // Sort by newest first
             videos.sort((a, b) => b.timestamp - a.timestamp);
             
             return videos;
@@ -1051,6 +544,7 @@ class StreamManager {
                 filteredStreams = streams.filter(stream => stream.category === category);
             }
 
+            // Shuffle videos for random order
             filteredStreams = this.shuffleArray(filteredStreams);
 
             return filteredStreams;
@@ -1139,12 +633,13 @@ class StreamManager {
     }
 
     // LIKE FUNCTIONALITY
-    async handleLike(streamId, likeButton = null) {
+    async handleLike(streamId, likeButton) {
         if (!currentUser) {
             alert('Please login to like videos');
             return null;
         }
 
+        // Check if already liked
         const isLiked = likedStreams.has(streamId);
         
         try {
@@ -1156,20 +651,25 @@ class StreamManager {
                 let newLikes = (stream.likes || 0);
                 
                 if (isLiked) {
+                    // Unlike
                     newLikes = Math.max(0, newLikes - 1);
                     likedStreams.delete(streamId);
                 } else {
+                    // Like
                     newLikes = newLikes + 1;
                     likedStreams.add(streamId);
                 }
                 
+                // Update Firestore
                 await updateDoc(streamRef, {
                     likes: newLikes,
                     updatedAt: serverTimestamp()
                 });
 
+                // Save to localStorage
                 saveLikedStreams();
 
+                // Return the updated like count and whether it's liked
                 return { likes: newLikes, isLiked: !isLiked };
             }
         } catch (error) {
@@ -1183,12 +683,14 @@ class StreamManager {
         if (!container) return;
 
         try {
+            // Clean up previous listener for this stream if it exists
             if (activeCommentListeners.has(streamId)) {
                 const unsubscribe = activeCommentListeners.get(streamId);
                 unsubscribe();
                 activeCommentListeners.delete(streamId);
             }
 
+            // Create a new real-time listener
             const commentsQuery = query(
                 collection(db, 'streams', streamId, 'comments'), 
                 orderBy('createdAt', 'asc')
@@ -1211,15 +713,19 @@ class StreamManager {
                     }
                 });
 
+                // Get user data for all comments
                 this.getUsersData([...userIds]).then(usersData => {
+                    // Clear container again in case we get multiple rapid updates
                     container.innerHTML = '';
                     
+                    // Track displayed comment IDs to prevent duplicates
                     const displayedCommentIds = new Set();
                     
                     snapshot.forEach(doc => {
                         const comment = doc.data();
                         const commentId = doc.id;
                         
+                        // Skip if we've already displayed this comment
                         if (displayedCommentIds.has(commentId)) {
                             return;
                         }
@@ -1230,8 +736,10 @@ class StreamManager {
                         container.appendChild(commentElement);
                     });
                     
+                    // Scroll to bottom
                     container.scrollTop = container.scrollHeight;
                     
+                    // Add reply functionality
                     this.addReplyListeners(streamId);
                 });
             }, (error) => {
@@ -1239,6 +747,7 @@ class StreamManager {
                 container.innerHTML = '<div class="error">Error loading comments</div>';
             });
 
+            // Store the unsubscribe function
             activeCommentListeners.set(streamId, unsubscribe);
 
         } catch (error) {
@@ -1299,21 +808,15 @@ class StreamManager {
             return;
         }
 
-        // Find the active comment input
-        let commentInput = null;
-        if (videoModalInstance && videoModalInstance.commentInput) {
-            commentInput = videoModalInstance.commentInput;
-        } else {
-            commentInput = document.querySelector('.comment-input');
-        }
-
-        if (commentInput) {
-            commentInput.value = `@${userName} `;
-            commentInput.focus();
-            commentInput.setAttribute('data-reply-to', commentId);
-            commentInput.setAttribute('data-reply-user-name', userName);
+        const modalCommentInput = document.getElementById('modalCommentInput');
+        if (modalCommentInput) {
+            modalCommentInput.value = `@${userName} `;
+            modalCommentInput.focus();
+            modalCommentInput.setAttribute('data-reply-to', commentId);
+            modalCommentInput.setAttribute('data-reply-user-name', userName);
             
-            commentInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Scroll to input
+            modalCommentInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
 
@@ -1335,7 +838,9 @@ class StreamManager {
                 createdAt: serverTimestamp()
             };
 
+            // Add reply information if replying to a comment
             if (replyTo) {
+                // Get the original comment to include in reply
                 const originalCommentRef = doc(db, 'streams', streamId, 'comments', replyTo.commentId);
                 const originalCommentSnap = await getDoc(originalCommentRef);
                 
@@ -1350,8 +855,10 @@ class StreamManager {
                 }
             }
 
+            // Add comment to subcollection
             await addDoc(collection(db, 'streams', streamId, 'comments'), commentData);
 
+            // Update comments count
             const streamRef = doc(db, 'streams', streamId);
             await updateDoc(streamRef, {
                 commentsCount: increment(1),
@@ -1410,6 +917,7 @@ class StreamManager {
                     filteredStreams = streams.filter(stream => stream.category === category);
                 }
 
+                // Shuffle videos when they load
                 filteredStreams = this.shuffleArray(filteredStreams);
 
                 callback(filteredStreams);
@@ -1506,6 +1014,7 @@ class StreamManager {
         this.streamListeners.clear();
         this.viewerListeners.clear();
         
+        // Clean up comment listeners
         activeCommentListeners.forEach(unsubscribe => unsubscribe());
         activeCommentListeners.clear();
         
@@ -1519,235 +1028,21 @@ class StreamManager {
 // Initialize Stream Manager
 const streamManager = new StreamManager();
 
-// VIDEO GRID CLASS
-class VideoGrid {
-    constructor() {
-        this.videoGrid = document.getElementById('videoGrid');
-        this.videos = [];
-        this.userVideos = new Map();
-        this.currentModalUserVideos = [];
-        this.currentModalIndex = 0;
-        
-        this.init();
-    }
-
-    init() {
-        this.loadVideos();
-        this.setupEventListeners();
-    }
-
-    async loadVideos() {
-        try {
-            this.videos = await streamManager.getStreams('all');
-            this.groupVideosByUser();
-            this.renderGrid();
-            
-            this.updateTotalViewers();
-            
-            streamManager.listenToStreams((streams) => {
-                this.videos = streams;
-                this.groupVideosByUser();
-                this.renderGrid();
-                this.updateTotalViewers();
-            }, 'all');
-            
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            if (loadingOverlay) {
-                loadingOverlay.classList.add('hidden');
-            }
-            
-        } catch (error) {
-            console.error('Error loading videos:', error);
-            this.showError();
-        }
-    }
-
-    groupVideosByUser() {
-        this.userVideos.clear();
-        this.videos.forEach(video => {
-            if (!this.userVideos.has(video.authorId)) {
-                this.userVideos.set(video.authorId, []);
-            }
-            this.userVideos.get(video.authorId).push(video);
-        });
-    }
-
-    renderGrid() {
-        if (!this.videoGrid) return;
-
-        if (this.videos.length === 0) {
-            this.videoGrid.innerHTML = `
-                <div class="no-videos">
-                    <i class="fas fa-video-slash"></i>
-                    <h3>No videos available</h3>
-                    <p>Be the first to share a video!</p>
-                </div>
-            `;
-            return;
-        }
-
-        let html = '';
-        this.videos.forEach(video => {
-            const isLiked = likedStreams.has(video.id);
-            const thumbnailUrl = getVideoThumbnail(video);
-            const views = video.viewCount || 0;
-            
-            html += `
-            <div class="video-card" data-video-id="${video.id}" data-user-id="${video.authorId}">
-                <div class="video-thumbnail-container">
-                    <img src="${thumbnailUrl}" 
-                         alt="${video.headline}" 
-                         class="video-thumbnail"
-                         onerror="this.src='images-defaultse-profile.jpg'">
-                    
-                    <div class="video-avatar-overlay">
-                        <img src="${video.authorImage || 'images-defaultse-profile.jpg'}" 
-                             alt="${video.authorName}" 
-                             class="video-avatar">
-                        <span class="video-username">${video.authorName}</span>
-                    </div>
-                    
-                    <div class="video-like-overlay">
-                        <button class="video-like-btn ${isLiked ? 'liked' : ''}" 
-                                data-video-id="${video.id}"
-                                onclick="event.stopPropagation(); videoGridInstance.handleLike('${video.id}', this)">
-                            <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i>
-                        </button>
-                        <div class="video-like-count">${video.likes || 0}</div>
-                    </div>
-                    
-                    <div class="video-play-overlay">
-                        <div class="play-icon">
-                            <i class="fas fa-play"></i>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="video-info">
-                    <div class="video-title">${video.headline}</div>
-                    <div class="video-meta">
-                        <div class="video-views">
-                            <i class="fas fa-eye"></i> ${views}
-                        </div>
-                        <div class="video-time">${formatTime(video.createdAt)}</div>
-                    </div>
-                </div>
-            </div>
-            `;
-        });
-
-        this.videoGrid.innerHTML = html;
-        
-        document.querySelectorAll('.video-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                if (!e.target.closest('.video-like-btn')) {
-                    const videoId = card.dataset.videoId;
-                    const userId = card.dataset.userId;
-                    this.openVideoModal(videoId, userId);
-                }
-            });
-        });
-    }
-
-    async openVideoModal(videoId, userId) {
-        if (!videoModalInstance) {
-            videoModalInstance = new VideoModal();
-        }
-        
-        const userVideos = this.userVideos.get(userId) || [];
-        const currentIndex = userVideos.findIndex(v => v.id === videoId);
-        
-        this.currentModalUserVideos = userVideos;
-        this.currentModalIndex = currentIndex;
-        
-        await videoModalInstance.open(videoId, userVideos, currentIndex);
-    }
-
-    async handleLike(videoId, button) {
-        if (!currentUser) {
-            alert('Please login to like videos');
-            return;
-        }
-
-        const isLiked = button.classList.contains('liked');
-        
-        try {
-            const result = await streamManager.handleLike(videoId, button);
-            if (result) {
-                const likeCount = button.nextElementSibling;
-                const icon = button.querySelector('i');
-                
-                if (isLiked) {
-                    button.classList.remove('liked');
-                    icon.className = 'far fa-heart';
-                    if (likeCount) {
-                        const current = parseInt(likeCount.textContent) || 0;
-                        likeCount.textContent = Math.max(0, current - 1);
-                    }
-                } else {
-                    button.classList.add('liked');
-                    icon.className = 'fas fa-heart';
-                    if (likeCount) {
-                        const current = parseInt(likeCount.textContent) || 0;
-                        likeCount.textContent = current + 1;
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error liking video:', error);
-        }
-    }
-
-    updateTotalViewers() {
-        const totalViewersSpan = document.getElementById('totalViewers');
-        if (totalViewersSpan) {
-            const total = this.videos.reduce((sum, video) => sum + (video.currentViewers || 0), 0);
-            totalViewersSpan.textContent = total;
-        }
-    }
-
-    showError() {
-        if (this.videoGrid) {
-            this.videoGrid.innerHTML = `
-                <div class="no-videos">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <h3>Error loading videos</h3>
-                    <p>Please try refreshing the page</p>
-                </div>
-            `;
-        }
-    }
-
-    setupEventListeners() {
-        window.addEventListener('resize', () => {
-            this.renderGrid();
-        });
-    }
-}
-
-// VIDEO MODAL CLASS - Fixed with working comments
+// Enhanced Video Modal Class with scrollable content
 class VideoModal {
     constructor() {
         this.modal = null;
         this.videoElement = null;
         this.currentVideo = null;
-        this.userVideos = [];
-        this.currentIndex = 0;
         this.isOpen = false;
-        this.isSwiping = false;
-        this.startX = 0;
-        this.currentX = 0;
-        this.commentsContainer = null;
-        
+        this.progressBar = null;
+        this.progressFill = null;
+        this.isDragging = false;
         this.init();
     }
 
     init() {
-        this.createModal();
-        this.setupEventListeners();
-    }
-
-    createModal() {
+        // Create modal element
         this.modal = document.createElement('div');
         this.modal.className = 'video-modal';
         this.modal.style.cssText = `
@@ -1757,445 +1052,356 @@ class VideoModal {
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.95);
-            z-index: 2000;
+            z-index: 10000;
             display: none;
-            flex-direction: column;
+            backdrop-filter: blur(10px);
+            overflow: hidden;
         `;
 
+        // Modal content with scrollable container
         this.modal.innerHTML = `
-            <div class="modal-header" style="
-                padding: 20px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                border-bottom: 1px solid rgba(255,255,255,0.1);
+            <div class="video-modal-scroll-container" style="
+                width: 100%;
+                height: 100%;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
             ">
-                <div class="modal-user-info" style="display: flex; align-items: center; gap: 10px;">
-                    <img id="modalUserAvatar" src="" alt="" style="width: 40px; height: 40px; border-radius: 50%;">
-                    <div>
-                        <div id="modalUserName" style="font-weight: 600; font-size: 16px;"></div>
-                        <div id="modalVideoCount" style="font-size: 12px; opacity: 0.7;"></div>
-                    </div>
-                </div>
-                <button class="modal-close" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <div class="modal-video-container" style="
-                flex: 1;
-                position: relative;
-                overflow: hidden;
-                background: #000;
-            ">
-                <video id="modalVideoPlayer" style="
-                    width: 100%;
-                    height: 100%;
-                    object-fit: contain;
-                " controls playsinline></video>
-                
-                <div class="modal-progress-container" style="
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 4px;
-                    background: rgba(255,255,255,0.2);
-                ">
-                    <div class="modal-progress-fill" style="
-                        height: 100%;
-                        width: 0%;
-                        background: #ff2d55;
-                        transition: width 0.1s linear;
-                    "></div>
-                </div>
-                
-                <!-- Swipe indicators -->
-                <div class="swipe-indicator left" style="
-                    position: absolute;
-                    left: 20px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    color: white;
-                    font-size: 24px;
-                    opacity: 0;
-                    transition: opacity 0.3s;
-                    pointer-events: none;
-                ">
-                    <i class="fas fa-chevron-left"></i>
-                </div>
-                <div class="swipe-indicator right" style="
-                    position: absolute;
-                    right: 20px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    color: white;
-                    font-size: 24px;
-                    opacity: 0;
-                    transition: opacity 0.3s;
-                    pointer-events: none;
-                ">
-                    <i class="fas fa-chevron-right"></i>
-                </div>
-            </div>
-
-            <div class="modal-content" style="
-                background: #1a1a1a;
-                padding: 20px;
-                max-height: 40vh;
-                overflow-y:auto;
-                width:100%;
-            ">
-                <div class="modal-video-info" style="margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 id="modalVideoTitle" style="font-size: 18px; font-weight: 600;"></h3>
-                        <button id="modalLikeBtn" style="
-                            background: none;
-                            border: none;
-                            color: white;
-                            font-size: 20px;
-                            cursor: pointer;
-                            padding: 10px;
-                        ">
-                            <i class="far fa-heart"></i>
-                        </button>
-                    </div>
-                    <p id="modalVideoDescription" style="
-                        color: #d1d5db;
-                        line-height: 1.5;
-                        margin-bottom: 15px;
-                    "></p>
-                    
-                    <div style="display: flex; gap: 20px; color: #aaa; font-size: 14px;">
-                        <span id="modalVideoViews"><i class="fas fa-eye"></i> <span>0</span></span>
-                        <span id="modalVideoLikes"><i class="fas fa-heart"></i> <span>0</span></span>
-                        <span id="modalVideoComments"><i class="fas fa-comment"></i> <span>0</span></span>
-                    </div>
-                </div>
-
-                <div class="modal-actions" style="
+                <div class="video-modal-scroll-content" style="
+                    min-height: 100%;
                     display: flex;
-                    gap: 10px;
-                    margin-bottom: 20px;
+                    flex-direction: column;
                 ">
-                    <button id="modalCommentBtn" style="
-                        flex: 1;
-                        background: #ff2d55;
-                        color: white;
-                        border: none;
-                        padding: 12px;
-                        border-radius: 25px;
-                        font-weight: 600;
-                        cursor: pointer;
+                    <!-- Close button at top (scrollable) -->
+                    <div class="video-modal-header" style="
+                        position: sticky;
+                        top: 0;
+                        z-index: 10002;
+                        background: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, transparent 100%);
+                        padding: 1.5rem;
                         display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 8px;
+                        justify-content: flex-end;
                     ">
-                        <i class="fas fa-comment"></i> View Comments
-                    </button>
-                </div>
-
-                <!-- Comments Section -->
-                <div class="modal-comments-section" id="modalCommentsSection" style="display: none;">
-                    <div class="comments-header" style="
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 15px;
-                        padding-bottom: 10px;
-                        border-bottom: 1px solid rgba(255,255,255,0.1);
-                    ">
-                        <h4 style="margin: 0;">Comments</h4>
-                        <button id="closeCommentsBtn" style="
-                            background: none;
-                            border: none;
-                            color: #aaa;
-                            font-size: 20px;
-                            cursor: pointer;
-                        ">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="comments-list" id="modalCommentsList" style="
-                        max-height: 200px;
-                        overflow-y: auto;
-                        margin-bottom: 15px;
-                    "></div>
-                    
-                    <div class="modal-add-comment" style="
-                        display: flex;
-                        gap: 10px;
-                        padding-top: 15px;
-                        border-top: 1px solid rgba(255,255,255,0.1);
-                    ">
-                        <input type="text" id="modalCommentInput" placeholder="Add a comment..." style="
-                            flex: 1;
+                        <button class="video-modal-close" style="
                             background: rgba(255,255,255,0.1);
-                            border: none;
-                            color: white;
-                            padding: 12px 15px;
-                            border-radius: 25px;
-                            outline: none;
-                        ">
-                        <button id="modalSendComment" style="
-                            background: #ff2d55;
-                            color: white;
                             border: none;
                             width: 44px;
                             height: 44px;
                             border-radius: 50%;
+                            color: white;
+                            font-size: 20px;
                             cursor: pointer;
-                            font-size: 18px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            backdrop-filter: blur(10px);
+                            transition: all 0.3s ease;
                         ">
-                            <i class="fas fa-paper-plane"></i>
+                            <i class="fas fa-times"></i>
                         </button>
+                    </div>
+
+                    <!-- Video player container -->
+                    <div class="video-modal-player-container" style="
+                        flex: 1;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 1rem;
+                        min-height: 60vh;
+                    ">
+                        <div class="video-modal-player" style="
+                            width: 100%;
+                            max-width: 800px;
+                            background: #000;
+                            border-radius: 12px;
+                            overflow: hidden;
+                            position: relative;
+                        ">
+                            <!-- Video element -->
+                            <video id="modalVideoPlayer" style="
+                                width: 100%;
+                                height: auto;
+                                max-height: 70vh;
+                                display: block;
+                            " controls playsinline></video>
+
+                            <!-- Custom progress bar -->
+                            <div class="video-progress-container" style="
+                                position: absolute;
+                                bottom: 0;
+                                left: 0;
+                                width: 100%;
+                                height: 4px;
+                                background: rgba(255,255,255,0.2);
+                                cursor: pointer;
+                                z-index: 10001;
+                            ">
+                                <div class="video-progress-fill" style="
+                                    height: 100%;
+                                    width: 0%;
+                                    background: linear-gradient(to right, #b3004b, #ff2d55);
+                                    transition: width 0.1s linear;
+                                    position: relative;
+                                ">
+                                    <div class="video-progress-handle" style="
+                                        position: absolute;
+                                        right: -6px;
+                                        top: 50%;
+                                        transform: translateY(-50%);
+                                        width: 12px;
+                                        height: 12px;
+                                        background: white;
+                                        border-radius: 50%;
+                                        opacity: 0;
+                                        transition: opacity 0.2s ease;
+                                        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                                    "></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Video info (scrollable) -->
+                    <div class="video-modal-info" style="
+                        background: #1a1a1a;
+                        padding: 2rem;
+                        border-radius: 20px 20px 0 0;
+                        margin-top: -20px;
+                        position: relative;
+                        z-index: 10001;
+                    ">
+                        <div class="video-modal-header-info" style="
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                            margin-bottom: 1.5rem;
+                            flex-wrap: wrap;
+                            gap: 1rem;
+                        ">
+                            <div style="flex: 1; min-width: 200px;">
+                                <h3 id="modalVideoTitle" style="
+                                    color: white;
+                                    margin: 0 0 0.5rem 0;
+                                    font-size: 1.5rem;
+                                    line-height: 1.3;
+                                "></h3>
+                                <p id="modalVideoAuthor" style="
+                                    color: #b3004b;
+                                    margin: 0;
+                                    font-size: 1rem;
+                                    font-weight: 600;
+                                "></p>
+                            </div>
+                            <div class="video-modal-stats" style="
+                                display: flex;
+                                gap: 1.5rem;
+                                color: #9ca3af;
+                                font-size: 0.95rem;
+                                flex-wrap: wrap;
+                            ">
+                                <span id="modalVideoViews" style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <i class="fas fa-eye"></i> <span>0</span>
+                                </span>
+                                <span id="modalVideoLikes" style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <i class="fas fa-heart"></i> <span>0</span>
+                                </span>
+                                <span id="modalVideoComments" style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <i class="fas fa-comment"></i> <span>0</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Description with "See More" -->
+                        <div class="video-modal-description-container" style="margin-bottom: 1.5rem;">
+                            <p id="modalVideoDescription" style="
+                                color: #d1d5db;
+                                margin: 0 0 0.5rem 0;
+                                line-height: 1.6;
+                                overflow: hidden;
+                                display: -webkit-box;
+                                -webkit-line-clamp: 3;
+                                -webkit-box-orient: vertical;
+                            "></p>
+                            <button class="see-more-btn" style="
+                                background: none;
+                                border: none;
+                                color: #b3004b;
+                                font-size: 0.9rem;
+                                cursor: pointer;
+                                padding: 0;
+                                font-weight: 600;
+                                display: none;
+                            ">
+                                See More
+                            </button>
+                        </div>
+
+                        <!-- Video actions -->
+                        <div class="video-modal-actions" style="
+                            display: flex;
+                            gap: 1rem;
+                            flex-wrap: wrap;
+                        ">
+                            <button class="video-modal-like" style="
+                                background: #b3004b;
+                                color: white;
+                                border: none;
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 25px;
+                                cursor: pointer;
+                                font-weight: 600;
+                                display: flex;
+                                align-items: center;
+                                gap: 0.5rem;
+                                font-size: 1rem;
+                                transition: all 0.3s ease;
+                            ">
+                                <i class="far fa-heart"></i> Like
+                            </button>
+                            <button class="video-modal-share" style="
+                                background: #2e2e2e;
+                                color: white;
+                                border: none;
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 25px;
+                                cursor: pointer;
+                                font-weight: 600;
+                                display: flex;
+                                align-items: center;
+                                gap: 0.5rem;
+                                font-size: 1rem;
+                                transition: all 0.3s ease;
+                            ">
+                                <i class="fas fa-share"></i> Share
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         `;
 
+        // Append to body
         document.body.appendChild(this.modal);
 
+        // Get elements
         this.videoElement = this.modal.querySelector('#modalVideoPlayer');
-        this.closeButton = this.modal.querySelector('.modal-close');
-        this.likeButton = this.modal.querySelector('#modalLikeBtn');
-        this.commentButton = this.modal.querySelector('#modalCommentBtn');
-        this.sendCommentButton = this.modal.querySelector('#modalSendComment');
-        this.commentInput = this.modal.querySelector('#modalCommentInput');
-        this.closeCommentsBtn = this.modal.querySelector('#closeCommentsBtn');
-        this.commentsSection = this.modal.querySelector('#modalCommentsSection');
-        this.commentsList = this.modal.querySelector('#modalCommentsList');
-        this.progressFill = this.modal.querySelector('.modal-progress-fill');
-        this.videoContainer = this.modal.querySelector('.modal-video-container');
-        this.leftIndicator = this.modal.querySelector('.swipe-indicator.left');
-        this.rightIndicator = this.modal.querySelector('.swipe-indicator.right');
+        this.closeButton = this.modal.querySelector('.video-modal-close');
+        this.likeButton = this.modal.querySelector('.video-modal-like');
+        this.shareButton = this.modal.querySelector('.video-modal-share');
+        this.descriptionElement = this.modal.querySelector('#modalVideoDescription');
+        this.seeMoreBtn = this.modal.querySelector('.see-more-btn');
+        this.progressContainer = this.modal.querySelector('.video-progress-container');
+        this.progressFill = this.modal.querySelector('.video-progress-fill');
+        this.progressHandle = this.modal.querySelector('.video-progress-handle');
+        this.scrollContainer = this.modal.querySelector('.video-modal-scroll-container');
 
-        this.commentsContainer = this.commentsList;
-    }
-
-    setupEventListeners() {
+        // Add event listeners
         this.closeButton.addEventListener('click', () => this.close());
         this.likeButton.addEventListener('click', () => this.handleLike());
-        this.commentButton.addEventListener('click', () => this.toggleComments());
-        this.sendCommentButton.addEventListener('click', () => this.handleAddComment());
-        this.closeCommentsBtn.addEventListener('click', () => this.toggleComments());
-        this.commentInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.handleAddComment();
-        });
+        this.shareButton.addEventListener('click', () => this.handleShare());
+        this.seeMoreBtn.addEventListener('click', () => this.toggleDescription());
 
+        // Progress bar events
+        if (this.progressContainer) {
+            this.progressContainer.addEventListener('mousedown', (e) => this.handleProgressClick(e));
+            this.progressContainer.addEventListener('touchstart', (e) => this.handleProgressClick(e));
+        }
+
+        // Video time update
         if (this.videoElement) {
             this.videoElement.addEventListener('timeupdate', () => this.updateProgressBar());
             this.videoElement.addEventListener('loadedmetadata', () => this.setupProgressBar());
         }
 
-        this.setupSwipeHandlers();
-    }
-
-    setupSwipeHandlers() {
-        this.videoContainer.addEventListener('touchstart', (e) => this.handleTouchStart(e));
-        this.videoContainer.addEventListener('touchmove', (e) => this.handleTouchMove(e));
-        this.videoContainer.addEventListener('touchend', (e) => this.handleTouchEnd(e));
-        
-        this.videoContainer.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-        this.videoContainer.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-        this.videoContainer.addEventListener('mouseup', (e) => this.handleMouseUp(e));
-        this.videoContainer.addEventListener('mouseleave', (e) => this.handleMouseLeave(e));
-    }
-
-    handleTouchStart(e) {
-        if (this.userVideos.length <= 1) return;
-        
-        this.startX = e.touches[0].clientX;
-        this.currentX = this.startX;
-        this.isSwiping = true;
-    }
-
-    handleTouchMove(e) {
-        if (!this.isSwiping || this.userVideos.length <= 1) return;
-        
-        e.preventDefault();
-        this.currentX = e.touches[0].clientX;
-        const dragX = this.currentX - this.startX;
-        
-        if (dragX > 50 && this.currentIndex > 0) {
-            this.leftIndicator.style.opacity = '1';
-        } else if (dragX < -50 && this.currentIndex < this.userVideos.length - 1) {
-            this.rightIndicator.style.opacity = '1';
-        } else {
-            this.leftIndicator.style.opacity = '0';
-            this.rightIndicator.style.opacity = '0';
+        // Handle modal scrolling
+        if (this.scrollContainer) {
+            this.scrollContainer.addEventListener('scroll', () => this.handleScroll());
         }
-    }
 
-    handleTouchEnd(e) {
-        if (!this.isSwiping || this.userVideos.length <= 1) return;
-        
-        const dragX = this.currentX - this.startX;
-        const threshold = 100;
-        
-        if (Math.abs(dragX) > threshold) {
-            if (dragX > 0 && this.currentIndex > 0) {
-                this.changeVideo(this.currentIndex - 1);
-            } else if (dragX < 0 && this.currentIndex < this.userVideos.length - 1) {
-                this.changeVideo(this.currentIndex + 1);
+        // Close modal when clicking outside (on backdrop)
+        this.modal.addEventListener('click', (e) => {
+            if (e.target === this.modal && !e.target.closest('.video-modal-player-container')) {
+                this.close();
             }
-        }
-        
-        this.leftIndicator.style.opacity = '0';
-        this.rightIndicator.style.opacity = '0';
-        this.isSwiping = false;
-    }
+        });
 
-    handleMouseDown(e) {
-        if (this.userVideos.length <= 1) return;
-        
-        this.startX = e.clientX;
-        this.currentX = this.startX;
-        this.isSwiping = true;
-        e.preventDefault();
-    }
-
-    handleMouseMove(e) {
-        if (!this.isSwiping || this.userVideos.length <= 1) return;
-        
-        this.currentX = e.clientX;
-        const dragX = this.currentX - this.startX;
-        
-        if (dragX > 50 && this.currentIndex > 0) {
-            this.leftIndicator.style.opacity = '1';
-        } else if (dragX < -50 && this.currentIndex < this.userVideos.length - 1) {
-            this.rightIndicator.style.opacity = '1';
-        } else {
-            this.leftIndicator.style.opacity = '0';
-            this.rightIndicator.style.opacity = '0';
-        }
-    }
-
-    handleMouseUp(e) {
-        if (!this.isSwiping || this.userVideos.length <= 1) return;
-        
-        const dragX = this.currentX - this.startX;
-        const threshold = 100;
-        
-        if (Math.abs(dragX) > threshold) {
-            if (dragX > 0 && this.currentIndex > 0) {
-                this.changeVideo(this.currentIndex - 1);
-            } else if (dragX < 0 && this.currentIndex < this.userVideos.length - 1) {
-                this.changeVideo(this.currentIndex + 1);
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isOpen) {
+                this.close();
             }
-        }
-        
-        this.leftIndicator.style.opacity = '0';
-        this.rightIndicator.style.opacity = '0';
-        this.isSwiping = false;
+        });
+
+        // Handle video end
+        this.videoElement.addEventListener('ended', () => {
+            this.videoElement.currentTime = 0;
+            this.updateProgressBar();
+        });
+
+        // Prevent body scroll when modal is open
+        this.modal.addEventListener('wheel', (e) => {
+            if (this.scrollContainer.scrollHeight > this.scrollContainer.clientHeight) {
+                e.stopPropagation();
+            }
+        }, { passive: false });
     }
 
-    handleMouseLeave() {
-        this.leftIndicator.style.opacity = '0';
-        this.rightIndicator.style.opacity = '0';
-        this.isSwiping = false;
-    }
-
-    async open(videoId, userVideos, currentIndex) {
+    async open(videoId) {
         try {
-            this.userVideos = userVideos;
-            this.currentIndex = currentIndex;
-            
-            this.modal.style.display = 'flex';
+            // Show modal
+            this.modal.style.display = 'block';
             this.isOpen = true;
             document.body.style.overflow = 'hidden';
 
+            // Reset scroll position
+            if (this.scrollContainer) {
+                this.scrollContainer.scrollTop = 0;
+            }
+
+            // Get video data
             this.currentVideo = await streamManager.getVideoById(videoId);
             if (!this.currentVideo) {
                 throw new Error('Video not found');
             }
 
-            this.updateModalContent();
+            // Update modal content
+            const titleElement = this.modal.querySelector('#modalVideoTitle');
+            const authorElement = this.modal.querySelector('#modalVideoAuthor');
+            const viewsElement = this.modal.querySelector('#modalVideoViews span');
+            const likesElement = this.modal.querySelector('#modalVideoLikes span');
+            const commentsElement = this.modal.querySelector('#modalVideoComments span');
+
+            titleElement.textContent = this.currentVideo.headline;
+            authorElement.textContent = `By ${this.currentVideo.authorName}`;
+            viewsElement.textContent = this.currentVideo.viewCount || 0;
+            likesElement.textContent = this.currentVideo.likes || 0;
+            commentsElement.textContent = this.currentVideo.commentsCount || 0;
+
+            // Handle description with "See More"
+            this.updateDescription();
+
+            // Set video source
             this.videoElement.src = this.currentVideo.videoUrl;
             this.videoElement.load();
 
+            // Update like button state
+            this.updateLikeButton();
+
+            // Add viewer count
             streamManager.addViewer(videoId);
 
+            // Play video
             await this.videoElement.play().catch(e => {
                 console.log('Auto-play prevented:', e);
             });
-
-            this.updateSwipeIndicators();
 
         } catch (error) {
             console.error('Error opening video modal:', error);
             alert('Error loading video: ' + error.message);
             this.close();
         }
-    }
-
-    updateModalContent() {
-        const userAvatar = this.modal.querySelector('#modalUserAvatar');
-        const userName = this.modal.querySelector('#modalUserName');
-        const videoCount = this.modal.querySelector('#modalVideoCount');
-        const videoTitle = this.modal.querySelector('#modalVideoTitle');
-        const videoDescription = this.modal.querySelector('#modalVideoDescription');
-        const videoViews = this.modal.querySelector('#modalVideoViews span');
-        const videoLikes = this.modal.querySelector('#modalVideoLikes span');
-        const videoComments = this.modal.querySelector('#modalVideoComments span');
-
-        if (userAvatar) userAvatar.src = this.currentVideo.authorImage || 'images-defaultse-profile.jpg';
-        if (userName) userName.textContent = this.currentVideo.authorName;
-        if (videoCount) videoCount.textContent = `${this.userVideos.length} videos`;
-        if (videoTitle) videoTitle.textContent = this.currentVideo.headline;
-        if (videoDescription) videoDescription.textContent = this.currentVideo.description || 'No description';
-        if (videoViews) videoViews.textContent = this.currentVideo.viewCount || 0;
-        if (videoLikes) videoLikes.textContent = this.currentVideo.likes || 0;
-        if (videoComments) videoComments.textContent = this.currentVideo.commentsCount || 0;
-
-        this.updateLikeButton();
-    }
-
-    updateLikeButton() {
-        if (!this.currentVideo) return;
-
-        const isLiked = likedStreams.has(this.currentVideo.id);
-        const icon = this.likeButton.querySelector('i');
-        icon.className = isLiked ? 'fas fa-heart' : 'far fa-heart';
-    }
-
-    updateSwipeIndicators() {
-        if (this.currentIndex > 0) {
-            this.leftIndicator.style.opacity = '0.5';
-        } else {
-            this.leftIndicator.style.opacity = '0';
-        }
-        
-        if (this.currentIndex < this.userVideos.length - 1) {
-            this.rightIndicator.style.opacity = '0.5';
-        } else {
-            this.rightIndicator.style.opacity = '0';
-        }
-    }
-
-    async changeVideo(newIndex) {
-        if (newIndex < 0 || newIndex >= this.userVideos.length) return;
-
-        if (this.currentVideo) {
-            streamManager.removeViewer(this.currentVideo.id);
-        }
-
-        this.currentIndex = newIndex;
-        this.currentVideo = this.userVideos[newIndex];
-        
-        this.updateModalContent();
-        this.videoElement.src = this.currentVideo.videoUrl;
-        this.videoElement.load();
-        
-        streamManager.addViewer(this.currentVideo.id);
-        
-        await this.videoElement.play().catch(e => {
-            console.log('Auto-play prevented:', e);
-        });
-        
-        this.updateSwipeIndicators();
     }
 
     close() {
@@ -2207,16 +1413,37 @@ class VideoModal {
         this.isOpen = false;
         document.body.style.overflow = 'auto';
 
+        // Remove viewer count
         if (this.currentVideo) {
             streamManager.removeViewer(this.currentVideo.id);
         }
         this.currentVideo = null;
-        this.userVideos = [];
-        this.currentIndex = 0;
+    }
+
+    updateDescription() {
+        const description = this.currentVideo.description || 'No description provided';
+        const maxLength = 150;
         
-        // Hide comments section when closing modal
-        if (this.commentsSection) {
-            this.commentsSection.style.display = 'none';
+        if (description.length > maxLength) {
+            this.descriptionElement.textContent = description.substring(0, maxLength) + '...';
+            this.seeMoreBtn.style.display = 'block';
+            this.descriptionElement.dataset.fullText = description;
+        } else {
+            this.descriptionElement.textContent = description;
+            this.seeMoreBtn.style.display = 'none';
+        }
+    }
+
+    toggleDescription() {
+        const fullText = this.descriptionElement.dataset.fullText;
+        if (fullText) {
+            if (this.descriptionElement.style.webkitLineClamp) {
+                this.descriptionElement.style.webkitLineClamp = 'unset';
+                this.seeMoreBtn.textContent = 'See Less';
+            } else {
+                this.descriptionElement.style.webkitLineClamp = '3';
+                this.seeMoreBtn.textContent = 'See More';
+            }
         }
     }
 
@@ -2224,6 +1451,7 @@ class VideoModal {
         if (!this.videoElement || !this.progressFill) return;
         
         this.progressFill.style.width = '0%';
+        this.progressHandle.style.opacity = '0';
     }
 
     updateProgressBar() {
@@ -2233,25 +1461,72 @@ class VideoModal {
         this.progressFill.style.width = `${progress}%`;
     }
 
-    toggleComments() {
-        if (this.commentsSection.style.display === 'none') {
-            this.commentsSection.style.display = 'block';
-            this.loadComments();
-        } else {
-            this.commentsSection.style.display = 'none';
+    handleProgressClick(e) {
+        if (!this.videoElement || !this.progressContainer) return;
+        
+        e.preventDefault();
+        this.isDragging = true;
+        
+        const rect = this.progressContainer.getBoundingClientRect();
+        const clickX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const percent = Math.max(0, Math.min(1, (clickX - rect.left) / rect.width));
+        
+        this.videoElement.currentTime = percent * this.videoElement.duration;
+        this.updateProgressBar();
+        
+        // Show handle
+        this.progressHandle.style.opacity = '1';
+        
+        // Add move and end listeners
+        const handleMove = (moveEvent) => {
+            if (!this.isDragging) return;
+            
+            const moveX = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
+            const movePercent = Math.max(0, Math.min(1, (moveX - rect.left) / rect.width));
+            
+            this.videoElement.currentTime = movePercent * this.videoElement.duration;
+            this.updateProgressBar();
+        };
+        
+        const handleEnd = () => {
+            this.isDragging = false;
+            this.progressHandle.style.opacity = '0';
+            
+            document.removeEventListener('mousemove', handleMove);
+            document.removeEventListener('touchmove', handleMove);
+            document.removeEventListener('mouseup', handleEnd);
+            document.removeEventListener('touchend', handleEnd);
+        };
+        
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('mouseup', handleEnd);
+        document.addEventListener('touchend', handleEnd);
+    }
+
+    handleScroll() {
+        // Optional: Add parallax or other scroll effects
+        const scrollTop = this.scrollContainer.scrollTop;
+        const header = this.modal.querySelector('.video-modal-header');
+        
+        if (header) {
+            if (scrollTop > 50) {
+                header.style.background = 'rgba(0,0,0,0.9)';
+            } else {
+                header.style.background = 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, transparent 100%)';
+            }
         }
     }
 
-    async loadComments() {
-        if (!this.currentVideo || !this.commentsContainer) return;
+    updateLikeButton() {
+        if (!this.currentVideo) return;
 
-        this.commentsContainer.innerHTML = `
-            <div style="text-align: center; padding: 20px; color: #aaa;">
-                <i class="fas fa-spinner fa-spin"></i> Loading comments...
-            </div>
-        `;
-
-        await streamManager.loadComments(this.currentVideo.id, this.commentsContainer);
+        const isLiked = likedStreams.has(this.currentVideo.id);
+        const icon = this.likeButton.querySelector('i');
+        icon.className = isLiked ? 'fas fa-heart' : 'far fa-heart';
+        this.likeButton.innerHTML = isLiked ? 
+            '<i class="fas fa-heart"></i> Liked' : 
+            '<i class="far fa-heart"></i> Like';
     }
 
     async handleLike() {
@@ -2262,48 +1537,1330 @@ class VideoModal {
             if (result) {
                 this.updateLikeButton();
                 const likesElement = this.modal.querySelector('#modalVideoLikes span');
-                if (likesElement) {
-                    likesElement.textContent = result.likes;
-                }
-                
-                if (videoGridInstance) {
-                    videoGridInstance.renderGrid();
-                }
+                likesElement.textContent = result.likes;
             }
         } catch (error) {
             console.error('Error liking video:', error);
         }
     }
 
-    async handleAddComment() {
-        if (!this.currentVideo || !this.commentInput) return;
+    async handleShare() {
+        if (!this.currentVideo) return;
 
-        const commentText = this.commentInput.value.trim();
+        const shareText = `Check out this video: ${this.currentVideo.headline}`;
+        const shareUrl = window.location.origin + '/stream.html';
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: this.currentVideo.headline,
+                    text: this.currentVideo.description || shareText,
+                    url: shareUrl
+                });
+            } catch (error) {
+                console.log('Share cancelled:', error);
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+                alert('Link copied to clipboard!');
+            } catch (err) {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy link. Please try again.');
+            }
+        }
+    }
+}
+
+// Enhanced TikTok Feed Class with all requested features
+class TikTokFeed {
+    constructor() {
+        this.videoFeed = document.getElementById('videoFeed');
+        this.currentIndex = 0;
+        this.videos = [];
+        this.isSwiping = false;
+        this.startY = 0;
+        this.currentY = 0;
+        this.isDragging = false;
+        this.dragY = 0;
+        this.currentStreamId = null;
+        this.videoElements = new Map();
+        this.commentsModal = document.getElementById('commentsModal');
+        this.modalCommentsList = document.getElementById('modalCommentsList');
+        this.modalCommentInput = document.getElementById('modalCommentInput');
+        this.modalSendComment = document.getElementById('modalSendComment');
+        this.closeComments = document.getElementById('closeComments');
+        this.replyTo = null;
+        this.isScrolling = false;
+        this.scrollVelocity = 0;
+        this.lastScrollTime = 0;
+        
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.loadInitialVideos();
+        this.hideSwipeIndicator();
+        this.setupSmoothScrolling();
+    }
+
+    setupSmoothScrolling() {
+        // Enable momentum scrolling
+        this.videoFeed.style.webkitOverflowScrolling = 'touch';
+        
+        // Add smooth scroll behavior
+        let lastTouchY = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+        let isTouchScrolling = false;
+
+        this.videoFeed.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            touchStartTime = Date.now();
+            isTouchScrolling = true;
+            this.isScrolling = true;
+        });
+
+        this.videoFeed.addEventListener('touchmove', (e) => {
+            if (!isTouchScrolling) return;
+            
+            const touchY = e.touches[0].clientY;
+            const deltaY = touchY - lastTouchY;
+            lastTouchY = touchY;
+            
+            // Apply smooth deceleration
+            this.scrollVelocity = deltaY;
+            this.lastScrollTime = Date.now();
+        });
+
+        this.videoFeed.addEventListener('touchend', () => {
+            isTouchScrolling = false;
+            
+            // Apply momentum scrolling
+            if (this.scrollVelocity !== 0) {
+                const duration = Date.now() - touchStartTime;
+                const momentum = this.scrollVelocity * (duration / 1000);
+                
+                let remainingMomentum = Math.abs(momentum);
+                const direction = momentum > 0 ? 1 : -1;
+                
+                const applyMomentum = () => {
+                    if (remainingMomentum > 0.1) {
+                        remainingMomentum *= 0.95; // Deceleration factor
+                        
+                        // Apply scroll
+                        window.requestAnimationFrame(applyMomentum);
+                    } else {
+                        this.isScrolling = false;
+                        this.scrollVelocity = 0;
+                    }
+                };
+                
+                applyMomentum();
+            } else {
+                this.isScrolling = false;
+            }
+        });
+    }
+
+    setupEventListeners() {
+        // Touch events for swiping
+        if (this.videoFeed) {
+            this.videoFeed.addEventListener('touchstart', (e) => this.handleTouchStart(e));
+            this.videoFeed.addEventListener('touchmove', (e) => this.handleTouchMove(e));
+            this.videoFeed.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+
+            // Mouse events for desktop
+            this.videoFeed.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+            this.videoFeed.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+            this.videoFeed.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+            this.videoFeed.addEventListener('mouseleave', (e) => this.handleMouseLeave(e));
+
+            // VIDEO CLICK EVENTS - TIKTOK-LIKE CONTROLS
+            this.videoFeed.addEventListener('click', (e) => this.handleVideoClick(e));
+        }
+
+        // Comments modal
+        if (this.closeComments) {
+            this.closeComments.addEventListener('click', () => this.closeCommentsModal());
+        }
+
+        if (this.modalSendComment) {
+            this.modalSendComment.addEventListener('click', () => this.handleAddComment());
+        }
+
+        if (this.modalCommentInput) {
+            this.modalCommentInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.handleAddComment();
+            });
+            
+            this.modalCommentInput.addEventListener('input', (e) => {
+                const value = e.target.value;
+                if (!value.startsWith('@')) {
+                    this.clearReply();
+                }
+            });
+        }
+
+        // Close modal when clicking outside
+        if (this.commentsModal) {
+            this.commentsModal.addEventListener('click', (e) => {
+                if (e.target === this.commentsModal) {
+                    this.closeCommentsModal();
+                }
+            });
+        }
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.pauseCurrentVideo();
+            } else {
+                this.playCurrentVideo();
+            }
+        });
+
+        // Prevent default scroll behavior
+        document.addEventListener('touchmove', (e) => {
+            if (this.isSwiping && e.target.closest('.video-feed')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Handle escape key to clear reply
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.replyTo) {
+                this.clearReply();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            this.adjustVideoSizes();
+        });
+    }
+
+    // TIKTOK-LIKE VIDEO CONTROLS
+    handleVideoClick(e) {
+        if (e.target.closest('.side-action, .video-side-actions, .video-info-overlay, .video-progress-container')) {
+            return;
+        }
+        
+        const videoSlide = e.target.closest('.video-slide');
+        if (!videoSlide || !videoSlide.classList.contains('active')) {
+            return;
+        }
+        
+        const streamId = videoSlide.dataset.streamId;
+        const videoData = this.videoElements.get(streamId);
+        
+        if (!videoData || !videoData.videoElement) {
+            return;
+        }
+        
+        const video = videoData.videoElement;
+        const now = Date.now();
+        
+        // Check for double click (within 300ms)
+        if (now - lastClickTime < 300) {
+            // Double click detected
+            clearTimeout(clickTimeout);
+            lastClickTime = 0;
+            this.handleDoubleClick(video, videoSlide);
+        } else {
+            // Single click - handle after delay
+            lastClickTime = now;
+            clickTimeout = setTimeout(() => {
+                this.handleSingleClick(video, videoSlide);
+            }, 300);
+        }
+    }
+
+    handleSingleClick(video, videoSlide) {
+        // Toggle play/pause
+        if (video.paused) {
+            video.play().catch(e => console.log('Play failed:', e));
+            this.hidePlayPauseOverlay(videoSlide);
+        } else {
+            video.pause();
+            this.showPlayPauseOverlay(videoSlide, 'pause');
+        }
+    }
+
+    handleDoubleClick(video, videoSlide) {
+        // Fast forward 10 seconds
+        video.currentTime = Math.min(video.duration, video.currentTime + 10);
+        
+        // Show fast forward overlay
+        this.showFastForwardOverlay(videoSlide);
+        
+        // Play if paused
+        if (video.paused) {
+            video.play().catch(e => console.log('Play failed:', e));
+        }
+    }
+
+    showPlayPauseOverlay(videoSlide, state) {
+        this.removeVideoOverlay(videoSlide);
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'video-click-overlay';
+        overlay.innerHTML = `<i class="fas fa-${state === 'pause' ? 'pause' : 'play'}"></i>`;
+        
+        videoSlide.appendChild(overlay);
+        
+        setTimeout(() => {
+            if (overlay.parentNode) {
+                overlay.remove();
+            }
+        }, 1000);
+    }
+
+    showFastForwardOverlay(videoSlide) {
+        this.removeVideoOverlay(videoSlide);
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'video-click-overlay fast-forward';
+        overlay.innerHTML = `<i class="fas fa-forward"></i><span>+10s</span>`;
+        
+        videoSlide.appendChild(overlay);
+        
+        setTimeout(() => {
+            if (overlay.parentNode) {
+                overlay.remove();
+            }
+        }, 1000);
+    }
+
+    hidePlayPauseOverlay(videoSlide) {
+        this.removeVideoOverlay(videoSlide);
+    }
+
+    removeVideoOverlay(videoSlide) {
+        const existingOverlay = videoSlide.querySelector('.video-click-overlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
+        }
+    }
+
+    handleTouchStart(e) {
+        if (this.isScrolling) return;
+        
+        this.startY = e.touches[0].clientY;
+        this.currentY = this.startY;
+        this.isSwiping = true;
+        this.isDragging = true;
+        this.dragY = 0;
+        this.videoFeed.style.transition = 'none';
+    }
+
+    handleTouchMove(e) {
+        if (!this.isSwiping || !this.isDragging || this.isScrolling) return;
+        
+        e.preventDefault();
+        this.currentY = e.touches[0].clientY;
+        this.dragY = this.currentY - this.startY;
+        
+        // Apply smooth rubber band effect
+        const resistance = 0.5;
+        let adjustedDragY = this.dragY;
+        
+        if (this.dragY < 0 && this.currentIndex >= this.videos.length - 1) {
+            // Pull down from bottom
+            adjustedDragY = this.dragY * resistance;
+        } else if (this.dragY > 0 && this.currentIndex <= 0) {
+            // Pull up from top
+            adjustedDragY = this.dragY * resistance;
+        }
+        
+        this.videoFeed.style.transform = `translateY(${adjustedDragY}px)`;
+    }
+
+    handleTouchEnd(e) {
+        if (!this.isSwiping || !this.isDragging) return;
+        
+        const slideHeight = window.innerHeight;
+        const threshold = slideHeight * 0.15;
+        const velocity = Math.abs(this.dragY) / (Date.now() - this.lastScrollTime);
+        
+        // Consider velocity for more natural scrolling
+        const effectiveThreshold = velocity > 0.5 ? threshold * 0.7 : threshold;
+        
+        if (Math.abs(this.dragY) > effectiveThreshold) {
+            if (this.dragY < 0 && this.currentIndex < this.videos.length - 1) {
+                this.changeVideo(this.currentIndex + 1);
+            } else if (this.dragY > 0 && this.currentIndex > 0) {
+                this.changeVideo(this.currentIndex - 1);
+            }
+        }
+        
+        // Smooth return animation
+        this.videoFeed.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        this.videoFeed.style.transform = 'translateY(0px)';
+        
+        setTimeout(() => {
+            this.videoFeed.style.transition = '';
+        }, 400);
+        
+        this.isSwiping = false;
+        this.isDragging = false;
+        this.dragY = 0;
+    }
+
+    handleMouseDown(e) {
+        this.startY = e.clientY;
+        this.currentY = this.startY;
+        this.isSwiping = true;
+        this.isDragging = true;
+        this.dragY = 0;
+        this.videoFeed.style.transition = 'none';
+    }
+
+    handleMouseMove(e) {
+        if (!this.isSwiping || !this.isDragging) return;
+        this.currentY = e.clientY;
+        this.dragY = this.currentY - this.startY;
+        
+        this.videoFeed.style.transform = `translateY(${this.dragY}px)`;
+    }
+
+    handleMouseUp(e) {
+        if (!this.isSwiping || !this.isDragging) return;
+        
+        const slideHeight = window.innerHeight;
+        const threshold = slideHeight * 0.15;
+        
+        if (Math.abs(this.dragY) > threshold) {
+            if (this.dragY < 0 && this.currentIndex < this.videos.length - 1) {
+                this.changeVideo(this.currentIndex + 1);
+            } else if (this.dragY > 0 && this.currentIndex > 0) {
+                this.changeVideo(this.currentIndex - 1);
+            }
+        }
+        
+        this.videoFeed.style.transition = 'transform 0.3s ease-out';
+        this.videoFeed.style.transform = 'translateY(0px)';
+        
+        setTimeout(() => {
+            this.videoFeed.style.transition = '';
+        }, 300);
+        
+        this.isSwiping = false;
+        this.isDragging = false;
+        this.dragY = 0;
+    }
+
+    handleMouseLeave(e) {
+        this.isSwiping = false;
+        this.isDragging = false;
+        this.dragY = 0;
+        this.videoFeed.style.transform = 'translateY(0px)';
+    }
+
+    async loadInitialVideos() {
+        try {
+            const streams = await streamManager.getStreams('all');
+            this.videos = streams;
+            this.renderVideos();
+            
+            // Start from random video
+            const randomIndex = Math.floor(Math.random() * this.videos.length);
+            this.showVideo(randomIndex);
+            
+            // Start caching videos
+            this.startVideoCaching();
+            
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingOverlay) {
+                loadingOverlay.classList.add('hidden');
+            }
+            
+            this.updateTotalViewers(streams);
+            
+            // Setup real-time listener
+            streamManager.listenToStreams((streams) => {
+                const currentIds = this.videos.map(v => v.id).sort();
+                const newIds = streams.map(v => v.id).sort();
+                
+                const videosChanged = JSON.stringify(currentIds) !== JSON.stringify(newIds);
+                
+                if (videosChanged) {
+                    this.videos = streams;
+                    this.renderVideos();
+                    
+                    if (this.currentIndex >= 0 && this.currentIndex < this.videos.length) {
+                        const currentVideoId = this.videos[this.currentIndex]?.id;
+                        if (currentVideoId) {
+                            setTimeout(() => {
+                                this.showVideo(this.currentIndex);
+                            }, 100);
+                        }
+                    }
+                    
+                    // Update cache
+                    this.startVideoCaching();
+                }
+                
+                this.updateTotalViewers(streams);
+            }, 'all');
+            
+        } catch (error) {
+            console.error('Error loading videos:', error);
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingOverlay) {
+                loadingOverlay.innerHTML = `
+                    <div style="text-align: center;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px;"></i>
+                        <div>Error loading videos</div>
+                        <button onclick="window.location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #ff2d55; border: none; border-radius: 10px; color: white; cursor: pointer;">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    startVideoCaching() {
+        // Cache initial 5 videos
+        videoCache.cacheVideos(this.videos, 0);
+        
+        // Cache next batch when user reaches near the end
+        const checkCache = () => {
+            if (this.currentIndex >= this.videos.length - 3) {
+                videoCache.cacheVideos(this.videos, this.currentIndex + 1);
+            }
+        };
+        
+        // Check cache every 30 seconds
+        setInterval(checkCache, 30000);
+    }
+
+    renderVideos() {
+        if (!this.videoFeed) return;
+        
+        const now = Date.now();
+        if (isRendering || (now - lastRenderTime < 1000)) {
+            console.log('Skipping render - too frequent');
+            return;
+        }
+        
+        isRendering = true;
+        lastRenderTime = now;
+        
+        const currentVideoId = this.currentIndex >= 0 && this.currentIndex < this.videos.length 
+            ? this.videos[this.currentIndex].id 
+            : null;
+        const wasPlaying = currentVideoId ? 
+            (this.videoElements.get(currentVideoId)?.videoElement?.paused === false) : false;
+        
+        // Get existing slides to preserve video elements
+        const existingSlides = Array.from(this.videoFeed.children);
+        
+        // Clear only if necessary (when videos have changed significantly)
+        if (existingSlides.length !== this.videos.length) {
+            this.videoFeed.innerHTML = '';
+            existingSlides.forEach(slide => {
+                const videoElement = slide.querySelector('video');
+                if (videoElement) {
+                    videoElement.pause();
+                    videoElement.src = '';
+                    videoElement.load();
+                }
+            });
+        }
+        
+        // Track which videos we have rendered
+        const renderedVideoIds = new Set();
+        
+        this.videos.forEach((video, index) => {
+            // Check if this video already exists in the DOM
+            const existingSlide = existingSlides.find(slide => 
+                slide.dataset.streamId === video.id
+            );
+            
+            if (existingSlide) {
+                // Update existing slide
+                existingSlide.dataset.index = index;
+                existingSlide.className = 'video-slide';
+                
+                // Update video info
+                this.updateVideoSlide(existingSlide, video, index);
+                renderedVideoIds.add(video.id);
+                
+                // Keep the existing video element
+                const videoElement = existingSlide.querySelector('video');
+                if (videoElement) {
+                    this.videoElements.set(video.id, {
+                        slide: existingSlide,
+                        videoElement: videoElement,
+                        loadingElement: existingSlide.querySelector(`#loading-${video.id}`),
+                        progressContainer: existingSlide.querySelector('.video-progress-container'),
+                        progressFill: existingSlide.querySelector('.video-progress-fill'),
+                        progressHandle: existingSlide.querySelector('.video-progress-handle'),
+                        descriptionElement: existingSlide.querySelector('.video-description'),
+                        seeMoreBtn: existingSlide.querySelector('.video-see-more')
+                    });
+                }
+            } else {
+                // Create new slide
+                const slide = this.createVideoSlide(video, index);
+                this.videoFeed.appendChild(slide);
+                renderedVideoIds.add(video.id);
+            }
+        });
+        
+        // Remove any slides that are no longer in the videos array
+        existingSlides.forEach(slide => {
+            const streamId = slide.dataset.streamId;
+            if (!renderedVideoIds.has(streamId)) {
+                const videoElement = slide.querySelector('video');
+                if (videoElement) {
+                    videoElement.pause();
+                    videoElement.src = '';
+                    videoElement.load();
+                }
+                slide.remove();
+                this.videoElements.delete(streamId);
+            }
+        });
+        
+        // Ensure slides are in correct order
+        this.videos.forEach((video, index) => {
+            const slide = this.videoFeed.querySelector(`[data-stream-id="${video.id}"]`);
+            if (slide && slide.dataset.index !== index.toString()) {
+                slide.dataset.index = index;
+            }
+        });
+        
+        // Restore current video position
+        if (currentVideoId) {
+            const newIndex = this.videos.findIndex(v => v.id === currentVideoId);
+            if (newIndex >= 0) {
+                this.currentIndex = newIndex;
+                setTimeout(() => {
+                    this.showVideo(newIndex);
+                    if (wasPlaying) {
+                        setTimeout(() => this.playCurrentVideo(), 200);
+                    }
+                }, 50);
+            }
+        }
+        
+        isRendering = false;
+    }
+
+    createVideoSlide(video, index) {
+        const slide = document.createElement('div');
+        slide.className = 'video-slide';
+        slide.dataset.index = index;
+        slide.dataset.streamId = video.id;
+        
+        const thumbnailUrl = getVideoThumbnail(video);
+        const isLiked = likedStreams.has(video.id);
+        const description = video.description || '';
+        const shouldShowSeeMore = description.length > 100;
+        const displayDescription = shouldShowSeeMore ? 
+            description.substring(0, 100) + '...' : description;
+        
+        slide.innerHTML = `
+            <div class="video-container">
+                <video id="video-${video.id}" playsinline preload="none" 
+                       poster="${thumbnailUrl}" style="display: none;">
+                    <source src="${video.videoUrl}" type="video/mp4">
+                </video>
+                <div class="video-loading" id="loading-${video.id}">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <div>Loading video...</div>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="video-progress-container">
+                    <div class="video-progress-fill" style="width: 0%">
+                        <div class="video-progress-handle"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="video-info-overlay">
+                <!-- Profile picture now links to user's profile -->
+                <div class="video-author" onclick="navigateToUserProfile('${video.authorId}')" style="cursor: pointer;">
+                    <img src="${video.authorImage || 'images-defaultse-profile.jpg'}" 
+                         alt="${video.authorName}" 
+                         class="video-author-avatar">
+                    <div class="video-author-info">
+                        <div class="video-author-name">${video.authorName}</div>
+                    </div>
+                </div>
+                <div class="video-headline">${video.headline}</div>
+                <div class="video-description-container">
+                    <div class="video-description">${displayDescription}</div>
+                    ${shouldShowSeeMore ? '<button class="video-see-more">See More</button>' : ''}
+                </div>
+                <div class="video-category">${formatCategory(video.category)}</div>
+            </div>
+            
+            <div class="video-side-actions">
+                <button class="side-action like-btn ${isLiked ? 'liked' : ''}" 
+                        data-stream-id="${video.id}">
+                    <div class="side-action-icon">
+                        <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i>
+                    </div>
+                    <div class="side-action-count like-count">${video.likes || 0}</div>
+                </button>
+                
+                <button class="side-action comment-btn" 
+                        data-stream-id="${video.id}">
+                    <div class="side-action-icon">
+                        <i class="far fa-comment"></i>
+                    </div>
+                    <div class="side-action-count comment-count">${video.commentsCount || 0}</div>
+                </button>
+                
+                <button class="side-action share-btn" 
+                        data-stream-id="${video.id}">
+                    <div class="side-action-icon">
+                        <i class="far fa-share-square"></i>
+                    </div>
+                    <div class="side-action-count">Share</div>
+                </button>
+            </div>
+        `;
+        
+        this.setupVideoSlideEventListeners(slide, video);
+        
+        this.videoElements.set(video.id, {
+            slide: slide,
+            videoElement: null,
+            loadingElement: slide.querySelector(`#loading-${video.id}`),
+            progressContainer: slide.querySelector('.video-progress-container'),
+            progressFill: slide.querySelector('.video-progress-fill'),
+            progressHandle: slide.querySelector('.video-progress-handle'),
+            descriptionElement: slide.querySelector('.video-description'),
+            seeMoreBtn: slide.querySelector('.video-see-more')
+        });
+        
+        return slide;
+    }
+
+    updateVideoSlide(slide, video, index) {
+        const thumbnailUrl = getVideoThumbnail(video);
+        const isLiked = likedStreams.has(video.id);
+        const description = video.description || '';
+        const shouldShowSeeMore = description.length > 100;
+        const displayDescription = shouldShowSeeMore ? 
+            description.substring(0, 100) + '...' : description;
+        
+        // Update thumbnail if needed
+        const videoElement = slide.querySelector('video');
+        if (videoElement && videoElement.poster !== thumbnailUrl) {
+            videoElement.poster = thumbnailUrl;
+        }
+        
+        // Update video source if needed
+        if (videoElement && videoElement.querySelector('source').src !== video.videoUrl) {
+            videoElement.querySelector('source').src = video.videoUrl;
+            if (videoElement.dataset.listenersAdded !== 'true') {
+                videoElement.load();
+            }
+        }
+        
+        // Update content
+        const authorName = slide.querySelector('.video-author-name');
+        if (authorName) authorName.textContent = video.authorName;
+        
+        const headline = slide.querySelector('.video-headline');
+        if (headline) headline.textContent = video.headline;
+        
+        const descriptionElement = slide.querySelector('.video-description');
+        if (descriptionElement) {
+            descriptionElement.textContent = displayDescription;
+            if (shouldShowSeeMore) {
+                descriptionElement.dataset.fullText = description;
+            }
+        }
+        
+        const seeMoreBtn = slide.querySelector('.video-see-more');
+        if (seeMoreBtn) {
+            seeMoreBtn.style.display = shouldShowSeeMore ? 'block' : 'none';
+        }
+        
+        const category = slide.querySelector('.video-category');
+        if (category) category.textContent = formatCategory(video.category);
+        
+        const likeBtn = slide.querySelector('.like-btn');
+        if (likeBtn) {
+            likeBtn.className = `side-action like-btn ${isLiked ? 'liked' : ''}`;
+            likeBtn.dataset.streamId = video.id;
+            const likeIcon = likeBtn.querySelector('.side-action-icon i');
+            if (likeIcon) likeIcon.className = isLiked ? 'fas fa-heart' : 'far fa-heart';
+            const likeCount = likeBtn.querySelector('.like-count');
+            if (likeCount) likeCount.textContent = video.likes || 0;
+        }
+        
+        const commentBtn = slide.querySelector('.comment-btn');
+        if (commentBtn) {
+            commentBtn.dataset.streamId = video.id;
+            const commentCount = commentBtn.querySelector('.comment-count');
+            if (commentCount) commentCount.textContent = video.commentsCount || 0;
+        }
+        
+        const shareBtn = slide.querySelector('.share-btn');
+        if (shareBtn) {
+            shareBtn.dataset.streamId = video.id;
+        }
+        
+        // Update author image
+        const authorAvatar = slide.querySelector('.video-author-avatar');
+        if (authorAvatar) {
+            authorAvatar.src = video.authorImage || 'images-defaultse-profile.jpg';
+            authorAvatar.alt = video.authorName;
+        }
+        
+        // Update author click handler
+        const authorDiv = slide.querySelector('.video-author');
+        if (authorDiv) {
+            authorDiv.onclick = () => navigateToUserProfile(video.authorId);
+        }
+        
+        // Re-attach event listeners if needed
+        this.setupVideoSlideEventListeners(slide, video);
+    }
+
+    setupVideoSlideEventListeners(slide, video) {
+        const likeBtn = slide.querySelector('.like-btn');
+        const commentBtn = slide.querySelector('.comment-btn');
+        const shareBtn = slide.querySelector('.share-btn');
+        const seeMoreBtn = slide.querySelector('.video-see-more');
+        const progressContainer = slide.querySelector('.video-progress-container');
+        
+        // Remove existing listeners
+        const newLikeBtn = likeBtn.cloneNode(true);
+        if (likeBtn.parentNode) {
+            likeBtn.parentNode.replaceChild(newLikeBtn, likeBtn);
+        }
+        
+        const newCommentBtn = commentBtn.cloneNode(true);
+        if (commentBtn.parentNode) {
+            commentBtn.parentNode.replaceChild(newCommentBtn, commentBtn);
+        }
+        
+        const newShareBtn = shareBtn.cloneNode(true);
+        if (shareBtn.parentNode) {
+            shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
+        }
+        
+        // Add new listeners
+        if (newLikeBtn) {
+            newLikeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleLike(video.id, newLikeBtn);
+            });
+        }
+        
+        if (newCommentBtn) {
+            newCommentBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openCommentsModal(video.id);
+            });
+        }
+        
+        if (newShareBtn) {
+            newShareBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.shareVideo(video.id);
+            });
+        }
+        
+        if (seeMoreBtn) {
+            seeMoreBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleDescription(video.id);
+            });
+        }
+        
+        if (progressContainer) {
+            progressContainer.addEventListener('mousedown', (e) => this.handleProgressClick(e, video.id));
+            progressContainer.addEventListener('touchstart', (e) => this.handleProgressClick(e, video.id));
+        }
+    }
+
+    showVideo(index) {
+        if (index < 0 || index >= this.videos.length) return;
+        
+        // Remove active/next classes from all slides
+        this.videoElements.forEach((videoData, videoId) => {
+            if (videoData.slide) {
+                videoData.slide.classList.remove('active', 'next');
+            }
+        });
+        
+        const currentSlide = this.videoElements.get(this.videos[index].id)?.slide;
+        if (currentSlide) {
+            currentSlide.classList.add('active');
+            this.currentIndex = index;
+            const videoId = this.videos[index].id;
+            this.loadAndPlayVideo(videoId);
+            
+            // Add next class to next slide if exists
+            if (index + 1 < this.videos.length) {
+                const nextVideoId = this.videos[index + 1].id;
+                const nextSlide = this.videoElements.get(nextVideoId)?.slide;
+                if (nextSlide) {
+                    nextSlide.classList.add('next');
+                    
+                    // Preload next video from cache if available
+                    const cachedVideo = videoCache.getCachedVideo(nextVideoId);
+                    if (cachedVideo && cachedVideo.loaded) {
+                        // Video is already cached, no need to preload
+                    }
+                }
+            }
+            
+            // Cache more videos
+            videoCache.cacheVideos(this.videos, index + 1);
+        }
+    }
+
+    changeVideo(newIndex) {
+        if (newIndex < 0 || newIndex >= this.videos.length) return;
+        
+        this.pauseCurrentVideo();
+        
+        if (this.currentIndex >= 0 && this.currentIndex < this.videos.length) {
+            const prevVideoId = this.videos[this.currentIndex].id;
+            if (currentUser) {
+                streamManager.removeViewer(prevVideoId);
+            }
+        }
+        
+        this.showVideo(newIndex);
+        
+        const newVideoId = this.videos[newIndex].id;
+        if (currentUser) {
+            streamManager.addViewer(newVideoId);
+        }
+    }
+
+    async loadAndPlayVideo(videoId) {
+        const videoData = this.videoElements.get(videoId);
+        if (!videoData) return;
+        
+        const { slide, loadingElement } = videoData;
+        let videoElement = slide.querySelector(`#video-${videoId}`);
+        if (!videoElement) return;
+        
+        // Check if video is cached
+        const cachedVideo = videoCache.getCachedVideo(videoId);
+        if (cachedVideo && cachedVideo.loaded) {
+            // Use cached video element
+            const newVideoElement = cachedVideo.element.cloneNode();
+            newVideoElement.id = `video-${videoId}`;
+            newVideoElement.poster = videoElement.poster;
+            
+            // Replace existing video element
+            const videoContainer = slide.querySelector('.video-container');
+            const existingVideo = slide.querySelector(`#video-${videoId}`);
+            if (existingVideo) {
+                existingVideo.remove();
+            }
+            videoContainer.prepend(newVideoElement);
+            videoElement = newVideoElement;
+        }
+        
+        videoData.videoElement = videoElement;
+        
+        // Pause other videos
+        this.videoElements.forEach((data, id) => {
+            if (id !== videoId && data.videoElement && !data.videoElement.paused) {
+                data.videoElement.pause();
+                if (data.loadingElement) {
+                    data.loadingElement.style.display = 'none';
+                }
+            }
+        });
+        
+        if (!videoElement.dataset.listenersAdded) {
+            videoElement.addEventListener('loadeddata', () => {
+                if (loadingElement) {
+                    loadingElement.style.display = 'none';
+                }
+                videoElement.style.display = 'block';
+                this.playCurrentVideo();
+            });
+            
+            videoElement.addEventListener('canplay', () => {
+                if (loadingElement) {
+                    loadingElement.style.display = 'none';
+                }
+                videoElement.style.display = 'block';
+            });
+            
+            videoElement.addEventListener('waiting', () => {
+                if (loadingElement) {
+                    loadingElement.style.display = 'block';
+                }
+            });
+            
+            videoElement.addEventListener('playing', () => {
+                if (loadingElement) {
+                    loadingElement.style.display = 'none';
+                }
+            });
+            
+            videoElement.addEventListener('timeupdate', () => {
+                this.updateProgressBar(videoId);
+            });
+            
+            videoElement.addEventListener('loadedmetadata', () => {
+                this.setupProgressBar(videoId);
+            });
+            
+            videoElement.addEventListener('error', (e) => {
+                console.error('Video error:', e);
+                if (loadingElement) {
+                    loadingElement.innerHTML = `
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <div>Failed to load video</div>
+                        <button onclick="tiktokFeedInstance.retryVideo('${videoId}')" 
+                                style="margin-top: 10px; padding: 5px 10px; background: #ff2d55; border: none; border-radius: 5px; color: white; cursor: pointer;">
+                            Retry
+                        </button>
+                    `;
+                }
+            });
+            
+            videoElement.dataset.listenersAdded = 'true';
+        }
+        
+        if (loadingElement) {
+            loadingElement.style.display = 'block';
+            loadingElement.innerHTML = `
+                <i class="fas fa-spinner fa-spin"></i>
+                <div>Loading video...</div>
+            `;
+        }
+        
+        // Only reload if needed
+        const currentVideo = this.videos.find(v => v.id === videoId);
+        if (currentVideo && (!videoElement.src || videoElement.src !== currentVideo.videoUrl)) {
+            videoElement.src = currentVideo.videoUrl;
+            videoElement.load();
+        } else if (videoElement.readyState >= 2) {
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            videoElement.style.display = 'block';
+            this.playCurrentVideo();
+        }
+    }
+
+    setupProgressBar(videoId) {
+        const videoData = this.videoElements.get(videoId);
+        if (!videoData || !videoData.progressFill || !videoData.videoElement) return;
+        
+        videoData.progressFill.style.width = '0%';
+        if (videoData.progressHandle) {
+            videoData.progressHandle.style.opacity = '0';
+        }
+    }
+
+    updateProgressBar(videoId) {
+        const videoData = this.videoElements.get(videoId);
+        if (!videoData || !videoData.progressFill || !videoData.videoElement || !videoData.videoElement.duration) return;
+        
+        const progress = (videoData.videoElement.currentTime / videoData.videoElement.duration) * 100;
+        videoData.progressFill.style.width = `${progress}%`;
+    }
+
+    handleProgressClick(e, videoId) {
+        const videoData = this.videoElements.get(videoId);
+        if (!videoData || !videoData.videoElement || !videoData.progressContainer) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const rect = videoData.progressContainer.getBoundingClientRect();
+        const clickX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const percent = Math.max(0, Math.min(1, (clickX - rect.left) / rect.width));
+        
+        videoData.videoElement.currentTime = percent * videoData.videoElement.duration;
+        this.updateProgressBar(videoId);
+        
+        if (videoData.progressHandle) {
+            videoData.progressHandle.style.opacity = '1';
+            
+            setTimeout(() => {
+                if (videoData.progressHandle) {
+                    videoData.progressHandle.style.opacity = '0';
+                }
+            }, 1000);
+        }
+    }
+
+    toggleDescription(videoId) {
+        const videoData = this.videoElements.get(videoId);
+        if (!videoData || !videoData.descriptionElement || !videoData.seeMoreBtn) return;
+        
+        const video = this.videos.find(v => v.id === videoId);
+        if (!video) return;
+        
+        const fullDescription = video.description || '';
+        const isExpanded = videoData.descriptionElement.style.webkitLineClamp === 'unset';
+        
+        if (isExpanded) {
+            videoData.descriptionElement.style.webkitLineClamp = '3';
+            videoData.descriptionElement.textContent = fullDescription.substring(0, 100) + '...';
+            videoData.seeMoreBtn.textContent = 'See More';
+        } else {
+            videoData.descriptionElement.style.webkitLineClamp = 'unset';
+            videoData.descriptionElement.textContent = fullDescription;
+            videoData.seeMoreBtn.textContent = 'See Less';
+        }
+    }
+
+    playCurrentVideo() {
+        if (this.currentIndex >= 0 && this.currentIndex < this.videos.length) {
+            const videoId = this.videos[this.currentIndex].id;
+            const videoData = this.videoElements.get(videoId);
+            
+            if (videoData && videoData.videoElement) {
+                const playPromise = videoData.videoElement.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.log('Auto-play prevented:', error);
+                    });
+                }
+            }
+        }
+    }
+
+    pauseCurrentVideo() {
+        if (this.currentIndex >= 0 && this.currentIndex < this.videos.length) {
+            const videoId = this.videos[this.currentIndex].id;
+            const videoData = this.videoElements.get(videoId);
+            
+            if (videoData && videoData.videoElement) {
+                videoData.videoElement.pause();
+            }
+        }
+    }
+
+    retryVideo(videoId) {
+        const videoData = this.videoElements.get(videoId);
+        if (videoData && videoData.videoElement) {
+            const videoElement = videoData.videoElement;
+            videoElement.src = videoElement.src;
+            videoElement.load();
+        }
+    }
+
+    adjustVideoSizes() {
+        this.videoElements.forEach((videoData, videoId) => {
+            if (videoData.videoElement) {
+                const container = videoData.slide.querySelector('.video-container');
+                if (container) {
+                    const containerWidth = container.offsetWidth;
+                    const containerHeight = container.offsetHeight;
+                    
+                    // Adjust video size to fit container while maintaining aspect ratio
+                    videoData.videoElement.style.width = '100%';
+                    videoData.videoElement.style.height = '100%';
+                    videoData.videoElement.style.objectFit = 'cover';
+                }
+            }
+        });
+    }
+
+    async handleLike(streamId, button) {
+        if (button.classList.contains('processing')) return;
+        button.classList.add('processing');
+        
+        try {
+            const result = await streamManager.handleLike(streamId, button);
+            
+            if (result) {
+                const likeCount = button.querySelector('.side-action-count');
+                const likeIcon = button.querySelector('.side-action-icon i');
+                
+                if (button.classList.contains('liked')) {
+                    button.classList.remove('liked');
+                    likeIcon.className = 'far fa-heart';
+                    if (likeCount) {
+                        const currentCount = parseInt(likeCount.textContent) || 0;
+                        likeCount.textContent = Math.max(0, currentCount - 1);
+                    }
+                } else {
+                    button.classList.add('liked');
+                    likeIcon.className = 'fas fa-heart';
+                    if (likeCount) {
+                        const currentCount = parseInt(likeCount.textContent) || 0;
+                        likeCount.textContent = currentCount + 1;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error liking video:', error);
+        } finally {
+            button.classList.remove('processing');
+        }
+    }
+
+    openCommentsModal(streamId) {
+        this.currentStreamId = streamId;
+        if (this.commentsModal) {
+            this.commentsModal.classList.add('active');
+            this.loadComments(streamId);
+        }
+    }
+
+    closeCommentsModal() {
+        if (this.commentsModal) {
+            this.commentsModal.classList.remove('active');
+            this.currentStreamId = null;
+            this.clearReply();
+        }
+        
+        if (this.currentStreamId && activeCommentListeners.has(this.currentStreamId)) {
+            const unsubscribe = activeCommentListeners.get(this.currentStreamId);
+            unsubscribe();
+            activeCommentListeners.delete(this.currentStreamId);
+        }
+    }
+
+    clearReply() {
+        this.replyTo = null;
+        const modalCommentInput = document.getElementById('modalCommentInput');
+        if (modalCommentInput) {
+            modalCommentInput.removeAttribute('data-reply-to');
+            modalCommentInput.removeAttribute('data-reply-user-name');
+        }
+    }
+
+    async loadComments(streamId) {
+        if (!this.modalCommentsList) return;
+
+        try {
+            await streamManager.loadComments(streamId, this.modalCommentsList);
+            this.modalCommentsList.scrollTop = this.modalCommentsList.scrollHeight;
+        } catch (error) {
+            console.error('Error loading comments:', error);
+            this.modalCommentsList.innerHTML = '<div class="error">Error loading comments</div>';
+        }
+    }
+
+    async handleAddComment() {
+        if (!this.currentStreamId || !this.modalCommentInput) return;
+
+        const commentText = this.modalCommentInput.value.trim();
         if (!commentText) {
             alert('Please enter a comment');
             return;
         }
 
+        let replyTo = null;
+        const replyToCommentId = this.modalCommentInput.getAttribute('data-reply-to');
+        const replyToUserName = this.modalCommentInput.getAttribute('data-reply-user-name');
+        
+        if (replyToCommentId && replyToUserName && commentText.startsWith(`@${replyToUserName} `)) {
+            replyTo = {
+                commentId: replyToCommentId,
+                userName: replyToUserName,
+                userId: await this.getUserIdFromComment(replyToCommentId)
+            };
+        }
+
         try {
-            const success = await streamManager.handleAddComment(this.currentVideo.id, commentText);
+            const success = await streamManager.handleAddComment(this.currentStreamId, commentText, replyTo);
             if (success) {
-                this.commentInput.value = '';
-                this.loadComments();
+                this.modalCommentInput.value = '';
+                this.clearReply();
                 
-                const commentsElement = this.modal.querySelector('#modalVideoComments span');
-                if (commentsElement) {
-                    const current = parseInt(commentsElement.textContent) || 0;
-                    commentsElement.textContent = current + 1;
-                }
-                
-                if (videoGridInstance) {
-                    videoGridInstance.renderGrid();
+                const currentVideo = this.videos.find(v => v.id === this.currentStreamId);
+                if (currentVideo) {
+                    const commentCount = document.querySelector(`.comment-btn[data-stream-id="${this.currentStreamId}"] .side-action-count`);
+                    if (commentCount) {
+                        const currentCount = parseInt(commentCount.textContent) || 0;
+                        commentCount.textContent = currentCount + 1;
+                    }
+                    currentVideo.commentsCount = (currentVideo.commentsCount || 0) + 1;
                 }
             }
         } catch (error) {
             console.error('Error adding comment:', error);
             alert('Error adding comment: ' + error.message);
         }
+    }
+
+    async getUserIdFromComment(commentId) {
+        try {
+            const commentRef = doc(db, 'streams', this.currentStreamId, 'comments', commentId);
+            const commentSnap = await getDoc(commentRef);
+            if (commentSnap.exists()) {
+                return commentSnap.data().userId;
+            }
+        } catch (error) {
+            console.error('Error getting user ID from comment:', error);
+        }
+        return null;
+    }
+
+    shareVideo(streamId) {
+        const stream = this.videos.find(v => v.id === streamId);
+        if (!stream) return;
+        
+        const shareText = `Check out this video on WhipRoom: ${stream.headline}`;
+        const shareUrl = window.location.origin + '/stream.html';
+        
+        if (navigator.share) {
+            navigator.share({
+                title: stream.headline,
+                text: stream.description || shareText,
+                url: shareUrl
+            }).catch(error => {
+                console.log('Share cancelled or failed:', error);
+            });
+        } else {
+            navigator.clipboard.writeText(`${shareText}\n${shareUrl}`)
+                .then(() => alert('Link copied to clipboard!'))
+                .catch(err => console.error('Failed to copy:', err));
+        }
+    }
+
+    updateTotalViewers(streams) {
+        const totalViewersSpan = document.getElementById('totalViewers');
+        if (totalViewersSpan) {
+            const total = streams.reduce((sum, stream) => sum + (stream.currentViewers || 0), 0);
+            totalViewersSpan.textContent = total;
+        }
+    }
+
+    hideSwipeIndicator() {
+        setTimeout(() => {
+            const indicator = document.getElementById('swipeIndicator');
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+        }, 3000);
+    }
+
+    cleanup() {
+        this.pauseCurrentVideo();
+        
+        if (this.currentIndex >= 0 && this.currentIndex < this.videos.length && currentUser) {
+            const currentVideoId = this.videos[this.currentIndex].id;
+            streamManager.removeViewer(currentVideoId);
+        }
+        
+        activeCommentListeners.forEach(unsubscribe => unsubscribe());
+        activeCommentListeners.clear();
+        
+        if (clickTimeout) {
+            clearTimeout(clickTimeout);
+        }
+        
+        videoCache.clearCache();
     }
 }
 
@@ -2339,6 +2896,7 @@ function markStreamAsViewed(streamId) {
     saveViewedStreams();
 }
 
+// Function to navigate to user profile
 function navigateToUserProfile(userId) {
     if (userId && userId !== currentUser?.uid) {
         window.location.href = `profile.html?id=${userId}`;
@@ -2347,6 +2905,7 @@ function navigateToUserProfile(userId) {
     }
 }
 
+// Function to load user videos in profile page
 async function loadUserVideos(userId) {
     try {
         const videosContainer = document.getElementById('userVideosGrid');
@@ -2428,25 +2987,15 @@ async function loadUserVideos(userId) {
     }
 }
 
+// Function to open video modal
 function openVideoModal(videoId) {
     if (!videoModalInstance) {
         videoModalInstance = new VideoModal();
     }
-    
-    if (videoGridInstance) {
-        const video = videoGridInstance.videos.find(v => v.id === videoId);
-        if (video) {
-            const userId = video.authorId;
-            const userVideos = videoGridInstance.userVideos.get(userId) || [];
-            const currentIndex = userVideos.findIndex(v => v.id === videoId);
-            
-            videoModalInstance.open(videoId, userVideos, currentIndex);
-        }
-    } else {
-        videoModalInstance.open(videoId, [], 0);
-    }
+    videoModalInstance.open(videoId);
 }
 
+// Get video thumbnail
 function getVideoThumbnail(stream) {
     if (!stream) {
         return 'images-defaultse-profile.jpg';
@@ -2463,6 +3012,7 @@ function getVideoThumbnail(stream) {
     return 'images-defaultse-profile.jpg';
 }
 
+// Auth state management
 function initializeAuth() {
     return new Promise((resolve) => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -2491,23 +3041,25 @@ function initializeAuth() {
     });
 }
 
-async function initializeVideoGrid() {
+// Initialize TikTok feed
+async function initializeTikTokFeed() {
     try {
         await initializeAuth();
         
-        if (document.getElementById('videoGrid')) {
-            videoGridInstance = new VideoGrid();
-            window.videoGridInstance = videoGridInstance;
+        if (document.getElementById('tiktokContainer')) {
+            tiktokFeedInstance = new TikTokFeed();
+            window.tiktokFeedInstance = tiktokFeedInstance;
             
             streamManager.initializeActivityTracking();
             
-            console.log('Video grid initialized successfully');
+            console.log('TikTok feed initialized successfully');
         }
     } catch (error) {
-        console.error('Error initializing video grid:', error);
+        console.error('Error initializing TikTok feed:', error);
     }
 }
 
+// Initialize stream functionality based on current page
 async function initializeStreamPage() {
     const currentPage = window.location.pathname.split('/').pop().split('.')[0];
     
@@ -2522,8 +3074,8 @@ async function initializeStreamPage() {
             initializePostStreamPage();
             break;
         case 'stream':
-            if (document.getElementById('videoGrid')) {
-                initializeVideoGrid();
+            if (document.getElementById('tiktokContainer')) {
+                initializeTikTokFeed();
             } else {
                 initializeStreamsPage();
             }
@@ -2534,6 +3086,7 @@ async function initializeStreamPage() {
     }
 }
 
+// Initialize profile page videos
 function initializeProfilePageVideos() {
     const urlParams = new URLSearchParams(window.location.search);
     const profileId = urlParams.get('id') || currentUser?.uid;
@@ -2556,6 +3109,7 @@ function initializeProfilePageVideos() {
     }
 }
 
+// Initialize post stream page
 function initializePostStreamPage() {
     const streamForm = document.getElementById('streamForm');
     const videoFileInput = document.getElementById('videoFile');
@@ -2569,6 +3123,7 @@ function initializePostStreamPage() {
         return;
     }
 
+    // Remove URL upload option if it exists
     const urlSection = document.getElementById('urlSection');
     const urlOption = document.querySelector('.upload-option[data-method="url"]');
     if (urlSection) urlSection.remove();
@@ -2725,6 +3280,7 @@ function initializePostStreamPage() {
     }
 }
 
+// Initialize streams page (grid view)
 function initializeStreamsPage() {
     const streamsContainer = document.getElementById('streamsContainer');
     
@@ -2757,6 +3313,7 @@ function initializeStreamsPage() {
     streamManager.initializeActivityTracking();
 }
 
+// Load streams function for grid view
 function loadStreams(category) {
     const streamsContainer = document.getElementById('streamsContainer');
     if (!streamsContainer) return;
@@ -2784,6 +3341,7 @@ function loadStreams(category) {
         });
 }
 
+// Render streams function for grid view
 function renderStreams(streams) {
     const streamsContainer = document.getElementById('streamsContainer');
     if (!streamsContainer) return;
@@ -2911,6 +3469,7 @@ function renderStreams(streams) {
     });
 }
 
+// Toggle comments function for stream cards
 function toggleStreamComments(streamId) {
     const commentsSection = document.getElementById(`comments-${streamId}`);
     if (commentsSection) {
@@ -2926,6 +3485,7 @@ function toggleStreamComments(streamId) {
     }
 }
 
+// Handle add comment for stream cards
 function handleAddComment(streamId) {
     if (!currentUser) {
         alert('Please login to add comments');
@@ -2957,6 +3517,7 @@ function handleAddComment(streamId) {
     });
 }
 
+// Update total viewers function
 function updateTotalViewers(streams) {
     const totalViewersSpan = document.getElementById('totalViewers');
     if (totalViewersSpan) {
@@ -2965,6 +3526,7 @@ function updateTotalViewers(streams) {
     }
 }
 
+// Helper functions
 function formatCategory(category) {
     if (!category) return 'Uncategorized';
     return category.split('-').map(word => 
@@ -2993,6 +3555,7 @@ function formatTime(timestamp) {
     }
 }
 
+// Handle logout
 function setupLogout() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -3008,33 +3571,7 @@ function setupLogout() {
     }
 }
 
-// WhatsApp Stories initialization
-async function initializeWhatsAppStories() {
-    if (!document.querySelector('.posts-header')) return;
-    
-    try {
-        await initializeAuth();
-        
-        if (currentUser) {
-            whatsappStoriesInstance = new WhatsAppStories();
-            window.whatsappStoriesInstance = whatsappStoriesInstance;
-            
-            console.log('WhatsApp stories initialized successfully');
-        }
-    } catch (error) {
-        console.error('Error initializing WhatsApp stories:', error);
-    }
-}
-
-// Initialize WhatsApp stories on posts page
-if (window.location.pathname.includes('posts.html')) {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-            initializeWhatsAppStories();
-        }, 1000);
-    });
-}
-
+// Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', async () => {
     setupLogout();
     
@@ -3068,13 +3605,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// Export for use in other files
 window.streamManager = streamManager;
-window.videoGridInstance = videoGridInstance;
-window.whatsappStoriesInstance = whatsappStoriesInstance;
+window.tiktokFeedInstance = tiktokFeedInstance;
 
+// Make functions globally available for HTML onclick
+window.handleTikTokLike = (streamId, button) => {
+    if (tiktokFeedInstance) {
+        tiktokFeedInstance.handleLike(streamId, button);
+    }
+};
+
+window.openTikTokComments = (streamId) => {
+    if (tiktokFeedInstance) {
+        tiktokFeedInstance.openCommentsModal(streamId);
+    }
+};
+
+window.shareTikTokVideo = (streamId) => {
+    if (tiktokFeedInstance) {
+        tiktokFeedInstance.shareVideo(streamId);
+    }
+};
+
+window.retryTikTokVideo = (videoId) => {
+    if (tiktokFeedInstance) {
+        tiktokFeedInstance.retryVideo(videoId);
+    }
+};
+
+// Make video modal function globally available
 window.openVideoModal = openVideoModal;
+
+// Make profile navigation function globally available
 window.navigateToUserProfile = navigateToUserProfile;
+
+// Make user videos loading function globally available
 window.loadUserVideos = loadUserVideos;
+
 window.getVideoThumbnail = getVideoThumbnail;
 window.formatCategory = formatCategory;
 window.formatTime = formatTime;
