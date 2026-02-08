@@ -65,243 +65,524 @@
             stroke-linejoin: round;
             fill: none;
         }
-/* Add this to your CSS file, likely in styles.css or a dedicated styles file */
 
-/* Message button styling for gamers directory */
-.message-gamer-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-    flex-shrink: 0;
-    margin-left: 8px;
-}
+        /* Tournament Table */
+        .tournament-table {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            max-width: 1200px;
+            margin: 20px auto;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
 
-.message-gamer-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
-}
+        .tournament-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
 
-.message-gamer-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
-}
+        .tournament-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-.message-gamer-btn .feather {
-    width: 16px;
-    height: 16px;
-    stroke: white;
-    stroke-width: 2;
-}
+        .tournament-title .feather {
+            width: 24px;
+            height: 24px;
+            stroke: white;
+        }
 
-/* Tooltip for message button */
-.message-gamer-btn::after {
-    content: attr(title);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    white-space: nowrap;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s ease;
-    pointer-events: none;
-    z-index: 1000;
-    margin-bottom: 8px;
-}
+        .tournament-countdown {
+            font-size: 0.9rem;
+            color: #ffd700;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
 
-.message-gamer-btn:hover::after {
-    opacity: 1;
-    visibility: visible;
-}
+        .tournament-content {
+            padding: 20px;
+        }
 
-/* Update the gamer-actions container to accommodate the new button */
-.gamer-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    position: relative;
-    z-index: 2;
-}
+        .tournament-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
 
-/* Update existing clan-section styling if needed */
-.clan-section {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 4px;
-}
+        .tournament-detail {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: var(--bg-light);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
 
-.clan-count {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text-light);
-    background: var(--bg-secondary);
-    padding: 4px 8px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-}
+        .tournament-detail .feather {
+            width: 18px;
+            height: 18px;
+            color: var(--primary-light);
+        }
 
-.clan-count .feather {
-    width: 12px;
-    height: 12px;
-    stroke: var(--text-light);
-}
+        .detail-label {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
 
-/* Update the button row in gamer-actions */
-.gamer-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
+        .detail-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
 
-/* For larger screens, you might want a row layout */
-@media (min-width: 768px) {
-    .gamer-actions {
-        flex-direction: row;
-        gap: 12px;
-    }
-    
-    .message-gamer-btn {
-        margin-left: 0;
-    }
-}
+        .prize-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-light);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
 
-/* Update existing .add-clan-btn styling to work better with new button */
-.add-clan-btn {
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 20px;
-    padding: 8px 16px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(255, 42, 109, 0.2);
-}
+        .prize-table th {
+            background: rgba(179, 0, 75, 0.2);
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
+        }
 
-.add-clan-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(255, 42, 109, 0.3);
-}
+        .prize-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
 
-.add-clan-btn.added {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-}
+        .prize-table tr:last-child td {
+            border-bottom: none;
+        }
 
-.add-clan-btn.added:hover {
-    background: var(--bg-primary);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
+        .prize-amount {
+            color: #ffd700;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
 
-.add-clan-btn .feather {
-    width: 14px;
-    height: 14px;
-    stroke: currentColor;
-}
+        .tournament-games {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
 
-/* Loading state adjustments */
-.gamer-item.loading .message-gamer-btn,
-.gamer-item.loading .add-clan-btn {
-    background: var(--bg-secondary);
-    cursor: default;
-}
+        .game-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-primary);
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
 
-/* Animation for the message button */
-@keyframes pulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 6px rgba(102, 126, 234, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
-    }
-}
+        .game-badge .feather {
+            width: 16px;
+            height: 16px;
+            color: #00ff88;
+        }
 
-/* Add pulse animation for new/unread messages indicator */
-.message-gamer-btn.has-unread {
-    animation: pulse 2s infinite;
-    position: relative;
-}
+        /* Popup Notification */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            padding: 20px;
+        }
 
-.message-gamer-btn.has-unread::before {
-    content: '';
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background: #ff2a6d;
-    border-radius: 50%;
-    border: 2px solid white;
-    z-index: 1;
-}
+        .popup-content {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            max-width: 500px;
+            width: 100%;
+            border: 2px solid var(--primary);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            animation: popupIn 0.3s ease-out;
+        }
 
-/* For dark mode support */
-@media (prefers-color-scheme: dark) {
-    .message-gamer-btn {
-        background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
-    }
-    
-    .message-gamer-btn:hover {
-        background: linear-gradient(135deg, #4a5fc7 0%, #5a307f 100%);
-    }
-    
-    .message-gamer-btn::after {
-        background: rgba(255, 255, 255, 0.9);
-        color: #333;
-    }
-}
+        @keyframes popupIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
 
-/* Responsive adjustments for mobile */
-@media (max-width: 480px) {
-    .gamer-actions {
-        flex-direction: column;
-        gap: 6px;
-    }
-    
-    .message-gamer-btn {
-        width: 32px;
-        height: 32px;
-    }
-    
-    .message-gamer-btn .feather {
-        width: 14px;
-        height: 14px;
-    }
-    
-    .add-clan-btn {
-        padding: 6px 12px;
-        font-size: 11px;
-    }
-}
+        .popup-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .popup-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .popup-title .feather {
+            width: 24px;
+            height: 24px;
+            stroke: white;
+        }
+
+        .popup-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: background 0.3s ease;
+        }
+
+        .popup-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .popup-body {
+            padding: 25px;
+        }
+
+        .popup-message {
+            margin-bottom: 20px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .premium-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin: 5px 0;
+        }
+
+        .popup-footer {
+            padding: 20px;
+            background: var(--bg-light);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .btn-mark-read {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-mark-read:hover {
+            background: var(--bg-light);
+        }
+
+        .btn-view-details {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-view-details:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+        }
+
+        /* Message button styling for gamers directory */
+        .message-gamer-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
+
+        .message-gamer-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
+        }
+
+        .message-gamer-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+        }
+
+        .message-gamer-btn .feather {
+            width: 16px;
+            height: 16px;
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        /* Tooltip for message button */
+        .message-gamer-btn::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 1000;
+            margin-bottom: 8px;
+        }
+
+        .message-gamer-btn:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Update the gamer-actions container to accommodate the new button */
+        .gamer-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Update existing clan-section styling if needed */
+        .clan-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 4px;
+        }
+
+        .clan-count {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--text-light);
+            background: var(--bg-secondary);
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .clan-count .feather {
+            width: 12px;
+            height: 12px;
+            stroke: var(--text-light);
+        }
+
+        /* Update the button row in gamer-actions */
+        .gamer-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* For larger screens, you might want a row layout */
+        @media (min-width: 768px) {
+            .gamer-actions {
+                flex-direction: row;
+                gap: 12px;
+            }
+            
+            .message-gamer-btn {
+                margin-left: 0;
+            }
+        }
+
+        /* Update existing .add-clan-btn styling to work better with new button */
+        .add-clan-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(255, 42, 109, 0.2);
+        }
+
+        .add-clan-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 42, 109, 0.3);
+        }
+
+        .add-clan-btn.added {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .add-clan-btn.added:hover {
+            background: var(--bg-primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .add-clan-btn .feather {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+        }
+
+        /* Loading state adjustments */
+        .gamer-item.loading .message-gamer-btn,
+        .gamer-item.loading .add-clan-btn {
+            background: var(--bg-secondary);
+            cursor: default;
+        }
+
+        /* Animation for the message button */
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 6px rgba(102, 126, 234, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+            }
+        }
+
+        /* Add pulse animation for new/unread messages indicator */
+        .message-gamer-btn.has-unread {
+            animation: pulse 2s infinite;
+            position: relative;
+        }
+
+        .message-gamer-btn.has-unread::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background: #ff2a6d;
+            border-radius: 50%;
+            border: 2px solid white;
+            z-index: 1;
+        }
+
+        /* For dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .message-gamer-btn {
+                background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
+            }
+            
+            .message-gamer-btn:hover {
+                background: linear-gradient(135deg, #4a5fc7 0%, #5a307f 100%);
+            }
+            
+            .message-gamer-btn::after {
+                background: rgba(255, 255, 255, 0.9);
+                color: #333;
+            }
+        }
+
+        /* Responsive adjustments for mobile */
+        @media (max-width: 480px) {
+            .gamer-actions {
+                flex-direction: column;
+                gap: 6px;
+            }
+            
+            .message-gamer-btn {
+                width: 32px;
+                height: 32px;
+            }
+            
+            .message-gamer-btn .feather {
+                width: 14px;
+                height: 14px;
+            }
+            
+            .add-clan-btn {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+        }
+
         /* Top Navigation */
         .top-nav {
             background: rgba(255, 255, 255, 0.06);
@@ -812,6 +1093,28 @@
                 font-size: 1.4rem;
             }
 
+            .tournament-info {
+                grid-template-columns: 1fr;
+            }
+            
+            .prize-table th,
+            .prize-table td {
+                padding: 10px 12px;
+                font-size: 0.9rem;
+            }
+            
+            .popup-body {
+                padding: 20px;
+            }
+            
+            .popup-footer {
+                flex-direction: column;
+            }
+            
+            .popup-footer button {
+                width: 100%;
+            }
+
             .gamer-item {
                 padding: 10px;
                 gap: 10px;
@@ -846,6 +1149,25 @@
         }
 
         @media (max-width: 480px) {
+            .tournament-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+            
+            .tournament-title {
+                font-size: 1.1rem;
+            }
+            
+            .tournament-countdown {
+                align-self: flex-start;
+            }
+            
+            .game-badge {
+                font-size: 0.85rem;
+                padding: 6px 12px;
+            }
+
             .gamer-header {
                 flex-direction: column;
                 align-items: flex-start;
@@ -1013,20 +1335,120 @@
                 </svg>
                 BondBase Gamers
             </a>
-                      <div class="notification-top">
-    <a href="notification.html" class="notification-link">
-        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-        </svg>
-        <span class="notification-badge">0</span>
-    </a>
-</div>
+            <div class="notification-top">
+                <a href="notification.html" class="notification-link">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="notification-badge">0</span>
+                </a>
+            </div>
         </div>
     </nav>
 
     <!-- Main Content -->
     <div class="main-content">
+        <!-- Tournament Table -->
+        <div class="tournament-table">
+            <div class="tournament-header">
+                <h2 class="tournament-title">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    NEXT TOURNAMENT: ELITE SHOWDOWN
+                </h2>
+                <div class="tournament-countdown">IN 2 WEEKS</div>
+            </div>
+            <div class="tournament-content">
+                <div class="tournament-info">
+                    <div class="tournament-detail">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                        </svg>
+                        <div>
+                            <div class="detail-label">PRIZE POOL</div>
+                            <div class="detail-value">$1,200 TOTAL</div>
+                        </div>
+                    </div>
+                    <div class="tournament-detail">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <div>
+                            <div class="detail-label">FORMAT</div>
+                            <div class="detail-value">DUOS & SOLOS</div>
+                        </div>
+                    </div>
+                    <div class="tournament-detail">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        <div>
+                            <div class="detail-label">SLOTS</div>
+                            <div class="detail-value">100 TEAMS MAX</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <table class="prize-table">
+                    <thead>
+                        <tr>
+                            <th>PLACE</th>
+                            <th>REWARD</th>
+                            <th>XP BONUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>🥇 1st Place</td>
+                            <td class="prize-amount">$700</td>
+                            <td>+5,000 XP</td>
+                        </tr>
+                        <tr>
+                            <td>🥈 2nd Place</td>
+                            <td class="prize-amount">$500</td>
+                            <td>+3,000 XP</td>
+                        </tr>
+                        <tr>
+                            <td>🥉 3rd Place</td>
+                            <td class="prize-amount">$300</td>
+                            <td>+2,000 XP</td>
+                        </tr>
+                        <tr>
+                            <td>4th-10th</td>
+                            <td>$50 each</td>
+                            <td>+1,000 XP</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="tournament-games">
+                    <div class="game-badge">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        <span>CALL OF DUTY: WARZONE</span>
+                    </div>
+                    <div class="game-badge">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <circle cx="12" cy="12" r="4"></circle>
+                            <line x1="21.17" y1="8" x2="12" y2="8"></line>
+                            <line x1="3.95" y1="6.06" x2="8.54" y2="14"></line>
+                            <line x1="10.88" y1="21.94" x2="15.46" y2="14"></line>
+                        </svg>
+                        <span>FREE FIRE BATTLEGROUNDS</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Page Header -->
         <div class="page-header">
             <h1 class="page-title">Gamers Directory</h1>
@@ -1054,7 +1476,7 @@
                         All
                     </button>
                     <button class="filter-btn" data-filter="online">
-                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <svg class="feather" xmlns="http://.w3.org/2000/svg" viewBox="0 0 24 24">
                             <circle cx="12" cy="12" r="10"></circle>
                         </svg>
                         Online
@@ -1108,6 +1530,64 @@
         </div>
     </div>
 
+    <!-- Popup Notification -->
+    <div id="tournamentPopup" class="popup-overlay">
+        <div class="popup-content">
+            <div class="popup-header">
+                <h3 class="popup-title">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    ELITE TOURNAMENT ALERT!
+                </h3>
+                <button class="popup-close" id="closePopup">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="popup-body">
+                <div class="popup-message">
+                    <p><strong>🔥 ELITE SHOWDOWN TOURNAMENT 🔥</strong></p>
+                    <p>Get ready for the ultimate gaming battle! Our next tournament starts in <strong>2 weeks</strong> with massive prizes up for grabs:</p>
+                    
+                    <ul style="margin: 15px 0; padding-left: 20px; color: var(--text-secondary);">
+                        <li>🥇 1st Place: <strong>$700</strong> + 5,000 XP</li>
+                        <li>🥈 2nd Place: <strong>$500</strong> + 3,000 XP</li>
+                        <li>🥉 3rd Place: <strong>$300</strong> + 2,000 XP</li>
+                    </ul>
+                    
+                    <p>Featured Games: <strong>Call of Duty: Warzone</strong> and <strong>Free Fire Battlegrounds</strong></p>
+                    
+                    <div class="premium-badge">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                        PREMIUM LEVEL 4 ACCESS
+                    </div>
+                    
+                    <p style="margin-top: 10px;"><strong>This tournament is exclusive to Premium Users at Level 4 and above!</strong> Level up your account to participate and compete for these incredible rewards.</p>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="btn-mark-read" id="markAsRead">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Mark as Read
+                </button>
+                <button class="btn-view-details" id="viewTournament">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    View Tournament Details
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Clan Modal -->
     <div id="clanModal" class="clan-modal">
         <div class="clan-modal-content">
@@ -1147,7 +1627,6 @@
     </div>
 
     <!-- Bottom Navigation -->
-        <!-- Bottom Navigation - Updated to match mingle.html with 6 items -->
     <div class="bottom-nav">
         <a href="mingle.html" class="nav-item active">
             <div class="nav-icon">
@@ -1205,20 +1684,109 @@
             </div>
             <span class="nav-label">Groups</span>
         </a>
-
     </div>
 
     <!-- Scripts -->
     <script type="module" src="gamers.js"></script>
     <script type="module" src=""></script>
-     <script type="module" src="notification.js"></script>
+    <script type="module" src="notification.js"></script>
 
-    <!-- Initialize Feather Icons -->
+    <!-- Tournament and Popup Script -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             if (typeof feather !== 'undefined') {
                 feather.replace();
             }
+            
+            // Tournament Popup Logic
+            const tournamentPopup = document.getElementById('tournamentPopup');
+            const closePopup = document.getElementById('closePopup');
+            const markAsRead = document.getElementById('markAsRead');
+            const viewTournament = document.getElementById('viewTournament');
+            
+            // Check if user has already marked the notification as read
+            const hasReadNotification = localStorage.getItem('tournamentNotificationRead');
+            
+            // Show popup if not marked as read (with 2 second delay for better UX)
+            if (!hasReadNotification) {
+                setTimeout(() => {
+                    tournamentPopup.style.display = 'flex';
+                }, 2000);
+            }
+            
+            // Close popup when X button is clicked
+            closePopup.addEventListener('click', function() {
+                tournamentPopup.style.display = 'none';
+            });
+            
+            // Mark as read functionality
+            markAsRead.addEventListener('click', function() {
+                // Store in localStorage that user has read the notification
+                localStorage.setItem('tournamentNotificationRead', 'true');
+                tournamentPopup.style.display = 'none';
+                
+                // Optional: Show a confirmation message
+                showToast('Notification marked as read. You can view tournament details in the top banner.');
+            });
+            
+            // View tournament details
+            viewTournament.addEventListener('click', function() {
+                tournamentPopup.style.display = 'none';
+                // Scroll to tournament table
+                const tournamentTable = document.querySelector('.tournament-table');
+                tournamentTable.scrollIntoView({ behavior: 'smooth' });
+                
+                // Optional: Highlight the tournament table
+                tournamentTable.style.boxShadow = '0 0 0 3px var(--primary)';
+                setTimeout(() => {
+                    tournamentTable.style.boxShadow = 'var(--shadow)';
+                }, 2000);
+            });
+            
+            // Close popup when clicking outside the content
+            tournamentPopup.addEventListener('click', function(e) {
+                if (e.target === tournamentPopup) {
+                    tournamentPopup.style.display = 'none';
+                }
+            });
+            
+            // Helper function to show toast messages
+            function showToast(message) {
+                const toast = document.createElement('div');
+                toast.textContent = message;
+                toast.style.cssText = `
+                    position: fixed;
+                    bottom: 100px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: var(--primary);
+                    color: white;
+                    padding: 12px 20px;
+                    border-radius: var(--radius);
+                    z-index: 3001;
+                    font-weight: 500;
+                    box-shadow: var(--shadow-lg);
+                    animation: fadeInOut 3s ease;
+                `;
+                
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            }
+            
+            // Add CSS for toast animation
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeInOut {
+                    0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+                    10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                    90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                    100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                }
+            `;
+            document.head.appendChild(style);
         });
     </script>
 </body>
