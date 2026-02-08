@@ -1184,7 +1184,7 @@ class EditManager {
                 newInviteCode += chars.charAt(Math.floor(Math.random() * chars.length));
             }
             
-            const newInviteLink = `https://bondlydatingweb.vercel.app/join.html?code=${newInviteCode}`;
+            const newInviteLink = `https://bond-base.vercel.app/join.html?code=${newInviteCode}`;
             
             // Update group in Firebase
             const groupRef = doc(db, 'groups', this.currentGroupId);
