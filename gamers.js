@@ -1300,28 +1300,26 @@ function createProfileItem(profile) {
     const buttonClass = profile.isFollowing ? 'add-clan-btn added' : 'add-clan-btn';
     const followersCount = profile.clanCount || 0;
     
-    // XP Badge - Position it so it doesn't block the avatar
+    // XP Badge - SIMPLIFIED: Just the icon, no level text
     const xpBadge = profile.xpLevel ? `
         <span class="xp-badge" style="
             position: absolute;
             top: 5px;
             right: 5px;
-            background: linear-gradient(135deg, ${profile.xpColor || '#667eea'}, #764ba2);
+            background: ${profile.xpColor || '#667eea'};
             color: white;
-            border-radius: 12px;
-            padding: 2px 8px;
-            font-size: 10px;
-            font-weight: bold;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
             display: flex;
             align-items: center;
-            gap: 3px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            z-index: 2;
-            min-width: 40px;
             justify-content: center;
-        ">
-            <span style="font-size: 12px;">${profile.xpIcon || '🌱'}</span>
-            <span>Lvl ${profile.xpLevel}</span>
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 2;
+            border: 2px solid white;
+        " title="Level ${profile.xpLevel} - ${profile.xpRank}">
+            ${profile.xpIcon || '🌱'}
         </span>
     ` : '';
     
@@ -1346,15 +1344,6 @@ function createProfileItem(profile) {
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                         </svg>
                         ${profile.gamerProfile.rank}
-                    </span>
-                ` : ''}
-                ${profile.xpLevel ? `
-                    <span class="gamer-stat gamer-level" style="color: ${profile.xpColor || '#667eea'};">
-                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                            <polyline points="17 6 23 6 23 12"></polyline>
-                        </svg>
-                        ${profile.xpRank}
                     </span>
                 ` : ''}
                 <span class="gamer-stat" title="${profile.isOnline ? 'Online' : 'Offline'}">
@@ -1581,45 +1570,58 @@ async function addXPDisplayToProfile(profileId) {
                 existingDisplay.remove();
             }
             
-            // Create XP display element
-            const xpDisplay = document.createElement('div');
-            xpDisplay.className = 'profile-xp-display';
-            xpDisplay.style.cssText = `
-                background: linear-gradient(135deg, ${userRank.color || '#667eea'}, #764ba2);
-                color: white;
-                padding: 15px;
-                border-radius: 15px;
-                margin: 20px 0;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            `;
-            
-            xpDisplay.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <div style="font-size: 30px;">${userRank.icon}</div>
-                    <div>
-                        <div style="font-size: 18px; font-weight: bold;">${userRank.title}</div>
-                        <div style="font-size: 14px; opacity: 0.9;">Level ${userRank.level}</div>
-                    </div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 24px; font-weight: bold;">${xpData.totalXP || 0} XP</div>
-                    <div style="font-size: 16px; opacity: 0.9;">${xpData.coins || 0} 🪙 Coins</div>
-                </div>
-            `;
-            
-            // Find where to insert the XP display
-            const profileContainer = document.querySelector('.profile-container, .profile-content');
-            if (profileContainer) {
-                // Insert after the basic profile info
-                const basicInfo = profileContainer.querySelector('.profile-basic-info, .profile-header');
-                if (basicInfo) {
-                    basicInfo.insertAdjacentElement('afterend', xpDisplay);
-                } else {
-                    profileContainer.prepend(xpDisplay);
+            // SIMPLIFIED: Just add an XP icon near the profile picture
+            const profilePic = document.querySelector('.profile-pic, .profile-avatar, [class*="avatar"], img[alt*="profile"]');
+            if (profilePic) {
+                // Remove any existing XP icon
+                const existingXPIcon = profilePic.parentElement.querySelector('.profile-xp-icon');
+                if (existingXPIcon) {
+                    existingXPIcon.remove();
                 }
+                
+                // Create XP icon element
+                const xpIcon = document.createElement('div');
+                xpIcon.className = 'profile-xp-icon';
+                xpIcon.style.cssText = `
+                    position: absolute;
+                    bottom: 0;
+                    right: 0;
+                    background: ${userRank.color || '#667eea'};
+                    color: white;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                    z-index: 10;
+                    border: 3px solid white;
+                    cursor: pointer;
+                `;
+                xpIcon.innerHTML = userRank.icon;
+                xpIcon.title = `Level ${userRank.level} - ${userRank.title}\n${xpData.totalXP || 0} XP • ${xpData.coins || 0} Coins`;
+                
+                // Add hover tooltip effect
+                xpIcon.addEventListener('mouseenter', () => {
+                    xpIcon.style.transform = 'scale(1.1)';
+                    xpIcon.style.boxShadow = '0 5px 15px rgba(0,0,0,0.4)';
+                });
+                
+                xpIcon.addEventListener('mouseleave', () => {
+                    xpIcon.style.transform = 'scale(1)';
+                    xpIcon.style.boxShadow = '0 3px 10px rgba(0,0,0,0.3)';
+                });
+                
+                // Click to show full XP details
+                xpIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showXPTooltip(xpIcon, userRank, xpData);
+                });
+                
+                profilePic.parentElement.style.position = 'relative';
+                profilePic.parentElement.appendChild(xpIcon);
             }
             
             // Add floating triumph icons around profile picture based on user's level
@@ -1631,6 +1633,81 @@ async function addXPDisplayToProfile(profileId) {
     } catch (error) {
         console.error('Error adding XP display to profile:', error);
     }
+}
+
+function showXPTooltip(element, userRank, xpData) {
+    // Remove any existing tooltip
+    const existingTooltip = document.querySelector('.xp-tooltip');
+    if (existingTooltip) {
+        existingTooltip.remove();
+    }
+    
+    // Create tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'xp-tooltip';
+    tooltip.style.cssText = `
+        position: absolute;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        z-index: 1000;
+        min-width: 200px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+        backdrop-filter: blur(10px);
+        animation: fadeIn 0.3s ease;
+    `;
+    
+    tooltip.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <div style="font-size: 24px;">${userRank.icon}</div>
+            <div>
+                <div style="font-weight: bold; font-size: 16px;">${userRank.title}</div>
+                <div style="font-size: 12px; opacity: 0.8;">Level ${userRank.level}</div>
+            </div>
+        </div>
+        <div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span style="opacity: 0.8;">Total XP:</span>
+                <span style="font-weight: bold;">${xpData.totalXP || 0}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="opacity: 0.8;">Coins:</span>
+                <span style="font-weight: bold;">${xpData.coins || 0} 🪙</span>
+            </div>
+        </div>
+    `;
+    
+    // Position tooltip relative to the icon
+    const rect = element.getBoundingClientRect();
+    tooltip.style.top = `${rect.top - tooltip.offsetHeight - 10}px`;
+    tooltip.style.left = `${rect.left + (rect.width / 2) - 100}px`;
+    
+    document.body.appendChild(tooltip);
+    
+    // Add animation style if not exists
+    if (!document.getElementById('xpTooltipAnimations')) {
+        const style = document.createElement('style');
+        style.id = 'xpTooltipAnimations';
+        style.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Close tooltip when clicking outside
+    setTimeout(() => {
+        const closeTooltip = (e) => {
+            if (!tooltip.contains(e.target) && !element.contains(e.target)) {
+                tooltip.remove();
+                document.removeEventListener('click', closeTooltip);
+            }
+        };
+        document.addEventListener('click', closeTooltip);
+    }, 100);
 }
 
 function addTriumphIconsToProfile(profileId, level) {
@@ -1772,7 +1849,7 @@ async function fetchFreshProfileData(profileId) {
             console.log('Could not cache profile detail:', cacheError);
         }
         
-        // Add XP display
+        // Add XP display (icon only)
         await addXPDisplayToProfile(profileId);
         
     } catch (error) {
