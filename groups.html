@@ -460,14 +460,19 @@
             margin-bottom: 70px; /* Space for bottom nav */
         }
 
+        /* Page Header - Updated for better layout */
         .page-header {
             max-width: 1200px;
             margin: 0 auto 30px;
-            display: grid;
-            grid-template:column;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .header-top {
+            display: flex;
             justify-content: space-between;
-            grid-template-columns:1fr;
-            align-items: center;
+            align-items: flex-start;
             flex-wrap: wrap;
             gap: 20px;
         }
@@ -476,40 +481,107 @@
             font-size: 2rem;
             font-weight: 700;
             color: var(--text-primary);
+            flex: 1;
+            min-width: 200px;
         }
 
-        .create-group-btn {
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        /* Main button - takes full width */
+        .main-action-btn {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             border: none;
-            padding: 12px 24px;
+            padding: 14px 24px;
             border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
             display: flex;
-            grid-column:row;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
+            gap: 10px;
             transition: all 0.3s ease;
             text-decoration: none;
+            white-space: nowrap;
+            width: 100%;
+            font-size: 1rem;
         }
 
-        .create-group-btn:hover {
+        .main-action-btn:hover {
             background: linear-gradient(135deg, var(--primary-light), var(--primary));
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(179, 0, 75, 0.3);
         }
         
-        .create-group-btn a {
+        .main-action-btn a {
             color: white;
             text-decoration: none;
             display: flex;
             align-items: center;
             gap: 8px;
+            width: 100%;
+            justify-content: center;
         }
         
-        .create-group-btn .feather {
-            width: 18px;
-            height: 18px;
+        .main-action-btn .feather {
+            width: 20px;
+            height: 20px;
+            stroke: white;
+            stroke-width: 2.5;
+        }
+
+        /* Small buttons container */
+        .small-buttons-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        /* Small button style */
+        .small-action-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            white-space: nowrap;
+            flex: 1;
+            font-size: 0.9rem;
+        }
+
+        .small-action-btn:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(179, 0, 75, 0.3);
+        }
+        
+        .small-action-btn a {
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .small-action-btn .feather {
+            width: 16px;
+            height: 16px;
             stroke: white;
             stroke-width: 2.5;
         }
@@ -531,8 +603,6 @@
             transition: border-color 0.3s ease;
             cursor: default; /* Changed from pointer */
         }
-
-        /* REMOVED: .group-card:hover styles */
 
         .group-header {
             padding: 20px;
@@ -785,18 +855,25 @@
                 grid-template-columns: 1fr;
             }
 
-            .page-header {
+            .header-top {
                 flex-direction: column;
-                align-items: flex-start;
+                align-items: stretch;
+                gap: 15px;
+            }
+
+            .page-title {
+                text-align: center;
+                min-width: auto;
+                font-size: 1.8rem;
+            }
+
+            .action-buttons {
+                max-width: 100%;
             }
 
             .main-content {
                 padding: 15px;
                 margin-top: 70px;
-            }
-
-            .page-title {
-                font-size: 1.6rem;
             }
             
             /* Bottom nav responsive */
@@ -828,6 +905,21 @@
                 margin: 0 10px;
             }
             
+            .main-action-btn {
+                padding: 12px 20px;
+                font-size: 0.95rem;
+            }
+            
+            .small-action-btn {
+                padding: 8px 12px;
+                font-size: 0.85rem;
+            }
+            
+            .small-action-btn .feather {
+                width: 14px;
+                height: 14px;
+            }
+            
             /* Bottom nav small screens */
             .bottom-nav {
                 height: 60px;
@@ -853,6 +945,27 @@
                 font-size: 9px;
             }
         }
+
+        @media (max-width: 400px) {
+            .main-action-btn {
+                padding: 10px 16px;
+                font-size: 0.9rem;
+            }
+            
+            .main-action-btn .feather {
+                width: 16px;
+                height: 16px;
+            }
+            
+            .small-buttons-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .small-action-btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -866,57 +979,63 @@
                 </svg>
                 BondBase
             </a>
-<a href="message.html" class="message-link" style="text-decoration:none;color:white;">private
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-message-circle">
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-      
-  </svg>
-</a>
+            <a href="message.html" class="message-link" style="text-decoration:none;color:white;">private
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-message-circle">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                </svg>
+            </a>
             <div class="notification-top">
-    <a href="notification.html" class="notification-link">
-        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-        </svg>
-        <span class="notification-badge">0</span>
-    </a>
-</div>
+                <a href="notification.html" class="notification-link">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="notification-badge">0</span>
+                </a>
+            </div>
         </div>
     </nav>
 
     <div class="main-content">
         <div class="page-header">
-            <h1 class="page-title">Join Groups</h1>
-            <div>
-            <button class="create-group-btn" id="createGroupBtn">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Create Group
-            </button>
+            <div class="header-top">
+                <h1 class="page-title">Join Groups</h1>
+                <div class="action-buttons">
+                    <!-- Main Create Group Button (full width) -->
+                    <button class="main-action-btn" id="createGroupBtn">
+                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Create Group
+                    </button>
+                    
+                    <!-- Small buttons row -->
+                    <div class="small-buttons-row">
+                        <!-- Edit Group Button -->
+                        <button class="small-action-btn">
+                            <a href="admin-groups.html">
+                                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                                </svg>
+                                Edit Group
+                            </a>
+                        </button>
+                        
+                        <!-- Edit Groups Profile Button -->
+                        <button class="small-action-btn">
+                            <a href="edit-profile.html">
+                                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                                </svg>
+                                Edit Profile
+                            </a>
+                        </button>
+                    </div>
                 </div>
-            <div>
-            <button class="create-group-btn">
-                <a href="admin-groups.html">
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-                    </svg>
-                    Edit Group
-                </a>
-            </button>
-                </div>
-            <div>
-            <button class="create-group-btn" style="float:righ;margin-top:none;">
-                <a href="edit-profile.html">
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-                    </svg>
-                    Edit Groups profile
-                </a>
-            </button>
-               </div>
-             </div>
+            </div>
+        </div>
+        
         <div class="search-container">
             <input type="text" class="search-box" id="groupSearch" placeholder="Search groups by name, topic, or category...">
         </div>
@@ -992,7 +1111,7 @@
 
     <!-- Targeted fix for the video button insertion error -->
     <!-- Then your group.js script -->
-    <script  src="clea.js"></script>
+    <script src="clea.js"></script>
     <script type="module" src="groups.js"></script>
     <script type="module" src="calls.js"></script>
     <script type="module" src="notification.js"></script>
