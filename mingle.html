@@ -1,4 +1,3 @@
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -65,243 +64,242 @@
             stroke-linejoin: round;
             fill: none;
         }
-/* Add this to your CSS file, likely in styles.css or a dedicated styles file */
 
-/* Message button styling for gamers directory */
-.message-gamer-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-    flex-shrink: 0;
-    margin-left: 8px;
-}
+        /* Message button styling for gamers directory */
+        .message-gamer-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
 
-.message-gamer-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
-}
+        .message-gamer-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
+        }
 
-.message-gamer-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
-}
+        .message-gamer-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+        }
 
-.message-gamer-btn .feather {
-    width: 16px;
-    height: 16px;
-    stroke: white;
-    stroke-width: 2;
-}
+        .message-gamer-btn .feather {
+            width: 16px;
+            height: 16px;
+            stroke: white;
+            stroke-width: 2;
+        }
 
-/* Tooltip for message button */
-.message-gamer-btn::after {
-    content: attr(title);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    white-space: nowrap;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s ease;
-    pointer-events: none;
-    z-index: 1000;
-    margin-bottom: 8px;
-}
+        /* Tooltip for message button */
+        .message-gamer-btn::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 1000;
+            margin-bottom: 8px;
+        }
 
-.message-gamer-btn:hover::after {
-    opacity: 1;
-    visibility: visible;
-}
+        .message-gamer-btn:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
 
-/* Update the gamer-actions container to accommodate the new button */
-.gamer-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    position: relative;
-    z-index: 2;
-}
+        /* Update the gamer-actions container to accommodate the new button */
+        .gamer-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            z-index: 2;
+        }
 
-/* Update existing clan-section styling if needed */
-.clan-section {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 4px;
-}
+        /* Update existing clan-section styling if needed */
+        .clan-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 4px;
+        }
 
-.clan-count {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text-light);
-    background: var(--bg-secondary);
-    padding: 4px 8px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-}
+        .clan-count {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--text-light);
+            background: var(--bg-secondary);
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
 
-.clan-count .feather {
-    width: 12px;
-    height: 12px;
-    stroke: var(--text-light);
-}
+        .clan-count .feather {
+            width: 12px;
+            height: 12px;
+            stroke: var(--text-light);
+        }
 
-/* Update the button row in gamer-actions */
-.gamer-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
+        /* Update the button row in gamer-actions */
+        .gamer-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
 
-/* For larger screens, you might want a row layout */
-@media (min-width: 768px) {
-    .gamer-actions {
-        flex-direction: row;
-        gap: 12px;
-    }
-    
-    .message-gamer-btn {
-        margin-left: 0;
-    }
-}
+        /* For larger screens, you might want a row layout */
+        @media (min-width: 768px) {
+            .gamer-actions {
+                flex-direction: row;
+                gap: 12px;
+            }
+            
+            .message-gamer-btn {
+                margin-left: 0;
+            }
+        }
 
-/* Update existing .add-clan-btn styling to work better with new button */
-.add-clan-btn {
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 20px;
-    padding: 8px 16px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(255, 42, 109, 0.2);
-}
+        /* Update existing .add-clan-btn styling to work better with new button */
+        .add-clan-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(255, 42, 109, 0.2);
+        }
 
-.add-clan-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(255, 42, 109, 0.3);
-}
+        .add-clan-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 42, 109, 0.3);
+        }
 
-.add-clan-btn.added {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-}
+        .add-clan-btn.added {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
 
-.add-clan-btn.added:hover {
-    background: var(--bg-primary);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
+        .add-clan-btn.added:hover {
+            background: var(--bg-primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
 
-.add-clan-btn .feather {
-    width: 14px;
-    height: 14px;
-    stroke: currentColor;
-}
+        .add-clan-btn .feather {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+        }
 
-/* Loading state adjustments */
-.gamer-item.loading .message-gamer-btn,
-.gamer-item.loading .add-clan-btn {
-    background: var(--bg-secondary);
-    cursor: default;
-}
+        /* Loading state adjustments */
+        .gamer-item.loading .message-gamer-btn,
+        .gamer-item.loading .add-clan-btn {
+            background: var(--bg-secondary);
+            cursor: default;
+        }
 
-/* Animation for the message button */
-@keyframes pulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 6px rgba(102, 126, 234, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
-    }
-}
+        /* Animation for the message button */
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 6px rgba(102, 126, 234, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+            }
+        }
 
-/* Add pulse animation for new/unread messages indicator */
-.message-gamer-btn.has-unread {
-    animation: pulse 2s infinite;
-    position: relative;
-}
+        /* Add pulse animation for new/unread messages indicator */
+        .message-gamer-btn.has-unread {
+            animation: pulse 2s infinite;
+            position: relative;
+        }
 
-.message-gamer-btn.has-unread::before {
-    content: '';
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background: #ff2a6d;
-    border-radius: 50%;
-    border: 2px solid white;
-    z-index: 1;
-}
+        .message-gamer-btn.has-unread::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background: #ff2a6d;
+            border-radius: 50%;
+            border: 2px solid white;
+            z-index: 1;
+        }
 
-/* For dark mode support */
-@media (prefers-color-scheme: dark) {
-    .message-gamer-btn {
-        background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
-    }
-    
-    .message-gamer-btn:hover {
-        background: linear-gradient(135deg, #4a5fc7 0%, #5a307f 100%);
-    }
-    
-    .message-gamer-btn::after {
-        background: rgba(255, 255, 255, 0.9);
-        color: #333;
-    }
-}
+        /* For dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .message-gamer-btn {
+                background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
+            }
+            
+            .message-gamer-btn:hover {
+                background: linear-gradient(135deg, #4a5fc7 0%, #5a307f 100%);
+            }
+            
+            .message-gamer-btn::after {
+                background: rgba(255, 255, 255, 0.9);
+                color: #333;
+            }
+        }
 
-/* Responsive adjustments for mobile */
-@media (max-width: 480px) {
-    .gamer-actions {
-        flex-direction: column;
-        gap: 6px;
-    }
-    
-    .message-gamer-btn {
-        width: 32px;
-        height: 32px;
-    }
-    
-    .message-gamer-btn .feather {
-        width: 14px;
-        height: 14px;
-    }
-    
-    .add-clan-btn {
-        padding: 6px 12px;
-        font-size: 11px;
-    }
-}
+        /* Responsive adjustments for mobile */
+        @media (max-width: 480px) {
+            .gamer-actions {
+                flex-direction: column;
+                gap: 6px;
+            }
+            
+            .message-gamer-btn {
+                width: 32px;
+                height: 32px;
+            }
+            
+            .message-gamer-btn .feather {
+                width: 14px;
+                height: 14px;
+            }
+            
+            .add-clan-btn {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+        }
         /* Top Navigation */
         .top-nav {
             background: rgba(255, 255, 255, 0.06);
@@ -760,7 +758,7 @@
             transition: opacity 0.3s;
             padding: 5px;
             flex: 1;
-            max-width: 16.666%;
+            max-width: 14.285%; /* Updated for 7 items instead of 6 */
             height: 100%;
         }
 
@@ -876,6 +874,10 @@
                 max-width: 100%;
                 overflow: hidden;
                 text-overflow: ellipsis;
+            }
+            
+            .nav-label {
+                font-size: 9px;
             }
         }
 
@@ -1013,22 +1015,20 @@
                 </svg>
                 BondBase Gamers
             </a>
-                      <div class="notification-top">
-    <a href="notification.html" class="notification-link">
-        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-        </svg>
-        <span class="notification-badge">0</span>
-    </a>
-</div>
+            <div class="notification-top">
+                <a href="notification.html" class="notification-link">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="notification-badge">0</span>
+                </a>
+            </div>
         </div>
     </nav>
 
     <!-- Main Content -->
     <div class="main-content">
-
-
         <!-- Gamers Container -->
         <div class="gamers-container">
             <!-- Search and Filter -->
@@ -1142,8 +1142,7 @@
         </div>
     </div>
 
-    <!-- Bottom Navigation -->
-        <!-- Bottom Navigation - Updated to match mingle.html with 6 items -->
+    <!-- Bottom Navigation - With 7 items including Anonymous -->
     <div class="bottom-nav">
         <a href="mingle.html" class="nav-item active">
             <div class="nav-icon">
@@ -1164,14 +1163,14 @@
             </div>
             <span class="nav-label">Chat</span>
         </a>
-        <a href="gist.html" class="nav-item">
+        <a href="posts.html" class="nav-item">
             <div class="nav-icon">
                 <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                     <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                     <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                 </svg>
             </div>
-            <span class="nav-label">Anonymous</span>
+            <span class="nav-label">Post</span>
         </a>
         <a href="stream.html" class="nav-item stream-link">
             <div class="nav-icon">
@@ -1180,6 +1179,20 @@
                 </svg>
             </div>
             <span class="nav-label">updates</span>
+        </a>
+        <!-- New Anonymous Link to Gist.html -->
+        <a href="gist.html" class="nav-item">
+            <div class="nav-icon">
+                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path>
+                    <path d="M12 6v6l4 2"></path>
+                    <circle cx="12" cy="12" r="2"></circle>
+                    <path d="M12 22v-4"></path>
+                    <path d="M8 9.5c.5-1 1.5-2 3-2s2.5 1 3 2"></path>
+                    <path d="M6 15c1.5 1 4 1 6 0"></path>
+                </svg>
+            </div>
+            <span class="nav-label">Anonymous</span>
         </a>
         <a href="account.html" class="nav-item">
             <div class="nav-icon">
@@ -1190,8 +1203,8 @@
             </div>
             <span class="nav-label">Profile</span>
         </a>
-        <a href="groups.html"class="nav-item">
-            <div class="nav-icon" >
+        <a href="groups.html" class="nav-item">
+            <div class="nav-icon">
                 <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
@@ -1201,13 +1214,11 @@
             </div>
             <span class="nav-label">Groups</span>
         </a>
-
     </div>
 
     <!-- Scripts -->
     <script type="module" src="gamers.js"></script>
-    <script type="module" src=""></script>
-     <script type="module" src="notification.js"></script>
+    <script type="module" src="notification.js"></script>
 
     <!-- Initialize Feather Icons -->
     <script>
@@ -1215,6 +1226,19 @@
             if (typeof feather !== 'undefined') {
                 feather.replace();
             }
+            
+            // Set active nav item based on current page
+            const currentPage = window.location.pathname.split('/').pop() || 'mingle.html';
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            navItems.forEach(item => {
+                const href = item.getAttribute('href');
+                if (href === currentPage) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
         });
     </script>
 </body>
