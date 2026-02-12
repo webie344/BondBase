@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Post - Dating Connect</title>
-    <link rel="stylesheet" href="style.css"> <!-- Fixed: changed styles.css to style.css -->
+    <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         .create-post-container {
@@ -61,7 +61,7 @@
             border-color: var(--accent-color);
         }
 
-        .image-upload-area {
+        .media-upload-area {
             border: 2px dashed var(--border-color);
             border-radius: 10px;
             padding: 40px 20px;
@@ -70,40 +70,158 @@
             transition: border-color 0.3s ease;
         }
 
-        .image-upload-area:hover {
+        .media-upload-area:hover {
             border-color: var(--accent-color);
         }
 
-        .image-upload-area i {
+        .media-upload-area i {
             font-size: 48px;
             color: var(--text-light);
             margin-bottom: 15px;
         }
 
-        .image-upload-text {
+        .media-upload-text {
             color: var(--text-light);
             margin-bottom: 10px;
+            font-weight: 500;
         }
 
-        .image-upload-hint {
+        .media-upload-hint {
             font-size: 14px;
             color: var(--text-lighter);
         }
 
-        #postImage { /* Fixed: changed from imageInput to postImage to match social.js */
+        #postMedia {
             display: none;
         }
 
-        .image-preview {
+        .media-preview {
             margin-top: 20px;
             display: none;
+            position: relative;
         }
 
-        .image-preview img {
+        .media-preview img,
+        .media-preview video {
             max-width: 100%;
             max-height: 400px;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .media-type-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            backdrop-filter: blur(4px);
+            z-index: 10;
+        }
+
+        .media-type-badge i {
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .media-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            color: var(--text-light);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .media-info i {
+            color: var(--accent-color);
+        }
+
+        .video-toggle-container {
+            margin: 15px 0;
+            padding: 15px;
+            background: var(--bg-dark);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .toggle-checkbox {
+            display: none;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 52px;
+            height: 28px;
+            background: #ccc;
+            border-radius: 30px;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .toggle-switch:before {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            background: white;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle-checkbox:checked + .toggle-switch {
+            background: var(--accent-color);
+        }
+
+        .toggle-checkbox:checked + .toggle-switch:before {
+            left: 26px;
+        }
+
+        .toggle-icon {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+
+        .toggle-icon i {
+            font-size: 18px;
+            color: var(--accent-color);
+        }
+
+        .video-hint {
+            font-size: 12px;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .video-hint i {
+            color: #f59e0b;
         }
 
         .form-actions {
@@ -131,6 +249,12 @@
         .btn-primary:hover {
             background: var(--accent-dark);
             transform: translateY(-2px);
+        }
+
+        .btn-primary:disabled {
+            background: var(--border-color);
+            cursor: not-allowed;
+            transform: none;
         }
 
         .btn-secondary {
@@ -165,10 +289,11 @@
 
         .upload-status {
             margin-top: 10px;
-            padding: 10px;
-            border-radius: 5px;
+            padding: 12px;
+            border-radius: 8px;
             text-align: center;
             display: none;
+            font-size: 14px;
         }
 
         .upload-status.uploading {
@@ -178,15 +303,45 @@
         }
 
         .upload-status.success {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
         }
 
         .upload-status.error {
             background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
+        }
+
+        .upload-status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: var(--border-color);
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s;
+            animation: progress-animation 2s infinite;
+        }
+
+        @keyframes progress-animation {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
         }
 
         @media (max-width: 768px) {
@@ -200,6 +355,11 @@
 
             .form-actions {
                 flex-direction: column;
+            }
+
+            .video-toggle-container {
+                flex-direction: column;
+                align-items: flex-start;
             }
         }
     </style>
@@ -259,7 +419,7 @@
         <div class="create-post-container">
             <div class="create-post-header">
                 <h1><i class="fas fa-plus-circle"></i> Create New Post</h1>
-                <p>Share your thoughts and moments with the community</p>
+                <p>Share your thoughts, photos, and videos with the community</p>
             </div>
 
             <form id="createPostForm" class="post-form">
@@ -276,23 +436,50 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label><i class="fas fa-image"></i> Add Photo (Optional)</label>
-                    <div class="image-upload-area" onclick="document.getElementById('postImage').click()">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <div class="image-upload-text">Click to upload an image</div>
-                        <div class="image-upload-hint">JPEG, PNG, GIF up to 10MB</div>
+                <!-- Video/Image Toggle - FIXED -->
+                <div class="video-toggle-container">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="videoMode" class="toggle-checkbox">
+                        <span class="toggle-switch"></span>
+                        <span class="toggle-icon">
+                            <i class="fas fa-video"></i>
+                            Video Mode
+                        </span>
+                    </label>
+                    <div class="video-hint">
+                        <i class="fas fa-info-circle"></i>
+                        Max: 100MB (MP4, WebM, MOV)
                     </div>
-                    <input type="file" id="postImage" accept="image/*"> <!-- Fixed: changed id to postImage -->
-                    <div class="image-preview" id="imagePreview"></div>
-                    <div class="upload-status" id="uploadStatus"></div> <!-- Added upload status -->
+                </div>
+
+                <div class="form-group">
+                    <label id="mediaLabel">
+                        <i class="fas fa-image" id="mediaIcon"></i> 
+                        <span id="mediaTypeText">Add Photo</span> (Optional)
+                    </label>
+                    <div class="media-upload-area" onclick="document.getElementById('postMedia').click()">
+                        <i class="fas fa-cloud-upload-alt" id="uploadIcon"></i>
+                        <div class="media-upload-text" id="uploadText">Click to upload media</div>
+                        <div class="media-upload-hint" id="uploadHint">JPEG, PNG, GIF up to 10MB</div>
+                    </div>
+                    <input type="file" id="postMedia" accept="image/*">
+                    <div class="media-preview" id="mediaPreview">
+                        <div class="media-type-badge" id="mediaTypeBadge">
+                            <i class="fas fa-image"></i> Image
+                        </div>
+                    </div>
+                    <div class="media-info" id="mediaInfo" style="display: none;"></div>
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <div class="upload-status" id="uploadStatus"></div>
                 </div>
 
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="window.history.back()">
                         <i class="fas fa-arrow-left"></i> Cancel
                     </button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
                         <i class="fas fa-paper-plane"></i> Post Now
                     </button>
                 </div>
@@ -306,13 +493,14 @@
                     <li>Share genuine moments and stories</li>
                     <li>Keep captions meaningful and engaging</li>
                     <li>Respect everyone's privacy</li>
+                    <li><i class="fas fa-video" style="color: var(--accent-color);"></i> Videos must be under 100MB (MP4, WebM, MOV)</li>
                 </ul>
             </div>
         </div>
     </main>
 
     <script type="module" src="social.js"></script>
-        <script type="module" src="app.js"></script>
+    <script type="module" src="app.js"></script>
     <script>
         // Character count for caption
         const captionInput = document.getElementById('postCaption');
@@ -324,94 +512,272 @@
             });
         }
 
-        // Image preview
-        const imageInput = document.getElementById('postImage'); // Fixed: changed to postImage
-        const imagePreview = document.getElementById('imagePreview');
-        const uploadStatus = document.getElementById('uploadStatus');
-        
-        if (imageInput && imagePreview) {
-            imageInput.addEventListener('change', function(e) {
+        // ============ FIXED VIDEO/IMAGE MODE TOGGLE ============
+        const videoModeCheckbox = document.getElementById('videoMode');
+        const mediaInput = document.getElementById('postMedia');
+        const mediaIcon = document.getElementById('mediaIcon');
+        const mediaTypeText = document.getElementById('mediaTypeText');
+        const uploadText = document.getElementById('uploadText');
+        const uploadHint = document.getElementById('uploadHint');
+        const uploadIcon = document.getElementById('uploadIcon');
+        const mediaTypeBadge = document.getElementById('mediaTypeBadge');
+        const mediaInfo = document.getElementById('mediaInfo');
+        const mediaPreview = document.getElementById('mediaPreview');
+
+        // Function to switch to image mode
+        function switchToImageMode() {
+            console.log('Switching to Image Mode');
+            mediaInput.accept = 'image/*';
+            mediaIcon.className = 'fas fa-image';
+            mediaTypeText.textContent = 'Add Photo';
+            uploadText.textContent = 'Click to upload an image';
+            uploadHint.innerHTML = 'JPEG, PNG, GIF up to 10MB';
+            uploadIcon.className = 'fas fa-cloud-upload-alt';
+            
+            if (mediaTypeBadge) {
+                mediaTypeBadge.innerHTML = '<i class="fas fa-image"></i> Image';
+            }
+            
+            // Clear any selected file
+            mediaInput.value = '';
+            if (mediaPreview) {
+                mediaPreview.style.display = 'none';
+                mediaPreview.innerHTML = '<div class="media-type-badge" id="mediaTypeBadge"><i class="fas fa-image"></i> Image</div>';
+            }
+            if (mediaInfo) {
+                mediaInfo.style.display = 'none';
+            }
+            hideUploadStatus();
+        }
+
+        // Function to switch to video mode
+        function switchToVideoMode() {
+            console.log('Switching to Video Mode');
+            mediaInput.accept = 'video/*';
+            mediaIcon.className = 'fas fa-video';
+            mediaTypeText.textContent = 'Add Video';
+            uploadText.textContent = 'Click to upload a video';
+            uploadHint.innerHTML = 'MP4, WebM, MOV up to 100MB';
+            uploadIcon.className = 'fas fa-video';
+            
+            if (mediaTypeBadge) {
+                mediaTypeBadge.innerHTML = '<i class="fas fa-video"></i> Video';
+            }
+            
+            // Clear any selected file
+            mediaInput.value = '';
+            if (mediaPreview) {
+                mediaPreview.style.display = 'none';
+                mediaPreview.innerHTML = '<div class="media-type-badge" id="mediaTypeBadge"><i class="fas fa-video"></i> Video</div>';
+            }
+            if (mediaInfo) {
+                mediaInfo.style.display = 'none';
+            }
+            hideUploadStatus();
+        }
+
+        // Add event listener to checkbox
+        if (videoModeCheckbox) {
+            videoModeCheckbox.addEventListener('change', function(e) {
+                if (this.checked) {
+                    switchToVideoMode();
+                } else {
+                    switchToImageMode();
+                }
+            });
+        }
+
+        // Media preview with validation
+        if (mediaInput && mediaPreview) {
+            mediaInput.addEventListener('change', function(e) {
                 const file = e.target.files[0];
                 if (file) {
-                    // Validate file size (10MB limit)
-                    if (file.size > 10 * 1024 * 1024) {
-                        showUploadStatus('File size must be less than 10MB', 'error');
-                        return;
-                    }
+                    const isVideo = videoModeCheckbox ? videoModeCheckbox.checked : false;
+                    
+                    if (isVideo) {
+                        // Video validation
+                        const maxSize = 100 * 1024 * 1024; // 100MB
+                        const validTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
+                        
+                        if (file.size > maxSize) {
+                            showUploadStatus('Video file size must be less than 100MB', 'error');
+                            mediaInput.value = '';
+                            return;
+                        }
+                        
+                        if (!validTypes.includes(file.type)) {
+                            showUploadStatus('Please select a valid video file (MP4, WebM, OGG, MOV)', 'error');
+                            mediaInput.value = '';
+                            return;
+                        }
 
-                    // Validate file type
-                    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-                    if (!validTypes.includes(file.type)) {
-                        showUploadStatus('Please select a valid image file (JPEG, PNG, GIF)', 'error');
-                        return;
-                    }
+                        // Show video preview
+                        const videoUrl = URL.createObjectURL(file);
+                        mediaPreview.innerHTML = `
+                            <div class="media-type-badge">
+                                <i class="fas fa-video"></i> Video
+                            </div>
+                            <video controls>
+                                <source src="${videoUrl}" type="${file.type}">
+                                Your browser does not support the video tag.
+                            </video>
+                        `;
+                        mediaPreview.style.display = 'block';
 
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        imagePreview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
-                        imagePreview.style.display = 'block';
-                        showUploadStatus('Image ready for upload', 'success');
-                    };
-                    reader.onerror = function() {
-                        showUploadStatus('Error reading image file', 'error');
-                    };
-                    reader.readAsDataURL(file);
+                        // Show video info
+                        mediaInfo.style.display = 'flex';
+                        mediaInfo.innerHTML = `
+                            <i class="fas fa-video"></i>
+                            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>
+                            <span>${(file.size / (1024 * 1024)).toFixed(2)}MB</span>
+                        `;
+                        
+                        showUploadStatus('Video ready for upload', 'success');
+                    } else {
+                        // Image validation
+                        if (file.size > 10 * 1024 * 1024) {
+                            showUploadStatus('Image size must be less than 10MB', 'error');
+                            mediaInput.value = '';
+                            return;
+                        }
+
+                        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+                        if (!validTypes.includes(file.type)) {
+                            showUploadStatus('Please select a valid image file (JPEG, PNG, GIF, WebP)', 'error');
+                            mediaInput.value = '';
+                            return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            mediaPreview.innerHTML = `
+                                <div class="media-type-badge">
+                                    <i class="fas fa-image"></i> Image
+                                </div>
+                                <img src="${e.target.result}" alt="Preview">
+                            `;
+                            mediaPreview.style.display = 'block';
+                            
+                            // Show image info
+                            mediaInfo.style.display = 'flex';
+                            mediaInfo.innerHTML = `
+                                <i class="fas fa-image"></i>
+                                <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>
+                                <span>${(file.size / (1024 * 1024)).toFixed(2)}MB</span>
+                            `;
+                            
+                            showUploadStatus('Image ready for upload', 'success');
+                        };
+                        reader.onerror = function() {
+                            showUploadStatus('Error reading image file', 'error');
+                        };
+                        reader.readAsDataURL(file);
+                    }
                 } else {
-                    imagePreview.style.display = 'none';
-                    imagePreview.innerHTML = '';
-                    uploadStatus.style.display = 'none';
+                    mediaPreview.style.display = 'none';
+                    mediaInfo.style.display = 'none';
+                    hideUploadStatus();
                 }
             });
         }
 
         function showUploadStatus(message, type) {
-            uploadStatus.textContent = message;
-            uploadStatus.className = `upload-status ${type}`;
-            uploadStatus.style.display = 'block';
+            const uploadStatus = document.getElementById('uploadStatus');
+            const progressBar = document.getElementById('progressBar');
             
-            // Auto-hide success messages after 3 seconds
-            if (type === 'success') {
+            if (uploadStatus) {
+                uploadStatus.textContent = message;
+                uploadStatus.className = `upload-status ${type}`;
+                uploadStatus.style.display = 'block';
+            }
+            
+            if (progressBar) {
+                if (type === 'uploading') {
+                    progressBar.style.display = 'block';
+                } else {
+                    progressBar.style.display = 'none';
+                }
+            }
+            
+            if (type === 'success' || type === 'error') {
                 setTimeout(() => {
-                    uploadStatus.style.display = 'none';
+                    if (uploadStatus) uploadStatus.style.display = 'none';
                 }, 3000);
             }
+        }
+
+        function hideUploadStatus() {
+            const uploadStatus = document.getElementById('uploadStatus');
+            const progressBar = document.getElementById('progressBar');
+            if (uploadStatus) uploadStatus.style.display = 'none';
+            if (progressBar) progressBar.style.display = 'none';
+        }
+
+        // Form submission handling
+        const form = document.getElementById('createPostForm');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        if (form) {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const caption = document.getElementById('postCaption').value.trim();
+                const mediaFile = document.getElementById('postMedia').files[0];
+                
+                if (!caption && !mediaFile) {
+                    showUploadStatus('Please add a caption or media to your post', 'warning');
+                    return;
+                }
+
+                // Show uploading status
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+                showUploadStatus('Uploading to Cloudinary...', 'uploading');
+
+                // Let social.js handle the actual upload
+                if (window.socialManager) {
+                    try {
+                        await window.socialManager.createPost();
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        showUploadStatus('Upload failed: ' + error.message, 'error');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
+                    }
+                } else {
+                    showUploadStatus('Error: Social manager not loaded', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
+                }
+            });
         }
 
         // Debug: Check if socialManager is properly initialized
         document.addEventListener('DOMContentLoaded', function() {
             console.log('=== CREATE POST DEBUG ===');
             
-            // Check form elements
             const form = document.getElementById('createPostForm');
             const caption = document.getElementById('postCaption');
-            const imageInput = document.getElementById('postImage');
+            const mediaInput = document.getElementById('postMedia');
+            const videoToggle = document.getElementById('videoMode');
             
             console.log('Form elements:', {
                 form: form ? 'Found' : 'Missing',
                 caption: caption ? 'Found' : 'Missing',
-                imageInput: imageInput ? 'Found' : 'Missing'
+                mediaInput: mediaInput ? 'Found' : 'Missing',
+                videoToggle: videoToggle ? 'Found' : 'Missing'
             });
 
-            // Check if socialManager is available
             if (window.socialManager) {
                 console.log('✅ socialManager is loaded');
+                console.log('✅ Video posting is enabled');
             } else {
                 console.error('❌ socialManager is not loaded');
             }
-
-            // Add form submission debug
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    console.log('=== FORM SUBMISSION DEBUG ===');
-                    const captionValue = caption ? caption.value : 'No caption';
-                    const imageFile = imageInput ? imageInput.files[0] : 'No image';
-                    
-                    console.log('Submission data:', {
-                        caption: captionValue,
-                        imageFile: imageFile,
-                        hasImage: !!imageFile
-                    });
-                });
+            
+            // Initialize default state
+            if (videoToggle && !videoToggle.checked) {
+                switchToImageMode();
             }
         });
     </script>

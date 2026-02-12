@@ -160,42 +160,18 @@
         </div>
 
         <form class="post-form" id="createPostForm">
-            <div class="form-group">
-                <label>Post as:</label>
-                <div class="persona-selector" id="personaSelector">
-                    <div class="persona-option active" data-persona-id="main">
-                        <i class="fas fa-user"></i> Main Profile
-                    </div>
-                    <!-- Personas will be dynamically loaded -->
-                </div>
-                <div class="anonymous-option">
-                    <input type="checkbox" id="anonymousToggle">
-                    <label for="anonymousToggle">Post Anonymously</label>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <textarea 
-                    class="post-content" 
-                    id="postContent" 
-                    placeholder="What's on your mind?..."
-                    maxlength="1000"
-                ></textarea>
-                <div class="char-count" style="text-align: right; font-size: 0.8rem; color: var(--text-secondary);">
-                    <span id="charCount">0</span>/1000
-                </div>
-            </div>
-
-            <div class="media-upload" id="mediaUploadArea">
-                <i class="fas fa-cloud-upload-alt" style="font-size: 2rem; color: var(--text-secondary); margin-bottom: 1rem;"></i>
-                <p>Click to upload image or video</p>
-                <input type="file" id="mediaUpload" accept="image/*,video/*" style="display: none;">
-            </div>
-
-            <div class="media-preview" id="mediaPreview">
-                <!-- Media preview will be shown here -->
-            </div>
-
+<!-- Update the media input section in create.html -->
+<div class="form-group">
+    <label for="postMedia">Add Photo or Video</label>
+    <div class="media-input-container">
+        <input type="file" id="postMedia" accept="image/*,video/*">
+        <div class="upload-hint">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <span>Click to upload (Images: JPG, PNG, GIF | Videos: MP4, WebM, MOV up to 100MB)</span>
+        </div>
+    </div>
+    <div id="mediaPreview" class="media-preview" style="display: none;"></div>
+</div>
             <div class="post-options">
                 <div class="option-btn" onclick="document.getElementById('mediaUpload').click()">
                     <i class="fas fa-image"></i> Media
