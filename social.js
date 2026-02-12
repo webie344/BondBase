@@ -47,6 +47,34 @@ const cloudinaryConfig = {
     apiUrl: "https://api.cloudinary.com/v1_1"
 };
 
+// Supported video formats
+const SUPPORTED_VIDEO_FORMATS = [
+    'video/mp4', 'video/quicktime', 'video/x-m4v', 'video/3gpp', 'video/3gpp2',
+    'video/mpeg', 'video/webm', 'video/ogg', 'video/x-msvideo', 'video/x-matroska',
+    'video/mp2t', 'video/h264', 'video/hevc', 'video/avi', 'video/x-flv',
+    'video/x-ms-wmv', 'video/x-ms-asf', 'video/mp4v-es', 'video/mj2',
+    'video/x-mpeg', 'video/mp2p', 'video/mp2t', 'video/MP2T'
+];
+
+// Supported file extensions
+const SUPPORTED_EXTENSIONS = [
+    '.mp4', '.mov', '.m4v', '.3gp', '.3g2', '.mpeg', '.mpg', '.webm', '.ogg',
+    '.avi', '.mkv', '.ts', '.mts', '.m2ts', '.flv', '.f4v', '.wmv', '.mpg', '.mpeg',
+    '.qt', '.mxf', '.m2v', '.m4p', '.m4b', '.mp2', '.mpv', '.mpe', '.m1v', '.m2p',
+    '.divx', '.xvid', '.vob', '.mod', '.tod', '.mts', '.m2t', '.m2ts'
+];
+
+// Problematic formats that often need conversion
+const PROBLEMATIC_FORMATS = [
+    'video/quicktime',
+    'video/x-msvideo',
+    'video/x-matroska',
+    'video/x-ms-wmv',
+    'video/x-flv',
+    'video/3gpp',
+    'video/3gpp2'
+];
+
 class SocialManager {
     constructor() {
         this.currentUser = null;
@@ -99,9 +127,8 @@ class SocialManager {
         this.hasMorePYMK = true;
         
         // Video upload settings
-        this.maxVideoSize = 100 * 1024 * 1024;
-        this.allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
-        this.currentlyPlayingVideo = null;
+        this.maxVideoSize = 1024 * 1024 * 1024; // 1GB max
+        this.allowedVideoTypes = SUPPORTED_VIDEO_FORMATS;
         
         // Flag to prevent double submission
         this.isSubmitting = false;
@@ -132,32 +159,162 @@ class SocialManager {
         });
     }
 
+    // ==================== FORMAT COUNT FUNCTION ====================
+    formatCount(count) {
+        if (!count && count !== 0) return '0';
+        
+        const num = typeof count === 'number' ? count : parseInt(count);
+        
+        if (isNaN(num)) return '0';
+        
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+        }
+        
+        return num.toString();
+    }
+
+    // ==================== FORMAT DURATION ====================
+    formatDuration(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // ==================== FORMAT FILE SIZE ====================
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // ==================== FORMAT TIME ====================
+    formatTime(timestamp) {
+        if (!timestamp) return 'Just now';
+        
+        try {
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (minutes < 1) return 'Just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days}d ago`;
+            return date.toLocaleDateString();
+        } catch (error) {
+            return 'Recently';
+        }
+    }
+
+    // ==================== SHUFFLE ARRAY ====================
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
     // ==================== ADD ALL STYLES ====================
-    
     addAllStyles() {
         if (!document.getElementById('socialManagerStyles')) {
             const style = document.createElement('style');
             style.id = 'socialManagerStyles';
             style.textContent = `
+                /* ========== VIDEO THUMBNAIL STYLES ========== */
+                .video-thumbnail-container {
+                    position: relative;
+                    width: 100%;
+                    height: 0;
+                    padding-bottom: 56.25%;
+                    background: #000;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    cursor: pointer;
+                }
+
+                .video-thumbnail-image {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    transition: transform 0.3s ease;
+                }
+
+                .video-thumbnail-container:hover .video-thumbnail-image {
+                    transform: scale(1.05);
+                }
+
+                .video-play-button-center {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 70px;
+                    height: 70px;
+                    background: rgba(255, 75, 110, 0.95);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 28px;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+                    border: 2px solid rgba(255,255,255,0.5);
+                }
+
+                .video-thumbnail-container:hover .video-play-button-center {
+                    background: #ff4b6e;
+                    transform: translate(-50%, -50%) scale(1.1);
+                    box-shadow: 0 8px 24px rgba(255, 75, 110, 0.6);
+                    border-color: white;
+                }
+
+                .video-duration-overlay {
+                    position: absolute;
+                    bottom: 12px;
+                    right: 12px;
+                    background: rgba(0, 0, 0, 0.85);
+                    color: white;
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    font-size: 13px;
+                    font-weight: 600;
+                    z-index: 2;
+                    letter-spacing: 0.5px;
+                    backdrop-filter: blur(4px);
+                    border: 1px solid rgba(255,255,255,0.2);
+                }
+
                 /* ========== VIDEO PLACEHOLDER STYLES ========== */
                 .video-placeholder {
                     position: relative;
                     width: 100%;
-                    height: 300px;
+                    height: 0;
+                    padding-bottom: 56.25%;
                     background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%);
                     background-size: 200% 100%;
                     animation: shimmer 1.5s infinite linear;
                     border-radius: 12px;
                     display: flex;
-                    flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    color: #999;
                 }
 
                 .dark-mode .video-placeholder {
                     background: linear-gradient(110deg, #2a2a2a 8%, #333333 18%, #2a2a2a 33%);
-                    color: #666;
                 }
 
                 @keyframes shimmer {
@@ -165,19 +322,104 @@ class SocialManager {
                     100% { background-position: 200% 0; }
                 }
 
-                .video-loading-skeleton {
+                .video-placeholder-content {
                     text-align: center;
+                    color: #999;
                 }
 
-                .video-loading-skeleton i {
+                .dark-mode .video-placeholder-content {
+                    color: #666;
+                }
+
+                .video-placeholder-content i {
                     font-size: 48px;
                     margin-bottom: 16px;
                     opacity: 0.5;
                 }
 
-                .video-loading-skeleton p {
+                .video-placeholder-content p {
                     margin: 0;
                     font-size: 14px;
+                }
+
+                .post-video-container {
+                    position: relative;
+                    width: 100%;
+                    margin-bottom: 15px;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    background: #000;
+                }
+
+                .media-type-indicator {
+                    margin-left: 10px;
+                    color: #ff4b6e;
+                    font-size: 14px;
+                }
+
+                /* ========== VIDEO INFO BADGES ========== */
+                .video-info-badge {
+                    position: absolute;
+                    top: 12px;
+                    left: 12px;
+                    background: rgba(0, 0, 0, 0.7);
+                    color: white;
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    backdrop-filter: blur(4px);
+                    border: 1px solid rgba(255,255,255,0.2);
+                    z-index: 3;
+                }
+
+                .video-info-badge i {
+                    color: #ff4b6e;
+                }
+
+                .video-format-badge {
+                    position: absolute;
+                    top: 12px;
+                    right: 12px;
+                    background: rgba(0, 0, 0, 0.7);
+                    color: white;
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    backdrop-filter: blur(4px);
+                    border: 1px solid rgba(255,255,255,0.2);
+                    z-index: 3;
+                }
+
+                .video-format-badge i {
+                    color: #ffaa33;
+                }
+
+                .video-warning-badge {
+                    position: absolute;
+                    bottom: 12px;
+                    left: 12px;
+                    background: rgba(255, 193, 7, 0.9);
+                    color: #000;
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    backdrop-filter: blur(4px);
+                    border: 1px solid rgba(255,255,255,0.2);
+                    z-index: 3;
+                    font-weight: 600;
+                }
+
+                .video-warning-badge i {
+                    color: #000;
                 }
 
                 /* ========== CUSTOM VIDEO PLAYER STYLES ========== */
@@ -204,45 +446,71 @@ class SocialManager {
                 .custom-video-player::-webkit-media-controls {
                     display: none !important;
                 }
-                .custom-video-player::-webkit-media-controls-enclosure {
-                    display: none !important;
-                }
-                .custom-video-player::-webkit-media-controls-panel {
-                    display: none !important;
-                }
-                .custom-video-player::--webkit-media-controls-play-button {
-                    display: none !important;
-                }
-                .custom-video-player::-webkit-media-controls-start-playback-button {
-                    display: none !important;
+
+                .video-controls-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
                 }
 
-                .video-controls {
+                .custom-video-container:hover .video-controls-overlay {
+                    opacity: 1;
+                }
+
+                .video-center-play-btn {
+                    width: 80px;
+                    height: 80px;
+                    background: rgba(255, 75, 110, 0.95);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 32px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    border: 3px solid rgba(255,255,255,0.5);
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+                }
+
+                .video-center-play-btn:hover {
+                    background: #ff4b6e;
+                    transform: scale(1.1);
+                    border-color: white;
+                }
+
+                .video-bottom-controls {
                     position: absolute;
                     bottom: 0;
                     left: 0;
                     right: 0;
-                    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+                    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
                     padding: 20px 15px 15px;
-                    opacity: 0;
-                    transition: opacity 0.3s ease;
                     display: flex;
                     flex-direction: column;
                     gap: 8px;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                    pointer-events: none;
                 }
 
-                .custom-video-container:hover .video-controls {
+                .custom-video-container:hover .video-bottom-controls {
                     opacity: 1;
-                }
-
-                .video-controls.show {
-                    opacity: 1;
+                    pointer-events: auto;
                 }
 
                 .control-bar {
                     display: flex;
                     align-items: center;
-                    gap: 12px;
+                    gap: 15px;
                     color: white;
                 }
 
@@ -251,8 +519,8 @@ class SocialManager {
                     border: none;
                     color: white;
                     cursor: pointer;
-                    padding: 6px;
-                    border-radius: 4px;
+                    padding: 8px;
+                    border-radius: 6px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -303,16 +571,17 @@ class SocialManager {
                 }
 
                 .time-display {
-                    font-size: 13px;
+                    font-size: 14px;
                     color: white;
                     font-family: monospace;
-                    min-width: 85px;
+                    min-width: 90px;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
                 }
 
                 .volume-control {
                     display: flex;
                     align-items: center;
-                    gap: 6px;
+                    gap: 8px;
                 }
 
                 .volume-slider {
@@ -329,43 +598,6 @@ class SocialManager {
                     background: white;
                     border-radius: 2px;
                     width: 100%;
-                }
-
-                .video-duration-badge {
-                    position: absolute;
-                    bottom: 60px;
-                    right: 15px;
-                    background: rgba(0,0,0,0.8);
-                    color: white;
-                    padding: 4px 8px;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    font-weight: 600;
-                    z-index: 2;
-                    pointer-events: none;
-                }
-
-                .post-video-container {
-                    position: relative;
-                    width: 100%;
-                    margin-bottom: 15px;
-                    border-radius: 12px;
-                    overflow: hidden;
-                    background: #000;
-                    aspect-ratio: 16/9;
-                }
-
-                .post-video {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: contain;
-                    background: #000;
-                }
-
-                .media-type-indicator {
-                    margin-left: 10px;
-                    color: #ff4b6e;
-                    font-size: 14px;
                 }
 
                 /* ========== PEOPLE YOU MAY KNOW STYLES ========== */
@@ -644,7 +876,7 @@ class SocialManager {
                     margin-top: 20px;
                 }
 
-                /* ========== DELETE MODAL STYLES - FIXED FOR MOBILE ========== */
+                /* ========== DELETE MODAL STYLES ========== */
                 #deletePostModal {
                     display: none;
                     position: fixed;
@@ -829,6 +1061,18 @@ class SocialManager {
                         min-width: 160px;
                         max-width: 160px;
                     }
+                    
+                    .video-play-button-center {
+                        width: 60px;
+                        height: 60px;
+                        font-size: 24px;
+                    }
+                    
+                    .video-center-play-btn {
+                        width: 60px;
+                        height: 60px;
+                        font-size: 24px;
+                    }
                 }
 
                 @media (max-width: 480px) {
@@ -883,24 +1127,185 @@ class SocialManager {
                     .pymk-nav-btn.right {
                         right: -5px;
                     }
+                    
+                    .video-play-button-center {
+                        width: 50px;
+                        height: 50px;
+                        font-size: 20px;
+                    }
+                    
+                    .video-center-play-btn {
+                        width: 50px;
+                        height: 50px;
+                        font-size: 20px;
+                    }
                 }
             `;
             document.head.appendChild(style);
         }
     }
 
-    // ==================== VIDEO PLACEHOLDER METHODS ====================
+    // ==================== VIDEO THUMBNAIL METHODS ====================
     
-    createVideoPlaceholder() {
-        const placeholder = document.createElement('div');
-        placeholder.className = 'video-placeholder';
-        placeholder.innerHTML = `
-            <div class="video-loading-skeleton">
-                <i class="fas fa-video"></i>
-                <p>Loading video...</p>
-            </div>
-        `;
-        return placeholder;
+    /**
+     * Get the best available thumbnail for a video
+     */
+    getVideoThumbnail(post) {
+        if (!post) {
+            return 'images/video-placeholder.jpg';
+        }
+        
+        // Check if we have a stored thumbnail
+        if (post.videoThumbnail && post.videoThumbnail !== 'images/video-placeholder.jpg' && 
+            post.videoThumbnail !== 'null' && post.videoThumbnail !== 'undefined') {
+            return post.videoThumbnail;
+        }
+        
+        // Check for poster image
+        if (post.videoPoster && post.videoPoster !== 'images/video-placeholder.jpg' &&
+            post.videoPoster !== 'null' && post.videoPoster !== 'undefined') {
+            return post.videoPoster;
+        }
+        
+        // Generate from Cloudinary URL
+        if (post.videoUrl && post.videoUrl.includes('cloudinary.com')) {
+            return this.generateCloudinaryThumbnail(post.videoUrl);
+        }
+        
+        // Fallback
+        return 'images/video-placeholder.jpg';
+    }
+    
+    /**
+     * Generate Cloudinary thumbnail URL with proper transformations
+     */
+    generateCloudinaryThumbnail(videoUrl) {
+        try {
+            if (!videoUrl || typeof videoUrl !== 'string') {
+                return 'images/video-placeholder.jpg';
+            }
+
+            if (!videoUrl.includes('cloudinary.com')) {
+                return 'images/video-placeholder.jpg';
+            }
+
+            // Handle different Cloudinary URL patterns
+            if (videoUrl.includes('/upload/')) {
+                if (videoUrl.includes('/upload/video/')) {
+                    // For video-specific URLs
+                    return videoUrl.replace('/upload/video/', '/upload/w_600,h_338,c_fill,q_auto,f_jpg/')
+                                   .replace(/\.(mp4|mov|avi|mkv|webm|ogg|3gp|m4v)$/i, '.jpg');
+                } else {
+                    // Standard URLs
+                    return videoUrl.replace('/upload/', '/upload/w_600,h_338,c_fill,q_auto,f_jpg/');
+                }
+            }
+            
+            return 'images/video-placeholder.jpg';
+        } catch (error) {
+            console.error('Error generating thumbnail:', error);
+            return 'images/video-placeholder.jpg';
+        }
+    }
+
+    /**
+     * Create video thumbnail element with all badges
+     */
+    createVideoThumbnail(videoUrl, thumbnailUrl, duration, postId, postData = null) {
+        const container = document.createElement('div');
+        container.className = 'video-thumbnail-container';
+        container.setAttribute('data-video-url', videoUrl);
+        container.setAttribute('data-post-id', postId);
+        
+        // Get the best thumbnail URL
+        const thumbUrl = thumbnailUrl || this.getVideoThumbnail(postData || { videoUrl });
+        
+        const img = document.createElement('img');
+        img.className = 'video-thumbnail-image';
+        img.src = thumbUrl;
+        img.alt = 'Video thumbnail';
+        img.loading = 'lazy';
+        
+        // Add error handler for broken thumbnails
+        img.onerror = () => {
+            img.src = 'images/video-placeholder.jpg';
+        };
+        
+        const playButton = document.createElement('div');
+        playButton.className = 'video-play-button-center';
+        playButton.innerHTML = '<i class="fas fa-play"></i>';
+        
+        const durationBadge = document.createElement('span');
+        durationBadge.className = 'video-duration-overlay';
+        durationBadge.textContent = this.formatDuration(duration);
+        
+        container.appendChild(img);
+        container.appendChild(playButton);
+        container.appendChild(durationBadge);
+        
+        // Add format badge if we have post data
+        if (postData) {
+            this.addVideoBadges(container, postData);
+        }
+        
+        // Click to play video
+        container.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.playVideo(postId, videoUrl, thumbUrl, duration);
+        });
+        
+        return container;
+    }
+
+    /**
+     * Add informational badges to video thumbnail
+     */
+    addVideoBadges(container, postData) {
+        // Add video info badge
+        const infoBadge = document.createElement('div');
+        infoBadge.className = 'video-info-badge';
+        infoBadge.innerHTML = '<i class="fas fa-video"></i> Video Post';
+        container.appendChild(infoBadge);
+        
+        // Add format badge if available
+        if (postData.videoFormat) {
+            const formatBadge = document.createElement('div');
+            formatBadge.className = 'video-format-badge';
+            formatBadge.innerHTML = `<i class="fas fa-file-video"></i> ${postData.videoFormat.extension || 'MP4'}`;
+            container.appendChild(formatBadge);
+        }
+        
+        // Add warning badge for problematic formats
+        if (postData.needsConversion) {
+            const warningBadge = document.createElement('div');
+            warningBadge.className = 'video-warning-badge';
+            warningBadge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Optimizing...';
+            container.appendChild(warningBadge);
+        }
+        
+        if (postData.isPhoneVideo) {
+            const phoneBadge = document.createElement('div');
+            phoneBadge.className = 'video-warning-badge';
+            phoneBadge.style.background = 'rgba(0, 123, 255, 0.9)';
+            phoneBadge.style.color = 'white';
+            phoneBadge.innerHTML = '<i class="fas fa-mobile-alt"></i> Mobile Video';
+            container.appendChild(phoneBadge);
+        }
+    }
+    
+    playVideo(postId, videoUrl, thumbnailUrl, duration) {
+        const container = document.getElementById(`video-container-${postId}`);
+        if (!container) return;
+        
+        // Clear container and add custom video player
+        container.innerHTML = '';
+        const player = this.createCustomVideoPlayer(videoUrl, thumbnailUrl, duration);
+        container.appendChild(player.container);
+        
+        // Auto-play the video
+        setTimeout(() => {
+            player.video.play().catch(e => console.log('Auto-play prevented:', e));
+        }, 100);
     }
 
     // ==================== CUSTOM VIDEO PLAYER ====================
@@ -912,19 +1317,29 @@ class SocialManager {
         const video = document.createElement('video');
         video.className = 'custom-video-player';
         video.preload = 'metadata';
-        video.poster = thumbnailUrl || '';
+        video.poster = thumbnailUrl || this.generateCloudinaryThumbnail(videoUrl);
         video.innerHTML = `<source src="${videoUrl}" type="video/mp4">Your browser does not support the video tag.`;
         
         video.controls = false;
         
-        const controls = document.createElement('div');
-        controls.className = 'video-controls';
+        // Controls overlay
+        const controlsOverlay = document.createElement('div');
+        controlsOverlay.className = 'video-controls-overlay';
+        
+        const centerPlayBtn = document.createElement('div');
+        centerPlayBtn.className = 'video-center-play-btn';
+        centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+        controlsOverlay.appendChild(centerPlayBtn);
+        
+        // Bottom controls
+        const bottomControls = document.createElement('div');
+        bottomControls.className = 'video-bottom-controls';
         
         const controlBar = document.createElement('div');
         controlBar.className = 'control-bar';
         
         const playPauseBtn = document.createElement('button');
-        playPauseBtn.className = 'control-btn play-pause';
+        playPauseBtn.className = 'control-btn';
         playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
         
         const progressContainer = document.createElement('div');
@@ -960,37 +1375,44 @@ class SocialManager {
         controlBar.appendChild(volumeControl);
         controlBar.appendChild(fullscreenBtn);
         
-        controls.appendChild(controlBar);
-        
-        if (duration) {
-            const durationBadge = document.createElement('span');
-            durationBadge.className = 'video-duration-badge';
-            durationBadge.textContent = this.formatDuration(duration);
-            container.appendChild(durationBadge);
-        }
+        bottomControls.appendChild(controlBar);
         
         container.appendChild(video);
-        container.appendChild(controls);
+        container.appendChild(controlsOverlay);
+        container.appendChild(bottomControls);
         
+        // Video event listeners
         let hideControlsTimeout;
         
         const showControls = () => {
-            controls.classList.add('show');
+            controlsOverlay.style.opacity = '1';
+            bottomControls.style.opacity = '1';
             clearTimeout(hideControlsTimeout);
             hideControlsTimeout = setTimeout(() => {
                 if (!video.paused) {
-                    controls.classList.remove('show');
+                    controlsOverlay.style.opacity = '0';
+                    bottomControls.style.opacity = '0';
                 }
             }, 3000);
         };
         
         const updateProgress = () => {
-            const percent = (video.currentTime / video.duration) * 100;
-            progressFill.style.width = percent + '%';
-            
-            const current = this.formatDuration(video.currentTime);
-            const total = this.formatDuration(video.duration);
-            timeDisplay.textContent = `${current} / ${total}`;
+            if (video.duration) {
+                const percent = (video.currentTime / video.duration) * 100;
+                progressFill.style.width = percent + '%';
+                
+                const current = this.formatDuration(video.currentTime);
+                const total = this.formatDuration(video.duration);
+                timeDisplay.textContent = `${current} / ${total}`;
+            }
+        };
+        
+        const togglePlay = () => {
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
         };
         
         video.addEventListener('loadedmetadata', () => {
@@ -1001,38 +1423,53 @@ class SocialManager {
         
         video.addEventListener('play', () => {
             playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            centerPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
             showControls();
         });
         
         video.addEventListener('pause', () => {
             playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-            controls.classList.add('show');
+            centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+            controlsOverlay.style.opacity = '1';
+            bottomControls.style.opacity = '1';
             clearTimeout(hideControlsTimeout);
+        });
+        
+        video.addEventListener('ended', () => {
+            playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+            controlsOverlay.style.opacity = '1';
+            bottomControls.style.opacity = '1';
         });
         
         container.addEventListener('mouseenter', showControls);
         container.addEventListener('mouseleave', () => {
             if (!video.paused) {
-                controls.classList.remove('show');
+                controlsOverlay.style.opacity = '0';
+                bottomControls.style.opacity = '0';
             }
+        });
+        
+        // Click handlers
+        centerPlayBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePlay();
         });
         
         playPauseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (video.paused) {
-                video.play();
-            } else {
-                video.pause();
-            }
+            togglePlay();
         });
         
         progressContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
             const rect = progressContainer.getBoundingClientRect();
             const percent = (e.clientX - rect.left) / rect.width;
             video.currentTime = percent * video.duration;
         });
         
-        volumeBtn.addEventListener('click', () => {
+        volumeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             video.muted = !video.muted;
             volumeBtn.innerHTML = video.muted ? 
                 '<i class="fas fa-volume-mute"></i>' : 
@@ -1041,6 +1478,7 @@ class SocialManager {
         });
         
         volumeSlider.addEventListener('click', (e) => {
+            e.stopPropagation();
             const rect = volumeSlider.getBoundingClientRect();
             const percent = (e.clientX - rect.left) / rect.width;
             video.volume = Math.max(0, Math.min(1, percent));
@@ -1049,7 +1487,8 @@ class SocialManager {
             volumeFill.style.width = (video.volume * 100) + '%';
         });
         
-        fullscreenBtn.addEventListener('click', () => {
+        fullscreenBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (!document.fullscreenElement) {
                 container.requestFullscreen();
                 fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
@@ -1076,43 +1515,153 @@ class SocialManager {
         return { container, video };
     }
 
-    // ==================== FORMAT COUNT FUNCTION ====================
-    formatCount(count) {
-        if (!count && count !== 0) return '0';
-        
-        const num = typeof count === 'number' ? count : parseInt(count);
-        
-        if (isNaN(num)) return '0';
-        
-        if (num >= 1000000) {
-            return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-        } else if (num >= 1000) {
-            return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-        }
-        
-        return num.toString();
+    // ==================== VIDEO PLACEHOLDER METHODS ====================
+    
+    createVideoPlaceholder() {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'video-placeholder';
+        placeholder.innerHTML = `
+            <div class="video-placeholder-content">
+                <i class="fas fa-video"></i>
+                <p>Loading video...</p>
+            </div>
+        `;
+        return placeholder;
     }
 
-    // ==================== VIDEO UPLOAD & PROCESSING ====================
+    // ==================== VIDEO VALIDATION METHODS ====================
     
-    validateVideoFile(file) {
+    /**
+     * Validate video file for compatibility
+     */
+    async validateVideoFile(file) {
+        // Check file size
         if (file.size > this.maxVideoSize) {
-            throw new Error(`Video file too large. Maximum size is ${this.maxVideoSize / (1024 * 1024)}MB`);
+            throw new Error(`Video file too large. Maximum size is ${this.formatFileSize(this.maxVideoSize)}`);
         }
         
-        if (!this.allowedVideoTypes.includes(file.type)) {
-            throw new Error('Invalid video format. Please upload MP4, WebM, OGG, or MOV files.');
+        // Check if it's a video file
+        if (!file.type.startsWith('video/') && !this.isLikelyVideoFile(file)) {
+            throw new Error('Please select a valid video file');
+        }
+
+        // Check supported formats
+        const isSupportedFormat = SUPPORTED_VIDEO_FORMATS.some(format => 
+            file.type === format || 
+            file.type.includes(format.replace('video/', ''))
+        );
+
+        const isSupportedExtension = SUPPORTED_EXTENSIONS.some(ext => 
+            file.name.toLowerCase().endsWith(ext)
+        );
+
+        if (!isSupportedFormat && !isSupportedExtension) {
+            // We'll still try to upload as Cloudinary can handle many formats
+            console.warn('Video format may not be fully compatible:', file.type);
         }
         
         return true;
     }
 
+    /**
+     * Check if file is likely a video based on name and properties
+     */
+    isLikelyVideoFile(file) {
+        const videoIndicators = [
+            file.name.toLowerCase().match(/\.(mp4|mov|avi|mkv|wmv|flv|webm|3gp|m4v|mpg|mpeg)$/),
+            file.size > 100000,
+            file.type === '' || file.type === 'application/octet-stream'
+        ];
+        
+        return videoIndicators.some(indicator => indicator);
+    }
+
+    /**
+     * Check if video is downloaded from social media
+     */
+    isDownloadedVideo(file) {
+        const downloadedIndicators = [
+            file.name.match(/(discord|whatsapp|telegram|instagram|facebook|twitter|tiktok|snapchat)/i),
+            file.name.match(/(downloaded|save|received|forwarded)/i),
+            file.size < 10000000 && file.type === 'video/mp4',
+            file.name.includes('-') && file.name.split('-').length > 3,
+        ];
+        
+        return downloadedIndicators.some(indicator => indicator);
+    }
+
+    /**
+     * Check if video needs conversion
+     */
+    needsConversion(file) {
+        const needsConversion = PROBLEMATIC_FORMATS.includes(file.type) || 
+                               this.isDownloadedVideo(file) ||
+                               file.name.toLowerCase().includes('discord') ||
+                               file.name.toLowerCase().includes('whatsapp') ||
+                               file.name.toLowerCase().includes('telegram') ||
+                               file.name.toLowerCase().includes('social') ||
+                               file.name.toLowerCase().includes('downloaded');
+        
+        return needsConversion;
+    }
+
+    /**
+     * Check if video is from common phone formats
+     */
+    isCommonPhoneFormat(file) {
+        const phoneFormats = [
+            'video/mp4',
+            'video/quicktime',
+            'video/x-m4v',
+            'video/3gpp',
+            'video/3gpp2',
+            'video/avi',
+            'video/x-msvideo'
+        ];
+        
+        return phoneFormats.includes(file.type) || 
+               file.name.toLowerCase().includes('iphone') ||
+               file.name.toLowerCase().includes('android') ||
+               file.name.toLowerCase().includes('movi') ||
+               file.name.toLowerCase().includes('vid_') ||
+               file.name.toLowerCase().includes('camera') ||
+               file.name.toLowerCase().includes('record');
+    }
+
+    /**
+     * Check if video is likely from a phone
+     */
+    isLikelyPhoneVideo(file) {
+        return this.isCommonPhoneFormat(file) || 
+               file.name.match(/(IMG_|VID_|PXL_|MVIMG_|CAM_|REC_)/i) !== null ||
+               file.name.toLowerCase().includes('whatsapp') ||
+               file.name.toLowerCase().includes('camera') ||
+               file.type === 'video/quicktime' ||
+               file.type === 'video/mp4' ||
+               file.type === 'video/3gpp';
+    }
+
+    /**
+     * Get video format information
+     */
+    getVideoFormat(file) {
+        return {
+            mimeType: file.type,
+            extension: file.name.split('.').pop().toLowerCase(),
+            isCommonPhoneFormat: this.isCommonPhoneFormat(file),
+            isDownloaded: this.isDownloadedVideo(file),
+            needsConversion: this.needsConversion(file)
+        };
+    }
+
+    // ==================== VIDEO UPLOAD & PROCESSING ====================
+    
     async uploadMediaToCloudinary(file) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', cloudinaryConfig.uploadPreset);
         
-        const isVideo = file.type.startsWith('video/');
+        const isVideo = file.type.startsWith('video/') || this.isLikelyVideoFile(file);
         const resourceType = isVideo ? 'video' : 'image';
         
         formData.append('resource_type', resourceType);
@@ -1142,17 +1691,30 @@ class SocialManager {
             }
             
             if (isVideo) {
-                const thumbnailUrl = data.secure_url.replace('/upload/', '/upload/w_600,h_338,c_fill,q_auto/');
+                // Generate high-quality thumbnail URL
+                const videoUrl = data.secure_url;
+                // Get thumbnail at 1 second with specific dimensions
+                const thumbnailUrl = this.generateCloudinaryThumbnail(videoUrl);
+                const posterUrl = videoUrl.replace('/upload/', '/upload/w_1200,h_675,c_fill,q_auto,f_auto/so_1/');
+                
+                console.log('Generated thumbnail URL:', thumbnailUrl);
                 
                 return {
-                    url: data.secure_url,
+                    url: videoUrl,
                     type: 'video',
                     duration: data.duration || 0,
                     width: data.width,
                     height: data.height,
                     format: data.format,
                     publicId: data.public_id,
-                    thumbnail: thumbnailUrl
+                    thumbnail: thumbnailUrl,
+                    poster: posterUrl,
+                    videoFormat: {
+                        extension: file.name.split('.').pop().toLowerCase(),
+                        mimeType: file.type,
+                        isPhoneVideo: this.isLikelyPhoneVideo(file),
+                        needsConversion: this.needsConversion(file)
+                    }
                 };
             }
             
@@ -1206,27 +1768,109 @@ class SocialManager {
         }
     }
 
-    previewMedia(file) {
+    async previewMedia(file) {
         const preview = document.getElementById('mediaPreview');
         if (!preview) return;
 
         if (file) {
-            const reader = new FileReader();
-            
-            if (file.type.startsWith('video/')) {
-                preview.innerHTML = `
-                    <div class="media-type-badge">
-                        <i class="fas fa-video"></i> Video
-                    </div>
-                    <div class="post-video-container">
-                        <video controls style="width: 100%; height: 100%; object-fit: contain;">
-                            <source src="${URL.createObjectURL(file)}" type="${file.type}">
-                            Your browser does not support the video tag.
-                        </video>
-                    </div>
-                `;
-                preview.style.display = 'block';
+            if (file.type.startsWith('video/') || this.isLikelyVideoFile(file)) {
+                // Validate file first
+                try {
+                    await this.validateVideoFile(file);
+                } catch (error) {
+                    preview.innerHTML = `
+                        <div class="media-type-badge" style="background: #dc2626;">
+                            <i class="fas fa-exclamation-triangle"></i> Error
+                        </div>
+                        <p style="color: #dc2626; padding: 20px;">${error.message}</p>
+                    `;
+                    preview.style.display = 'block';
+                    return;
+                }
+
+                // Create video element to generate thumbnail
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.onloadedmetadata = () => {
+                    // Seek to 1 second for thumbnail
+                    video.currentTime = Math.min(1, video.duration / 2);
+                };
+                video.onseeked = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    // Determine video info
+                    const isPhoneVideo = this.isLikelyPhoneVideo(file);
+                    const needsConversion = this.needsConversion(file);
+                    const format = this.getVideoFormat(file);
+                    
+                    let statusMessage = '';
+                    let statusColor = '#4CAF50';
+                    let statusIcon = 'check-circle';
+                    
+                    if (needsConversion) {
+                        statusMessage = ' - May need optimization for best playback';
+                        statusColor = '#f59e0b';
+                        statusIcon = 'exclamation-triangle';
+                    }
+                    
+                    if (isPhoneVideo) {
+                        statusMessage += ' - Mobile video detected';
+                    }
+                    
+                    preview.innerHTML = `
+                        <div class="media-type-badge" style="background: #ff4b6e;">
+                            <i class="fas fa-video"></i> Video Ready
+                        </div>
+                        <div style="position: relative;">
+                            <div class="video-thumbnail-container" style="cursor: default;">
+                                <img src="${thumbnailUrl}" class="video-thumbnail-image" alt="Video thumbnail">
+                                <div class="video-play-button-center" style="background: rgba(255,75,110,0.95);">
+                                    <i class="fas fa-play"></i>
+                                </div>
+                                <span class="video-duration-overlay">${this.formatDuration(video.duration)}</span>
+                            </div>
+                            <div class="video-info-badge">
+                                <i class="fas fa-file-video"></i> ${format.extension.toUpperCase()}
+                            </div>
+                            ${isPhoneVideo ? `
+                                <div class="video-info-badge" style="top: 60px; background: rgba(0, 123, 255, 0.9);">
+                                    <i class="fas fa-mobile-alt"></i> Mobile
+                                </div>
+                            ` : ''}
+                            ${needsConversion ? `
+                                <div class="video-warning-badge">
+                                    <i class="fas fa-exclamation-triangle"></i> Optimization recommended
+                                </div>
+                            ` : ''}
+                        </div>
+                        <p style="margin-top: 10px; font-size: 14px; color: ${statusColor};">
+                            <i class="fas fa-${statusIcon}"></i> 
+                            ${file.name} (${this.formatFileSize(file.size)})${statusMessage}
+                        </p>
+                    `;
+                    preview.style.display = 'block';
+                    
+                    // Clean up
+                    URL.revokeObjectURL(video.src);
+                };
+                video.onerror = () => {
+                    preview.innerHTML = `
+                        <div class="media-type-badge" style="background: #dc2626;">
+                            <i class="fas fa-exclamation-triangle"></i> Error
+                        </div>
+                        <p style="color: #dc2626; padding: 20px;">Could not preview video. It will still upload correctly.</p>
+                        <p style="font-size: 14px; color: #666;">${file.name} (${this.formatFileSize(file.size)})</p>
+                    `;
+                    preview.style.display = 'block';
+                };
+                video.src = URL.createObjectURL(file);
             } else {
+                const reader = new FileReader();
                 reader.onload = (e) => {
                     preview.innerHTML = `
                         <div class="media-type-badge">
@@ -1275,8 +1919,8 @@ class SocialManager {
                 submitBtn.disabled = true;
                 
                 try {
-                    if (mediaFile.type.startsWith('video/')) {
-                        this.validateVideoFile(mediaFile);
+                    if (mediaFile.type.startsWith('video/') || this.isLikelyVideoFile(mediaFile)) {
+                        await this.validateVideoFile(mediaFile);
                     }
                     
                     mediaData = await this.uploadMediaToCloudinary(mediaFile);
@@ -1308,9 +1952,17 @@ class SocialManager {
                 if (mediaData.type === 'video') {
                     postData.videoUrl = mediaData.url;
                     postData.videoThumbnail = mediaData.thumbnail;
+                    postData.videoPoster = mediaData.poster;
                     postData.videoDuration = mediaData.duration;
                     postData.mediaType = 'video';
                     postData.imageUrl = null;
+                    
+                    // Add video format information
+                    if (mediaData.videoFormat) {
+                        postData.videoFormat = mediaData.videoFormat;
+                        postData.isPhoneVideo = mediaData.videoFormat.isPhoneVideo;
+                        postData.needsConversion = mediaData.videoFormat.needsConversion;
+                    }
                 } else {
                     postData.imageUrl = mediaData.url;
                     postData.mediaType = 'image';
@@ -1318,8 +1970,8 @@ class SocialManager {
                 }
             }
 
-            await addDoc(collection(db, 'posts'), postData);
-            console.log('Post created successfully in Firestore');
+            const docRef = await addDoc(collection(db, 'posts'), postData);
+            console.log('Post created successfully in Firestore with ID:', docRef.id);
             
             this.showNotification('Post created successfully!', 'success');
             
@@ -1479,14 +2131,6 @@ class SocialManager {
         this.shuffleArray(otherPosts);
         
         return [...highLikesPosts, ...followedUserPosts, ...otherPosts];
-    }
-
-    shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
     }
 
     // ==================== FOLLOWERS FUNCTIONALITY ====================
@@ -1772,8 +2416,21 @@ class SocialManager {
         if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl || post.imageUrl;
             if (videoUrl) {
-                const player = this.createCustomVideoPlayer(videoUrl, post.videoThumbnail, post.videoDuration);
-                postContentHTML = `<div class="post-video-container">${player.container.outerHTML}</div>`;
+                postContentHTML = `<div id="video-container-${post.id}"></div>`;
+                
+                setTimeout(() => {
+                    const videoContainer = document.getElementById(`video-container-${post.id}`);
+                    if (videoContainer) {
+                        const thumbnail = this.createVideoThumbnail(
+                            videoUrl, 
+                            this.getVideoThumbnail(post), 
+                            post.videoDuration, 
+                            post.id,
+                            post
+                        );
+                        videoContainer.appendChild(thumbnail);
+                    }
+                }, 50);
             }
         }
         else if (post.imageUrl) {
@@ -1853,13 +2510,6 @@ class SocialManager {
                 }
             });
         }
-    }
-
-    formatDuration(seconds) {
-        if (!seconds || isNaN(seconds)) return '0:00';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
     async loadCommentsForPage(postId) {
@@ -1960,14 +2610,15 @@ class SocialManager {
                 setTimeout(() => {
                     const container = document.getElementById(`video-container-${postId}`);
                     if (container) {
-                        const placeholder = this.createVideoPlaceholder();
-                        container.appendChild(placeholder);
-                        
-                        setTimeout(() => {
-                            const player = this.createCustomVideoPlayer(videoUrl, post.videoThumbnail, post.videoDuration);
-                            container.innerHTML = '';
-                            container.appendChild(player.container);
-                        }, 100);
+                        // Show thumbnail with all badges
+                        const thumbnail = this.createVideoThumbnail(
+                            videoUrl, 
+                            this.getVideoThumbnail(post), 
+                            post.videoDuration, 
+                            postId,
+                            post
+                        );
+                        container.appendChild(thumbnail);
                     }
                 }, 50);
             }
@@ -2250,27 +2901,6 @@ class SocialManager {
             }
         } catch (error) {
             console.error('Error liking post:', error);
-        }
-    }
-
-    formatTime(timestamp) {
-        if (!timestamp) return 'Just now';
-        
-        try {
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            const now = new Date();
-            const diff = now - date;
-            const minutes = Math.floor(diff / 60000);
-            const hours = Math.floor(minutes / 60);
-            const days = Math.floor(hours / 24);
-
-            if (minutes < 1) return 'Just now';
-            if (minutes < 60) return `${minutes}m ago`;
-            if (hours < 24) return `${hours}h ago`;
-            if (days < 7) return `${days}d ago`;
-            return date.toLocaleDateString();
-        } catch (error) {
-            return 'Recently';
         }
     }
 
@@ -3011,14 +3641,14 @@ class SocialManager {
                 setTimeout(() => {
                     const container = document.getElementById(`profile-video-container-${postId}`);
                     if (container) {
-                        const placeholder = this.createVideoPlaceholder();
-                        container.appendChild(placeholder);
-                        
-                        setTimeout(() => {
-                            const player = this.createCustomVideoPlayer(videoUrl, post.videoThumbnail, post.videoDuration);
-                            container.innerHTML = '';
-                            container.appendChild(player.container);
-                        }, 100);
+                        const thumbnail = this.createVideoThumbnail(
+                            videoUrl, 
+                            this.getVideoThumbnail(post), 
+                            post.videoDuration, 
+                            postId,
+                            post
+                        );
+                        container.appendChild(thumbnail);
                     }
                 }, 50);
             }
@@ -3280,14 +3910,14 @@ class SocialManager {
                 setTimeout(() => {
                     const container = document.getElementById(`user-video-container-${postId}`);
                     if (container) {
-                        const placeholder = this.createVideoPlaceholder();
-                        container.appendChild(placeholder);
-                        
-                        setTimeout(() => {
-                            const player = this.createCustomVideoPlayer(videoUrl, post.videoThumbnail, post.videoDuration);
-                            container.innerHTML = '';
-                            container.appendChild(player.container);
-                        }, 100);
+                        const thumbnail = this.createVideoThumbnail(
+                            videoUrl, 
+                            this.getVideoThumbnail(post), 
+                            post.videoDuration, 
+                            postId,
+                            post
+                        );
+                        container.appendChild(thumbnail);
                     }
                 }, 50);
             }
@@ -3360,12 +3990,14 @@ class SocialManager {
         if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl || post.imageUrl;
             if (videoUrl) {
+                const thumbnail = this.getVideoThumbnail(post);
                 previewHTML += `
                     <div class="preview-image">
                         <div style="position: relative; width: 100%; padding-bottom: 56.25%; background: #000;">
-                            <video style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;" controls>
-                                <source src="${videoUrl}" type="video/mp4">
-                            </video>
+                            <img src="${thumbnail}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;" alt="Video thumbnail">
+                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; background: rgba(255,75,110,0.95); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid white;">
+                                <i class="fas fa-play"></i>
+                            </div>
                         </div>
                         <span class="media-badge"><i class="fas fa-video"></i> Video</span>
                     </div>
