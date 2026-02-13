@@ -1,4 +1,4 @@
-// social.js - Complete independent social features module for dating site WITH PAGINATION, FOLLOWERS INTEGRATION, AND VIDEO POSTING
+// social.js - Complete independent social features module for dating site WITH POLLING, REPLIES, FOLLOWERS INTEGRATION, AND VIDEO POSTING
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -40,7 +40,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Cloudinary configuration - SAME UPLOAD PRESET FOR BOTH IMAGES AND VIDEOS
+// Cloudinary configuration
 const cloudinaryConfig = {
     cloudName: "ddtdqrh1b",
     uploadPreset: "profile-pictures",
@@ -132,6 +132,10 @@ class SocialManager {
         
         // Flag to prevent double submission
         this.isSubmitting = false;
+        
+        // Poll settings
+        this.maxPollOptions = 4;
+        this.minPollOptions = 2;
         
         // Add all styles
         this.addAllStyles();
@@ -296,6 +300,662 @@ class SocialManager {
                     letter-spacing: 0.5px;
                     backdrop-filter: blur(4px);
                     border: 1px solid rgba(255,255,255,0.2);
+                }
+
+                /* ========== POLL STYLES ========== */
+                .poll-toggle-btn {
+                    background: transparent;
+                    border: 1px dashed var(--primary, #ff4b6e);
+                    color: var(--primary, #ff4b6e);
+                    padding: 10px 16px;
+                    border-radius: 20px;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    margin: 10px 0;
+                    transition: all 0.3s;
+                }
+                
+                .poll-toggle-btn:hover {
+                    background: var(--primary, #ff4b6e);
+                    color: white;
+                    border-style: solid;
+                }
+                
+                .poll-toggle-btn.active {
+                    background: var(--primary, #ff4b6e);
+                    color: white;
+                    border-style: solid;
+                }
+                
+                .poll-builder {
+                    background: var(--bg-secondary, #f8f9fa);
+                    border-radius: 12px;
+                    padding: 20px;
+                    margin: 15px 0;
+                    border: 1px solid var(--border, #e9ecef);
+                }
+                
+                .dark-mode .poll-builder {
+                    background: var(--bg-secondary-dark, #2c2f33);
+                    border-color: var(--border-dark, #40444b);
+                }
+                
+                .poll-question {
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid var(--border, #e9ecef);
+                    border-radius: 12px;
+                    font-size: 15px;
+                    background: var(--bg-primary, white);
+                    color: var(--text-primary, #2c3e50);
+                    margin-bottom: 15px;
+                }
+                
+                .dark-mode .poll-question {
+                    background: var(--bg-primary-dark, #36393f);
+                    border-color: var(--border-dark, #40444b);
+                    color: var(--text-primary-dark, #fff);
+                }
+                
+                .poll-options-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    margin-bottom: 15px;
+                }
+                
+                .poll-option-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+                
+                .poll-option-input {
+                    flex: 1;
+                    padding: 10px 14px;
+                    border: 2px solid var(--border, #e9ecef);
+                    border-radius: 10px;
+                    font-size: 14px;
+                    background: var(--bg-primary, white);
+                    color: var(--text-primary, #2c3e50);
+                }
+                
+                .dark-mode .poll-option-input {
+                    background: var(--bg-primary-dark, #36393f);
+                    border-color: var(--border-dark, #40444b);
+                    color: var(--text-primary-dark, #fff);
+                }
+                
+                .remove-poll-option {
+                    background: transparent;
+                    border: none;
+                    color: #dc2626;
+                    cursor: pointer;
+                    padding: 8px;
+                    border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0.7;
+                    transition: all 0.2s;
+                }
+                
+                .remove-poll-option:hover {
+                    opacity: 1;
+                    background: rgba(220, 38, 38, 0.1);
+                }
+                
+                .add-poll-option {
+                    background: transparent;
+                    border: 1px dashed var(--success, #10b981);
+                    color: var(--success, #10b981);
+                    padding: 10px 16px;
+                    border-radius: 20px;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    margin-top: 5px;
+                    transition: all 0.3s;
+                }
+                
+                .add-poll-option:hover {
+                    background: var(--success, #10b981);
+                    color: white;
+                    border-style: solid;
+                }
+                
+                .add-poll-option.disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                    border-color: #999;
+                    color: #999;
+                }
+                
+                .poll-preview {
+                    margin-top: 15px;
+                    padding-top: 15px;
+                    border-top: 1px solid var(--border, #e9ecef);
+                    font-size: 13px;
+                    color: var(--text-light, #6c757d);
+                }
+                
+                .post-poll-container {
+                    background: var(--bg-secondary, #f8f9fa);
+                    border-radius: 16px;
+                    padding: 20px;
+                    margin: 15px 0;
+                    border: 1px solid var(--border, #e9ecef);
+                }
+                
+                .dark-mode .post-poll-container {
+                    background: var(--bg-secondary-dark, #2c2f33);
+                    border-color: var(--border-dark, #40444b);
+                }
+                
+                .poll-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 16px;
+                    padding-bottom: 12px;
+                    border-bottom: 1px solid var(--border, #e9ecef);
+                }
+                
+                .poll-header i {
+                    color: var(--primary, #ff4b6e);
+                    font-size: 20px;
+                }
+                
+                .poll-header h4 {
+                    margin: 0;
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: var(--text-primary, #2c3e50);
+                }
+                
+                .poll-question-display {
+                    font-size: 16px;
+                    font-weight: 500;
+                    color: var(--text-primary, #2c3e50);
+                    margin-bottom: 16px;
+                    padding: 0 4px;
+                }
+                
+                .poll-options-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    margin-bottom: 16px;
+                }
+                
+                .poll-option-item {
+                    position: relative;
+                }
+                
+                .poll-option-content {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 12px 16px;
+                    background: var(--bg-primary, white);
+                    border: 2px solid var(--border, #e9ecef);
+                    border-radius: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    position: relative;
+                    z-index: 2;
+                }
+                
+                .dark-mode .poll-option-content {
+                    background: var(--bg-primary-dark, #36393f);
+                    border-color: var(--border-dark, #40444b);
+                }
+                
+                .poll-option-content:hover {
+                    border-color: var(--primary, #ff4b6e);
+                    background: rgba(255, 75, 110, 0.05);
+                }
+                
+                .poll-option-content.voted {
+                    border-color: var(--primary, #ff4b6e);
+                    background: rgba(255, 75, 110, 0.1);
+                }
+                
+                .poll-option-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    flex: 1;
+                }
+                
+                .poll-radio {
+                    width: 20px;
+                    height: 20px;
+                    border: 2px solid var(--border, #e9ecef);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s;
+                }
+                
+                .poll-option-content:hover .poll-radio {
+                    border-color: var(--primary, #ff4b6e);
+                }
+                
+                .poll-option-content.voted .poll-radio {
+                    border-color: var(--primary, #ff4b6e);
+                    background: var(--primary, #ff4b6e);
+                    position: relative;
+                }
+                
+                .poll-option-content.voted .poll-radio::after {
+                    content: '';
+                    width: 10px;
+                    height: 10px;
+                    background: white;
+                    border-radius: 50%;
+                }
+                
+                .poll-option-text {
+                    font-size: 15px;
+                    color: var(--text-primary, #2c3e50);
+                    font-weight: 500;
+                }
+                
+                .poll-option-right {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                
+                .poll-percentage {
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: var(--primary, #ff4b6e);
+                    min-width: 50px;
+                    text-align: right;
+                }
+                
+                .poll-count {
+                    font-size: 13px;
+                    color: var(--text-light, #6c757d);
+                }
+                
+                .poll-progress-bar-bg {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    background: rgba(255, 75, 110, 0.15);
+                    border-radius: 12px;
+                    transition: width 0.5s ease;
+                    z-index: 1;
+                    pointer-events: none;
+                }
+                
+                .poll-footer {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: 16px;
+                    padding-top: 12px;
+                    border-top: 1px solid var(--border, #e9ecef);
+                    font-size: 13px;
+                    color: var(--text-light, #6c757d);
+                }
+                
+                .poll-total-votes {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                
+                .poll-total-votes i {
+                    color: var(--primary, #ff4b6e);
+                }
+                
+                .poll-closed-badge {
+                    background: var(--warning, #f59e0b);
+                    color: white;
+                    padding: 4px 10px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                }
+
+                /* ========== COMMENT REPLIES STYLES - FIXED FOR TIKTOK LAYOUT ========== */
+                .comment-item {
+                    position: relative;
+                    padding: 12px;
+                    margin-bottom: 8px;
+                    background: var(--bg-secondary, #f8f9fa);
+                    border-radius: 12px;
+                    border: 1px solid var(--border, #e9ecef);
+                }
+                
+                .dark-mode .comment-item {
+                    background: var(--bg-secondary-dark, #2c2f33);
+                    border-color: var(--border-dark, #40444b);
+                }
+                
+                .comment-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 8px;
+                }
+                
+                .comment-avatar {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                }
+                
+                .comment-info {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                }
+                
+                .comment-info strong {
+                    font-size: 13px;
+                    color: var(--text-primary, #2c3e50);
+                }
+                
+                .comment-time {
+                    font-size: 11px;
+                    color: var(--text-light, #6c757d);
+                }
+                
+                .comment-text {
+                    font-size: 14px;
+                    color: var(--text-primary, #2c3e50);
+                    line-height: 1.5;
+                    margin-left: 42px;
+                    margin-bottom: 8px;
+                    word-wrap: break-word;
+                }
+                
+                .comment-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                    margin-left: 42px;
+                    margin-bottom: 8px;
+                }
+                
+                .comment-action-btn {
+                    background: transparent;
+                    border: none;
+                    color: var(--text-light, #6c757d);
+                    font-size: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 4px 8px;
+                    border-radius: 16px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                
+                .comment-action-btn:hover {
+                    background: rgba(255, 75, 110, 0.1);
+                    color: var(--primary, #ff4b6e);
+                }
+                
+                .comment-action-btn.reply {
+                    color: var(--primary, #ff4b6e);
+                }
+                
+                .comment-action-btn i {
+                    font-size: 12px;
+                }
+                
+                /* FIXED: View replies button - now at BOTTOM like TikTok */
+                .view-replies-btn {
+                    background: transparent;
+                    border: none;
+                    color: var(--primary, #ff4b6e);
+                    font-size: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    cursor: pointer;
+                    margin-left: 42px;
+                    margin-top: 4px;
+                    margin-bottom: 4px;
+                    font-weight: 500;
+                }
+                
+                .view-replies-btn:hover {
+                    background: rgba(255, 75, 110, 0.1);
+                }
+                
+                .view-replies-btn i {
+                    transition: transform 0.2s;
+                    font-size: 10px;
+                }
+                
+                .view-replies-btn.active i {
+                    transform: rotate(90deg);
+                }
+                
+                .replies-container {
+                    margin-left: 42px;
+                    margin-top: 8px;
+                    margin-bottom: 4px;
+                    padding-left: 16px;
+                    border-left: 2px solid var(--border, #e9ecef);
+                }
+                
+                .dark-mode .replies-container {
+                    border-left-color: var(--border-dark, #40444b);
+                }
+                
+                .reply-item {
+                    padding: 10px;
+                    margin-bottom: 8px;
+                    background: var(--bg-primary, white);
+                    border-radius: 10px;
+                    border: 1px solid var(--border, #e9ecef);
+                }
+                
+                .dark-mode .reply-item {
+                    background: var(--bg-primary-dark, #36393f);
+                    border-color: var(--border-dark, #40444b);
+                }
+                
+                .reply-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 4px;
+                }
+                
+                .reply-avatar {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                }
+                
+                .reply-info {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                }
+                
+                .reply-info strong {
+                    font-size: 12px;
+                    color: var(--text-primary, #2c3e50);
+                }
+                
+                .reply-time {
+                    font-size: 10px;
+                    color: var(--text-light, #6c757d);
+                }
+                
+                .reply-text {
+                    font-size: 13px;
+                    color: var(--text-primary, #2c3e50);
+                    margin-left: 34px;
+                    margin-bottom: 4px;
+                    word-wrap: break-word;
+                }
+                
+                .reply-mention {
+                    color: var(--primary, #ff4b6e);
+                    font-weight: 600;
+                    margin-right: 4px;
+                }
+                
+                .reply-modal {
+                    position: fixed;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    background: var(--bg-primary, white);
+                    border-top: 2px solid var(--border, #e9ecef);
+                    padding: 16px;
+                    z-index: 10000;
+                    display: none;
+                    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+                    animation: slideUp 0.3s ease;
+                }
+                
+                .dark-mode .reply-modal {
+                    background: var(--bg-primary-dark, #36393f);
+                    border-top-color: var(--border-dark, #40444b);
+                }
+                
+                @keyframes slideUp {
+                    from {
+                        transform: translateY(100%);
+                    }
+                    to {
+                        transform: translateY(0);
+                    }
+                }
+                
+                .reply-modal-content {
+                    max-width: 600px;
+                    margin: 0 auto;
+                }
+                
+                .reply-to-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    margin-bottom: 16px;
+                    padding-bottom: 12px;
+                    border-bottom: 1px solid var(--border, #e9ecef);
+                }
+                
+                .reply-to-avatar {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                }
+                
+                .reply-to-details {
+                    flex: 1;
+                }
+                
+                .reply-to-name {
+                    font-weight: 600;
+                    color: var(--text-primary, #2c3e50);
+                    font-size: 14px;
+                }
+                
+                .reply-to-text {
+                    font-size: 13px;
+                    color: var(--text-light, #6c757d);
+                    margin-top: 2px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    max-width: 400px;
+                }
+                
+                .reply-modal-input-container {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                
+                .reply-modal-input {
+                    flex: 1;
+                    padding: 14px 18px;
+                    border: 2px solid var(--border, #e9ecef);
+                    border-radius: 30px;
+                    font-size: 15px;
+                    background: var(--bg-secondary, #f8f9fa);
+                    color: var(--text-primary, #2c3e50);
+                }
+                
+                .dark-mode .reply-modal-input {
+                    background: var(--bg-secondary-dark, #2c2f33);
+                    border-color: var(--border-dark, #40444b);
+                    color: var(--text-primary-dark, #fff);
+                }
+                
+                .reply-modal-send {
+                    background: var(--primary, #ff4b6e);
+                    border: none;
+                    color: white;
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                
+                .reply-modal-send:hover {
+                    transform: scale(1.1);
+                }
+                
+                .reply-modal-send i {
+                    font-size: 18px;
+                }
+                
+                .reply-modal-close {
+                    position: absolute;
+                    top: 16px;
+                    right: 16px;
+                    background: transparent;
+                    border: none;
+                    color: var(--text-light, #6c757d);
+                    font-size: 24px;
+                    cursor: pointer;
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 50%;
+                }
+                
+                .reply-modal-close:hover {
+                    background: rgba(0,0,0,0.1);
+                }
+                
+                .dark-mode .reply-modal-close:hover {
+                    background: rgba(255,255,255,0.1);
                 }
 
                 /* ========== VIDEO PLACEHOLDER STYLES ========== */
@@ -1139,6 +1799,26 @@ class SocialManager {
                         height: 50px;
                         font-size: 20px;
                     }
+                    
+                    .poll-option-content {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 8px;
+                    }
+                    
+                    .poll-option-right {
+                        width: 100%;
+                        justify-content: space-between;
+                    }
+                    
+                    .reply-modal-input-container {
+                        flex-wrap: wrap;
+                    }
+                    
+                    .reply-modal-send {
+                        width: 100%;
+                        border-radius: 30px;
+                    }
                 }
             `;
             document.head.appendChild(style);
@@ -1147,38 +1827,28 @@ class SocialManager {
 
     // ==================== VIDEO THUMBNAIL METHODS ====================
     
-    /**
-     * Get the best available thumbnail for a video
-     */
     getVideoThumbnail(post) {
         if (!post) {
             return 'images/video-placeholder.jpg';
         }
         
-        // Check if we have a stored thumbnail
         if (post.videoThumbnail && post.videoThumbnail !== 'images/video-placeholder.jpg' && 
             post.videoThumbnail !== 'null' && post.videoThumbnail !== 'undefined') {
             return post.videoThumbnail;
         }
         
-        // Check for poster image
         if (post.videoPoster && post.videoPoster !== 'images/video-placeholder.jpg' &&
             post.videoPoster !== 'null' && post.videoPoster !== 'undefined') {
             return post.videoPoster;
         }
         
-        // Generate from Cloudinary URL
         if (post.videoUrl && post.videoUrl.includes('cloudinary.com')) {
             return this.generateCloudinaryThumbnail(post.videoUrl);
         }
         
-        // Fallback
         return 'images/video-placeholder.jpg';
     }
     
-    /**
-     * Generate Cloudinary thumbnail URL with proper transformations
-     */
     generateCloudinaryThumbnail(videoUrl) {
         try {
             if (!videoUrl || typeof videoUrl !== 'string') {
@@ -1189,14 +1859,11 @@ class SocialManager {
                 return 'images/video-placeholder.jpg';
             }
 
-            // Handle different Cloudinary URL patterns
             if (videoUrl.includes('/upload/')) {
                 if (videoUrl.includes('/upload/video/')) {
-                    // For video-specific URLs
                     return videoUrl.replace('/upload/video/', '/upload/w_600,h_338,c_fill,q_auto,f_jpg/')
                                    .replace(/\.(mp4|mov|avi|mkv|webm|ogg|3gp|m4v)$/i, '.jpg');
                 } else {
-                    // Standard URLs
                     return videoUrl.replace('/upload/', '/upload/w_600,h_338,c_fill,q_auto,f_jpg/');
                 }
             }
@@ -1208,16 +1875,12 @@ class SocialManager {
         }
     }
 
-    /**
-     * Create video thumbnail element with all badges
-     */
     createVideoThumbnail(videoUrl, thumbnailUrl, duration, postId, postData = null) {
         const container = document.createElement('div');
         container.className = 'video-thumbnail-container';
         container.setAttribute('data-video-url', videoUrl);
         container.setAttribute('data-post-id', postId);
         
-        // Get the best thumbnail URL
         const thumbUrl = thumbnailUrl || this.getVideoThumbnail(postData || { videoUrl });
         
         const img = document.createElement('img');
@@ -1226,7 +1889,6 @@ class SocialManager {
         img.alt = 'Video thumbnail';
         img.loading = 'lazy';
         
-        // Add error handler for broken thumbnails
         img.onerror = () => {
             img.src = 'images/video-placeholder.jpg';
         };
@@ -1243,12 +1905,10 @@ class SocialManager {
         container.appendChild(playButton);
         container.appendChild(durationBadge);
         
-        // Add format badge if we have post data
         if (postData) {
             this.addVideoBadges(container, postData);
         }
         
-        // Click to play video
         container.addEventListener('click', (e) => {
             e.stopPropagation();
             this.playVideo(postId, videoUrl, thumbUrl, duration);
@@ -1257,17 +1917,12 @@ class SocialManager {
         return container;
     }
 
-    /**
-     * Add informational badges to video thumbnail
-     */
     addVideoBadges(container, postData) {
-        // Add video info badge
         const infoBadge = document.createElement('div');
         infoBadge.className = 'video-info-badge';
         infoBadge.innerHTML = '<i class="fas fa-video"></i> Video Post';
         container.appendChild(infoBadge);
         
-        // Add format badge if available
         if (postData.videoFormat) {
             const formatBadge = document.createElement('div');
             formatBadge.className = 'video-format-badge';
@@ -1275,7 +1930,6 @@ class SocialManager {
             container.appendChild(formatBadge);
         }
         
-        // Add warning badge for problematic formats
         if (postData.needsConversion) {
             const warningBadge = document.createElement('div');
             warningBadge.className = 'video-warning-badge';
@@ -1297,12 +1951,10 @@ class SocialManager {
         const container = document.getElementById(`video-container-${postId}`);
         if (!container) return;
         
-        // Clear container and add custom video player
         container.innerHTML = '';
         const player = this.createCustomVideoPlayer(videoUrl, thumbnailUrl, duration);
         container.appendChild(player.container);
         
-        // Auto-play the video
         setTimeout(() => {
             player.video.play().catch(e => console.log('Auto-play prevented:', e));
         }, 100);
@@ -1322,7 +1974,6 @@ class SocialManager {
         
         video.controls = false;
         
-        // Controls overlay
         const controlsOverlay = document.createElement('div');
         controlsOverlay.className = 'video-controls-overlay';
         
@@ -1331,7 +1982,6 @@ class SocialManager {
         centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
         controlsOverlay.appendChild(centerPlayBtn);
         
-        // Bottom controls
         const bottomControls = document.createElement('div');
         bottomControls.className = 'video-bottom-controls';
         
@@ -1381,7 +2031,6 @@ class SocialManager {
         container.appendChild(controlsOverlay);
         container.appendChild(bottomControls);
         
-        // Video event listeners
         let hideControlsTimeout;
         
         const showControls = () => {
@@ -1450,7 +2099,6 @@ class SocialManager {
             }
         });
         
-        // Click handlers
         centerPlayBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             togglePlay();
@@ -1531,21 +2179,15 @@ class SocialManager {
 
     // ==================== VIDEO VALIDATION METHODS ====================
     
-    /**
-     * Validate video file for compatibility
-     */
     async validateVideoFile(file) {
-        // Check file size
         if (file.size > this.maxVideoSize) {
             throw new Error(`Video file too large. Maximum size is ${this.formatFileSize(this.maxVideoSize)}`);
         }
         
-        // Check if it's a video file
         if (!file.type.startsWith('video/') && !this.isLikelyVideoFile(file)) {
             throw new Error('Please select a valid video file');
         }
 
-        // Check supported formats
         const isSupportedFormat = SUPPORTED_VIDEO_FORMATS.some(format => 
             file.type === format || 
             file.type.includes(format.replace('video/', ''))
@@ -1556,16 +2198,12 @@ class SocialManager {
         );
 
         if (!isSupportedFormat && !isSupportedExtension) {
-            // We'll still try to upload as Cloudinary can handle many formats
             console.warn('Video format may not be fully compatible:', file.type);
         }
         
         return true;
     }
 
-    /**
-     * Check if file is likely a video based on name and properties
-     */
     isLikelyVideoFile(file) {
         const videoIndicators = [
             file.name.toLowerCase().match(/\.(mp4|mov|avi|mkv|wmv|flv|webm|3gp|m4v|mpg|mpeg)$/),
@@ -1576,9 +2214,6 @@ class SocialManager {
         return videoIndicators.some(indicator => indicator);
     }
 
-    /**
-     * Check if video is downloaded from social media
-     */
     isDownloadedVideo(file) {
         const downloadedIndicators = [
             file.name.match(/(discord|whatsapp|telegram|instagram|facebook|twitter|tiktok|snapchat)/i),
@@ -1590,9 +2225,6 @@ class SocialManager {
         return downloadedIndicators.some(indicator => indicator);
     }
 
-    /**
-     * Check if video needs conversion
-     */
     needsConversion(file) {
         const needsConversion = PROBLEMATIC_FORMATS.includes(file.type) || 
                                this.isDownloadedVideo(file) ||
@@ -1605,9 +2237,6 @@ class SocialManager {
         return needsConversion;
     }
 
-    /**
-     * Check if video is from common phone formats
-     */
     isCommonPhoneFormat(file) {
         const phoneFormats = [
             'video/mp4',
@@ -1628,9 +2257,6 @@ class SocialManager {
                file.name.toLowerCase().includes('record');
     }
 
-    /**
-     * Check if video is likely from a phone
-     */
     isLikelyPhoneVideo(file) {
         return this.isCommonPhoneFormat(file) || 
                file.name.match(/(IMG_|VID_|PXL_|MVIMG_|CAM_|REC_)/i) !== null ||
@@ -1641,9 +2267,6 @@ class SocialManager {
                file.type === 'video/3gpp';
     }
 
-    /**
-     * Get video format information
-     */
     getVideoFormat(file) {
         return {
             mimeType: file.type,
@@ -1691,9 +2314,7 @@ class SocialManager {
             }
             
             if (isVideo) {
-                // Generate high-quality thumbnail URL
                 const videoUrl = data.secure_url;
-                // Get thumbnail at 1 second with specific dimensions
                 const thumbnailUrl = this.generateCloudinaryThumbnail(videoUrl);
                 const posterUrl = videoUrl.replace('/upload/', '/upload/w_1200,h_675,c_fill,q_auto,f_auto/so_1/');
                 
@@ -1733,7 +2354,770 @@ class SocialManager {
         }
     }
 
-    // ==================== CREATE POST WITH VIDEO ====================
+    // ==================== POLLING / VOTING FUNCTIONALITY - FIXED ====================
+    
+    setupPollBuilder() {
+        const createPostForm = document.getElementById('createPostForm');
+        if (!createPostForm) return;
+        
+        if (document.getElementById('pollToggleBtn')) return;
+        
+        const mediaInput = document.getElementById('postMedia');
+        const mediaLabel = document.querySelector('.media-upload-label');
+        
+        if (mediaLabel) {
+            const pollToggle = document.createElement('button');
+            pollToggle.type = 'button';
+            pollToggle.id = 'pollToggleBtn';
+            pollToggle.className = 'poll-toggle-btn';
+            pollToggle.innerHTML = '<i class="fas fa-chart-bar"></i> Add Poll';
+            
+            mediaLabel.parentNode.insertBefore(pollToggle, mediaLabel.nextSibling);
+            
+            pollToggle.addEventListener('click', () => {
+                this.togglePollBuilder();
+            });
+        }
+        
+        this.addPollStyles();
+    }
+    
+    togglePollBuilder() {
+        const pollToggle = document.getElementById('pollToggleBtn');
+        let pollBuilder = document.getElementById('pollBuilder');
+        
+        if (pollBuilder) {
+            pollBuilder.remove();
+            if (pollToggle) {
+                pollToggle.classList.remove('active');
+                pollToggle.innerHTML = '<i class="fas fa-chart-bar"></i> Add Poll';
+            }
+            return;
+        }
+        
+        const createPostForm = document.getElementById('createPostForm');
+        if (!createPostForm) return;
+        
+        pollBuilder = document.createElement('div');
+        pollBuilder.id = 'pollBuilder';
+        pollBuilder.className = 'poll-builder';
+        
+        pollBuilder.innerHTML = `
+            <input type="text" id="pollQuestion" class="poll-question" placeholder="Ask a question..." maxlength="200">
+            <div id="pollOptionsContainer" class="poll-options-container">
+                <div class="poll-option-row">
+                    <input type="text" id="pollOption1" class="poll-option-input" placeholder="Option 1" maxlength="100">
+                    <button type="button" class="remove-poll-option" data-option="1" style="display: none;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="poll-option-row">
+                    <input type="text" id="pollOption2" class="poll-option-input" placeholder="Option 2" maxlength="100">
+                    <button type="button" class="remove-poll-option" data-option="2" style="display: none;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <button type="button" id="addPollOptionBtn" class="add-poll-option">
+                <i class="fas fa-plus"></i> Add Option
+            </button>
+            <div class="poll-preview">
+                <small><i class="fas fa-info-circle"></i> Polls cannot be edited after posting. Min 2 options, Max 4 options.</small>
+            </div>
+        `;
+        
+        const captionInput = document.getElementById('postCaption');
+        if (captionInput) {
+            captionInput.parentNode.insertBefore(pollBuilder, captionInput.nextSibling);
+        } else {
+            createPostForm.appendChild(pollBuilder);
+        }
+        
+        if (pollToggle) {
+            pollToggle.classList.add('active');
+            pollToggle.innerHTML = '<i class="fas fa-trash"></i> Remove Poll';
+        }
+        
+        const addOptionBtn = document.getElementById('addPollOptionBtn');
+        if (addOptionBtn) {
+            addOptionBtn.addEventListener('click', () => {
+                this.addPollOption();
+            });
+        }
+        
+        this.setupRemoveOptionListeners();
+    }
+    
+    setupRemoveOptionListeners() {
+        const removeButtons = document.querySelectorAll('.remove-poll-option');
+        removeButtons.forEach(btn => {
+            btn.removeEventListener('click', this.handleRemoveOption);
+            btn.addEventListener('click', this.handleRemoveOption.bind(this));
+        });
+    }
+    
+    handleRemoveOption(e) {
+        e.preventDefault();
+        const optionRow = e.currentTarget.closest('.poll-option-row');
+        if (optionRow) {
+            optionRow.remove();
+            this.updatePollOptionCount();
+        }
+    }
+    
+    addPollOption() {
+        const optionsContainer = document.getElementById('pollOptionsContainer');
+        const currentOptions = optionsContainer.querySelectorAll('.poll-option-row').length;
+        
+        if (currentOptions >= this.maxPollOptions) {
+            this.showNotification(`Maximum ${this.maxPollOptions} options allowed`, 'warning');
+            return;
+        }
+        
+        const newOptionNumber = currentOptions + 1;
+        const optionRow = document.createElement('div');
+        optionRow.className = 'poll-option-row';
+        optionRow.innerHTML = `
+            <input type="text" id="pollOption${newOptionNumber}" class="poll-option-input" placeholder="Option ${newOptionNumber}" maxlength="100">
+            <button type="button" class="remove-poll-option" data-option="${newOptionNumber}">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        optionsContainer.appendChild(optionRow);
+        
+        this.updatePollOptionCount();
+        
+        const removeBtn = optionRow.querySelector('.remove-poll-option');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', this.handleRemoveOption.bind(this));
+        }
+        
+        setTimeout(() => {
+            document.getElementById(`pollOption${newOptionNumber}`)?.focus();
+        }, 100);
+    }
+    
+    updatePollOptionCount() {
+        const optionsContainer = document.getElementById('pollOptionsContainer');
+        const optionRows = optionsContainer.querySelectorAll('.poll-option-row');
+        const removeButtons = optionsContainer.querySelectorAll('.remove-poll-option');
+        const addOptionBtn = document.getElementById('addPollOptionBtn');
+        
+        removeButtons.forEach((btn, index) => {
+            if (optionRows.length > 2) {
+                btn.style.display = 'flex';
+            } else {
+                btn.style.display = 'none';
+            }
+        });
+        
+        if (addOptionBtn) {
+            if (optionRows.length >= this.maxPollOptions) {
+                addOptionBtn.classList.add('disabled');
+                addOptionBtn.disabled = true;
+            } else {
+                addOptionBtn.classList.remove('disabled');
+                addOptionBtn.disabled = false;
+            }
+        }
+    }
+    
+    addPollStyles() {
+        // Styles are already included in addAllStyles
+    }
+    
+    async createPollPost() {
+        if (this.isSubmitting || !this.currentUser) return;
+        
+        const caption = document.getElementById('postCaption')?.value.trim() || '';
+        const pollQuestion = document.getElementById('pollQuestion')?.value.trim();
+        
+        if (!pollQuestion) {
+            this.showNotification('Please enter a poll question', 'error');
+            return;
+        }
+        
+        const pollOptions = [];
+        const optionInputs = document.querySelectorAll('.poll-option-input');
+        
+        optionInputs.forEach((input, index) => {
+            const value = input.value.trim();
+            if (value) {
+                pollOptions.push({
+                    id: `opt_${index + 1}`,
+                    text: value,
+                    votes: 0,
+                    voters: []
+                });
+            }
+        });
+        
+        if (pollOptions.length < this.minPollOptions) {
+            this.showNotification(`Please add at least ${this.minPollOptions} poll options`, 'error');
+            return;
+        }
+        
+        try {
+            this.isSubmitting = true;
+            
+            const postData = {
+                userId: this.currentUser.uid,
+                caption: caption,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                likes: 0,
+                commentsCount: 0,
+                mediaType: 'poll',
+                poll: {
+                    question: pollQuestion,
+                    options: pollOptions,
+                    totalVotes: 0,
+                    createdAt: serverTimestamp(),
+                    expiresAt: null,
+                    isClosed: false,
+                    voters: []
+                }
+            };
+
+            const docRef = await addDoc(collection(db, 'posts'), postData);
+            console.log('Poll post created successfully with ID:', docRef.id);
+            
+            this.showNotification('Poll created successfully!', 'success');
+            
+            document.getElementById('postCaption').value = '';
+            document.getElementById('pollQuestion').value = '';
+            document.querySelectorAll('.poll-option-input').forEach(input => {
+                input.value = '';
+            });
+            
+            const pollBuilder = document.getElementById('pollBuilder');
+            if (pollBuilder) pollBuilder.remove();
+            
+            const pollToggle = document.getElementById('pollToggleBtn');
+            if (pollToggle) {
+                pollToggle.classList.remove('active');
+                pollToggle.innerHTML = '<i class="fas fa-chart-bar"></i> Add Poll';
+            }
+            
+            setTimeout(() => {
+                window.location.href = 'posts.html';
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Error creating poll post:', error);
+            this.showNotification('Error creating poll: ' + error.message, 'error');
+        } finally {
+            this.isSubmitting = false;
+        }
+    }
+
+    // FIXED: createPollElement with working click listeners
+    createPollElement(post, postId) {
+        const pollContainer = document.createElement('div');
+        pollContainer.className = 'post-poll-container';
+        pollContainer.setAttribute('data-poll-id', postId);
+        
+        const poll = post.poll;
+        const totalVotes = poll.totalVotes || 0;
+        const hasVoted = poll.voters?.includes(this.currentUser?.uid) || false;
+        const userVote = this.getUserVote(postId, this.currentUser?.uid);
+        
+        let optionsHTML = '';
+        
+        poll.options.forEach(option => {
+            const voteCount = option.votes || 0;
+            const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+            const isVoted = userVote === option.id;
+            
+            optionsHTML += `
+                <div class="poll-option-item">
+                    <div class="poll-option-content ${hasVoted || poll.isClosed ? (isVoted ? 'voted' : '') : ''}" 
+                         data-option-id="${option.id}"
+                         data-post-id="${postId}"
+                         ${!hasVoted && !poll.isClosed ? 'style="cursor: pointer;"' : 'style="cursor: default;"'}>
+                        <div class="poll-progress-bar-bg" style="width: ${percentage}%;"></div>
+                        <div class="poll-option-left">
+                            <div class="poll-radio"></div>
+                            <span class="poll-option-text">${this.escapeHTML(option.text)}</span>
+                        </div>
+                        <div class="poll-option-right">
+                            <span class="poll-percentage">${percentage}%</span>
+                            <span class="poll-count">${this.formatCount(voteCount)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        pollContainer.innerHTML = `
+            <div class="poll-header">
+                <i class="fas fa-chart-bar"></i>
+                <h4>${this.escapeHTML(poll.question)}</h4>
+            </div>
+            <div class="poll-options-list">
+                ${optionsHTML}
+            </div>
+            <div class="poll-footer">
+                <span class="poll-total-votes">
+                    <i class="fas fa-users"></i>
+                    ${this.formatCount(totalVotes)} votes
+                </span>
+                ${hasVoted ? '<span class="poll-closed-badge"><i class="fas fa-check-circle"></i> You voted</span>' : ''}
+                ${poll.isClosed ? '<span class="poll-closed-badge"><i class="fas fa-lock"></i> Poll closed</span>' : ''}
+            </div>
+        `;
+        
+        // FIXED: Direct click listener attachment
+        if (!hasVoted && !poll.isClosed && this.currentUser) {
+            const options = pollContainer.querySelectorAll('.poll-option-content');
+            options.forEach(option => {
+                // Remove any existing listeners first
+                option.removeEventListener('click', this.handlePollClick);
+                // Add fresh listener
+                option.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const optionId = option.dataset.optionId;
+                    const postId = option.dataset.postId;
+                    
+                    if (optionId && postId) {
+                        this.castVote(postId, optionId);
+                    }
+                });
+            });
+        }
+        
+        return pollContainer;
+    }
+    
+    getUserVote(postId, userId) {
+        if (!userId) return null;
+        const voteKey = `poll_vote_${postId}_${userId}`;
+        return localStorage.getItem(voteKey);
+    }
+    
+    async castVote(postId, optionId) {
+        if (!this.currentUser) {
+            this.showNotification('Please login to vote', 'error');
+            return;
+        }
+        
+        try {
+            const postRef = doc(db, 'posts', postId);
+            const postSnap = await getDoc(postRef);
+            
+            if (!postSnap.exists()) {
+                this.showNotification('Post not found', 'error');
+                return;
+            }
+            
+            const post = postSnap.data();
+            
+            if (!post.poll) {
+                this.showNotification('Poll not found', 'error');
+                return;
+            }
+            
+            if (post.poll.isClosed) {
+                this.showNotification('This poll is closed', 'error');
+                return;
+            }
+            
+            if (post.poll.voters?.includes(this.currentUser.uid)) {
+                this.showNotification('You have already voted', 'error');
+                return;
+            }
+            
+            const updatedOptions = post.poll.options.map(opt => {
+                if (opt.id === optionId) {
+                    return {
+                        ...opt,
+                        votes: (opt.votes || 0) + 1
+                    };
+                }
+                return opt;
+            });
+            
+            const newTotalVotes = (post.poll.totalVotes || 0) + 1;
+            const voters = [...(post.poll.voters || []), this.currentUser.uid];
+            
+            await updateDoc(postRef, {
+                'poll.options': updatedOptions,
+                'poll.totalVotes': newTotalVotes,
+                'poll.voters': voters
+            });
+            
+            localStorage.setItem(`poll_vote_${postId}_${this.currentUser.uid}`, optionId);
+            
+            this.showNotification('Vote cast successfully!', 'success');
+            
+            // Refresh the poll display
+            await this.refreshPollDisplay(postId);
+            
+        } catch (error) {
+            console.error('Error casting vote:', error);
+            this.showNotification('Error casting vote: ' + error.message, 'error');
+        }
+    }
+    
+    async refreshPollDisplay(postId) {
+        // Find the post element
+        const postElement = document.querySelector(`.post-item[data-post-id="${postId}"]`);
+        
+        if (postElement) {
+            const oldPollContainer = postElement.querySelector('.post-poll-container');
+            if (oldPollContainer) {
+                try {
+                    const postRef = doc(db, 'posts', postId);
+                    const postSnap = await getDoc(postRef);
+                    
+                    if (postSnap.exists()) {
+                        const post = postSnap.data();
+                        const newPollContainer = this.createPollElement(post, postId);
+                        oldPollContainer.replaceWith(newPollContainer);
+                    }
+                } catch (error) {
+                    console.error('Error refreshing poll:', error);
+                }
+            }
+        }
+    }
+
+    // ==================== COMMENT REPLIES FUNCTIONALITY - FIXED ====================
+    
+    setupReplyModal() {
+        if (!document.getElementById('replyModal')) {
+            const modal = document.createElement('div');
+            modal.id = 'replyModal';
+            modal.className = 'reply-modal';
+            modal.innerHTML = `
+                <div class="reply-modal-content">
+                    <button class="reply-modal-close">&times;</button>
+                    <div class="reply-to-info">
+                        <img id="replyToAvatar" class="reply-to-avatar" src="images/default-profile.jpg" alt="">
+                        <div class="reply-to-details">
+                            <div id="replyToName" class="reply-to-name"></div>
+                            <div id="replyToText" class="reply-to-text"></div>
+                        </div>
+                    </div>
+                    <div class="reply-modal-input-container">
+                        <input type="text" id="replyModalInput" class="reply-modal-input" placeholder="Write your reply..." autocomplete="off">
+                        <button id="replyModalSend" class="reply-modal-send">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            const closeBtn = modal.querySelector('.reply-modal-close');
+            closeBtn.addEventListener('click', () => {
+                this.closeReplyModal();
+            });
+            
+            const sendBtn = document.getElementById('replyModalSend');
+            sendBtn.addEventListener('click', () => {
+                this.submitReply();
+            });
+            
+            const input = document.getElementById('replyModalInput');
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.submitReply();
+                }
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeReplyModal();
+                }
+            });
+        }
+    }
+    
+    openReplyModal(commentData, postId, commentId) {
+        const modal = document.getElementById('replyModal');
+        if (!modal) {
+            this.setupReplyModal();
+            setTimeout(() => this.openReplyModal(commentData, postId, commentId), 100);
+            return;
+        }
+        
+        modal.dataset.postId = postId;
+        modal.dataset.commentId = commentId;
+        modal.dataset.replyToUserId = commentData.userId;
+        modal.dataset.replyToUsername = commentData.userName || 'User';
+        
+        const avatar = document.getElementById('replyToAvatar');
+        if (avatar) {
+            avatar.src = commentData.userAvatar || 'images/default-profile.jpg';
+        }
+        
+        const nameEl = document.getElementById('replyToName');
+        if (nameEl) {
+            nameEl.textContent = `Replying to ${commentData.userName || 'User'}`;
+        }
+        
+        const textEl = document.getElementById('replyToText');
+        if (textEl) {
+            let commentText = commentData.text || '';
+            if (commentText.length > 50) {
+                commentText = commentText.substring(0, 50) + '...';
+            }
+            textEl.textContent = `"${commentText}"`;
+        }
+        
+        const input = document.getElementById('replyModalInput');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+        
+        modal.style.display = 'block';
+    }
+    
+    closeReplyModal() {
+        const modal = document.getElementById('replyModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    async submitReply() {
+        const modal = document.getElementById('replyModal');
+        if (!modal) return;
+        
+        const postId = modal.dataset.postId;
+        const commentId = modal.dataset.commentId;
+        const replyToUserId = modal.dataset.replyToUserId;
+        const input = document.getElementById('replyModalInput');
+        const replyText = input.value.trim();
+        
+        if (!replyText) {
+            this.showNotification('Please enter a reply', 'error');
+            return;
+        }
+        
+        if (!this.currentUser) {
+            this.showNotification('Please login to reply', 'error');
+            return;
+        }
+        
+        try {
+            const replyData = {
+                userId: this.currentUser.uid,
+                userName: this.currentUser.displayName || 'User',
+                userAvatar: this.currentUser.photoURL || 'images/default-profile.jpg',
+                text: replyText,
+                replyToUserId: replyToUserId,
+                replyToUsername: modal.dataset.replyToUsername,
+                createdAt: serverTimestamp(),
+                likes: 0
+            };
+            
+            await addDoc(
+                collection(db, 'posts', postId, 'comments', commentId, 'replies'), 
+                replyData
+            );
+            
+            const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+            await updateDoc(commentRef, {
+                repliesCount: increment(1),
+                updatedAt: serverTimestamp()
+            });
+            
+            this.showNotification('Reply posted!', 'success');
+            this.closeReplyModal();
+            
+            // Refresh comments
+            const commentsSection = document.getElementById(`comments-${postId}`);
+            if (commentsSection && commentsSection.style.display !== 'none') {
+                await this.loadComments(postId);
+            }
+            
+        } catch (error) {
+            console.error('Error adding reply:', error);
+            this.showNotification('Error posting reply: ' + error.message, 'error');
+        }
+    }
+    
+    // FIXED: createCommentElement with working view replies button
+    createCommentElement(comment, user, postId) {
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'comment-item';
+        commentDiv.setAttribute('data-comment-id', comment.id);
+        
+        const hasReplies = comment.repliesCount && comment.repliesCount > 0;
+        const replyCount = comment.repliesCount || 0;
+        
+        commentDiv.innerHTML = `
+            <div class="comment-header">
+                <img src="${user.profileImage || 'images/default-profile.jpg'}" 
+                     alt="${user.name}" class="comment-avatar">
+                <div class="comment-info">
+                    <strong>${user.name || 'Unknown User'}</strong>
+                    <span class="comment-time">${this.formatTime(comment.createdAt)}</span>
+                </div>
+            </div>
+            <div class="comment-text">${this.escapeHTML(comment.text)}</div>
+            <div class="comment-actions">
+                <button class="comment-action-btn reply-btn" data-comment-id="${comment.id}" data-post-id="${postId}">
+                    <i class="fas fa-reply"></i> Reply
+                </button>
+            </div>
+            ${hasReplies ? `
+                <button class="view-replies-btn" data-comment-id="${comment.id}" data-post-id="${postId}">
+                    <i class="fas fa-chevron-right"></i> View ${replyCount} repl${replyCount === 1 ? 'y' : 'ies'}
+                </button>
+            ` : ''}
+            <div id="replies-${comment.id}" class="replies-container" style="display: none;"></div>
+        `;
+        
+        // FIXED: Reply button listener
+        const replyBtn = commentDiv.querySelector('.reply-btn');
+        if (replyBtn) {
+            replyBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentData = {
+                    id: comment.id,
+                    userId: comment.userId,
+                    userName: user.name || 'User',
+                    userAvatar: user.profileImage || 'images/default-profile.jpg',
+                    text: comment.text
+                };
+                this.openReplyModal(commentData, postId, comment.id);
+            });
+        }
+        
+        // FIXED: View replies button listener - now at BOTTOM
+        if (hasReplies) {
+            const viewRepliesBtn = commentDiv.querySelector('.view-replies-btn');
+            viewRepliesBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const repliesContainer = commentDiv.querySelector(`#replies-${comment.id}`);
+                const isHidden = repliesContainer.style.display === 'none' || repliesContainer.style.display === '';
+                
+                if (isHidden) {
+                    repliesContainer.style.display = 'block';
+                    viewRepliesBtn.innerHTML = `<i class="fas fa-chevron-down"></i> Hide replies`;
+                    viewRepliesBtn.classList.add('active');
+                    
+                    await this.loadReplies(postId, comment.id, repliesContainer);
+                } else {
+                    repliesContainer.style.display = 'none';
+                    viewRepliesBtn.innerHTML = `<i class="fas fa-chevron-right"></i> View ${replyCount} repl${replyCount === 1 ? 'y' : 'ies'}`;
+                    viewRepliesBtn.classList.remove('active');
+                }
+            });
+        }
+        
+        return commentDiv;
+    }
+    
+    async loadReplies(postId, commentId, container) {
+        if (!container) return;
+        
+        try {
+            const repliesQuery = query(
+                collection(db, 'posts', postId, 'comments', commentId, 'replies'),
+                orderBy('createdAt', 'asc')
+            );
+            
+            const repliesSnap = await getDocs(repliesQuery);
+            
+            container.innerHTML = '';
+            
+            if (repliesSnap.empty) {
+                container.innerHTML = '<div class="no-replies">No replies yet</div>';
+                return;
+            }
+            
+            const userIds = new Set();
+            repliesSnap.forEach(doc => {
+                const reply = doc.data();
+                userIds.add(reply.userId);
+                if (reply.replyToUserId) {
+                    userIds.add(reply.replyToUserId);
+                }
+            });
+            
+            const usersData = await this.getUsersData([...userIds]);
+            
+            repliesSnap.forEach(doc => {
+                const reply = { id: doc.id, ...doc.data() };
+                const replyUser = usersData[reply.userId] || { 
+                    name: reply.userName || 'User', 
+                    profileImage: reply.userAvatar 
+                };
+                const replyElement = this.createReplyElement(reply, replyUser, postId, commentId);
+                container.appendChild(replyElement);
+            });
+            
+        } catch (error) {
+            console.error('Error loading replies:', error);
+            container.innerHTML = '<div class="error">Error loading replies</div>';
+        }
+    }
+    
+    createReplyElement(reply, user, postId, commentId) {
+        const replyDiv = document.createElement('div');
+        replyDiv.className = 'reply-item';
+        replyDiv.setAttribute('data-reply-id', reply.id);
+        
+        const replyToName = reply.replyToUsername || 'User';
+        
+        replyDiv.innerHTML = `
+            <div class="reply-header">
+                <img src="${user.profileImage || 'images/default-profile.jpg'}" 
+                     alt="${user.name}" class="reply-avatar">
+                <div class="reply-info">
+                    <strong>${user.name || 'Unknown User'}</strong>
+                    <span class="reply-time">${this.formatTime(reply.createdAt)}</span>
+                </div>
+            </div>
+            <div class="reply-text">
+                <span class="reply-mention">@${replyToName}</span>
+                ${this.escapeHTML(reply.text)}
+            </div>
+            <div class="comment-actions" style="margin-left: 34px; margin-top: 8px;">
+                <button class="comment-action-btn reply-to-reply-btn" data-reply-id="${reply.id}" data-post-id="${postId}" data-comment-id="${commentId}">
+                    <i class="fas fa-reply"></i> Reply
+                </button>
+            </div>
+        `;
+        
+        const replyToReplyBtn = replyDiv.querySelector('.reply-to-reply-btn');
+        if (replyToReplyBtn) {
+            replyToReplyBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const replyData = {
+                    id: reply.id,
+                    userId: reply.userId,
+                    userName: user.name || 'User',
+                    userAvatar: user.profileImage || 'images/default-profile.jpg',
+                    text: reply.text
+                };
+                this.openReplyModal(replyData, postId, commentId);
+            });
+        }
+        
+        return replyDiv;
+    }
+    
+    escapeHTML(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ==================== CREATE POST WITH VIDEO/POLL ====================
     
     setupCreatePost() {
         const form = document.getElementById('createPostForm');
@@ -1743,7 +3127,13 @@ class SocialManager {
         
         this.handleFormSubmit = (e) => {
             e.preventDefault();
-            this.createPost();
+            
+            const pollBuilder = document.getElementById('pollBuilder');
+            if (pollBuilder) {
+                this.createPollPost();
+            } else {
+                this.createPost();
+            }
         };
         
         form.addEventListener('submit', this.handleFormSubmit);
@@ -1753,6 +3143,17 @@ class SocialManager {
             mediaInput.removeEventListener('change', this.handleMediaChange);
             this.handleMediaChange = (e) => {
                 this.previewMedia(e.target.files[0]);
+                
+                const pollBuilder = document.getElementById('pollBuilder');
+                if (pollBuilder) {
+                    pollBuilder.remove();
+                    const pollToggle = document.getElementById('pollToggleBtn');
+                    if (pollToggle) {
+                        pollToggle.classList.remove('active');
+                        pollToggle.innerHTML = '<i class="fas fa-chart-bar"></i> Add Poll';
+                    }
+                    this.showNotification('Poll removed - posts cannot have both media and poll', 'info');
+                }
             };
             mediaInput.addEventListener('change', this.handleMediaChange);
         }
@@ -1766,6 +3167,9 @@ class SocialManager {
             };
             captionInput.addEventListener('input', this.handleCaptionInput);
         }
+        
+        this.setupPollBuilder();
+        this.setupReplyModal();
     }
 
     async previewMedia(file) {
@@ -1774,7 +3178,6 @@ class SocialManager {
 
         if (file) {
             if (file.type.startsWith('video/') || this.isLikelyVideoFile(file)) {
-                // Validate file first
                 try {
                     await this.validateVideoFile(file);
                 } catch (error) {
@@ -1788,11 +3191,9 @@ class SocialManager {
                     return;
                 }
 
-                // Create video element to generate thumbnail
                 const video = document.createElement('video');
                 video.preload = 'metadata';
                 video.onloadedmetadata = () => {
-                    // Seek to 1 second for thumbnail
                     video.currentTime = Math.min(1, video.duration / 2);
                 };
                 video.onseeked = () => {
@@ -1803,7 +3204,6 @@ class SocialManager {
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
                     
-                    // Determine video info
                     const isPhoneVideo = this.isLikelyPhoneVideo(file);
                     const needsConversion = this.needsConversion(file);
                     const format = this.getVideoFormat(file);
@@ -1855,7 +3255,6 @@ class SocialManager {
                     `;
                     preview.style.display = 'block';
                     
-                    // Clean up
                     URL.revokeObjectURL(video.src);
                 };
                 video.onerror = () => {
@@ -1957,7 +3356,6 @@ class SocialManager {
                     postData.mediaType = 'video';
                     postData.imageUrl = null;
                     
-                    // Add video format information
                     if (mediaData.videoFormat) {
                         postData.videoFormat = mediaData.videoFormat;
                         postData.isPhoneVideo = mediaData.videoFormat.isPhoneVideo;
@@ -2413,7 +3811,10 @@ class SocialManager {
         
         let postContentHTML = '';
         
-        if (post.videoUrl || post.mediaType === 'video') {
+        if (post.mediaType === 'poll' && post.poll) {
+            const pollContainer = this.createPollElement(post, post.id);
+            postContentHTML = pollContainer.outerHTML;
+        } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl || post.imageUrl;
             if (videoUrl) {
                 postContentHTML = `<div id="video-container-${post.id}"></div>`;
@@ -2432,8 +3833,7 @@ class SocialManager {
                     }
                 }, 50);
             }
-        }
-        else if (post.imageUrl) {
+        } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
                 postContentHTML += `
@@ -2451,7 +3851,7 @@ class SocialManager {
         const isLiked = this.likedPosts.has(post.id);
         
         container.innerHTML = `
-            <div class="post-item">
+            <div class="post-item" data-post-id="${post.id}">
                 <div class="post-header">
                     <img src="${user.profileImage || 'images/default-profile.jpg'}" 
                          alt="${user.name}" class="post-author-avatar">
@@ -2539,9 +3939,9 @@ class SocialManager {
             const usersData = await this.getUsersData([...userIds]);
 
             commentsSnap.forEach(doc => {
-                const comment = doc.data();
+                const comment = { id: doc.id, ...doc.data() };
                 const user = usersData[comment.userId] || {};
-                const commentElement = this.createCommentElement(comment, user);
+                const commentElement = this.createCommentElement(comment, user, postId);
                 commentsList.appendChild(commentElement);
             });
         } catch (error) {
@@ -2590,6 +3990,7 @@ class SocialManager {
     async createPostElement(post, user, postId) {
         const postDiv = document.createElement('div');
         postDiv.className = 'post-item';
+        postDiv.setAttribute('data-post-id', postId);
         
         const userId = user.id || post.userId;
         const userName = user.name || 'Unknown User';
@@ -2602,7 +4003,10 @@ class SocialManager {
         
         let postContentHTML = '';
         
-        if (post.videoUrl || post.mediaType === 'video') {
+        if (post.mediaType === 'poll' && post.poll) {
+            const pollContainer = this.createPollElement(post, postId);
+            postContentHTML = pollContainer.outerHTML;
+        } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl || post.imageUrl;
             if (videoUrl) {
                 postContentHTML = `<div id="video-container-${postId}"></div>`;
@@ -2610,7 +4014,6 @@ class SocialManager {
                 setTimeout(() => {
                     const container = document.getElementById(`video-container-${postId}`);
                     if (container) {
-                        // Show thumbnail with all badges
                         const thumbnail = this.createVideoThumbnail(
                             videoUrl, 
                             this.getVideoThumbnail(post), 
@@ -2622,8 +4025,7 @@ class SocialManager {
                     }
                 }, 50);
             }
-        }
-        else if (post.imageUrl) {
+        } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
                 postContentHTML += `
@@ -2649,9 +4051,14 @@ class SocialManager {
             </button>
         ` : '';
         
-        const mediaTypeIcon = (post.videoUrl || post.mediaType === 'video') ? 
-            '<span class="media-type-indicator"><i class="fas fa-video"></i></span>' : 
-            (post.imageUrl ? '<span class="media-type-indicator"><i class="fas fa-image"></i></span>' : '');
+        let mediaTypeIcon = '';
+        if (post.mediaType === 'poll') {
+            mediaTypeIcon = '<span class="media-type-indicator"><i class="fas fa-chart-bar"></i></span>';
+        } else if (post.videoUrl || post.mediaType === 'video') {
+            mediaTypeIcon = '<span class="media-type-indicator"><i class="fas fa-video"></i></span>';
+        } else if (post.imageUrl) {
+            mediaTypeIcon = '<span class="media-type-indicator"><i class="fas fa-image"></i></span>';
+        }
         
         postDiv.innerHTML = `
             <div class="post-header">
@@ -2774,32 +4181,15 @@ class SocialManager {
             const usersData = await this.getUsersData([...userIds]);
 
             commentsSnap.forEach(doc => {
-                const comment = doc.data();
+                const comment = { id: doc.id, ...doc.data() };
                 const user = usersData[comment.userId] || {};
-                const commentElement = this.createCommentElement(comment, user);
+                const commentElement = this.createCommentElement(comment, user, postId);
                 commentsList.appendChild(commentElement);
             });
         } catch (error) {
             console.error('Error loading comments:', error);
             commentsList.innerHTML = '<div class="error">Error loading comments</div>';
         }
-    }
-
-    createCommentElement(comment, user) {
-        const commentDiv = document.createElement('div');
-        commentDiv.className = 'comment-item';
-        commentDiv.innerHTML = `
-            <div class="comment-header">
-                <img src="${user.profileImage || 'images/default-profile.jpg'}" 
-                     alt="${user.name}" class="comment-avatar">
-                <div class="comment-info">
-                    <strong>${user.name || 'Unknown User'}</strong>
-                    <span class="comment-time">${this.formatTime(comment.createdAt)}</span>
-                </div>
-            </div>
-            <div class="comment-text">${comment.text}</div>
-        `;
-        return commentDiv;
     }
 
     async handleAddComment(postId, isCommentsPage = false) {
@@ -2824,11 +4214,16 @@ class SocialManager {
         }
 
         try {
-            await addDoc(collection(db, 'posts', postId, 'comments'), {
+            const commentData = {
                 userId: this.currentUser.uid,
+                userName: this.currentUser.displayName || 'User',
+                userAvatar: this.currentUser.photoURL || 'images/default-profile.jpg',
                 text: commentText,
-                createdAt: serverTimestamp()
-            });
+                createdAt: serverTimestamp(),
+                repliesCount: 0
+            };
+
+            await addDoc(collection(db, 'posts', postId, 'comments'), commentData);
 
             const postRef = doc(db, 'posts', postId);
             await updateDoc(postRef, {
@@ -2853,6 +4248,8 @@ class SocialManager {
                     commentCount.textContent = this.formatCount(currentCount + 1);
                 }
             }
+
+            this.showNotification('Comment added!', 'success');
 
         } catch (error) {
             console.error('Error adding comment:', error);
@@ -3630,10 +5027,14 @@ class SocialManager {
     createProfilePostElement(post, userData, postId) {
         const postDiv = document.createElement('div');
         postDiv.className = 'profile-post-item';
+        postDiv.setAttribute('data-post-id', postId);
         
         let postContentHTML = '';
         
-        if (post.videoUrl || post.mediaType === 'video') {
+        if (post.mediaType === 'poll' && post.poll) {
+            const pollContainer = this.createPollElement(post, postId);
+            postContentHTML = pollContainer.outerHTML;
+        } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl || post.imageUrl;
             if (videoUrl) {
                 postContentHTML = `<div id="profile-video-container-${postId}"></div>`;
@@ -3652,8 +5053,7 @@ class SocialManager {
                     }
                 }, 50);
             }
-        }
-        else if (post.imageUrl) {
+        } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
                 postContentHTML += `
@@ -3902,7 +5302,10 @@ class SocialManager {
         
         let postContentHTML = '';
         
-        if (post.videoUrl || post.mediaType === 'video') {
+        if (post.mediaType === 'poll' && post.poll) {
+            const pollContainer = this.createPollElement(post, postId);
+            postContentHTML = pollContainer.outerHTML;
+        } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl || post.imageUrl;
             if (videoUrl) {
                 postContentHTML = `<div id="user-video-container-${postId}"></div>`;
@@ -3921,8 +5324,7 @@ class SocialManager {
                     }
                 }, 50);
             }
-        }
-        else if (post.imageUrl) {
+        } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
                 postContentHTML += `
@@ -3987,7 +5389,15 @@ class SocialManager {
 
         let previewHTML = '';
         
-        if (post.videoUrl || post.mediaType === 'video') {
+        if (post.mediaType === 'poll' && post.poll) {
+            previewHTML += `
+                <div class="preview-image" style="padding: 20px; text-align: center; background: var(--bg-secondary);">
+                    <i class="fas fa-chart-bar" style="font-size: 48px; color: var(--primary); margin-bottom: 10px;"></i>
+                    <h4 style="margin: 10px 0;">${post.poll.question}</h4>
+                    <p style="color: var(--text-light);">${post.poll.options.length} options · ${post.poll.totalVotes || 0} votes</p>
+                </div>
+            `;
+        } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl || post.imageUrl;
             if (videoUrl) {
                 const thumbnail = this.getVideoThumbnail(post);
@@ -4003,8 +5413,7 @@ class SocialManager {
                     </div>
                 `;
             }
-        }
-        else if (post.imageUrl) {
+        } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
                 previewHTML += `
