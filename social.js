@@ -153,6 +153,8 @@ class SocialManager {
                 this.loadViewedPosts();
                 this.loadLikedPosts();
                 this.loadViewedPYMKProfiles();
+                // Setup poll event listeners globally
+                this.setupPollEventListeners();
             } else {
                 if (!window.location.pathname.includes('login.html') && 
                     !window.location.pathname.includes('signup.html') &&
@@ -161,6 +163,50 @@ class SocialManager {
                 }
             }
         });
+    }
+
+    // ==================== FIXED: POLL EVENT LISTENERS ====================
+    setupPollEventListeners() {
+        // Remove any existing listener to avoid duplicates
+        document.removeEventListener('click', this.handlePollClick);
+        
+        // Bind the method to this instance
+        this.handlePollClick = (e) => {
+            // Find if the clicked element is a poll option or inside one
+            const pollOption = e.target.closest('.poll-option-content');
+            
+            if (pollOption) {
+                // Prevent default and stop propagation
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Get the post ID and option ID from the dataset
+                const postId = pollOption.dataset.postId;
+                const optionId = pollOption.dataset.optionId;
+                
+                // Check if we can vote
+                const pollContainer = pollOption.closest('.post-poll-container');
+                const hasVoted = pollContainer?.querySelector('.poll-closed-badge')?.textContent.includes('You voted');
+                const isClosed = pollContainer?.querySelector('.poll-closed-badge')?.textContent.includes('closed');
+                
+                if (hasVoted) {
+                    this.showNotification('You have already voted in this poll', 'warning');
+                    return;
+                }
+                
+                if (isClosed) {
+                    this.showNotification('This poll is closed', 'warning');
+                    return;
+                }
+                
+                if (postId && optionId) {
+                    this.castVote(postId, optionId);
+                }
+            }
+        };
+        
+        // Add the global click listener
+        document.addEventListener('click', this.handlePollClick);
     }
 
     // ==================== FORMAT COUNT FUNCTION ====================
@@ -228,7 +274,7 @@ class SocialManager {
         return array;
     }
 
-    // ==================== ADD ALL STYLES ====================
+    // ==================== ADD ALL STYLES (RESTORED ORIGINAL) ====================
     addAllStyles() {
         if (!document.getElementById('socialManagerStyles')) {
             const style = document.createElement('style');
@@ -305,8 +351,8 @@ class SocialManager {
                 /* ========== POLL STYLES ========== */
                 .poll-toggle-btn {
                     background: transparent;
-                    border: 1px dashed var(--primary, #ff4b6e);
-                    color: var(--primary, #ff4b6e);
+                    border: 1px dashed #ff4b6e;
+                    color: #ff4b6e;
                     padding: 10px 16px;
                     border-radius: 20px;
                     display: inline-flex;
@@ -319,45 +365,45 @@ class SocialManager {
                 }
                 
                 .poll-toggle-btn:hover {
-                    background: var(--primary, #ff4b6e);
+                    background: #ff4b6e;
                     color: white;
                     border-style: solid;
                 }
                 
                 .poll-toggle-btn.active {
-                    background: var(--primary, #ff4b6e);
+                    background: #ff4b6e;
                     color: white;
                     border-style: solid;
                 }
                 
                 .poll-builder {
-                    background: var(--bg-secondary, #f8f9fa);
+                    background: #f8f9fa;
                     border-radius: 12px;
                     padding: 20px;
                     margin: 15px 0;
-                    border: 1px solid var(--border, #e9ecef);
+                    border: 1px solid #e9ecef;
                 }
                 
                 .dark-mode .poll-builder {
-                    background: var(--bg-secondary-dark, #2c2f33);
-                    border-color: var(--border-dark, #40444b);
+                    background: #2c2f33;
+                    border-color: #40444b;
                 }
                 
                 .poll-question {
                     width: 100%;
                     padding: 12px 16px;
-                    border: 2px solid var(--border, #e9ecef);
+                    border: 2px solid #e9ecef;
                     border-radius: 12px;
                     font-size: 15px;
-                    background: var(--bg-primary, white);
-                    color: var(--text-primary, #2c3e50);
+                    background: white;
+                    color: #2c3e50;
                     margin-bottom: 15px;
                 }
                 
                 .dark-mode .poll-question {
-                    background: var(--bg-primary-dark, #36393f);
-                    border-color: var(--border-dark, #40444b);
-                    color: var(--text-primary-dark, #fff);
+                    background: #36393f;
+                    border-color: #40444b;
+                    color: #fff;
                 }
                 
                 .poll-options-container {
@@ -376,17 +422,17 @@ class SocialManager {
                 .poll-option-input {
                     flex: 1;
                     padding: 10px 14px;
-                    border: 2px solid var(--border, #e9ecef);
+                    border: 2px solid #e9ecef;
                     border-radius: 10px;
                     font-size: 14px;
-                    background: var(--bg-primary, white);
-                    color: var(--text-primary, #2c3e50);
+                    background: white;
+                    color: #2c3e50;
                 }
                 
                 .dark-mode .poll-option-input {
-                    background: var(--bg-primary-dark, #36393f);
-                    border-color: var(--border-dark, #40444b);
-                    color: var(--text-primary-dark, #fff);
+                    background: #36393f;
+                    border-color: #40444b;
+                    color: #fff;
                 }
                 
                 .remove-poll-option {
@@ -410,8 +456,8 @@ class SocialManager {
                 
                 .add-poll-option {
                     background: transparent;
-                    border: 1px dashed var(--success, #10b981);
-                    color: var(--success, #10b981);
+                    border: 1px dashed #10b981;
+                    color: #10b981;
                     padding: 10px 16px;
                     border-radius: 20px;
                     display: inline-flex;
@@ -424,7 +470,7 @@ class SocialManager {
                 }
                 
                 .add-poll-option:hover {
-                    background: var(--success, #10b981);
+                    background: #10b981;
                     color: white;
                     border-style: solid;
                 }
@@ -439,22 +485,22 @@ class SocialManager {
                 .poll-preview {
                     margin-top: 15px;
                     padding-top: 15px;
-                    border-top: 1px solid var(--border, #e9ecef);
+                    border-top: 1px solid #e9ecef;
                     font-size: 13px;
-                    color: var(--text-light, #6c757d);
+                    color: #6c757d;
                 }
                 
                 .post-poll-container {
-                    background: var(--bg-secondary, #f8f9fa);
+                    background: #f8f9fa;
                     border-radius: 16px;
                     padding: 20px;
                     margin: 15px 0;
-                    border: 1px solid var(--border, #e9ecef);
+                    border: 1px solid #e9ecef;
                 }
                 
                 .dark-mode .post-poll-container {
-                    background: var(--bg-secondary-dark, #2c2f33);
-                    border-color: var(--border-dark, #40444b);
+                    background: #2c2f33;
+                    border-color: #40444b;
                 }
                 
                 .poll-header {
@@ -463,11 +509,11 @@ class SocialManager {
                     gap: 10px;
                     margin-bottom: 16px;
                     padding-bottom: 12px;
-                    border-bottom: 1px solid var(--border, #e9ecef);
+                    border-bottom: 1px solid #e9ecef;
                 }
                 
                 .poll-header i {
-                    color: var(--primary, #ff4b6e);
+                    color: #ff4b6e;
                     font-size: 20px;
                 }
                 
@@ -475,15 +521,23 @@ class SocialManager {
                     margin: 0;
                     font-size: 16px;
                     font-weight: 600;
-                    color: var(--text-primary, #2c3e50);
+                    color: #2c3e50;
+                }
+                
+                .dark-mode .poll-header h4 {
+                    color: #fff;
                 }
                 
                 .poll-question-display {
                     font-size: 16px;
                     font-weight: 500;
-                    color: var(--text-primary, #2c3e50);
+                    color: #2c3e50;
                     margin-bottom: 16px;
                     padding: 0 4px;
+                }
+                
+                .dark-mode .poll-question-display {
+                    color: #fff;
                 }
                 
                 .poll-options-list {
@@ -502,8 +556,8 @@ class SocialManager {
                     align-items: center;
                     justify-content: space-between;
                     padding: 12px 16px;
-                    background: var(--bg-primary, white);
-                    border: 2px solid var(--border, #e9ecef);
+                    background: white;
+                    border: 2px solid #e9ecef;
                     border-radius: 12px;
                     cursor: pointer;
                     transition: all 0.2s;
@@ -512,18 +566,13 @@ class SocialManager {
                 }
                 
                 .dark-mode .poll-option-content {
-                    background: var(--bg-primary-dark, #36393f);
-                    border-color: var(--border-dark, #40444b);
+                    background: #36393f;
+                    border-color: #40444b;
                 }
                 
                 .poll-option-content:hover {
-                    border-color: var(--primary, #ff4b6e);
+                    border-color: #ff4b6e;
                     background: rgba(255, 75, 110, 0.05);
-                }
-                
-                .poll-option-content.voted {
-                    border-color: var(--primary, #ff4b6e);
-                    background: rgba(255, 75, 110, 0.1);
                 }
                 
                 .poll-option-left {
@@ -533,39 +582,50 @@ class SocialManager {
                     flex: 1;
                 }
                 
-                .poll-radio {
-                    width: 20px;
-                    height: 20px;
-                    border: 2px solid var(--border, #e9ecef);
+                .poll-checkmark {
+                    width: 22px;
+                    height: 22px;
                     border-radius: 50%;
+                    background: white;
+                    border: 2px solid #e9ecef;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     transition: all 0.2s;
                 }
                 
-                .poll-option-content:hover .poll-radio {
-                    border-color: var(--primary, #ff4b6e);
+                .dark-mode .poll-checkmark {
+                    background: #36393f;
+                    border-color: #40444b;
                 }
                 
-                .poll-option-content.voted .poll-radio {
-                    border-color: var(--primary, #ff4b6e);
-                    background: var(--primary, #ff4b6e);
-                    position: relative;
+                .poll-option-content:hover .poll-checkmark {
+                    border-color: #ff4b6e;
                 }
                 
-                .poll-option-content.voted .poll-radio::after {
-                    content: '';
-                    width: 10px;
-                    height: 10px;
-                    background: white;
-                    border-radius: 50%;
+                .poll-option-content.voted .poll-checkmark {
+                    background: #ff4b6e;
+                    border-color: #ff4b6e;
+                }
+                
+                .poll-checkmark i {
+                    color: white;
+                    font-size: 12px;
+                    display: none;
+                }
+                
+                .poll-option-content.voted .poll-checkmark i {
+                    display: inline;
                 }
                 
                 .poll-option-text {
                     font-size: 15px;
-                    color: var(--text-primary, #2c3e50);
+                    color: #2c3e50;
                     font-weight: 500;
+                }
+                
+                .dark-mode .poll-option-text {
+                    color: #fff;
                 }
                 
                 .poll-option-right {
@@ -577,14 +637,18 @@ class SocialManager {
                 .poll-percentage {
                     font-size: 15px;
                     font-weight: 600;
-                    color: var(--primary, #ff4b6e);
+                    color: #ff4b6e;
                     min-width: 50px;
                     text-align: right;
                 }
                 
                 .poll-count {
                     font-size: 13px;
-                    color: var(--text-light, #6c757d);
+                    color: #6c757d;
+                }
+                
+                .dark-mode .poll-count {
+                    color: #b9bbbe;
                 }
                 
                 .poll-progress-bar-bg {
@@ -605,9 +669,14 @@ class SocialManager {
                     align-items: center;
                     margin-top: 16px;
                     padding-top: 12px;
-                    border-top: 1px solid var(--border, #e9ecef);
+                    border-top: 1px solid #e9ecef;
                     font-size: 13px;
-                    color: var(--text-light, #6c757d);
+                    color: #6c757d;
+                }
+                
+                .dark-mode .poll-footer {
+                    border-top-color: #40444b;
+                    color: #b9bbbe;
                 }
                 
                 .poll-total-votes {
@@ -617,11 +686,11 @@ class SocialManager {
                 }
                 
                 .poll-total-votes i {
-                    color: var(--primary, #ff4b6e);
+                    color: #ff4b6e;
                 }
                 
                 .poll-closed-badge {
-                    background: var(--warning, #f59e0b);
+                    background: #f59e0b;
                     color: white;
                     padding: 4px 10px;
                     border-radius: 20px;
@@ -631,19 +700,19 @@ class SocialManager {
                     gap: 5px;
                 }
 
-                /* ========== COMMENT REPLIES STYLES - FIXED FOR TIKTOK LAYOUT ========== */
+                /* ========== COMMENT REPLIES STYLES ========== */
                 .comment-item {
                     position: relative;
                     padding: 12px;
                     margin-bottom: 8px;
-                    background: var(--bg-secondary, #f8f9fa);
+                    background: #f8f9fa;
                     border-radius: 12px;
-                    border: 1px solid var(--border, #e9ecef);
+                    border: 1px solid #e9ecef;
                 }
                 
                 .dark-mode .comment-item {
-                    background: var(--bg-secondary-dark, #2c2f33);
-                    border-color: var(--border-dark, #40444b);
+                    background: #2c2f33;
+                    border-color: #40444b;
                 }
                 
                 .comment-header {
@@ -668,21 +737,33 @@ class SocialManager {
                 
                 .comment-info strong {
                     font-size: 13px;
-                    color: var(--text-primary, #2c3e50);
+                    color: #2c3e50;
+                }
+                
+                .dark-mode .comment-info strong {
+                    color: #fff;
                 }
                 
                 .comment-time {
                     font-size: 11px;
-                    color: var(--text-light, #6c757d);
+                    color: #6c757d;
+                }
+                
+                .dark-mode .comment-time {
+                    color: #b9bbbe;
                 }
                 
                 .comment-text {
                     font-size: 14px;
-                    color: var(--text-primary, #2c3e50);
+                    color: #2c3e50;
                     line-height: 1.5;
                     margin-left: 42px;
                     margin-bottom: 8px;
                     word-wrap: break-word;
+                }
+                
+                .dark-mode .comment-text {
+                    color: #fff;
                 }
                 
                 .comment-actions {
@@ -696,7 +777,7 @@ class SocialManager {
                 .comment-action-btn {
                     background: transparent;
                     border: none;
-                    color: var(--text-light, #6c757d);
+                    color: #6c757d;
                     font-size: 12px;
                     display: flex;
                     align-items: center;
@@ -707,24 +788,27 @@ class SocialManager {
                     transition: all 0.2s;
                 }
                 
+                .dark-mode .comment-action-btn {
+                    color: #b9bbbe;
+                }
+                
                 .comment-action-btn:hover {
                     background: rgba(255, 75, 110, 0.1);
-                    color: var(--primary, #ff4b6e);
+                    color: #ff4b6e;
                 }
                 
                 .comment-action-btn.reply {
-                    color: var(--primary, #ff4b6e);
+                    color: #ff4b6e;
                 }
                 
                 .comment-action-btn i {
                     font-size: 12px;
                 }
                 
-                /* FIXED: View replies button - now at BOTTOM like TikTok */
                 .view-replies-btn {
                     background: transparent;
                     border: none;
-                    color: var(--primary, #ff4b6e);
+                    color: #ff4b6e;
                     font-size: 12px;
                     display: flex;
                     align-items: center;
@@ -756,24 +840,24 @@ class SocialManager {
                     margin-top: 8px;
                     margin-bottom: 4px;
                     padding-left: 16px;
-                    border-left: 2px solid var(--border, #e9ecef);
+                    border-left: 2px solid #e9ecef;
                 }
                 
                 .dark-mode .replies-container {
-                    border-left-color: var(--border-dark, #40444b);
+                    border-left-color: #40444b;
                 }
                 
                 .reply-item {
                     padding: 10px;
                     margin-bottom: 8px;
-                    background: var(--bg-primary, white);
+                    background: white;
                     border-radius: 10px;
-                    border: 1px solid var(--border, #e9ecef);
+                    border: 1px solid #e9ecef;
                 }
                 
                 .dark-mode .reply-item {
-                    background: var(--bg-primary-dark, #36393f);
-                    border-color: var(--border-dark, #40444b);
+                    background: #36393f;
+                    border-color: #40444b;
                 }
                 
                 .reply-header {
@@ -798,24 +882,36 @@ class SocialManager {
                 
                 .reply-info strong {
                     font-size: 12px;
-                    color: var(--text-primary, #2c3e50);
+                    color: #2c3e50;
+                }
+                
+                .dark-mode .reply-info strong {
+                    color: #fff;
                 }
                 
                 .reply-time {
                     font-size: 10px;
-                    color: var(--text-light, #6c757d);
+                    color: #6c757d;
+                }
+                
+                .dark-mode .reply-time {
+                    color: #b9bbbe;
                 }
                 
                 .reply-text {
                     font-size: 13px;
-                    color: var(--text-primary, #2c3e50);
+                    color: #2c3e50;
                     margin-left: 34px;
                     margin-bottom: 4px;
                     word-wrap: break-word;
                 }
                 
+                .dark-mode .reply-text {
+                    color: #fff;
+                }
+                
                 .reply-mention {
-                    color: var(--primary, #ff4b6e);
+                    color: #ff4b6e;
                     font-weight: 600;
                     margin-right: 4px;
                 }
@@ -825,8 +921,8 @@ class SocialManager {
                     bottom: 0;
                     left: 0;
                     right: 0;
-                    background: var(--bg-primary, white);
-                    border-top: 2px solid var(--border, #e9ecef);
+                    background: white;
+                    border-top: 2px solid #e9ecef;
                     padding: 16px;
                     z-index: 10000;
                     display: none;
@@ -835,8 +931,8 @@ class SocialManager {
                 }
                 
                 .dark-mode .reply-modal {
-                    background: var(--bg-primary-dark, #36393f);
-                    border-top-color: var(--border-dark, #40444b);
+                    background: #36393f;
+                    border-top-color: #40444b;
                 }
                 
                 @keyframes slideUp {
@@ -859,7 +955,11 @@ class SocialManager {
                     gap: 12px;
                     margin-bottom: 16px;
                     padding-bottom: 12px;
-                    border-bottom: 1px solid var(--border, #e9ecef);
+                    border-bottom: 1px solid #e9ecef;
+                }
+                
+                .dark-mode .reply-to-info {
+                    border-bottom-color: #40444b;
                 }
                 
                 .reply-to-avatar {
@@ -875,18 +975,26 @@ class SocialManager {
                 
                 .reply-to-name {
                     font-weight: 600;
-                    color: var(--text-primary, #2c3e50);
+                    color: #2c3e50;
                     font-size: 14px;
+                }
+                
+                .dark-mode .reply-to-name {
+                    color: #fff;
                 }
                 
                 .reply-to-text {
                     font-size: 13px;
-                    color: var(--text-light, #6c757d);
+                    color: #6c757d;
                     margin-top: 2px;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                     max-width: 400px;
+                }
+                
+                .dark-mode .reply-to-text {
+                    color: #b9bbbe;
                 }
                 
                 .reply-modal-input-container {
@@ -898,21 +1006,21 @@ class SocialManager {
                 .reply-modal-input {
                     flex: 1;
                     padding: 14px 18px;
-                    border: 2px solid var(--border, #e9ecef);
+                    border: 2px solid #e9ecef;
                     border-radius: 30px;
                     font-size: 15px;
-                    background: var(--bg-secondary, #f8f9fa);
-                    color: var(--text-primary, #2c3e50);
+                    background: #f8f9fa;
+                    color: #2c3e50;
                 }
                 
                 .dark-mode .reply-modal-input {
-                    background: var(--bg-secondary-dark, #2c2f33);
-                    border-color: var(--border-dark, #40444b);
-                    color: var(--text-primary-dark, #fff);
+                    background: #2c2f33;
+                    border-color: #40444b;
+                    color: #fff;
                 }
                 
                 .reply-modal-send {
-                    background: var(--primary, #ff4b6e);
+                    background: #ff4b6e;
                     border: none;
                     color: white;
                     width: 48px;
@@ -939,7 +1047,7 @@ class SocialManager {
                     right: 16px;
                     background: transparent;
                     border: none;
-                    color: var(--text-light, #6c757d);
+                    color: #6c757d;
                     font-size: 24px;
                     cursor: pointer;
                     width: 32px;
@@ -1262,12 +1370,17 @@ class SocialManager {
 
                 /* ========== PEOPLE YOU MAY KNOW STYLES ========== */
                 .pymk-section {
-                    background: var(--bg-secondary);
+                    background: #f8f9fa;
                     border-radius: 15px;
                     padding: 20px;
                     margin: 25px 0;
-                    border: 1px solid var(--border);
+                    border: 1px solid #e9ecef;
                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                }
+                
+                .dark-mode .pymk-section {
+                    background: #2c2f33;
+                    border-color: #40444b;
                 }
                 
                 .pymk-header {
@@ -1280,20 +1393,24 @@ class SocialManager {
                 .pymk-header h3 {
                     margin: 0;
                     font-size: 18px;
-                    color: var(--text-primary);
+                    color: #2c3e50;
                     display: flex;
                     align-items: center;
                     gap: 10px;
                 }
                 
+                .dark-mode .pymk-header h3 {
+                    color: #fff;
+                }
+                
                 .pymk-header h3 i {
-                    color: var(--primary);
+                    color: #ff4b6e;
                 }
                 
                 .pymk-see-all {
                     background: transparent;
-                    border: 1px solid var(--primary);
-                    color: var(--primary);
+                    border: 1px solid #ff4b6e;
+                    color: #ff4b6e;
                     padding: 6px 15px;
                     border-radius: 20px;
                     font-size: 14px;
@@ -1302,7 +1419,7 @@ class SocialManager {
                 }
                 
                 .pymk-see-all:hover {
-                    background: var(--primary);
+                    background: #ff4b6e;
                     color: white;
                 }
                 
@@ -1314,9 +1431,9 @@ class SocialManager {
                 }
                 
                 .pymk-nav-btn {
-                    background: var(--bg-primary);
-                    border: 1px solid var(--border);
-                    color: var(--text-primary);
+                    background: white;
+                    border: 1px solid #e9ecef;
+                    color: #2c3e50;
                     width: 40px;
                     height: 40px;
                     border-radius: 50%;
@@ -1329,10 +1446,20 @@ class SocialManager {
                     z-index: 2;
                 }
                 
+                .dark-mode .pymk-nav-btn {
+                    background: #36393f;
+                    border-color: #40444b;
+                    color: #fff;
+                }
+                
                 .pymk-nav-btn:hover {
-                    background: var(--hover);
-                    border-color: var(--primary);
-                    color: var(--primary);
+                    background: #f0f0f0;
+                    border-color: #ff4b6e;
+                    color: #ff4b6e;
+                }
+                
+                .dark-mode .pymk-nav-btn:hover {
+                    background: #40444b;
                 }
                 
                 .pymk-nav-btn.left {
@@ -1361,8 +1488,8 @@ class SocialManager {
                 }
                 
                 .pymk-profile-card {
-                    background: var(--bg-primary);
-                    border: 1px solid var(--border);
+                    background: white;
+                    border: 1px solid #e9ecef;
                     border-radius: 12px;
                     padding: 15px;
                     min-width: 180px;
@@ -1372,10 +1499,15 @@ class SocialManager {
                     flex-shrink: 0;
                 }
                 
+                .dark-mode .pymk-profile-card {
+                    background: #36393f;
+                    border-color: #40444b;
+                }
+                
                 .pymk-profile-card:hover {
                     transform: translateY(-5px);
                     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-                    border-color: var(--primary);
+                    border-color: #ff4b6e;
                 }
                 
                 .pymk-profile-avatar {
@@ -1384,31 +1516,39 @@ class SocialManager {
                     border-radius: 50%;
                     object-fit: cover;
                     margin: 0 auto 12px;
-                    border: 3px solid var(--primary);
+                    border: 3px solid #ff4b6e;
                 }
                 
                 .pymk-profile-name {
                     font-weight: 600;
                     font-size: 16px;
                     margin: 0 0 5px;
-                    color: var(--text-primary);
+                    color: #2c3e50;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
                 
+                .dark-mode .pymk-profile-name {
+                    color: #fff;
+                }
+                
                 .pymk-profile-info {
                     font-size: 12px;
-                    color: var(--text-light);
+                    color: #6c757d;
                     margin: 0 0 10px;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
                 
+                .dark-mode .pymk-profile-info {
+                    color: #b9bbbe;
+                }
+                
                 .pymk-profile-mutual {
                     font-size: 11px;
-                    color: var(--text-light);
+                    color: #6c757d;
                     margin: 0 0 15px;
                     display: flex;
                     align-items: center;
@@ -1416,8 +1556,12 @@ class SocialManager {
                     gap: 5px;
                 }
                 
+                .dark-mode .pymk-profile-mutual {
+                    color: #b9bbbe;
+                }
+                
                 .pymk-profile-mutual i {
-                    color: var(--success);
+                    color: #10b981;
                 }
                 
                 .pymk-follow-btn {
@@ -1436,12 +1580,12 @@ class SocialManager {
                 }
                 
                 .pymk-follow-btn:not(.following) {
-                    background: var(--primary);
+                    background: #ff4b6e;
                     color: white;
                 }
                 
                 .pymk-follow-btn.following {
-                    background: var(--success);
+                    background: #10b981;
                     color: white;
                 }
                 
@@ -1457,8 +1601,8 @@ class SocialManager {
                 
                 .pymk-load-more {
                     background: transparent;
-                    border: 1px solid var(--border);
-                    color: var(--text-primary);
+                    border: 1px solid #e9ecef;
+                    color: #2c3e50;
                     padding: 10px 20px;
                     border-radius: 20px;
                     font-size: 14px;
@@ -1469,17 +1613,30 @@ class SocialManager {
                     gap: 8px;
                 }
                 
+                .dark-mode .pymk-load-more {
+                    border-color: #40444b;
+                    color: #fff;
+                }
+                
                 .pymk-load-more:hover {
-                    background: var(--hover);
-                    border-color: var(--primary);
-                    color: var(--primary);
+                    background: #f0f0f0;
+                    border-color: #ff4b6e;
+                    color: #ff4b6e;
+                }
+                
+                .dark-mode .pymk-load-more:hover {
+                    background: #40444b;
                 }
                 
                 .pymk-loading {
                     text-align: center;
                     padding: 40px;
-                    color: var(--text-light);
+                    color: #6c757d;
                     font-style: italic;
+                }
+                
+                .dark-mode .pymk-loading {
+                    color: #b9bbbe;
                 }
                 
                 .pymk-expanded {
@@ -1497,7 +1654,7 @@ class SocialManager {
                 }
                 
                 .pymk-expanded-content {
-                    background: var(--bg-primary);
+                    background: white;
                     border-radius: 15px;
                     padding: 30px;
                     max-width: 90%;
@@ -1506,13 +1663,17 @@ class SocialManager {
                     position: relative;
                 }
                 
+                .dark-mode .pymk-expanded-content {
+                    background: #36393f;
+                }
+                
                 .pymk-close-expanded {
                     position: absolute;
                     top: 15px;
                     right: 15px;
                     background: transparent;
                     border: none;
-                    color: var(--text-light);
+                    color: #6c757d;
                     font-size: 24px;
                     cursor: pointer;
                     width: 30px;
@@ -1524,9 +1685,18 @@ class SocialManager {
                     transition: all 0.3s;
                 }
                 
+                .dark-mode .pymk-close-expanded {
+                    color: #b9bbbe;
+                }
+                
                 .pymk-close-expanded:hover {
-                    background: var(--hover);
-                    color: var(--text-primary);
+                    background: #f0f0f0;
+                    color: #2c3e50;
+                }
+                
+                .dark-mode .pymk-close-expanded:hover {
+                    background: #40444b;
+                    color: #fff;
                 }
                 
                 .pymk-expanded-grid {
@@ -1553,7 +1723,7 @@ class SocialManager {
                 }
 
                 #deletePostModal .modal-content {
-                    background: var(--discord-darker, #2c2f33);
+                    background: #2c2f33;
                     border-radius: 16px;
                     max-width: 500px;
                     width: 100%;
@@ -1577,7 +1747,7 @@ class SocialManager {
 
                 #deletePostModal .modal-header {
                     padding: 20px;
-                    border-bottom: 1px solid var(--discord-border, #40444b);
+                    border-bottom: 1px solid #40444b;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -1586,39 +1756,39 @@ class SocialManager {
 
                 #deletePostModal .modal-header h3 {
                     margin: 0;
-                    color: var(--discord-text, #ffffff);
+                    color: #ffffff;
                     font-size: 1.25rem;
                 }
 
                 #deletePostModal .close-modal {
                     font-size: 24px;
                     cursor: pointer;
-                    color: var(--discord-muted, #99aab5);
+                    color: #99aab5;
                     transition: color 0.2s;
                 }
 
                 #deletePostModal .close-modal:hover {
-                    color: var(--discord-text, #ffffff);
+                    color: #ffffff;
                 }
 
                 #deletePostModal .modal-body {
                     padding: 20px;
                     overflow-y: auto;
                     flex: 1;
-                    color: var(--discord-text, #ffffff);
+                    color: #ffffff;
                 }
 
                 #deletePostModal .modal-body p {
                     margin-top: 0;
                     margin-bottom: 20px;
-                    color: var(--discord-muted, #dcddde);
+                    color: #dcddde;
                 }
 
                 #deletePostModal .post-preview {
-                    background: var(--discord-bg, #36393f);
+                    background: #36393f;
                     border-radius: 12px;
                     padding: 15px;
-                    border: 1px solid var(--discord-border, #40444b);
+                    border: 1px solid #40444b;
                 }
 
                 #deletePostModal .preview-image {
@@ -1653,7 +1823,7 @@ class SocialManager {
 
                 #deletePostModal .preview-caption {
                     font-size: 14px;
-                    color: var(--discord-text, #ffffff);
+                    color: #ffffff;
                     word-wrap: break-word;
                     max-height: 100px;
                     overflow-y: auto;
@@ -1664,7 +1834,7 @@ class SocialManager {
 
                 #deletePostModal .modal-actions {
                     padding: 20px;
-                    border-top: 1px solid var(--discord-border, #40444b);
+                    border-top: 1px solid #40444b;
                     display: flex;
                     gap: 15px;
                     justify-content: flex-end;
@@ -1686,8 +1856,8 @@ class SocialManager {
                 }
 
                 #deletePostModal .btn-secondary {
-                    background: var(--discord-border, #40444b);
-                    color: var(--discord-text, #ffffff);
+                    background: #40444b;
+                    color: #ffffff;
                 }
 
                 #deletePostModal .btn-secondary:hover {
@@ -1819,6 +1989,50 @@ class SocialManager {
                         width: 100%;
                         border-radius: 30px;
                     }
+                }
+
+                /* ========== POLL CHECKMARK STYLES - ADDED ========== */
+                .poll-option-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    flex: 1;
+                }
+                
+                .poll-checkmark {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 50%;
+                    background: white;
+                    border: 2px solid #e9ecef;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s;
+                }
+                
+                .dark-mode .poll-checkmark {
+                    background: #36393f;
+                    border-color: #40444b;
+                }
+                
+                .poll-option-content:hover .poll-checkmark {
+                    border-color: #ff4b6e;
+                }
+                
+                .poll-option-content.voted .poll-checkmark {
+                    background: #ff4b6e;
+                    border-color: #ff4b6e;
+                }
+                
+                .poll-checkmark i {
+                    color: white;
+                    font-size: 12px;
+                    display: none;
+                }
+                
+                .poll-option-content.voted .poll-checkmark i {
+                    display: inline;
                 }
             `;
             document.head.appendChild(style);
@@ -2612,7 +2826,7 @@ class SocialManager {
         }
     }
 
-    // FIXED: createPollElement with working click listeners
+    // FIXED: createPollElement without direct click listeners
     createPollElement(post, postId) {
         const pollContainer = document.createElement('div');
         pollContainer.className = 'post-poll-container';
@@ -2620,7 +2834,6 @@ class SocialManager {
         
         const poll = post.poll;
         const totalVotes = poll.totalVotes || 0;
-        const hasVoted = poll.voters?.includes(this.currentUser?.uid) || false;
         const userVote = this.getUserVote(postId, this.currentUser?.uid);
         
         let optionsHTML = '';
@@ -2632,13 +2845,16 @@ class SocialManager {
             
             optionsHTML += `
                 <div class="poll-option-item">
-                    <div class="poll-option-content ${hasVoted || poll.isClosed ? (isVoted ? 'voted' : '') : ''}" 
+                    <div class="poll-option-content ${isVoted ? 'voted' : ''}" 
                          data-option-id="${option.id}"
                          data-post-id="${postId}"
-                         ${!hasVoted && !poll.isClosed ? 'style="cursor: pointer;"' : 'style="cursor: default;"'}>
+                         data-vote-count="${voteCount}"
+                         data-percentage="${percentage}">
                         <div class="poll-progress-bar-bg" style="width: ${percentage}%;"></div>
                         <div class="poll-option-left">
-                            <div class="poll-radio"></div>
+                            <div class="poll-checkmark">
+                                <i class="fas fa-check"></i>
+                            </div>
                             <span class="poll-option-text">${this.escapeHTML(option.text)}</span>
                         </div>
                         <div class="poll-option-right">
@@ -2663,31 +2879,10 @@ class SocialManager {
                     <i class="fas fa-users"></i>
                     ${this.formatCount(totalVotes)} votes
                 </span>
-                ${hasVoted ? '<span class="poll-closed-badge"><i class="fas fa-check-circle"></i> You voted</span>' : ''}
+                ${userVote ? '<span class="poll-closed-badge"><i class="fas fa-check-circle"></i> You voted</span>' : ''}
                 ${poll.isClosed ? '<span class="poll-closed-badge"><i class="fas fa-lock"></i> Poll closed</span>' : ''}
             </div>
         `;
-        
-        // FIXED: Direct click listener attachment
-        if (!hasVoted && !poll.isClosed && this.currentUser) {
-            const options = pollContainer.querySelectorAll('.poll-option-content');
-            options.forEach(option => {
-                // Remove any existing listeners first
-                option.removeEventListener('click', this.handlePollClick);
-                // Add fresh listener
-                option.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const optionId = option.dataset.optionId;
-                    const postId = option.dataset.postId;
-                    
-                    if (optionId && postId) {
-                        this.castVote(postId, optionId);
-                    }
-                });
-            });
-        }
         
         return pollContainer;
     }
@@ -2698,6 +2893,7 @@ class SocialManager {
         return localStorage.getItem(voteKey);
     }
     
+    // COMPLETELY FIXED: castVote method with direct UI update
     async castVote(postId, optionId) {
         if (!this.currentUser) {
             this.showNotification('Please login to vote', 'error');
@@ -2730,6 +2926,7 @@ class SocialManager {
                 return;
             }
             
+            // Update Firestore
             const updatedOptions = post.poll.options.map(opt => {
                 if (opt.id === optionId) {
                     return {
@@ -2749,12 +2946,13 @@ class SocialManager {
                 'poll.voters': voters
             });
             
+            // Save to localStorage
             localStorage.setItem(`poll_vote_${postId}_${this.currentUser.uid}`, optionId);
             
             this.showNotification('Vote cast successfully!', 'success');
             
-            // Refresh the poll display
-            await this.refreshPollDisplay(postId);
+            // Update UI directly
+            this.updatePollUIVote(postId, optionId, newTotalVotes, updatedOptions);
             
         } catch (error) {
             console.error('Error casting vote:', error);
@@ -2762,30 +2960,70 @@ class SocialManager {
         }
     }
     
-    async refreshPollDisplay(postId) {
-        // Find the post element
-        const postElement = document.querySelector(`.post-item[data-post-id="${postId}"]`);
+    // FIXED: Update poll UI directly
+    updatePollUIVote(postId, votedOptionId, newTotalVotes, updatedOptions) {
+        // Find the poll container for this post
+        const pollContainer = document.querySelector(`.post-poll-container[data-poll-id="${postId}"]`);
+        if (!pollContainer) {
+            console.log('Poll container not found for ID:', postId);
+            return;
+        }
         
-        if (postElement) {
-            const oldPollContainer = postElement.querySelector('.post-poll-container');
-            if (oldPollContainer) {
-                try {
-                    const postRef = doc(db, 'posts', postId);
-                    const postSnap = await getDoc(postRef);
-                    
-                    if (postSnap.exists()) {
-                        const post = postSnap.data();
-                        const newPollContainer = this.createPollElement(post, postId);
-                        oldPollContainer.replaceWith(newPollContainer);
-                    }
-                } catch (error) {
-                    console.error('Error refreshing poll:', error);
+        // Update each option's UI
+        updatedOptions.forEach(option => {
+            const optionElement = pollContainer.querySelector(`.poll-option-content[data-option-id="${option.id}"]`);
+            if (optionElement) {
+                const voteCount = option.votes || 0;
+                const percentage = newTotalVotes > 0 ? Math.round((voteCount / newTotalVotes) * 100) : 0;
+                
+                // Update progress bar
+                const progressBar = optionElement.querySelector('.poll-progress-bar-bg');
+                if (progressBar) {
+                    progressBar.style.width = percentage + '%';
+                }
+                
+                // Update percentage text
+                const percentageSpan = optionElement.querySelector('.poll-percentage');
+                if (percentageSpan) {
+                    percentageSpan.textContent = percentage + '%';
+                }
+                
+                // Update vote count
+                const countSpan = optionElement.querySelector('.poll-count');
+                if (countSpan) {
+                    countSpan.textContent = this.formatCount(voteCount);
+                }
+                
+                // Mark voted option with checkmark
+                if (option.id === votedOptionId) {
+                    optionElement.classList.add('voted');
                 }
             }
+        });
+        
+        // Update total votes count in footer
+        const totalVotesSpan = pollContainer.querySelector('.poll-total-votes');
+        if (totalVotesSpan) {
+            totalVotesSpan.innerHTML = `<i class="fas fa-users"></i> ${this.formatCount(newTotalVotes)} votes`;
+        }
+        
+        // Remove existing "You voted" badge if any
+        const existingBadge = pollContainer.querySelector('.poll-closed-badge');
+        if (existingBadge) {
+            existingBadge.remove();
+        }
+        
+        // Add "You voted" badge
+        const footer = pollContainer.querySelector('.poll-footer');
+        if (footer) {
+            const youVotedBadge = document.createElement('span');
+            youVotedBadge.className = 'poll-closed-badge';
+            youVotedBadge.innerHTML = '<i class="fas fa-check-circle"></i> You voted';
+            footer.appendChild(youVotedBadge);
         }
     }
 
-    // ==================== COMMENT REPLIES FUNCTIONALITY - FIXED ====================
+    // ==================== COMMENT REPLIES FUNCTIONALITY ====================
     
     setupReplyModal() {
         if (!document.getElementById('replyModal')) {
@@ -2943,7 +3181,6 @@ class SocialManager {
         }
     }
     
-    // FIXED: createCommentElement with working view replies button
     createCommentElement(comment, user, postId) {
         const commentDiv = document.createElement('div');
         commentDiv.className = 'comment-item';
@@ -2975,7 +3212,6 @@ class SocialManager {
             <div id="replies-${comment.id}" class="replies-container" style="display: none;"></div>
         `;
         
-        // FIXED: Reply button listener
         const replyBtn = commentDiv.querySelector('.reply-btn');
         if (replyBtn) {
             replyBtn.addEventListener('click', (e) => {
@@ -2992,7 +3228,6 @@ class SocialManager {
             });
         }
         
-        // FIXED: View replies button listener - now at BOTTOM
         if (hasReplies) {
             const viewRepliesBtn = commentDiv.querySelector('.view-replies-btn');
             viewRepliesBtn.addEventListener('click', async (e) => {
