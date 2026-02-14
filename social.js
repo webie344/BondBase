@@ -274,7 +274,7 @@ class SocialManager {
         return array;
     }
 
-    // ==================== ADD ALL STYLES (RESTORED ORIGINAL) ====================
+    // ==================== ADD ALL STYLES (UPDATED WITH DARK THEME FOR POLLS) ====================
     addAllStyles() {
         if (!document.getElementById('socialManagerStyles')) {
             const style = document.createElement('style');
@@ -348,7 +348,7 @@ class SocialManager {
                     border: 1px solid rgba(255,255,255,0.2);
                 }
 
-                /* ========== POLL STYLES ========== */
+                /* ========== POLL STYLES - UPDATED FOR DARK THEME ========== */
                 .poll-toggle-btn {
                     background: transparent;
                     border: 1px dashed #ff4b6e;
@@ -377,33 +377,27 @@ class SocialManager {
                 }
                 
                 .poll-builder {
-                    background: #f8f9fa;
+                    background: #2c2f33;
                     border-radius: 12px;
                     padding: 20px;
                     margin: 15px 0;
-                    border: 1px solid #e9ecef;
-                }
-                
-                .dark-mode .poll-builder {
-                    background: #2c2f33;
-                    border-color: #40444b;
+                    border: 1px solid #40444b;
                 }
                 
                 .poll-question {
                     width: 100%;
                     padding: 12px 16px;
-                    border: 2px solid #e9ecef;
+                    border: 2px solid #40444b;
                     border-radius: 12px;
                     font-size: 15px;
-                    background: white;
-                    color: #2c3e50;
+                    background: #36393f;
+                    color: #fff;
                     margin-bottom: 15px;
                 }
                 
-                .dark-mode .poll-question {
-                    background: #36393f;
-                    border-color: #40444b;
-                    color: #fff;
+                .poll-question:focus {
+                    outline: none;
+                    border-color: #ff4b6e;
                 }
                 
                 .poll-options-container {
@@ -422,17 +416,16 @@ class SocialManager {
                 .poll-option-input {
                     flex: 1;
                     padding: 10px 14px;
-                    border: 2px solid #e9ecef;
+                    border: 2px solid #40444b;
                     border-radius: 10px;
                     font-size: 14px;
-                    background: white;
-                    color: #2c3e50;
+                    background: #36393f;
+                    color: #fff;
                 }
                 
-                .dark-mode .poll-option-input {
-                    background: #36393f;
-                    border-color: #40444b;
-                    color: #fff;
+                .poll-option-input:focus {
+                    outline: none;
+                    border-color: #ff4b6e;
                 }
                 
                 .remove-poll-option {
@@ -485,22 +478,17 @@ class SocialManager {
                 .poll-preview {
                     margin-top: 15px;
                     padding-top: 15px;
-                    border-top: 1px solid #e9ecef;
+                    border-top: 1px solid #40444b;
                     font-size: 13px;
-                    color: #6c757d;
+                    color: #b9bbbe;
                 }
                 
                 .post-poll-container {
-                    background: #f8f9fa;
+                    background: #2c2f33;
                     border-radius: 16px;
                     padding: 20px;
                     margin: 15px 0;
-                    border: 1px solid #e9ecef;
-                }
-                
-                .dark-mode .post-poll-container {
-                    background: #2c2f33;
-                    border-color: #40444b;
+                    border: 1px solid #40444b;
                 }
                 
                 .poll-header {
@@ -509,7 +497,7 @@ class SocialManager {
                     gap: 10px;
                     margin-bottom: 16px;
                     padding-bottom: 12px;
-                    border-bottom: 1px solid #e9ecef;
+                    border-bottom: 1px solid #40444b;
                 }
                 
                 .poll-header i {
@@ -521,23 +509,15 @@ class SocialManager {
                     margin: 0;
                     font-size: 16px;
                     font-weight: 600;
-                    color: #2c3e50;
-                }
-                
-                .dark-mode .poll-header h4 {
                     color: #fff;
                 }
                 
                 .poll-question-display {
                     font-size: 16px;
                     font-weight: 500;
-                    color: #2c3e50;
+                    color: #fff;
                     margin-bottom: 16px;
                     padding: 0 4px;
-                }
-                
-                .dark-mode .poll-question-display {
-                    color: #fff;
                 }
                 
                 .poll-options-list {
@@ -556,8 +536,8 @@ class SocialManager {
                     align-items: center;
                     justify-content: space-between;
                     padding: 12px 16px;
-                    background: white;
-                    border: 2px solid #e9ecef;
+                    background: #36393f;
+                    border: 2px solid #40444b;
                     border-radius: 12px;
                     cursor: pointer;
                     transition: all 0.2s;
@@ -565,14 +545,9 @@ class SocialManager {
                     z-index: 2;
                 }
                 
-                .dark-mode .poll-option-content {
-                    background: #36393f;
-                    border-color: #40444b;
-                }
-                
                 .poll-option-content:hover {
                     border-color: #ff4b6e;
-                    background: rgba(255, 75, 110, 0.05);
+                    background: rgba(255, 75, 110, 0.1);
                 }
                 
                 .poll-option-left {
@@ -586,17 +561,12 @@ class SocialManager {
                     width: 22px;
                     height: 22px;
                     border-radius: 50%;
-                    background: white;
-                    border: 2px solid #e9ecef;
+                    background: #36393f;
+                    border: 2px solid #40444b;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     transition: all 0.2s;
-                }
-                
-                .dark-mode .poll-checkmark {
-                    background: #36393f;
-                    border-color: #40444b;
                 }
                 
                 .poll-option-content:hover .poll-checkmark {
@@ -620,12 +590,8 @@ class SocialManager {
                 
                 .poll-option-text {
                     font-size: 15px;
-                    color: #2c3e50;
-                    font-weight: 500;
-                }
-                
-                .dark-mode .poll-option-text {
                     color: #fff;
+                    font-weight: 500;
                 }
                 
                 .poll-option-right {
@@ -644,10 +610,6 @@ class SocialManager {
                 
                 .poll-count {
                     font-size: 13px;
-                    color: #6c757d;
-                }
-                
-                .dark-mode .poll-count {
                     color: #b9bbbe;
                 }
                 
@@ -669,13 +631,8 @@ class SocialManager {
                     align-items: center;
                     margin-top: 16px;
                     padding-top: 12px;
-                    border-top: 1px solid #e9ecef;
+                    border-top: 1px solid #40444b;
                     font-size: 13px;
-                    color: #6c757d;
-                }
-                
-                .dark-mode .poll-footer {
-                    border-top-color: #40444b;
                     color: #b9bbbe;
                 }
                 
@@ -705,14 +662,9 @@ class SocialManager {
                     position: relative;
                     padding: 12px;
                     margin-bottom: 8px;
-                    background: #f8f9fa;
-                    border-radius: 12px;
-                    border: 1px solid #e9ecef;
-                }
-                
-                .dark-mode .comment-item {
                     background: #2c2f33;
-                    border-color: #40444b;
+                    border-radius: 12px;
+                    border: 1px solid #40444b;
                 }
                 
                 .comment-header {
@@ -737,33 +689,21 @@ class SocialManager {
                 
                 .comment-info strong {
                     font-size: 13px;
-                    color: #2c3e50;
-                }
-                
-                .dark-mode .comment-info strong {
                     color: #fff;
                 }
                 
                 .comment-time {
                     font-size: 11px;
-                    color: #6c757d;
-                }
-                
-                .dark-mode .comment-time {
                     color: #b9bbbe;
                 }
                 
                 .comment-text {
                     font-size: 14px;
-                    color: #2c3e50;
+                    color: #fff;
                     line-height: 1.5;
                     margin-left: 42px;
                     margin-bottom: 8px;
                     word-wrap: break-word;
-                }
-                
-                .dark-mode .comment-text {
-                    color: #fff;
                 }
                 
                 .comment-actions {
@@ -777,7 +717,7 @@ class SocialManager {
                 .comment-action-btn {
                     background: transparent;
                     border: none;
-                    color: #6c757d;
+                    color: #b9bbbe;
                     font-size: 12px;
                     display: flex;
                     align-items: center;
@@ -786,10 +726,6 @@ class SocialManager {
                     border-radius: 16px;
                     cursor: pointer;
                     transition: all 0.2s;
-                }
-                
-                .dark-mode .comment-action-btn {
-                    color: #b9bbbe;
                 }
                 
                 .comment-action-btn:hover {
@@ -840,24 +776,15 @@ class SocialManager {
                     margin-top: 8px;
                     margin-bottom: 4px;
                     padding-left: 16px;
-                    border-left: 2px solid #e9ecef;
-                }
-                
-                .dark-mode .replies-container {
-                    border-left-color: #40444b;
+                    border-left: 2px solid #40444b;
                 }
                 
                 .reply-item {
                     padding: 10px;
                     margin-bottom: 8px;
-                    background: white;
-                    border-radius: 10px;
-                    border: 1px solid #e9ecef;
-                }
-                
-                .dark-mode .reply-item {
                     background: #36393f;
-                    border-color: #40444b;
+                    border-radius: 10px;
+                    border: 1px solid #40444b;
                 }
                 
                 .reply-header {
@@ -882,32 +809,20 @@ class SocialManager {
                 
                 .reply-info strong {
                     font-size: 12px;
-                    color: #2c3e50;
-                }
-                
-                .dark-mode .reply-info strong {
                     color: #fff;
                 }
                 
                 .reply-time {
                     font-size: 10px;
-                    color: #6c757d;
-                }
-                
-                .dark-mode .reply-time {
                     color: #b9bbbe;
                 }
                 
                 .reply-text {
                     font-size: 13px;
-                    color: #2c3e50;
+                    color: #fff;
                     margin-left: 34px;
                     margin-bottom: 4px;
                     word-wrap: break-word;
-                }
-                
-                .dark-mode .reply-text {
-                    color: #fff;
                 }
                 
                 .reply-mention {
@@ -921,18 +836,13 @@ class SocialManager {
                     bottom: 0;
                     left: 0;
                     right: 0;
-                    background: white;
-                    border-top: 2px solid #e9ecef;
+                    background: #36393f;
+                    border-top: 2px solid #40444b;
                     padding: 16px;
                     z-index: 10000;
                     display: none;
                     box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
                     animation: slideUp 0.3s ease;
-                }
-                
-                .dark-mode .reply-modal {
-                    background: #36393f;
-                    border-top-color: #40444b;
                 }
                 
                 @keyframes slideUp {
@@ -955,11 +865,7 @@ class SocialManager {
                     gap: 12px;
                     margin-bottom: 16px;
                     padding-bottom: 12px;
-                    border-bottom: 1px solid #e9ecef;
-                }
-                
-                .dark-mode .reply-to-info {
-                    border-bottom-color: #40444b;
+                    border-bottom: 1px solid #40444b;
                 }
                 
                 .reply-to-avatar {
@@ -975,26 +881,18 @@ class SocialManager {
                 
                 .reply-to-name {
                     font-weight: 600;
-                    color: #2c3e50;
-                    font-size: 14px;
-                }
-                
-                .dark-mode .reply-to-name {
                     color: #fff;
+                    font-size: 14px;
                 }
                 
                 .reply-to-text {
                     font-size: 13px;
-                    color: #6c757d;
+                    color: #b9bbbe;
                     margin-top: 2px;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                     max-width: 400px;
-                }
-                
-                .dark-mode .reply-to-text {
-                    color: #b9bbbe;
                 }
                 
                 .reply-modal-input-container {
@@ -1006,17 +904,16 @@ class SocialManager {
                 .reply-modal-input {
                     flex: 1;
                     padding: 14px 18px;
-                    border: 2px solid #e9ecef;
+                    border: 2px solid #40444b;
                     border-radius: 30px;
                     font-size: 15px;
-                    background: #f8f9fa;
-                    color: #2c3e50;
+                    background: #2c2f33;
+                    color: #fff;
                 }
                 
-                .dark-mode .reply-modal-input {
-                    background: #2c2f33;
-                    border-color: #40444b;
-                    color: #fff;
+                .reply-modal-input:focus {
+                    outline: none;
+                    border-color: #ff4b6e;
                 }
                 
                 .reply-modal-send {
@@ -1047,7 +944,7 @@ class SocialManager {
                     right: 16px;
                     background: transparent;
                     border: none;
-                    color: #6c757d;
+                    color: #b9bbbe;
                     font-size: 24px;
                     cursor: pointer;
                     width: 32px;
@@ -1059,10 +956,6 @@ class SocialManager {
                 }
                 
                 .reply-modal-close:hover {
-                    background: rgba(0,0,0,0.1);
-                }
-                
-                .dark-mode .reply-modal-close:hover {
                     background: rgba(255,255,255,0.1);
                 }
 
@@ -1072,17 +965,13 @@ class SocialManager {
                     width: 100%;
                     height: 0;
                     padding-bottom: 56.25%;
-                    background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%);
+                    background: linear-gradient(110deg, #2a2a2a 8%, #333333 18%, #2a2a2a 33%);
                     background-size: 200% 100%;
                     animation: shimmer 1.5s infinite linear;
                     border-radius: 12px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                }
-
-                .dark-mode .video-placeholder {
-                    background: linear-gradient(110deg, #2a2a2a 8%, #333333 18%, #2a2a2a 33%);
                 }
 
                 @keyframes shimmer {
@@ -1092,10 +981,6 @@ class SocialManager {
 
                 .video-placeholder-content {
                     text-align: center;
-                    color: #999;
-                }
-
-                .dark-mode .video-placeholder-content {
                     color: #666;
                 }
 
@@ -1370,17 +1255,12 @@ class SocialManager {
 
                 /* ========== PEOPLE YOU MAY KNOW STYLES ========== */
                 .pymk-section {
-                    background: #f8f9fa;
+                    background: #2c2f33;
                     border-radius: 15px;
                     padding: 20px;
                     margin: 25px 0;
-                    border: 1px solid #e9ecef;
+                    border: 1px solid #40444b;
                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-                }
-                
-                .dark-mode .pymk-section {
-                    background: #2c2f33;
-                    border-color: #40444b;
                 }
                 
                 .pymk-header {
@@ -1393,14 +1273,10 @@ class SocialManager {
                 .pymk-header h3 {
                     margin: 0;
                     font-size: 18px;
-                    color: #2c3e50;
+                    color: #fff;
                     display: flex;
                     align-items: center;
                     gap: 10px;
-                }
-                
-                .dark-mode .pymk-header h3 {
-                    color: #fff;
                 }
                 
                 .pymk-header h3 i {
@@ -1431,9 +1307,9 @@ class SocialManager {
                 }
                 
                 .pymk-nav-btn {
-                    background: white;
-                    border: 1px solid #e9ecef;
-                    color: #2c3e50;
+                    background: #36393f;
+                    border: 1px solid #40444b;
+                    color: #fff;
                     width: 40px;
                     height: 40px;
                     border-radius: 50%;
@@ -1446,20 +1322,10 @@ class SocialManager {
                     z-index: 2;
                 }
                 
-                .dark-mode .pymk-nav-btn {
-                    background: #36393f;
-                    border-color: #40444b;
-                    color: #fff;
-                }
-                
                 .pymk-nav-btn:hover {
-                    background: #f0f0f0;
+                    background: #40444b;
                     border-color: #ff4b6e;
                     color: #ff4b6e;
-                }
-                
-                .dark-mode .pymk-nav-btn:hover {
-                    background: #40444b;
                 }
                 
                 .pymk-nav-btn.left {
@@ -1488,8 +1354,8 @@ class SocialManager {
                 }
                 
                 .pymk-profile-card {
-                    background: white;
-                    border: 1px solid #e9ecef;
+                    background: #36393f;
+                    border: 1px solid #40444b;
                     border-radius: 12px;
                     padding: 15px;
                     min-width: 180px;
@@ -1497,11 +1363,6 @@ class SocialManager {
                     text-align: center;
                     transition: all 0.3s;
                     flex-shrink: 0;
-                }
-                
-                .dark-mode .pymk-profile-card {
-                    background: #36393f;
-                    border-color: #40444b;
                 }
                 
                 .pymk-profile-card:hover {
@@ -1523,41 +1384,29 @@ class SocialManager {
                     font-weight: 600;
                     font-size: 16px;
                     margin: 0 0 5px;
-                    color: #2c3e50;
+                    color: #fff;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
                 
-                .dark-mode .pymk-profile-name {
-                    color: #fff;
-                }
-                
                 .pymk-profile-info {
                     font-size: 12px;
-                    color: #6c757d;
+                    color: #b9bbbe;
                     margin: 0 0 10px;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
                 
-                .dark-mode .pymk-profile-info {
-                    color: #b9bbbe;
-                }
-                
                 .pymk-profile-mutual {
                     font-size: 11px;
-                    color: #6c757d;
+                    color: #b9bbbe;
                     margin: 0 0 15px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     gap: 5px;
-                }
-                
-                .dark-mode .pymk-profile-mutual {
-                    color: #b9bbbe;
                 }
                 
                 .pymk-profile-mutual i {
@@ -1601,8 +1450,8 @@ class SocialManager {
                 
                 .pymk-load-more {
                     background: transparent;
-                    border: 1px solid #e9ecef;
-                    color: #2c3e50;
+                    border: 1px solid #40444b;
+                    color: #fff;
                     padding: 10px 20px;
                     border-radius: 20px;
                     font-size: 14px;
@@ -1613,30 +1462,17 @@ class SocialManager {
                     gap: 8px;
                 }
                 
-                .dark-mode .pymk-load-more {
-                    border-color: #40444b;
-                    color: #fff;
-                }
-                
                 .pymk-load-more:hover {
-                    background: #f0f0f0;
+                    background: #40444b;
                     border-color: #ff4b6e;
                     color: #ff4b6e;
-                }
-                
-                .dark-mode .pymk-load-more:hover {
-                    background: #40444b;
                 }
                 
                 .pymk-loading {
                     text-align: center;
                     padding: 40px;
-                    color: #6c757d;
-                    font-style: italic;
-                }
-                
-                .dark-mode .pymk-loading {
                     color: #b9bbbe;
+                    font-style: italic;
                 }
                 
                 .pymk-expanded {
@@ -1654,7 +1490,7 @@ class SocialManager {
                 }
                 
                 .pymk-expanded-content {
-                    background: white;
+                    background: #36393f;
                     border-radius: 15px;
                     padding: 30px;
                     max-width: 90%;
@@ -1663,17 +1499,13 @@ class SocialManager {
                     position: relative;
                 }
                 
-                .dark-mode .pymk-expanded-content {
-                    background: #36393f;
-                }
-                
                 .pymk-close-expanded {
                     position: absolute;
                     top: 15px;
                     right: 15px;
                     background: transparent;
                     border: none;
-                    color: #6c757d;
+                    color: #b9bbbe;
                     font-size: 24px;
                     cursor: pointer;
                     width: 30px;
@@ -1685,16 +1517,7 @@ class SocialManager {
                     transition: all 0.3s;
                 }
                 
-                .dark-mode .pymk-close-expanded {
-                    color: #b9bbbe;
-                }
-                
                 .pymk-close-expanded:hover {
-                    background: #f0f0f0;
-                    color: #2c3e50;
-                }
-                
-                .dark-mode .pymk-close-expanded:hover {
                     background: #40444b;
                     color: #fff;
                 }
@@ -1989,50 +1812,6 @@ class SocialManager {
                         width: 100%;
                         border-radius: 30px;
                     }
-                }
-
-                /* ========== POLL CHECKMARK STYLES - ADDED ========== */
-                .poll-option-left {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    flex: 1;
-                }
-                
-                .poll-checkmark {
-                    width: 22px;
-                    height: 22px;
-                    border-radius: 50%;
-                    background: white;
-                    border: 2px solid #e9ecef;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.2s;
-                }
-                
-                .dark-mode .poll-checkmark {
-                    background: #36393f;
-                    border-color: #40444b;
-                }
-                
-                .poll-option-content:hover .poll-checkmark {
-                    border-color: #ff4b6e;
-                }
-                
-                .poll-option-content.voted .poll-checkmark {
-                    background: #ff4b6e;
-                    border-color: #ff4b6e;
-                }
-                
-                .poll-checkmark i {
-                    color: white;
-                    font-size: 12px;
-                    display: none;
-                }
-                
-                .poll-option-content.voted .poll-checkmark i {
-                    display: inline;
                 }
             `;
             document.head.appendChild(style);
