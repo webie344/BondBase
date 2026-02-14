@@ -146,6 +146,250 @@
             color: var(--accent-color);
         }
 
+        /* ========== POLL STYLES ========== */
+        .post-type-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .post-type-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            background: var(--bg-light);
+            color: var(--text-dark);
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .post-type-btn i {
+            font-size: 18px;
+        }
+
+        .post-type-btn:hover {
+            border-color: var(--accent-color);
+            background: rgba(255, 75, 110, 0.05);
+        }
+
+        .post-type-btn.active {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            color: white;
+        }
+
+        .post-type-btn.active i {
+            color: white;
+        }
+
+        .post-type-divider {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+            color: var(--text-light);
+            font-size: 14px;
+            position: relative;
+        }
+
+        .post-type-divider::before,
+        .post-type-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+            margin: 0 15px;
+        }
+
+        .poll-builder {
+            background: var(--bg-secondary, #f8f9fa);
+            border-radius: 16px;
+            padding: 24px;
+            margin: 20px 0;
+            border: 2px solid var(--accent-color);
+            box-shadow: 0 4px 12px rgba(255, 75, 110, 0.1);
+        }
+
+        .dark-mode .poll-builder {
+            background: var(--bg-secondary-dark, #2c2f33);
+            border-color: var(--accent-color);
+        }
+
+        .poll-question {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 16px;
+            background: var(--bg-primary, white);
+            color: var(--text-primary, #2c3e50);
+            margin-bottom: 20px;
+            transition: border-color 0.3s ease;
+        }
+
+        .dark-mode .poll-question {
+            background: var(--bg-primary-dark, #36393f);
+            border-color: var(--border-dark, #40444b);
+            color: var(--text-primary-dark, #fff);
+        }
+
+        .poll-question:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(255, 75, 110, 0.1);
+        }
+
+        .poll-options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .poll-option-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .poll-option-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 15px;
+            background: var(--bg-primary, white);
+            color: var(--text-primary, #2c3e50);
+            transition: all 0.3s ease;
+        }
+
+        .dark-mode .poll-option-input {
+            background: var(--bg-primary-dark, #36393f);
+            border-color: var(--border-dark, #40444b);
+            color: var(--text-primary-dark, #fff);
+        }
+
+        .poll-option-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(255, 75, 110, 0.1);
+        }
+
+        .remove-poll-option {
+            background: transparent;
+            border: none;
+            color: #dc2626;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.7;
+            transition: all 0.2s;
+        }
+
+        .remove-poll-option:hover {
+            opacity: 1;
+            background: rgba(220, 38, 38, 0.1);
+            transform: scale(1.1);
+        }
+
+        .remove-poll-option i {
+            font-size: 16px;
+        }
+
+        .add-poll-option {
+            background: transparent;
+            border: 2px dashed var(--success, #10b981);
+            color: var(--success, #10b981);
+            padding: 12px 20px;
+            border-radius: 30px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 5px;
+            transition: all 0.3s;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .add-poll-option:hover {
+            background: var(--success, #10b981);
+            color: white;
+            border-style: solid;
+            transform: translateY(-2px);
+        }
+
+        .add-poll-option.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #999;
+            color: #999;
+            background: transparent;
+            transform: none;
+        }
+
+        .add-poll-option i {
+            font-size: 16px;
+        }
+
+        .poll-preview {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            font-size: 13px;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .poll-preview i {
+            color: var(--accent-color);
+        }
+
+        .poll-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255, 75, 110, 0.1);
+            color: var(--accent-color);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .poll-badge i {
+            color: var(--accent-color);
+        }
+
         .video-toggle-container {
             margin: 15px 0;
             padding: 15px;
@@ -320,6 +564,12 @@
             border: 1px solid #ffeaa7;
         }
 
+        .upload-status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
         .progress-bar {
             width: 100%;
             height: 4px;
@@ -360,6 +610,18 @@
             .video-toggle-container {
                 flex-direction: column;
                 align-items: flex-start;
+            }
+
+            .post-type-selector {
+                flex-direction: column;
+            }
+
+            .post-type-btn {
+                width: 100%;
+            }
+
+            .poll-builder {
+                padding: 20px;
             }
         }
     </style>
@@ -419,10 +681,23 @@
         <div class="create-post-container">
             <div class="create-post-header">
                 <h1><i class="fas fa-plus-circle"></i> Create New Post</h1>
-                <p>Share your thoughts, photos, and videos with the community</p>
+                <p>Share your thoughts, create polls, or post photos and videos</p>
             </div>
 
             <form id="createPostForm" class="post-form">
+                <!-- Post Type Selector -->
+                <div class="post-type-selector">
+                    <button type="button" id="textPostBtn" class="post-type-btn active">
+                        <i class="fas fa-pencil-alt"></i> Text
+                    </button>
+                    <button type="button" id="mediaPostBtn" class="post-type-btn">
+                        <i class="fas fa-image"></i> Media
+                    </button>
+                    <button type="button" id="pollPostBtn" class="post-type-btn">
+                        <i class="fas fa-chart-bar"></i> Poll
+                    </button>
+                </div>
+
                 <div class="form-group">
                     <label for="postCaption"><i class="fas fa-pencil-alt"></i> What's on your mind?</label>
                     <textarea 
@@ -436,43 +711,98 @@
                     </div>
                 </div>
 
-                <!-- Video/Image Toggle - FIXED -->
-                <div class="video-toggle-container">
-                    <label class="toggle-label">
-                        <input type="checkbox" id="videoMode" class="toggle-checkbox">
-                        <span class="toggle-switch"></span>
-                        <span class="toggle-icon">
-                            <i class="fas fa-video"></i>
-                            Video Mode
-                        </span>
-                    </label>
-                    <div class="video-hint">
-                        <i class="fas fa-info-circle"></i>
-                        Max: 100MB (MP4, WebM, MOV)
+                <!-- Media Section (hidden by default for text/poll posts) -->
+                <div id="mediaSection" style="display: none;">
+                    <!-- Video/Image Toggle -->
+                    <div class="video-toggle-container">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="videoMode" class="toggle-checkbox">
+                            <span class="toggle-switch"></span>
+                            <span class="toggle-icon">
+                                <i class="fas fa-video"></i>
+                                Video Mode
+                            </span>
+                        </label>
+                        <div class="video-hint">
+                            <i class="fas fa-info-circle"></i>
+                            Max: 100MB (MP4, WebM, MOV)
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label id="mediaLabel">
+                            <i class="fas fa-image" id="mediaIcon"></i> 
+                            <span id="mediaTypeText">Add Photo</span> (Optional)
+                        </label>
+                        <div class="media-upload-area" onclick="document.getElementById('postMedia').click()">
+                            <i class="fas fa-cloud-upload-alt" id="uploadIcon"></i>
+                            <div class="media-upload-text" id="uploadText">Click to upload media</div>
+                            <div class="media-upload-hint" id="uploadHint">JPEG, PNG, GIF up to 10MB</div>
+                        </div>
+                        <input type="file" id="postMedia" accept="image/*">
+                        <div class="media-preview" id="mediaPreview">
+                            <div class="media-type-badge" id="mediaTypeBadge">
+                                <i class="fas fa-image"></i> Image
+                            </div>
+                        </div>
+                        <div class="media-info" id="mediaInfo" style="display: none;"></div>
+                        <div class="progress-bar" id="progressBar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="upload-status" id="uploadStatus"></div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label id="mediaLabel">
-                        <i class="fas fa-image" id="mediaIcon"></i> 
-                        <span id="mediaTypeText">Add Photo</span> (Optional)
-                    </label>
-                    <div class="media-upload-area" onclick="document.getElementById('postMedia').click()">
-                        <i class="fas fa-cloud-upload-alt" id="uploadIcon"></i>
-                        <div class="media-upload-text" id="uploadText">Click to upload media</div>
-                        <div class="media-upload-hint" id="uploadHint">JPEG, PNG, GIF up to 10MB</div>
-                    </div>
-                    <input type="file" id="postMedia" accept="image/*">
-                    <div class="media-preview" id="mediaPreview">
-                        <div class="media-type-badge" id="mediaTypeBadge">
-                            <i class="fas fa-image"></i> Image
+                <!-- Poll Builder Section (hidden by default) -->
+                <div id="pollSection" style="display: none;">
+                    <div class="poll-builder">
+                        <input 
+                            type="text" 
+                            id="pollQuestion" 
+                            class="poll-question" 
+                            placeholder="Ask a question..." 
+                            maxlength="200"
+                        >
+                        <div id="pollOptionsContainer" class="poll-options-container">
+                            <div class="poll-option-row">
+                                <input 
+                                    type="text" 
+                                    id="pollOption1" 
+                                    class="poll-option-input" 
+                                    placeholder="Option 1" 
+                                    maxlength="100"
+                                >
+                                <button type="button" class="remove-poll-option" data-option="1" style="display: none;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="poll-option-row">
+                                <input 
+                                    type="text" 
+                                    id="pollOption2" 
+                                    class="poll-option-input" 
+                                    placeholder="Option 2" 
+                                    maxlength="100"
+                                >
+                                <button type="button" class="remove-poll-option" data-option="2" style="display: none;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" id="addPollOptionBtn" class="add-poll-option">
+                            <i class="fas fa-plus"></i> Add Option
+                        </button>
+                        <div class="poll-preview">
+                            <span class="poll-badge">
+                                <i class="fas fa-chart-bar"></i> Poll
+                            </span>
+                            <span><i class="fas fa-info-circle"></i> Min 2 options, Max 4 options. Polls cannot be edited after posting.</span>
                         </div>
                     </div>
-                    <div class="media-info" id="mediaInfo" style="display: none;"></div>
-                    <div class="progress-bar" id="progressBar">
-                        <div class="progress-fill"></div>
-                    </div>
-                    <div class="upload-status" id="uploadStatus"></div>
+                </div>
+
+                <div class="post-type-divider">
+                    <span>Post Options</span>
                 </div>
 
                 <div class="form-actions">
@@ -493,6 +823,7 @@
                     <li>Share genuine moments and stories</li>
                     <li>Keep captions meaningful and engaging</li>
                     <li>Respect everyone's privacy</li>
+                    <li><i class="fas fa-chart-bar" style="color: var(--accent-color);"></i> Polls: Min 2 options, Max 4 options</li>
                     <li><i class="fas fa-video" style="color: var(--accent-color);"></i> Videos must be under 100MB (MP4, WebM, MOV)</li>
                 </ul>
             </div>
@@ -512,27 +843,85 @@
             });
         }
 
-        // ============ FIXED VIDEO/IMAGE MODE TOGGLE ============
+        // ============ POST TYPE SELECTOR ============
+        const textPostBtn = document.getElementById('textPostBtn');
+        const mediaPostBtn = document.getElementById('mediaPostBtn');
+        const pollPostBtn = document.getElementById('pollPostBtn');
+        const mediaSection = document.getElementById('mediaSection');
+        const pollSection = document.getElementById('pollSection');
         const videoModeCheckbox = document.getElementById('videoMode');
         const mediaInput = document.getElementById('postMedia');
-        const mediaIcon = document.getElementById('mediaIcon');
-        const mediaTypeText = document.getElementById('mediaTypeText');
-        const uploadText = document.getElementById('uploadText');
-        const uploadHint = document.getElementById('uploadHint');
-        const uploadIcon = document.getElementById('uploadIcon');
-        const mediaTypeBadge = document.getElementById('mediaTypeBadge');
-        const mediaInfo = document.getElementById('mediaInfo');
-        const mediaPreview = document.getElementById('mediaPreview');
+        const submitBtn = document.getElementById('submitBtn');
 
-        // Function to switch to image mode
+        // Function to switch post type
+        function setPostType(type) {
+            // Update active button states
+            textPostBtn.classList.remove('active');
+            mediaPostBtn.classList.remove('active');
+            pollPostBtn.classList.remove('active');
+            
+            // Hide all sections
+            mediaSection.style.display = 'none';
+            pollSection.style.display = 'none';
+            
+            // Clear any selected media when switching away from media
+            if (type !== 'media' && mediaInput) {
+                mediaInput.value = '';
+                const mediaPreview = document.getElementById('mediaPreview');
+                if (mediaPreview) {
+                    mediaPreview.style.display = 'none';
+                }
+                const mediaInfo = document.getElementById('mediaInfo');
+                if (mediaInfo) {
+                    mediaInfo.style.display = 'none';
+                }
+            }
+
+            switch(type) {
+                case 'text':
+                    textPostBtn.classList.add('active');
+                    captionInput.placeholder = 'Share your thoughts, ask a question, or tell a story...';
+                    break;
+                case 'media':
+                    mediaPostBtn.classList.add('active');
+                    mediaSection.style.display = 'block';
+                    captionInput.placeholder = 'Add a caption for your photo or video...';
+                    break;
+                case 'poll':
+                    pollPostBtn.classList.add('active');
+                    pollSection.style.display = 'block';
+                    captionInput.placeholder = 'Add an optional caption for your poll...';
+                    break;
+            }
+        }
+
+        // Add event listeners to post type buttons
+        if (textPostBtn) {
+            textPostBtn.addEventListener('click', () => setPostType('text'));
+        }
+        if (mediaPostBtn) {
+            mediaPostBtn.addEventListener('click', () => setPostType('media'));
+        }
+        if (pollPostBtn) {
+            pollPostBtn.addEventListener('click', () => setPostType('poll'));
+        }
+
+        // ============ VIDEO/IMAGE MODE TOGGLE ============
         function switchToImageMode() {
             console.log('Switching to Image Mode');
             mediaInput.accept = 'image/*';
-            mediaIcon.className = 'fas fa-image';
-            mediaTypeText.textContent = 'Add Photo';
-            uploadText.textContent = 'Click to upload an image';
-            uploadHint.innerHTML = 'JPEG, PNG, GIF up to 10MB';
-            uploadIcon.className = 'fas fa-cloud-upload-alt';
+            const mediaIcon = document.getElementById('mediaIcon');
+            const mediaTypeText = document.getElementById('mediaTypeText');
+            const uploadText = document.getElementById('uploadText');
+            const uploadHint = document.getElementById('uploadHint');
+            const uploadIcon = document.getElementById('uploadIcon');
+            const mediaTypeBadge = document.getElementById('mediaTypeBadge');
+            
+            if (mediaIcon) mediaIcon.className = 'fas fa-image';
+            if (mediaTypeText) mediaTypeText.textContent = 'Add Photo';
+            if (uploadText) uploadText.textContent = 'Click to upload an image';
+            if (uploadHint) uploadHint.innerHTML = 'JPEG, PNG, GIF up to 10MB';
+            if (uploadIcon) uploadIcon.className = 'fas fa-cloud-upload-alt';
             
             if (mediaTypeBadge) {
                 mediaTypeBadge.innerHTML = '<i class="fas fa-image"></i> Image';
@@ -540,25 +929,33 @@
             
             // Clear any selected file
             mediaInput.value = '';
+            const mediaPreview = document.getElementById('mediaPreview');
             if (mediaPreview) {
                 mediaPreview.style.display = 'none';
                 mediaPreview.innerHTML = '<div class="media-type-badge" id="mediaTypeBadge"><i class="fas fa-image"></i> Image</div>';
             }
+            const mediaInfo = document.getElementById('mediaInfo');
             if (mediaInfo) {
                 mediaInfo.style.display = 'none';
             }
             hideUploadStatus();
         }
 
-        // Function to switch to video mode
         function switchToVideoMode() {
             console.log('Switching to Video Mode');
             mediaInput.accept = 'video/*';
-            mediaIcon.className = 'fas fa-video';
-            mediaTypeText.textContent = 'Add Video';
-            uploadText.textContent = 'Click to upload a video';
-            uploadHint.innerHTML = 'MP4, WebM, MOV up to 100MB';
-            uploadIcon.className = 'fas fa-video';
+            const mediaIcon = document.getElementById('mediaIcon');
+            const mediaTypeText = document.getElementById('mediaTypeText');
+            const uploadText = document.getElementById('uploadText');
+            const uploadHint = document.getElementById('uploadHint');
+            const uploadIcon = document.getElementById('uploadIcon');
+            const mediaTypeBadge = document.getElementById('mediaTypeBadge');
+            
+            if (mediaIcon) mediaIcon.className = 'fas fa-video';
+            if (mediaTypeText) mediaTypeText.textContent = 'Add Video';
+            if (uploadText) uploadText.textContent = 'Click to upload a video';
+            if (uploadHint) uploadHint.innerHTML = 'MP4, WebM, MOV up to 100MB';
+            if (uploadIcon) uploadIcon.className = 'fas fa-video';
             
             if (mediaTypeBadge) {
                 mediaTypeBadge.innerHTML = '<i class="fas fa-video"></i> Video';
@@ -566,17 +963,18 @@
             
             // Clear any selected file
             mediaInput.value = '';
+            const mediaPreview = document.getElementById('mediaPreview');
             if (mediaPreview) {
                 mediaPreview.style.display = 'none';
                 mediaPreview.innerHTML = '<div class="media-type-badge" id="mediaTypeBadge"><i class="fas fa-video"></i> Video</div>';
             }
+            const mediaInfo = document.getElementById('mediaInfo');
             if (mediaInfo) {
                 mediaInfo.style.display = 'none';
             }
             hideUploadStatus();
         }
 
-        // Add event listener to checkbox
         if (videoModeCheckbox) {
             videoModeCheckbox.addEventListener('change', function(e) {
                 if (this.checked) {
@@ -587,12 +985,108 @@
             });
         }
 
-        // Media preview with validation
+        // ============ POLL FUNCTIONALITY ============
+        const maxPollOptions = 4;
+        const minPollOptions = 2;
+
+        function addPollOption() {
+            const optionsContainer = document.getElementById('pollOptionsContainer');
+            const currentOptions = optionsContainer.querySelectorAll('.poll-option-row').length;
+            
+            if (currentOptions >= maxPollOptions) {
+                showUploadStatus(`Maximum ${maxPollOptions} options allowed`, 'warning');
+                return;
+            }
+            
+            const newOptionNumber = currentOptions + 1;
+            const optionRow = document.createElement('div');
+            optionRow.className = 'poll-option-row';
+            optionRow.innerHTML = `
+                <input 
+                    type="text" 
+                    id="pollOption${newOptionNumber}" 
+                    class="poll-option-input" 
+                    placeholder="Option ${newOptionNumber}" 
+                    maxlength="100"
+                >
+                <button type="button" class="remove-poll-option" data-option="${newOptionNumber}">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            optionsContainer.appendChild(optionRow);
+            
+            // Update remove button visibility
+            updatePollOptionCount();
+            
+            // Add event listener to new remove button
+            const removeBtn = optionRow.querySelector('.remove-poll-option');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', handleRemoveOption);
+            }
+            
+            // Focus the new input
+            setTimeout(() => {
+                document.getElementById(`pollOption${newOptionNumber}`)?.focus();
+            }, 100);
+        }
+
+        function handleRemoveOption(e) {
+            e.preventDefault();
+            const optionRow = e.currentTarget.closest('.poll-option-row');
+            if (optionRow) {
+                optionRow.remove();
+                updatePollOptionCount();
+            }
+        }
+
+        function updatePollOptionCount() {
+            const optionsContainer = document.getElementById('pollOptionsContainer');
+            const optionRows = optionsContainer.querySelectorAll('.poll-option-row');
+            const removeButtons = optionsContainer.querySelectorAll('.remove-poll-option');
+            const addOptionBtn = document.getElementById('addPollOptionBtn');
+            
+            // Update remove button visibility - always show remove if more than 2 options
+            removeButtons.forEach((btn, index) => {
+                if (optionRows.length > 2) {
+                    btn.style.display = 'flex';
+                } else {
+                    // Hide remove buttons for first 2 options when exactly 2 options
+                    btn.style.display = 'none';
+                }
+            });
+            
+            // Update add button state
+            if (addOptionBtn) {
+                if (optionRows.length >= maxPollOptions) {
+                    addOptionBtn.classList.add('disabled');
+                    addOptionBtn.disabled = true;
+                } else {
+                    addOptionBtn.classList.remove('disabled');
+                    addOptionBtn.disabled = false;
+                }
+            }
+        }
+
+        // Add Poll Option button listener
+        const addPollOptionBtn = document.getElementById('addPollOptionBtn');
+        if (addPollOptionBtn) {
+            addPollOptionBtn.addEventListener('click', addPollOption);
+        }
+
+        // Add initial remove button listeners
+        document.querySelectorAll('.remove-poll-option').forEach(btn => {
+            btn.addEventListener('click', handleRemoveOption);
+        });
+
+        // ============ MEDIA PREVIEW ============
         if (mediaInput && mediaPreview) {
             mediaInput.addEventListener('change', function(e) {
                 const file = e.target.files[0];
                 if (file) {
                     const isVideo = videoModeCheckbox ? videoModeCheckbox.checked : false;
+                    const mediaPreview = document.getElementById('mediaPreview');
+                    const mediaInfo = document.getElementById('mediaInfo');
                     
                     if (isVideo) {
                         // Video validation
@@ -605,7 +1099,7 @@
                             return;
                         }
                         
-                        if (!validTypes.includes(file.type)) {
+                        if (!validTypes.includes(file.type) && !file.name.match(/\.(mp4|webm|ogg|mov)$/i)) {
                             showUploadStatus('Please select a valid video file (MP4, WebM, OGG, MOV)', 'error');
                             mediaInput.value = '';
                             return;
@@ -674,13 +1168,16 @@
                         reader.readAsDataURL(file);
                     }
                 } else {
-                    mediaPreview.style.display = 'none';
-                    mediaInfo.style.display = 'none';
+                    const mediaPreview = document.getElementById('mediaPreview');
+                    const mediaInfo = document.getElementById('mediaInfo');
+                    if (mediaPreview) mediaPreview.style.display = 'none';
+                    if (mediaInfo) mediaInfo.style.display = 'none';
                     hideUploadStatus();
                 }
             });
         }
 
+        // ============ UPLOAD STATUS FUNCTIONS ============
         function showUploadStatus(message, type) {
             const uploadStatus = document.getElementById('uploadStatus');
             const progressBar = document.getElementById('progressBar');
@@ -699,7 +1196,7 @@
                 }
             }
             
-            if (type === 'success' || type === 'error') {
+            if (type === 'success' || type === 'error' || type === 'warning') {
                 setTimeout(() => {
                     if (uploadStatus) uploadStatus.style.display = 'none';
                 }, 3000);
@@ -713,46 +1210,131 @@
             if (progressBar) progressBar.style.display = 'none';
         }
 
-        // Form submission handling
+        // ============ FORM SUBMISSION ============
         const form = document.getElementById('createPostForm');
-        const submitBtn = document.getElementById('submitBtn');
         
         if (form) {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
+                const postType = document.querySelector('.post-type-btn.active')?.id;
                 const caption = document.getElementById('postCaption').value.trim();
-                const mediaFile = document.getElementById('postMedia').files[0];
                 
-                if (!caption && !mediaFile) {
-                    showUploadStatus('Please add a caption or media to your post', 'warning');
-                    return;
-                }
+                // Validate based on post type
+                if (postType === 'pollPostBtn') {
+                    const pollQuestion = document.getElementById('pollQuestion').value.trim();
+                    const pollOptions = [];
+                    const optionInputs = document.querySelectorAll('.poll-option-input');
+                    
+                    optionInputs.forEach(input => {
+                        const value = input.value.trim();
+                        if (value) pollOptions.push(value);
+                    });
+                    
+                    if (!pollQuestion) {
+                        showUploadStatus('Please enter a poll question', 'warning');
+                        return;
+                    }
+                    
+                    if (pollOptions.length < 2) {
+                        showUploadStatus('Please add at least 2 poll options', 'warning');
+                        return;
+                    }
+                    
+                    // Let social.js handle the poll creation
+                    if (window.socialManager) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Poll...';
+                        showUploadStatus('Creating your poll...', 'uploading');
+                        
+                        try {
+                            await window.socialManager.createPollPost();
+                        } catch (error) {
+                            console.error('Poll creation error:', error);
+                            showUploadStatus('Failed to create poll: ' + error.message, 'error');
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
+                        }
+                    } else {
+                        showUploadStatus('Error: Social manager not loaded', 'error');
+                    }
+                } else if (postType === 'mediaPostBtn') {
+                    const mediaFile = document.getElementById('postMedia').files[0];
+                    
+                    if (!caption && !mediaFile) {
+                        showUploadStatus('Please add a caption or media to your post', 'warning');
+                        return;
+                    }
 
-                // Show uploading status
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-                showUploadStatus('Uploading to Cloudinary...', 'uploading');
+                    // Show uploading status
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+                    showUploadStatus('Uploading to Cloudinary...', 'uploading');
 
-                // Let social.js handle the actual upload
-                if (window.socialManager) {
-                    try {
-                        await window.socialManager.createPost();
-                    } catch (error) {
-                        console.error('Upload error:', error);
-                        showUploadStatus('Upload failed: ' + error.message, 'error');
+                    // Let social.js handle the media upload
+                    if (window.socialManager) {
+                        try {
+                            await window.socialManager.createPost();
+                        } catch (error) {
+                            console.error('Upload error:', error);
+                            showUploadStatus('Upload failed: ' + error.message, 'error');
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
+                        }
+                    } else {
+                        showUploadStatus('Error: Social manager not loaded', 'error');
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
                     }
                 } else {
-                    showUploadStatus('Error: Social manager not loaded', 'error');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
+                    // Text post
+                    if (!caption) {
+                        showUploadStatus('Please add a caption to your post', 'warning');
+                        return;
+                    }
+                    
+                    // Let social.js handle text post
+                    if (window.socialManager) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
+                        
+                        try {
+                            // Create a text-only post
+                            const postData = {
+                                userId: window.socialManager.currentUser?.uid,
+                                caption: caption,
+                                createdAt: new Date(),
+                                likes: 0,
+                                commentsCount: 0
+                            };
+                            
+                            const { addDoc, collection, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+                            const db = window.socialManager.db;
+                            
+                            await addDoc(collection(db, 'posts'), {
+                                ...postData,
+                                createdAt: serverTimestamp(),
+                                updatedAt: serverTimestamp()
+                            });
+                            
+                            showUploadStatus('Post created successfully!', 'success');
+                            setTimeout(() => {
+                                window.location.href = 'posts.html';
+                            }, 1500);
+                        } catch (error) {
+                            console.error('Error creating post:', error);
+                            showUploadStatus('Error creating post: ' + error.message, 'error');
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
+                        }
+                    } else {
+                        showUploadStatus('Error: Social manager not loaded', 'error');
+                    }
                 }
             });
         }
 
-        // Debug: Check if socialManager is properly initialized
+        // ============ INITIALIZATION ============
         document.addEventListener('DOMContentLoaded', function() {
             console.log('=== CREATE POST DEBUG ===');
             
@@ -765,20 +1347,26 @@
                 form: form ? 'Found' : 'Missing',
                 caption: caption ? 'Found' : 'Missing',
                 mediaInput: mediaInput ? 'Found' : 'Missing',
-                videoToggle: videoToggle ? 'Found' : 'Missing'
+                videoToggle: videoToggle ? 'Found' : 'Missing',
+                pollSection: document.getElementById('pollSection') ? 'Found' : 'Missing'
             });
 
             if (window.socialManager) {
                 console.log('✅ socialManager is loaded');
                 console.log('✅ Video posting is enabled');
+                console.log('✅ Poll posting is enabled');
             } else {
                 console.error('❌ socialManager is not loaded');
             }
             
             // Initialize default state
+            setPostType('text');
             if (videoToggle && !videoToggle.checked) {
                 switchToImageMode();
             }
+            
+            // Initialize poll option count
+            updatePollOptionCount();
         });
     </script>
 </body>
