@@ -64,17 +64,6 @@ const SUPPORTED_EXTENSIONS = [
     '.divx', '.xvid', '.vob', '.mod', '.tod', '.mts', '.m2t', '.m2ts'
 ];
 
-// Problematic formats that often need conversion
-const PROBLEMATIC_FORMATS = [
-    'video/quicktime',
-    'video/x-msvideo',
-    'video/x-matroska',
-    'video/x-ms-wmv',
-    'video/x-flv',
-    'video/3gpp',
-    'video/3gpp2'
-];
-
 class SocialManager {
     constructor() {
         this.currentUser = null;
@@ -128,7 +117,6 @@ class SocialManager {
         
         // Video upload settings
         this.maxVideoSize = 1024 * 1024 * 1024; // 1GB max
-        this.allowedVideoTypes = SUPPORTED_VIDEO_FORMATS;
         
         // Flag to prevent double submission
         this.isSubmitting = false;
@@ -153,7 +141,6 @@ class SocialManager {
                 this.loadViewedPosts();
                 this.loadLikedPosts();
                 this.loadViewedPYMKProfiles();
-                // Setup poll event listeners globally
                 this.setupPollEventListeners();
             } else {
                 if (!window.location.pathname.includes('login.html') && 
@@ -165,26 +152,20 @@ class SocialManager {
         });
     }
 
-    // ==================== FIXED: POLL EVENT LISTENERS ====================
+    // ==================== POLL EVENT LISTENERS ====================
     setupPollEventListeners() {
-        // Remove any existing listener to avoid duplicates
         document.removeEventListener('click', this.handlePollClick);
         
-        // Bind the method to this instance
         this.handlePollClick = (e) => {
-            // Find if the clicked element is a poll option or inside one
             const pollOption = e.target.closest('.poll-option-content');
             
             if (pollOption) {
-                // Prevent default and stop propagation
                 e.preventDefault();
                 e.stopPropagation();
                 
-                // Get the post ID and option ID from the dataset
                 const postId = pollOption.dataset.postId;
                 const optionId = pollOption.dataset.optionId;
                 
-                // Check if we can vote
                 const pollContainer = pollOption.closest('.post-poll-container');
                 const hasVoted = pollContainer?.querySelector('.poll-closed-badge')?.textContent.includes('You voted');
                 const isClosed = pollContainer?.querySelector('.poll-closed-badge')?.textContent.includes('closed');
@@ -205,7 +186,6 @@ class SocialManager {
             }
         };
         
-        // Add the global click listener
         document.addEventListener('click', this.handlePollClick);
     }
 
@@ -274,7 +254,7 @@ class SocialManager {
         return array;
     }
 
-    // ==================== ADD ALL STYLES (UPDATED WITH DARK THEME FOR POLLS) ====================
+    // ==================== ADD ALL STYLES ====================
     addAllStyles() {
         if (!document.getElementById('socialManagerStyles')) {
             const style = document.createElement('style');
@@ -348,7 +328,7 @@ class SocialManager {
                     border: 1px solid rgba(255,255,255,0.2);
                 }
 
-                /* ========== POLL STYLES - UPDATED FOR DARK THEME ========== */
+                /* ========== POLL STYLES ========== */
                 .poll-toggle-btn {
                     background: transparent;
                     border: 1px dashed #ff4b6e;
@@ -1010,7 +990,7 @@ class SocialManager {
                     font-size: 14px;
                 }
 
-                /* ========== VIDEO INFO BADGES ========== */
+                /* ========== VIDEO INFO BADGES - SIMPLIFIED ========== */
                 .video-info-badge {
                     position: absolute;
                     top: 12px;
@@ -1030,49 +1010,6 @@ class SocialManager {
 
                 .video-info-badge i {
                     color: #ff4b6e;
-                }
-
-                .video-format-badge {
-                    position: absolute;
-                    top: 12px;
-                    right: 12px;
-                    background: rgba(0, 0, 0, 0.7);
-                    color: white;
-                    padding: 6px 12px;
-                    border-radius: 20px;
-                    font-size: 12px;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    backdrop-filter: blur(4px);
-                    border: 1px solid rgba(255,255,255,0.2);
-                    z-index: 3;
-                }
-
-                .video-format-badge i {
-                    color: #ffaa33;
-                }
-
-                .video-warning-badge {
-                    position: absolute;
-                    bottom: 12px;
-                    left: 12px;
-                    background: rgba(255, 193, 7, 0.9);
-                    color: #000;
-                    padding: 6px 12px;
-                    border-radius: 20px;
-                    font-size: 12px;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    backdrop-filter: blur(4px);
-                    border: 1px solid rgba(255,255,255,0.2);
-                    z-index: 3;
-                    font-weight: 600;
-                }
-
-                .video-warning-badge i {
-                    color: #000;
                 }
 
                 /* ========== CUSTOM VIDEO PLAYER STYLES ========== */
@@ -1898,46 +1835,12 @@ class SocialManager {
         container.appendChild(playButton);
         container.appendChild(durationBadge);
         
-        if (postData) {
-            this.addVideoBadges(container, postData);
-        }
-        
         container.addEventListener('click', (e) => {
             e.stopPropagation();
             this.playVideo(postId, videoUrl, thumbUrl, duration);
         });
         
         return container;
-    }
-
-    addVideoBadges(container, postData) {
-        const infoBadge = document.createElement('div');
-        infoBadge.className = 'video-info-badge';
-        infoBadge.innerHTML = '<i class="fas fa-video"></i> Video Post';
-        container.appendChild(infoBadge);
-        
-        if (postData.videoFormat) {
-            const formatBadge = document.createElement('div');
-            formatBadge.className = 'video-format-badge';
-            formatBadge.innerHTML = `<i class="fas fa-file-video"></i> ${postData.videoFormat.extension || 'MP4'}`;
-            container.appendChild(formatBadge);
-        }
-        
-        if (postData.needsConversion) {
-            const warningBadge = document.createElement('div');
-            warningBadge.className = 'video-warning-badge';
-            warningBadge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Optimizing...';
-            container.appendChild(warningBadge);
-        }
-        
-        if (postData.isPhoneVideo) {
-            const phoneBadge = document.createElement('div');
-            phoneBadge.className = 'video-warning-badge';
-            phoneBadge.style.background = 'rgba(0, 123, 255, 0.9)';
-            phoneBadge.style.color = 'white';
-            phoneBadge.innerHTML = '<i class="fas fa-mobile-alt"></i> Mobile Video';
-            container.appendChild(phoneBadge);
-        }
     }
     
     playVideo(postId, videoUrl, thumbnailUrl, duration) {
@@ -2181,19 +2084,6 @@ class SocialManager {
             throw new Error('Please select a valid video file');
         }
 
-        const isSupportedFormat = SUPPORTED_VIDEO_FORMATS.some(format => 
-            file.type === format || 
-            file.type.includes(format.replace('video/', ''))
-        );
-
-        const isSupportedExtension = SUPPORTED_EXTENSIONS.some(ext => 
-            file.name.toLowerCase().endsWith(ext)
-        );
-
-        if (!isSupportedFormat && !isSupportedExtension) {
-            console.warn('Video format may not be fully compatible:', file.type);
-        }
-        
         return true;
     }
 
@@ -2207,79 +2097,18 @@ class SocialManager {
         return videoIndicators.some(indicator => indicator);
     }
 
-    isDownloadedVideo(file) {
-        const downloadedIndicators = [
-            file.name.match(/(discord|whatsapp|telegram|instagram|facebook|twitter|tiktok|snapchat)/i),
-            file.name.match(/(downloaded|save|received|forwarded)/i),
-            file.size < 10000000 && file.type === 'video/mp4',
-            file.name.includes('-') && file.name.split('-').length > 3,
-        ];
-        
-        return downloadedIndicators.some(indicator => indicator);
-    }
-
-    needsConversion(file) {
-        const needsConversion = PROBLEMATIC_FORMATS.includes(file.type) || 
-                               this.isDownloadedVideo(file) ||
-                               file.name.toLowerCase().includes('discord') ||
-                               file.name.toLowerCase().includes('whatsapp') ||
-                               file.name.toLowerCase().includes('telegram') ||
-                               file.name.toLowerCase().includes('social') ||
-                               file.name.toLowerCase().includes('downloaded');
-        
-        return needsConversion;
-    }
-
-    isCommonPhoneFormat(file) {
-        const phoneFormats = [
-            'video/mp4',
-            'video/quicktime',
-            'video/x-m4v',
-            'video/3gpp',
-            'video/3gpp2',
-            'video/avi',
-            'video/x-msvideo'
-        ];
-        
-        return phoneFormats.includes(file.type) || 
-               file.name.toLowerCase().includes('iphone') ||
-               file.name.toLowerCase().includes('android') ||
-               file.name.toLowerCase().includes('movi') ||
-               file.name.toLowerCase().includes('vid_') ||
-               file.name.toLowerCase().includes('camera') ||
-               file.name.toLowerCase().includes('record');
-    }
-
-    isLikelyPhoneVideo(file) {
-        return this.isCommonPhoneFormat(file) || 
-               file.name.match(/(IMG_|VID_|PXL_|MVIMG_|CAM_|REC_)/i) !== null ||
-               file.name.toLowerCase().includes('whatsapp') ||
-               file.name.toLowerCase().includes('camera') ||
-               file.type === 'video/quicktime' ||
-               file.type === 'video/mp4' ||
-               file.type === 'video/3gpp';
-    }
-
-    getVideoFormat(file) {
-        return {
-            mimeType: file.type,
-            extension: file.name.split('.').pop().toLowerCase(),
-            isCommonPhoneFormat: this.isCommonPhoneFormat(file),
-            isDownloaded: this.isDownloadedVideo(file),
-            needsConversion: this.needsConversion(file)
-        };
-    }
-
-    // ==================== VIDEO UPLOAD & PROCESSING ====================
+    // ==================== VIDEO UPLOAD & PROCESSING - FIXED ====================
     
     async uploadMediaToCloudinary(file) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', cloudinaryConfig.uploadPreset);
         
-        const isVideo = file.type.startsWith('video/') || this.isLikelyVideoFile(file);
-        const resourceType = isVideo ? 'video' : 'image';
+        // CRITICAL FIX: Properly detect video files
+        const isVideo = file.type.startsWith('video/') || 
+                       file.name.match(/\.(mp4|mov|avi|mkv|wmv|flv|webm|3gp|m4v|mpg|mpeg)$/i) !== null;
         
+        const resourceType = isVideo ? 'video' : 'image';
         formData.append('resource_type', resourceType);
         
         try {
@@ -2297,7 +2126,7 @@ class SocialManager {
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('Cloudinary error response:', errorText);
-                throw new Error(`Cloudinary error: ${response.status} - Please check your upload preset and cloud name`);
+                throw new Error(`Cloudinary error: ${response.status}`);
             }
             
             const data = await response.json();
@@ -2306,35 +2135,32 @@ class SocialManager {
                 throw new Error('No secure_url in Cloudinary response');
             }
             
+            // CRITICAL FIX: Always set the correct media type
             if (isVideo) {
                 const videoUrl = data.secure_url;
                 const thumbnailUrl = this.generateCloudinaryThumbnail(videoUrl);
-                const posterUrl = videoUrl.replace('/upload/', '/upload/w_1200,h_675,c_fill,q_auto,f_auto/so_1/');
                 
-                console.log('Generated thumbnail URL:', thumbnailUrl);
+                console.log('Video uploaded successfully:', videoUrl);
                 
                 return {
                     url: videoUrl,
-                    type: 'video',
+                    type: 'video', // Explicitly set as video
+                    mediaType: 'video', // Add explicit mediaType
                     duration: data.duration || 0,
                     width: data.width,
                     height: data.height,
                     format: data.format,
                     publicId: data.public_id,
                     thumbnail: thumbnailUrl,
-                    poster: posterUrl,
-                    videoFormat: {
-                        extension: file.name.split('.').pop().toLowerCase(),
-                        mimeType: file.type,
-                        isPhoneVideo: this.isLikelyPhoneVideo(file),
-                        needsConversion: this.needsConversion(file)
-                    }
+                    videoThumbnail: thumbnailUrl // Add for consistency
                 };
             }
             
+            // Return for images
             return {
                 url: data.secure_url,
                 type: 'image',
+                mediaType: 'image', // Add explicit mediaType
                 width: data.width,
                 height: data.height,
                 format: data.format,
@@ -2347,7 +2173,7 @@ class SocialManager {
         }
     }
 
-    // ==================== POLLING / VOTING FUNCTIONALITY - FIXED ====================
+    // ==================== POLLING / VOTING FUNCTIONALITY ====================
     
     setupPollBuilder() {
         const createPostForm = document.getElementById('createPostForm');
@@ -2605,7 +2431,6 @@ class SocialManager {
         }
     }
 
-    // FIXED: createPollElement without direct click listeners
     createPollElement(post, postId) {
         const pollContainer = document.createElement('div');
         pollContainer.className = 'post-poll-container';
@@ -2672,7 +2497,6 @@ class SocialManager {
         return localStorage.getItem(voteKey);
     }
     
-    // COMPLETELY FIXED: castVote method with direct UI update
     async castVote(postId, optionId) {
         if (!this.currentUser) {
             this.showNotification('Please login to vote', 'error');
@@ -2705,7 +2529,6 @@ class SocialManager {
                 return;
             }
             
-            // Update Firestore
             const updatedOptions = post.poll.options.map(opt => {
                 if (opt.id === optionId) {
                     return {
@@ -2725,12 +2548,10 @@ class SocialManager {
                 'poll.voters': voters
             });
             
-            // Save to localStorage
             localStorage.setItem(`poll_vote_${postId}_${this.currentUser.uid}`, optionId);
             
             this.showNotification('Vote cast successfully!', 'success');
             
-            // Update UI directly
             this.updatePollUIVote(postId, optionId, newTotalVotes, updatedOptions);
             
         } catch (error) {
@@ -2739,60 +2560,50 @@ class SocialManager {
         }
     }
     
-    // FIXED: Update poll UI directly
     updatePollUIVote(postId, votedOptionId, newTotalVotes, updatedOptions) {
-        // Find the poll container for this post
         const pollContainer = document.querySelector(`.post-poll-container[data-poll-id="${postId}"]`);
         if (!pollContainer) {
             console.log('Poll container not found for ID:', postId);
             return;
         }
         
-        // Update each option's UI
         updatedOptions.forEach(option => {
             const optionElement = pollContainer.querySelector(`.poll-option-content[data-option-id="${option.id}"]`);
             if (optionElement) {
                 const voteCount = option.votes || 0;
                 const percentage = newTotalVotes > 0 ? Math.round((voteCount / newTotalVotes) * 100) : 0;
                 
-                // Update progress bar
                 const progressBar = optionElement.querySelector('.poll-progress-bar-bg');
                 if (progressBar) {
                     progressBar.style.width = percentage + '%';
                 }
                 
-                // Update percentage text
                 const percentageSpan = optionElement.querySelector('.poll-percentage');
                 if (percentageSpan) {
                     percentageSpan.textContent = percentage + '%';
                 }
                 
-                // Update vote count
                 const countSpan = optionElement.querySelector('.poll-count');
                 if (countSpan) {
                     countSpan.textContent = this.formatCount(voteCount);
                 }
                 
-                // Mark voted option with checkmark
                 if (option.id === votedOptionId) {
                     optionElement.classList.add('voted');
                 }
             }
         });
         
-        // Update total votes count in footer
         const totalVotesSpan = pollContainer.querySelector('.poll-total-votes');
         if (totalVotesSpan) {
             totalVotesSpan.innerHTML = `<i class="fas fa-users"></i> ${this.formatCount(newTotalVotes)} votes`;
         }
         
-        // Remove existing "You voted" badge if any
         const existingBadge = pollContainer.querySelector('.poll-closed-badge');
         if (existingBadge) {
             existingBadge.remove();
         }
         
-        // Add "You voted" badge
         const footer = pollContainer.querySelector('.poll-footer');
         if (footer) {
             const youVotedBadge = document.createElement('span');
@@ -2948,7 +2759,6 @@ class SocialManager {
             this.showNotification('Reply posted!', 'success');
             this.closeReplyModal();
             
-            // Refresh comments
             const commentsSection = document.getElementById(`comments-${postId}`);
             if (commentsSection && commentsSection.style.display !== 'none') {
                 await this.loadComments(postId);
@@ -3131,7 +2941,7 @@ class SocialManager {
         return div.innerHTML;
     }
 
-    // ==================== CREATE POST WITH VIDEO/POLL ====================
+    // ==================== CREATE POST WITH VIDEO/POLL - FIXED ====================
     
     setupCreatePost() {
         const form = document.getElementById('createPostForm');
@@ -3218,24 +3028,6 @@ class SocialManager {
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
                     
-                    const isPhoneVideo = this.isLikelyPhoneVideo(file);
-                    const needsConversion = this.needsConversion(file);
-                    const format = this.getVideoFormat(file);
-                    
-                    let statusMessage = '';
-                    let statusColor = '#4CAF50';
-                    let statusIcon = 'check-circle';
-                    
-                    if (needsConversion) {
-                        statusMessage = ' - May need optimization for best playback';
-                        statusColor = '#f59e0b';
-                        statusIcon = 'exclamation-triangle';
-                    }
-                    
-                    if (isPhoneVideo) {
-                        statusMessage += ' - Mobile video detected';
-                    }
-                    
                     preview.innerHTML = `
                         <div class="media-type-badge" style="background: #ff4b6e;">
                             <i class="fas fa-video"></i> Video Ready
@@ -3249,22 +3041,12 @@ class SocialManager {
                                 <span class="video-duration-overlay">${this.formatDuration(video.duration)}</span>
                             </div>
                             <div class="video-info-badge">
-                                <i class="fas fa-file-video"></i> ${format.extension.toUpperCase()}
+                                <i class="fas fa-video"></i> Video
                             </div>
-                            ${isPhoneVideo ? `
-                                <div class="video-info-badge" style="top: 60px; background: rgba(0, 123, 255, 0.9);">
-                                    <i class="fas fa-mobile-alt"></i> Mobile
-                                </div>
-                            ` : ''}
-                            ${needsConversion ? `
-                                <div class="video-warning-badge">
-                                    <i class="fas fa-exclamation-triangle"></i> Optimization recommended
-                                </div>
-                            ` : ''}
                         </div>
-                        <p style="margin-top: 10px; font-size: 14px; color: ${statusColor};">
-                            <i class="fas fa-${statusIcon}"></i> 
-                            ${file.name} (${this.formatFileSize(file.size)})${statusMessage}
+                        <p style="margin-top: 10px; font-size: 14px; color: #4CAF50;">
+                            <i class="fas fa-check-circle"></i> 
+                            ${file.name} (${this.formatFileSize(file.size)})
                         </p>
                     `;
                     preview.style.display = 'block';
@@ -3273,11 +3055,11 @@ class SocialManager {
                 };
                 video.onerror = () => {
                     preview.innerHTML = `
-                        <div class="media-type-badge" style="background: #dc2626;">
-                            <i class="fas fa-exclamation-triangle"></i> Error
+                        <div class="media-type-badge" style="background: #ff4b6e;">
+                            <i class="fas fa-video"></i> Video Selected
                         </div>
-                        <p style="color: #dc2626; padding: 20px;">Could not preview video. It will still upload correctly.</p>
-                        <p style="font-size: 14px; color: #666;">${file.name} (${this.formatFileSize(file.size)})</p>
+                        <p style="color: #fff; padding: 20px;">Video ready to upload: ${file.name}</p>
+                        <p style="font-size: 14px; color: #b9bbbe;">${this.formatFileSize(file.size)}</p>
                     `;
                     preview.style.display = 'block';
                 };
@@ -3352,6 +3134,7 @@ class SocialManager {
                 submitBtn.disabled = false;
             }
 
+            // CRITICAL FIX: Properly set post data based on media type
             const postData = {
                 userId: this.currentUser.uid,
                 caption: caption,
@@ -3362,28 +3145,22 @@ class SocialManager {
             };
 
             if (mediaData) {
-                if (mediaData.type === 'video') {
+                // Use the mediaType from the upload response
+                if (mediaData.type === 'video' || mediaData.mediaType === 'video') {
                     postData.videoUrl = mediaData.url;
-                    postData.videoThumbnail = mediaData.thumbnail;
-                    postData.videoPoster = mediaData.poster;
-                    postData.videoDuration = mediaData.duration;
                     postData.mediaType = 'video';
-                    postData.imageUrl = null;
-                    
-                    if (mediaData.videoFormat) {
-                        postData.videoFormat = mediaData.videoFormat;
-                        postData.isPhoneVideo = mediaData.videoFormat.isPhoneVideo;
-                        postData.needsConversion = mediaData.videoFormat.needsConversion;
-                    }
+                    postData.videoThumbnail = mediaData.thumbnail || mediaData.videoThumbnail;
+                    postData.videoDuration = mediaData.duration || 0;
+                    postData.imageUrl = null; // Explicitly set to null
                 } else {
                     postData.imageUrl = mediaData.url;
                     postData.mediaType = 'image';
-                    postData.videoUrl = null;
+                    postData.videoUrl = null; // Explicitly set to null
                 }
             }
 
             const docRef = await addDoc(collection(db, 'posts'), postData);
-            console.log('Post created successfully in Firestore with ID:', docRef.id);
+            console.log('Post created successfully with ID:', docRef.id, 'Media type:', postData.mediaType);
             
             this.showNotification('Post created successfully!', 'success');
             
@@ -3829,7 +3606,7 @@ class SocialManager {
             const pollContainer = this.createPollElement(post, post.id);
             postContentHTML = pollContainer.outerHTML;
         } else if (post.videoUrl || post.mediaType === 'video') {
-            const videoUrl = post.videoUrl || post.imageUrl;
+            const videoUrl = post.videoUrl;
             if (videoUrl) {
                 postContentHTML = `<div id="video-container-${post.id}"></div>`;
                 
@@ -4017,11 +3794,12 @@ class SocialManager {
         
         let postContentHTML = '';
         
+        // CRITICAL FIX: Check media type correctly
         if (post.mediaType === 'poll' && post.poll) {
             const pollContainer = this.createPollElement(post, postId);
             postContentHTML = pollContainer.outerHTML;
         } else if (post.videoUrl || post.mediaType === 'video') {
-            const videoUrl = post.videoUrl || post.imageUrl;
+            const videoUrl = post.videoUrl;
             if (videoUrl) {
                 postContentHTML = `<div id="video-container-${postId}"></div>`;
                 
@@ -5049,7 +4827,7 @@ class SocialManager {
             const pollContainer = this.createPollElement(post, postId);
             postContentHTML = pollContainer.outerHTML;
         } else if (post.videoUrl || post.mediaType === 'video') {
-            const videoUrl = post.videoUrl || post.imageUrl;
+            const videoUrl = post.videoUrl;
             if (videoUrl) {
                 postContentHTML = `<div id="profile-video-container-${postId}"></div>`;
                 
@@ -5320,7 +5098,7 @@ class SocialManager {
             const pollContainer = this.createPollElement(post, postId);
             postContentHTML = pollContainer.outerHTML;
         } else if (post.videoUrl || post.mediaType === 'video') {
-            const videoUrl = post.videoUrl || post.imageUrl;
+            const videoUrl = post.videoUrl;
             if (videoUrl) {
                 postContentHTML = `<div id="user-video-container-${postId}"></div>`;
                 
@@ -5412,7 +5190,7 @@ class SocialManager {
                 </div>
             `;
         } else if (post.videoUrl || post.mediaType === 'video') {
-            const videoUrl = post.videoUrl || post.imageUrl;
+            const videoUrl = post.videoUrl;
             if (videoUrl) {
                 const thumbnail = this.getVideoThumbnail(post);
                 previewHTML += `
