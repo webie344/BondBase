@@ -1,4 +1,4 @@
-// xp.js - XP System for Gamers App (Fixed Version)
+// xp.js - XP System for Gamers App (Fixed Version - Profile Display)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
     getAuth,
@@ -162,7 +162,14 @@ class XPSystem {
                 await this.loadUserData();
                 await this.checkDailyXP();
                 await this.startOnlineTimer();
-                await this.updateProfilePage();
+                
+                // Check if we're on profile page and update accordingly
+                if (window.location.pathname.includes('profile.html')) {
+                    // Wait a bit for profile page to load
+                    setTimeout(() => {
+                        this.updateProfileDisplay();
+                    }, 1000);
+                }
                 
                 // Show welcome XP if new user
                 await this.checkNewUserBonus();
@@ -210,20 +217,20 @@ class XPSystem {
             const initialHistoryItem = {
                 amount: 10,
                 reason: "Welcome Bonus",
-                timestamp: Timestamp.now(), // Use Timestamp.now() instead of serverTimestamp()
+                timestamp: Timestamp.now(),
                 type: "earned"
             };
 
             const initialXPData = {
                 userId: this.currentUser.uid,
-                totalXP: 10, // Start with 10 XP as welcome bonus
+                totalXP: 10,
                 currentLevel: 1,
                 coins: 0,
                 xpHistory: [initialHistoryItem],
                 dailyCheckIns: [],
                 lastOnlineXP: null,
                 achievements: [],
-                created: Timestamp.now(), // Use Timestamp.now() here too
+                created: Timestamp.now(),
                 updated: Timestamp.now(),
                 lastDailyCheckIn: null
             };
@@ -274,7 +281,7 @@ class XPSystem {
             // Update XP
             await updateDoc(xpRef, {
                 totalXP: increment(amount),
-                coins: increment(Math.floor(amount / 10)), // 1 coin per 10 XP
+                coins: increment(Math.floor(amount / 10)),
                 updated: Timestamp.now(),
                 xpHistory: arrayUnion(historyItem)
             });
@@ -392,7 +399,7 @@ class XPSystem {
     getNextRank() {
         const currentLevel = this.getCurrentLevel();
         if (currentLevel >= 100) return null;
-        return XP_RANKS[currentLevel]; // Next level index
+        return XP_RANKS[currentLevel];
     }
 
     getProgressPercentage() {
@@ -471,7 +478,7 @@ class XPSystem {
                     console.log('XP System: Awarded online activity XP');
                 }
             }
-        }, 60000); // Check every minute
+        }, 60000);
     }
 
     stopOnlineTimer() {
@@ -483,7 +490,6 @@ class XPSystem {
 
     // ==================== NOTIFICATIONS & ANIMATIONS ====================
     showWelcomeNotification() {
-        // Only show if we're not on xp.html (where we have our own display)
         if (window.location.pathname.includes('xp.html')) return;
         
         const notification = document.createElement('div');
@@ -526,14 +532,12 @@ class XPSystem {
         
         document.body.appendChild(notification);
         
-        // Auto-remove after 5 seconds
         setTimeout(() => {
             if (notification.parentElement) {
                 notification.remove();
             }
         }, 5000);
         
-        // Add animation style
         if (!document.getElementById('popInAnimation')) {
             const style = document.createElement('style');
             style.id = 'popInAnimation';
@@ -548,10 +552,8 @@ class XPSystem {
     }
 
     showXPGainAnimation(amount, reason) {
-        // Only show on pages other than xp.html
         if (window.location.pathname.includes('xp.html')) return;
         
-        // Create floating XP element
         const xpElement = document.createElement('div');
         xpElement.style.cssText = `
             position: fixed;
@@ -579,14 +581,12 @@ class XPSystem {
         
         document.body.appendChild(xpElement);
         
-        // Remove after animation
         setTimeout(() => {
             if (xpElement.parentElement) {
                 xpElement.remove();
             }
         }, 2000);
         
-        // Add animation style if not exists
         if (!document.getElementById('floatUpAnimation')) {
             const style = document.createElement('style');
             style.id = 'floatUpAnimation';
@@ -635,14 +635,12 @@ class XPSystem {
         
         document.body.appendChild(notification);
         
-        // Remove after 3 seconds
         setTimeout(() => {
             if (notification.parentElement) {
                 notification.remove();
             }
         }, 3000);
         
-        // Add animation styles
         if (!document.getElementById('levelUpAnimations')) {
             const style = document.createElement('style');
             style.id = 'levelUpAnimations';
@@ -662,6 +660,191 @@ class XPSystem {
         }
     }
 
+    // ==================== PROFILE PAGE INTEGRATION (FIXED) ====================
+    async updateProfileDisplay() {
+        // Check if we're on profile.html
+        if (!window.location.pathname.includes('profile.html')) return;
+        
+        // Get the profile user ID from URL or page
+        const urlParams = new URLSearchParams(window.location.search);
+        const profileUserId = urlParams.get('uid') || this.currentUser?.uid;
+        
+        if (!profileUserId) return;
+        
+        // Load the profile user's XP data
+        const profileXPData = await this.getUserXPData(profileUserId);
+        
+        if (!profileXPData) return;
+        
+        // Add simple XP icon to profile
+        this.addSimpleXPIcon(profileXPData);
+    }
+
+    async getUserXPData(userId) {
+        try {
+            const xpRef = doc(db, 'xpData', userId);
+            const xpSnap = await getDoc(xpRef);
+            
+            if (xpSnap.exists()) {
+                return xpSnap.data();
+            }
+            return null;
+        } catch (error) {
+            console.error('XP System: Error loading user XP data:', error);
+            return null;
+        }
+    }
+
+    addSimpleXPIcon(xpData) {
+        // Find profile header or container
+        const profileHeader = document.querySelector('.profile-header, .profile-container, .user-profile');
+        if (!profileHeader) return;
+        
+        // Remove any existing XP displays
+        const existingXP = document.querySelector('.xp-profile-icon, .xp-profile-display, .triumph-icons-container');
+        if (existingXP) existingXP.remove();
+        
+        // Calculate level
+        let level = 1;
+        for (let i = XP_RANKS.length - 1; i >= 0; i--) {
+            if (xpData.totalXP >= XP_RANKS[i].xpNeeded) {
+                level = XP_RANKS[i].level;
+                break;
+            }
+        }
+        const rank = XP_RANKS[level - 1] || XP_RANKS[0];
+        
+        // Create simple XP icon
+        const xpIcon = document.createElement('div');
+        xpIcon.className = 'xp-profile-icon';
+        xpIcon.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 30px;
+            padding: 8px 16px;
+            margin: 10px;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.2s;
+        `;
+        
+        xpIcon.innerHTML = `
+            <span style="margin-right: 8px; font-size: 20px;">${rank.icon}</span>
+            <span>Lvl ${level}</span>
+            <span style="margin: 0 8px;">•</span>
+            <span>${xpData.totalXP || 0} XP</span>
+        `;
+        
+        // Add hover effect
+        xpIcon.addEventListener('mouseenter', () => {
+            xpIcon.style.transform = 'scale(1.05)';
+        });
+        xpIcon.addEventListener('mouseleave', () => {
+            xpIcon.style.transform = 'scale(1)';
+        });
+        
+        // Add click to show details (optional)
+        xpIcon.addEventListener('click', () => {
+            this.showQuickStats(xpData, level);
+        });
+        
+        // Insert at the top of profile header
+        profileHeader.insertBefore(xpIcon, profileHeader.firstChild);
+    }
+
+    showQuickStats(xpData, level) {
+        const rank = XP_RANKS[level - 1] || XP_RANKS[0];
+        const nextRank = XP_RANKS[level] || null;
+        
+        // Calculate progress
+        let progress = 0;
+        let xpToNext = 0;
+        
+        if (nextRank) {
+            xpToNext = nextRank.xpNeeded - xpData.totalXP;
+            const xpInCurrent = xpData.totalXP - rank.xpNeeded;
+            const xpNeeded = nextRank.xpNeeded - rank.xpNeeded;
+            progress = (xpInCurrent / xpNeeded) * 100;
+        }
+        
+        // Create tooltip/popup
+        const tooltip = document.createElement('div');
+        tooltip.style.cssText = `
+            position: absolute;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 300px;
+            animation: fadeIn 0.2s ease-out;
+        `;
+        
+        tooltip.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                <div style="font-size: 40px;">${rank.icon}</div>
+                <div>
+                    <div style="font-weight: bold; font-size: 18px;">${rank.title}</div>
+                    <div style="color: #666;">Level ${level}</div>
+                </div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>Total XP: ${xpData.totalXP}</span>
+                    <span>Coins: 🪙 ${xpData.coins || 0}</span>
+                </div>
+                ${nextRank ? `
+                    <div style="margin-top: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">
+                            Next: ${nextRank.title} (${xpToNext} XP needed)
+                        </div>
+                        <div style="width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${progress}%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);"></div>
+                        </div>
+                    </div>
+                ` : '<div style="color: gold;">🏆 MAX LEVEL ACHIEVED!</div>'}
+            </div>
+        `;
+        
+        // Position near the icon
+        const icon = document.querySelector('.xp-profile-icon');
+        if (icon) {
+            const rect = icon.getBoundingClientRect();
+            tooltip.style.top = `${rect.bottom + window.scrollY + 10}px`;
+            tooltip.style.left = `${rect.left + window.scrollX}px`;
+            
+            document.body.appendChild(tooltip);
+            
+            // Remove on click outside
+            setTimeout(() => {
+                document.addEventListener('click', function removeTooltip(e) {
+                    if (!tooltip.contains(e.target) && e.target !== icon) {
+                        tooltip.remove();
+                        document.removeEventListener('click', removeTooltip);
+                    }
+                });
+            }, 100);
+        }
+        
+        // Add animation style
+        if (!document.getElementById('fadeInAnimation')) {
+            const style = document.createElement('style');
+            style.id = 'fadeInAnimation';
+            style.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
     // ==================== XP PAGE FUNCTIONS ====================
     setupXPPage() {
         console.log('XP System: Setting up XP page');
@@ -673,7 +856,6 @@ class XPSystem {
                 await this.renderXPPage();
                 this.setupXPEventListeners();
             } else {
-                // Redirect to login if not authenticated
                 window.location.href = 'login.html';
             }
         });
@@ -785,11 +967,10 @@ class XPSystem {
             { icon: '🏆', title: 'Reach Level 10', xp: 200, completed: false }
         ];
         
-        // Check if user has completed any milestones
         if (this.xpData) {
             const userLevel = this.getCurrentLevel();
             if (userLevel >= 10) {
-                milestones[5].completed = true; // Reach Level 10
+                milestones[5].completed = true;
             }
         }
         
@@ -833,7 +1014,6 @@ class XPSystem {
         const xpHistory = document.getElementById('xpHistory');
         if (!xpHistory || !this.xpData || !this.xpData.xpHistory) return;
         
-        // Get recent XP events (last 10)
         const recentEvents = this.xpData.xpHistory.slice(-10).reverse();
         
         xpHistory.innerHTML = recentEvents.map(event => {
@@ -865,7 +1045,6 @@ class XPSystem {
     }
 
     setupXPEventListeners() {
-        // Filter buttons
         const filterButtons = document.querySelectorAll('.filter-btn');
         if (filterButtons.length > 0) {
             filterButtons.forEach(button => {
@@ -904,126 +1083,6 @@ class XPSystem {
                     card.style.display = 'block';
             }
         });
-    }
-
-    // ==================== PROFILE PAGE INTEGRATION ====================
-    async updateProfilePage() {
-        // This function will be called from gamers.js to update profile page with XP info
-        if (!window.location.pathname.includes('profile.html')) return;
-        
-        // Add XP display to profile page
-        await this.addXPToProfile();
-    }
-
-    async addXPToProfile() {
-        // Wait for profile page to load
-        setTimeout(async () => {
-            const profileHeader = document.querySelector('.profile-header');
-            if (!profileHeader || !this.xpData) return;
-            
-            // Check if XP display already exists
-            if (document.querySelector('.xp-profile-display')) return;
-            
-            // Create XP display element
-            const xpDisplay = document.createElement('div');
-            xpDisplay.className = 'xp-profile-display';
-            xpDisplay.style.cssText = `
-                position: absolute;
-                top: 20px;
-                right: 20px;
-                background: linear-gradient(135deg, #667eea, #764ba2);
-                padding: 10px 15px;
-                border-radius: 20px;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                color: white;
-                font-weight: bold;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-                z-index: 10;
-            `;
-            
-            const currentRank = this.getCurrentRank();
-            
-            xpDisplay.innerHTML = `
-                <span style="font-size: 20px;">${currentRank.icon}</span>
-                <div style="text-align: center;">
-                    <div style="font-size: 14px;">Level ${currentRank.level}</div>
-                    <div style="font-size: 12px; opacity: 0.9;">${currentRank.title}</div>
-                </div>
-                <div style="margin-left: 10px; border-left: 2px solid rgba(255,255,255,0.3); padding-left: 10px;">
-                    <div style="font-size: 16px;">${this.xpData.totalXP || 0} XP</div>
-                    <div style="font-size: 12px; opacity: 0.9;">${this.xpData.coins || 0} 🪙</div>
-                </div>
-            `;
-            
-            // Add to profile header
-            profileHeader.style.position = 'relative';
-            profileHeader.appendChild(xpDisplay);
-            
-            // Add floating triumph icons
-            this.addTriumphIcons();
-        }, 1000); // Delay to ensure profile page is loaded
-    }
-
-    addTriumphIcons() {
-        const triumphIcons = ['🏆', '⭐', '👑', '💎', '🔥', '✨', '🎮', '⚔️', '🛡️', '🌟'];
-        const profilePic = document.querySelector('.profile-pic, .user-avatar, [class*="avatar"]');
-        
-        if (!profilePic) return;
-        
-        // Create container for floating icons
-        const iconContainer = document.createElement('div');
-        iconContainer.className = 'triumph-icons-container';
-        iconContainer.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 5;
-        `;
-        
-        // Add floating icons
-        for (let i = 0; i < 5; i++) {
-            const icon = document.createElement('div');
-            icon.className = 'triumph-icon';
-            icon.textContent = triumphIcons[Math.floor(Math.random() * triumphIcons.length)];
-            icon.style.cssText = `
-                position: absolute;
-                font-size: 20px;
-                opacity: 0.7;
-                animation: triumphFloat ${3 + Math.random() * 5}s infinite ease-in-out;
-                filter: drop-shadow(0 0 5px gold);
-            `;
-            
-            // Random starting position
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 60;
-            icon.style.left = `calc(50% + ${Math.cos(angle) * radius}px)`;
-            icon.style.top = `calc(50% + ${Math.sin(angle) * radius}px)`;
-            
-            iconContainer.appendChild(icon);
-        }
-        
-        profilePic.parentElement.style.position = 'relative';
-        profilePic.parentElement.appendChild(iconContainer);
-        
-        // Add animation style
-        if (!document.getElementById('triumphAnimations')) {
-            const style = document.createElement('style');
-            style.id = 'triumphAnimations';
-            style.textContent = `
-                @keyframes triumphFloat {
-                    0%, 100% { transform: translate(0, 0) rotate(0deg); }
-                    25% { transform: translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px) rotate(90deg); }
-                    50% { transform: translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px) rotate(180deg); }
-                    75% { transform: translate(${Math.random() * 20 - 10}px, ${Math.random() * 20 - 10}px) rotate(270deg); }
-                }
-            `;
-            document.head.appendChild(style);
-        }
     }
 
     // ==================== PUBLIC API ====================
