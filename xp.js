@@ -10,7 +10,6 @@ import {
     getDoc,
     setDoc,
     updateDoc,
-    serverTimestamp,
     arrayUnion,
     increment,
     Timestamp
@@ -168,7 +167,7 @@ class XPSystem {
                     // Wait a bit for profile page to load
                     setTimeout(() => {
                         this.updateProfileDisplay();
-                    }, 1000);
+                    }, 1500);
                 }
                 
                 // Show welcome XP if new user
@@ -183,6 +182,25 @@ class XPSystem {
         if (window.location.pathname.includes('xp.html')) {
             this.setupXPPage();
         }
+        
+        // Also listen for URL changes (for single page apps)
+        this.listenForUrlChanges();
+    }
+    
+    listenForUrlChanges() {
+        // For SPAs that change URL without page reload
+        let lastUrl = location.href;
+        new MutationObserver(() => {
+            const url = location.href;
+            if (url !== lastUrl) {
+                lastUrl = url;
+                if (window.location.pathname.includes('profile.html')) {
+                    setTimeout(() => {
+                        this.updateProfileDisplay();
+                    }, 1000);
+                }
+            }
+        }).observe(document, {subtree: true, childList: true});
     }
 
     async loadUserData() {
@@ -663,101 +681,201 @@ class XPSystem {
     // ==================== PROFILE PAGE INTEGRATION (FIXED) ====================
     async updateProfileDisplay() {
         // Check if we're on profile.html
-        if (!window.location.pathname.includes('profile.html')) return;
+        if (!window.location.pathname.includes('profile.html')) {
+            console.log('XP System: Not on profile page');
+            return;
+        }
         
-        // Get the profile user ID from URL or page
-        const urlParams = new URLSearchParams(window.location.search);
-        const profileUserId = urlParams.get('uid') || this.currentUser?.uid;
+        console.log('XP System: Updating profile display');
         
-        if (!profileUserId) return;
+        // Get the profile user ID - this is the key fix
+        let profileUserId = await this.getProfileUserId();
+        
+        if (!profileUserId) {
+            console.log('XP System: Could not determine profile user ID');
+            return;
+        }
+        
+        console.log('XP System: Profile user ID:', profileUserId);
+        console.log('XP System: Current logged in user:', this.currentUser?.uid);
         
         // Load the profile user's XP data
         const profileXPData = await this.getUserXPData(profileUserId);
         
-        if (!profileXPData) return;
+        if (!profileXPData) {
+            console.log('XP System: No XP data found for profile user');
+            return;
+        }
         
         // Add simple XP icon to profile
-        this.addSimpleXPIcon(profileXPData);
+        this.addSimpleXPIcon(profileXPData, profileUserId);
+    }
+    
+    async getProfileUserId() {
+        // Method 1: Check URL parameters (most common for viewing other profiles)
+        const urlParams = new URLSearchParams(window.location.search);
+        let userId = urlParams.get('uid') || urlParams.get('userId') || urlParams.get('id');
+        
+        if (userId) {
+            console.log('XP System: Found user ID in URL params:', userId);
+            return userId;
+        }
+        
+        // Method 2: Check if there's a data attribute on the profile container
+        const profileContainer = document.querySelector('[data-user-id], .profile-container, .profile-header');
+        if (profileContainer) {
+            const dataUserId = profileContainer.dataset.userId;
+            if (dataUserId) {
+                console.log('XP System: Found user ID in data attribute:', dataUserId);
+                return dataUserId;
+            }
+        }
+        
+        // Method 3: Look for user ID in hidden input fields
+        const userIdInput = document.querySelector('input[name="userId"], input[name="uid"], #userId, #profileUserId');
+        if (userIdInput) {
+            const inputValue = userIdInput.value;
+            if (inputValue) {
+                console.log('XP System: Found user ID in input field:', inputValue);
+                return inputValue;
+            }
+        }
+        
+        // Method 4: Try to extract from profile URL structure (e.g., /profile/12345)
+        const pathMatch = window.location.pathname.match(/\/profile\/([^\/]+)/);
+        if (pathMatch && pathMatch[1]) {
+            console.log('XP System: Found user ID in path:', pathMatch[1]);
+            return pathMatch[1];
+        }
+        
+        // Method 5: Look for user ID in the page content
+        const userIdElement = document.querySelector('.user-id, .profile-id, [class*="userId"]');
+        if (userIdElement) {
+            const textContent = userIdElement.textContent || userIdElement.innerText;
+            if (textContent && textContent.trim()) {
+                console.log('XP System: Found user ID in element text:', textContent.trim());
+                return textContent.trim();
+            }
+        }
+        
+        // Method 6: Check if we're on the current user's profile (no UID parameter means own profile)
+        if (this.currentUser) {
+            console.log('XP System: No profile ID found, assuming current user\'s profile:', this.currentUser.uid);
+            return this.currentUser.uid;
+        }
+        
+        return null;
     }
 
     async getUserXPData(userId) {
         try {
+            console.log('XP System: Fetching XP data for user:', userId);
             const xpRef = doc(db, 'xpData', userId);
             const xpSnap = await getDoc(xpRef);
             
             if (xpSnap.exists()) {
+                console.log('XP System: XP data found for user:', userId);
                 return xpSnap.data();
+            } else {
+                console.log('XP System: No XP data found for user:', userId);
+                // Return default XP data for users who haven't earned any XP yet
+                return {
+                    totalXP: 0,
+                    coins: 0,
+                    currentLevel: 1
+                };
             }
-            return null;
         } catch (error) {
             console.error('XP System: Error loading user XP data:', error);
             return null;
         }
     }
 
-    addSimpleXPIcon(xpData) {
+    addSimpleXPIcon(xpData, userId) {
         // Find profile header or container
-        const profileHeader = document.querySelector('.profile-header, .profile-container, .user-profile');
-        if (!profileHeader) return;
+        const profileHeader = document.querySelector('.profile-header, .profile-container, .user-profile, .profile-section');
+        if (!profileHeader) {
+            console.log('XP System: Could not find profile header element');
+            return;
+        }
         
         // Remove any existing XP displays
-        const existingXP = document.querySelector('.xp-profile-icon, .xp-profile-display, .triumph-icons-container');
+        const existingXP = document.querySelector('.xp-profile-icon');
         if (existingXP) existingXP.remove();
         
         // Calculate level
         let level = 1;
-        for (let i = XP_RANKS.length - 1; i >= 0; i--) {
-            if (xpData.totalXP >= XP_RANKS[i].xpNeeded) {
-                level = XP_RANKS[i].level;
-                break;
+        let rank = XP_RANKS[0];
+        
+        if (xpData && xpData.totalXP) {
+            for (let i = XP_RANKS.length - 1; i >= 0; i--) {
+                if (xpData.totalXP >= XP_RANKS[i].xpNeeded) {
+                    level = XP_RANKS[i].level;
+                    rank = XP_RANKS[i];
+                    break;
+                }
             }
         }
-        const rank = XP_RANKS[level - 1] || XP_RANKS[0];
         
         // Create simple XP icon
         const xpIcon = document.createElement('div');
         xpIcon.className = 'xp-profile-icon';
+        xpIcon.setAttribute('data-user-id', userId);
         xpIcon.style.cssText = `
             display: inline-flex;
             align-items: center;
             justify-content: center;
             background: linear-gradient(135deg, #667eea, #764ba2);
             border-radius: 30px;
-            padding: 8px 16px;
+            padding: 6px 14px;
             margin: 10px;
             color: white;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 14px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid rgba(255,255,255,0.2);
         `;
         
         xpIcon.innerHTML = `
-            <span style="margin-right: 8px; font-size: 20px;">${rank.icon}</span>
+            <span style="margin-right: 6px; font-size: 16px;">${rank.icon}</span>
             <span>Lvl ${level}</span>
-            <span style="margin: 0 8px;">•</span>
-            <span>${xpData.totalXP || 0} XP</span>
+            <span style="margin: 0 6px;">•</span>
+            <span>${xpData?.totalXP || 0} XP</span>
         `;
         
         // Add hover effect
         xpIcon.addEventListener('mouseenter', () => {
             xpIcon.style.transform = 'scale(1.05)';
+            xpIcon.style.boxShadow = '0 6px 15px rgba(102, 126, 234, 0.4)';
         });
         xpIcon.addEventListener('mouseleave', () => {
             xpIcon.style.transform = 'scale(1)';
+            xpIcon.style.boxShadow = '0 4px 10px rgba(0,0,0,0.2)';
         });
         
-        // Add click to show details (optional)
-        xpIcon.addEventListener('click', () => {
-            this.showQuickStats(xpData, level);
+        // Add click to show details
+        xpIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showQuickStats(xpData, level, userId, e.target);
         });
         
         // Insert at the top of profile header
-        profileHeader.insertBefore(xpIcon, profileHeader.firstChild);
+        if (profileHeader.firstChild) {
+            profileHeader.insertBefore(xpIcon, profileHeader.firstChild);
+        } else {
+            profileHeader.appendChild(xpIcon);
+        }
+        
+        console.log('XP System: Added XP icon for user:', userId);
     }
 
-    showQuickStats(xpData, level) {
+    showQuickStats(xpData, level, userId, targetElement) {
+        // Remove any existing tooltips
+        const existingTooltip = document.querySelector('.xp-quick-stats');
+        if (existingTooltip) existingTooltip.remove();
+        
         const rank = XP_RANKS[level - 1] || XP_RANKS[0];
         const nextRank = XP_RANKS[level] || null;
         
@@ -765,7 +883,7 @@ class XPSystem {
         let progress = 0;
         let xpToNext = 0;
         
-        if (nextRank) {
+        if (nextRank && xpData) {
             xpToNext = nextRank.xpNeeded - xpData.totalXP;
             const xpInCurrent = xpData.totalXP - rank.xpNeeded;
             const xpNeeded = nextRank.xpNeeded - rank.xpNeeded;
@@ -774,64 +892,72 @@ class XPSystem {
         
         // Create tooltip/popup
         const tooltip = document.createElement('div');
+        tooltip.className = 'xp-quick-stats';
         tooltip.style.cssText = `
             position: absolute;
             background: white;
             border-radius: 15px;
             padding: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            z-index: 1000;
-            max-width: 300px;
+            z-index: 10000;
+            min-width: 280px;
             animation: fadeIn 0.2s ease-out;
+            border: 1px solid #e0e0e0;
         `;
         
         tooltip.innerHTML = `
             <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                <div style="font-size: 40px;">${rank.icon}</div>
+                <div style="font-size: 40px; background: ${rank.color}20; padding: 10px; border-radius: 50%;">${rank.icon}</div>
                 <div>
-                    <div style="font-weight: bold; font-size: 18px;">${rank.title}</div>
-                    <div style="color: #666;">Level ${level}</div>
+                    <div style="font-weight: bold; font-size: 18px; color: #333;">${rank.title}</div>
+                    <div style="color: #666; font-size: 14px;">Level ${level}</div>
                 </div>
             </div>
             <div style="margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span>Total XP: ${xpData.totalXP}</span>
-                    <span>Coins: 🪙 ${xpData.coins || 0}</span>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+                    <span style="color: #666;">Total XP:</span>
+                    <span style="font-weight: bold; color: #667eea;">${xpData?.totalXP || 0}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+                    <span style="color: #666;">Coins:</span>
+                    <span style="font-weight: bold; color: #f1c40f;">🪙 ${xpData?.coins || 0}</span>
                 </div>
                 ${nextRank ? `
-                    <div style="margin-top: 10px;">
-                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">
-                            Next: ${nextRank.title} (${xpToNext} XP needed)
+                    <div style="margin-top: 15px;">
+                        <div style="font-size: 13px; color: #666; margin-bottom: 5px; display: flex; justify-content: space-between;">
+                            <span>Next: ${nextRank.title}</span>
+                            <span style="font-weight: bold;">${xpToNext} XP needed</span>
                         </div>
                         <div style="width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
                             <div style="width: ${progress}%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);"></div>
                         </div>
                     </div>
-                ` : '<div style="color: gold;">🏆 MAX LEVEL ACHIEVED!</div>'}
+                ` : '<div style="color: #f1c40f; text-align: center; margin-top: 10px; font-weight: bold;">🏆 MAX LEVEL ACHIEVED!</div>'}
+            </div>
+            <div style="font-size: 11px; color: #999; text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+                Click anywhere to close
             </div>
         `;
         
-        // Position near the icon
-        const icon = document.querySelector('.xp-profile-icon');
-        if (icon) {
-            const rect = icon.getBoundingClientRect();
-            tooltip.style.top = `${rect.bottom + window.scrollY + 10}px`;
-            tooltip.style.left = `${rect.left + window.scrollX}px`;
-            
-            document.body.appendChild(tooltip);
-            
-            // Remove on click outside
-            setTimeout(() => {
-                document.addEventListener('click', function removeTooltip(e) {
-                    if (!tooltip.contains(e.target) && e.target !== icon) {
-                        tooltip.remove();
-                        document.removeEventListener('click', removeTooltip);
-                    }
-                });
-            }, 100);
-        }
+        // Position near the clicked element
+        const rect = targetElement.getBoundingClientRect();
+        tooltip.style.top = `${rect.bottom + window.scrollY + 10}px`;
+        tooltip.style.left = `${rect.left + window.scrollX}px`;
         
-        // Add animation style
+        document.body.appendChild(tooltip);
+        
+        // Remove on click outside
+        setTimeout(() => {
+            const clickHandler = (e) => {
+                if (!tooltip.contains(e.target) && e.target !== targetElement) {
+                    tooltip.remove();
+                    document.removeEventListener('click', clickHandler);
+                }
+            };
+            document.addEventListener('click', clickHandler);
+        }, 100);
+        
+        // Add animation style if not exists
         if (!document.getElementById('fadeInAnimation')) {
             const style = document.createElement('style');
             style.id = 'fadeInAnimation';
@@ -1152,6 +1278,13 @@ window.getRankInfo = (level) => xpSystem.getRankInfo(level);
 // Function to initialize XP system from other pages
 window.initializeXPSystem = function() {
     return xpSystem.initialize();
+};
+
+// Function to manually refresh profile display (can be called from profile page)
+window.refreshProfileXP = function() {
+    if (xpSystem) {
+        xpSystem.updateProfileDisplay();
+    }
 };
 
 console.log('XP System: Module loaded successfully');
