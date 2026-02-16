@@ -683,7 +683,8 @@ class ChatCustomization {
         tagsContainer.style.flexWrap = 'wrap';
         tagsContainer.style.alignItems = 'center';
         
-        selectedTags.slice(0, 3).forEach(tagId => {
+        // FIXED: Show only 2 badges max in preview
+        selectedTags.slice(0, 2).forEach(tagId => {
             const tag = this.getTagInfo(tagId);
             if (tag) {
                 const tagEl = document.createElement('span');
@@ -1380,9 +1381,9 @@ class ChatCustomization {
                 </div>
             `;
             
-            // Add tags if available
+            // Add tags if available - FIXED: Show only 2 badges max in profile
             if (customization.selectedTags && customization.selectedTags.length > 0) {
-                const tagsHtml = customization.selectedTags.map(tagId => {
+                const tagsHtml = customization.selectedTags.slice(0, 2).map(tagId => {
                     const tag = this.getTagInfo(tagId);
                     if (!tag) return '';
                     
@@ -1397,11 +1398,17 @@ class ChatCustomization {
                     `;
                 }).join('');
                 
+                // Add indicator if there are more tags
+                const remainingCount = customization.selectedTags.length - 2;
+                const remainingIndicator = remainingCount > 0 ? 
+                    `<div class="display-tag" style="background: #2196F3; color: white;">+${remainingCount} more</div>` : '';
+                
                 displayElement.innerHTML += `
                     <div class="display-section">
                         <h4>Gaming Tags</h4>
                         <div class="display-tags">
                             ${tagsHtml}
+                            ${remainingIndicator}
                         </div>
                     </div>
                 `;
@@ -1712,8 +1719,8 @@ class ChatCustomization {
         tagsContainer.style.marginLeft = '6px';
         tagsContainer.style.alignItems = 'center';
         
-        // Add tags (limit to 3 for display)
-        tagIds.slice(0, 3).forEach(tagId => {
+        // FIXED: Add tags (limit to 2 for display)
+        tagIds.slice(0, 2).forEach(tagId => {
             const tag = this.getTagInfo(tagId);
             if (tag) {
                 const tagElement = document.createElement('span');
@@ -1732,6 +1739,17 @@ class ChatCustomization {
                 tagsContainer.appendChild(tagElement);
             }
         });
+        
+        // Add indicator for more tags if needed
+        if (tagIds.length > 2) {
+            const moreIndicator = document.createElement('span');
+            moreIndicator.className = 'customization-tag';
+            moreIndicator.style.background = '#2196F3';
+            moreIndicator.style.color = 'white';
+            moreIndicator.innerHTML = `<span>+${tagIds.length - 2}</span>`;
+            moreIndicator.title = `${tagIds.length - 2} more badges`;
+            tagsContainer.appendChild(moreIndicator);
+        }
         
         // Insert after name
         if (nameElement.parentNode) {

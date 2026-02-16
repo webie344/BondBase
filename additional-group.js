@@ -1,18 +1,24 @@
-// additional-group.js - Animations with proper 5-6 second duration
+// additional-group.js - COMPLETE FIXED VERSION
+// All stickers now display correctly even after page reload
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
 import { 
     getFirestore, 
     doc, 
     getDoc,
     collection,
+    addDoc,
+    serverTimestamp,
+    updateDoc,
     query,
     orderBy,
     limit,
+    arrayUnion,
+    getDocs,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -24,3008 +30,2240 @@ const firebaseConfig = {
     storageBucket: "crypto-6517d.firebasestorage.app",
     messagingSenderId: "60263975159",
     appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-  };
+};
 
+// Cloudinary configuration
+const CLOUDINARY_CONFIG = {
+    cloudName: "ddtdqrh1b",
+    uploadPreset: "profile-pictures"
+};
 
 // Initialize Firebase
-const app = window.app || (() => {
-    try {
-        return window.initializeApp(firebaseConfig);
-    } catch (e) {
-        return window.app;
-    }
-})();
+let app;
+let auth;
+let db;
 
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// Pure Visual Animations Configuration with proper durations
-const VISUAL_ANIMATIONS = [
-    { 
-        name: 'fire_strike', 
-        displayName: 'Fire Strike',
-        animation: 'fireStrike',
-        color: '#FF6B00',
-        duration: 6.0,
-        description: 'Flaming attack'
-    },
-    { 
-        name: 'headshot', 
-        displayName: 'Headshot',
-        animation: 'headshotEffect',
-        color: '#FF0000',
-        duration: 5.5,
-        description: 'Precision hit'
-    },
-    { 
-        name: 'sword_slash', 
-        displayName: 'Sword Slash',
-        animation: 'swordSlash',
-        color: '#00FF00',
-        duration: 5.0,
-        description: 'Blade attack'
-    },
-    { 
-        name: 'shield_up', 
-        displayName: 'Shield Up',
-        animation: 'shieldUp',
-        color: '#00FFFF',
-        duration: 6.0,
-        description: 'Defensive barrier'
-    },
-    { 
-        name: 'grenade', 
-        displayName: 'Grenade Blast',
-        animation: 'grenadeExplosion',
-        color: '#FF4500',
-        duration: 5.5,
-        description: 'Explosive damage'
-    },
-    { 
-        name: 'speed_boost', 
-        displayName: 'Speed Boost',
-        animation: 'speedBoost',
-        color: '#FFFF00',
-        duration: 5.0,
-        description: 'Movement speed'
-    },
-    { 
-        name: 'rank_up', 
-        displayName: 'Rank Up',
-        animation: 'rankUp',
-        color: '#FFD700',
-        duration: 6.5,
-        description: 'Level upgrade'
-    },
-    { 
-        name: 'coin_rain', 
-        displayName: 'Coin Rain',
-        animation: 'coinRain',
-        color: '#FFD700',
-        duration: 6.0,
-        description: 'Currency shower'
-    },
-    { 
-        name: 'combo_attack', 
-        displayName: 'Combo Attack',
-        animation: 'comboAttack',
-        color: '#FF00FF',
-        duration: 5.5,
-        description: 'Multi-hit'
-    },
-    { 
-        name: 'damage_hit', 
-        displayName: 'Damage Hit',
-        animation: 'damageHit',
-        color: '#FF1493',
-        duration: 5.0,
-        description: 'Impact damage'
-    },
-    { 
-        name: 'airdrop', 
-        displayName: 'Airdrop Supply',
-        animation: 'airdropFall',
-        color: '#00FF00',
-        duration: 7.0,
-        description: 'Supply drop'
-    },
-    { 
-        name: 'arrow_shot', 
-        displayName: 'Arrow Shot',
-        animation: 'arrowShot',
-        color: '#8B4513',
-        duration: 5.0,
-        description: 'Ranged attack'
-    },
-    { 
-        name: 'kill_feed', 
-        displayName: 'Elimination',
-        animation: 'killFeed',
-        color: '#DC143C',
-        duration: 5.5,
-        description: 'Player defeated'
-    },
-    { 
-        name: 'sprint', 
-        displayName: 'Sprint Dash',
-        animation: 'sprintEffect',
-        color: '#1E90FF',
-        duration: 5.0,
-        description: 'Fast movement'
-    },
-    { 
-        name: 'victory_royale', 
-        displayName: 'Victory Royale',
-        animation: 'victoryRoyale',
-        color: '#FFD700',
-        duration: 7.5,
-        description: 'Match winner'
+try {
+    if (!window.firebaseApps) {
+        window.firebaseApps = {};
     }
-];
+    
+    const appName = '[DEFAULT]';
+    
+    if (!window.firebaseApps[appName]) {
+        app = initializeApp(firebaseConfig, appName);
+        window.firebaseApps[appName] = app;
+    } else {
+        app = window.firebaseApps[appName];
+    }
+    
+    auth = getAuth(app);
+    db = getFirestore(app);
+    
+} catch (error) {
+    console.error('Error initializing Firebase:', error);
+    app = { name: 'DEFAULT', options: {} };
+    auth = { currentUser: null };
+    db = {};
+}
 
 // Global variables
-let animationLibraryOpen = false;
-let userHasPremium = false;
 let currentUser = null;
 let currentGroupId = null;
-let playedAnimations = new Set();
-let animationListenerUnsubscribe = null;
-let lastProcessedMessageTime = 0;
+let userStickers = [];
+let stickerPickerOpen = false;
+let stickerDataCache = new Map(); // messageId -> stickerData
+let isSendingSticker = false;
+let stickerListenerUnsubscribe = null;
+let hasLoadedInitialMessages = false;
+let messageObserver = null;
+
+// Sticker creator state
+let stickerCreator = {
+    currentStep: 1,
+    type: '',
+    selectedImage: null,
+    selectedEmoji: '😊',
+    imageFile: null,
+    name: '',
+    text: ''
+};
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    loadVisualAnimationStyles();
-    loadPlayedAnimations();
+    loadStickerStyles();
     
-    // Set up auth state listener
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            currentUser = user;
-            initializeGroupFeatures();
-        } else {
-            currentUser = null;
-            cleanupAnimationListener();
-            playedAnimations.clear();
-        }
-    });
+    if (auth && typeof onAuthStateChanged === 'function') {
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                
+                // Get group ID from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                currentGroupId = urlParams.get('id');
+                
+                // Wait a bit for the chat to load
+                setTimeout(() => {
+                    initializeFeatures();
+                }, 1000);
+            } else {
+                currentUser = null;
+            }
+        });
+    }
 });
 
-// Load played animations from localStorage
-function loadPlayedAnimations() {
-    try {
-        const stored = localStorage.getItem('visualPlayedAnimations');
-        if (stored) {
-            const data = JSON.parse(stored);
-            playedAnimations = new Set(data.animations || []);
-            lastProcessedMessageTime = data.lastProcessedTime || 0;
-        }
-    } catch (error) {
-        console.error('Error loading played animations:', error);
-    }
-}
-
-// Save played animations to localStorage
-function savePlayedAnimations() {
-    try {
-        const data = {
-            animations: Array.from(playedAnimations),
-            lastProcessedTime: lastProcessedMessageTime,
-            timestamp: Date.now()
-        };
-        localStorage.setItem('visualPlayedAnimations', JSON.stringify(data));
-    } catch (error) {
-        console.error('Error saving played animations:', error);
-    }
-}
-
-// Clean up animation listener
-function cleanupAnimationListener() {
-    if (animationListenerUnsubscribe) {
-        animationListenerUnsubscribe();
-        animationListenerUnsubscribe = null;
-    }
-}
-
 // Initialize features after auth
-function initializeGroupFeatures() {
-    if (window.location.pathname.includes('group.html')) {
-        const urlParams = new URLSearchParams(window.location.search);
-        currentGroupId = urlParams.get('id');
+function initializeFeatures() {
+    console.log('Initializing sticker system for group:', currentGroupId);
+    
+    // Add sticker button
+    addStickerButton();
+    
+    // Create sticker picker
+    createStickerPicker();
+    
+    // Load user stickers
+    loadUserStickers();
+    
+    // Setup sticker listener for new messages
+    setupStickerListener();
+    
+    // Setup sticker interceptor
+    setupStickerInterceptor();
+    
+    // Load all existing messages to populate cache
+    loadAllMessagesForCache();
+}
+
+// ============================================
+// FIXED: Load ALL messages for cache
+// ============================================
+async function loadAllMessagesForCache() {
+    if (!currentUser || !currentGroupId || !db) {
+        return;
     }
-    
-    initGroupAnimationLibrary();
-    checkPremiumStatus();
-    
-    if (window.location.pathname.includes('group.html') && currentGroupId) {
+
+    console.log('Loading ALL messages to populate sticker cache...');
+
+    try {
+        // Load more messages to ensure we get all stickers
+        const messagesQuery = query(
+            collection(db, 'groups', currentGroupId, 'messages'),
+            orderBy('timestamp', 'asc'),
+            limit(200)
+        );
+
+        const querySnapshot = await getDocs(messagesQuery);
+        let stickerCount = 0;
+        
+        querySnapshot.forEach((doc) => {
+            const message = doc.data();
+            const messageId = doc.id;
+            
+            // If this is a sticker message, store in cache
+            if (message.type === 'sticker' || message.isSticker || message.stickerId) {
+                
+                const stickerData = {
+                    id: message.stickerId || `sticker_${Date.now()}`,
+                    name: message.stickerName || 'Sticker',
+                    type: message.stickerType || 'text',
+                    url: message.stickerUrl || '',
+                    emoji: message.stickerEmoji || '😊',
+                    text: message.stickerText || ''
+                };
+                
+                stickerDataCache.set(messageId, stickerData);
+                stickerCount++;
+                console.log(`Cached sticker ${stickerCount} for message ${messageId}:`, stickerData.name);
+            }
+        });
+        
+        console.log(`✅ Loaded ${stickerCount} stickers into cache out of ${querySnapshot.size} total messages`);
+        
+        // Process all messages after cache is populated
         setTimeout(() => {
-            setupGroupAnimationListener();
+            processAllMessagesForStickers();
+            hasLoadedInitialMessages = true;
+        }, 500);
+        
+        // Also run again after 2 seconds to catch any that might have been missed
+        setTimeout(() => {
+            processAllMessagesForStickers();
         }, 2000);
+        
+    } catch (error) {
+        console.error('Error loading messages for cache:', error);
     }
 }
 
-// Initialize animation library for group chat
-function initGroupAnimationLibrary() {
-    if (window.location.pathname.includes('group.html')) {
-        addGroupAnimationButton();
-        createGroupAnimationModal();
-        setupGroupInputFocusHandling();
-    }
-}
-
-// Add animation library button for group chat
-function addGroupAnimationButton() {
-    const messageInputContainer = document.querySelector('.message-input-container');
-    if (!messageInputContainer) {
-        setTimeout(addGroupAnimationButton, 1000);
+// ============================================
+// STICKER INTERCEPTOR
+// ============================================
+function setupStickerInterceptor() {
+    const messagesContainer = document.getElementById('messagesContainer');
+    if (!messagesContainer) {
+        setTimeout(setupStickerInterceptor, 1000);
         return;
     }
 
-    const existingBtn = document.getElementById('groupAnimationBtn');
-    if (existingBtn) {
-        existingBtn.remove();
+    console.log('Sticker interceptor set up');
+
+    // Process all existing messages
+    processAllMessagesForStickers();
+
+    // Watch for new messages
+    if (messageObserver) {
+        messageObserver.disconnect();
     }
-
-    const animationBtn = document.createElement('button');
-    animationBtn.id = 'groupAnimationBtn';
-    animationBtn.className = 'visual-animation-btn';
-    animationBtn.innerHTML = '<i class="fas fa-bolt"></i>';
-    animationBtn.title = 'Visual Animations';
-    animationBtn.addEventListener('click', toggleGroupAnimationLibrary);
-
-    const messageInput = document.getElementById('messageInput');
-    if (messageInput && messageInput.parentNode === messageInputContainer) {
-        messageInputContainer.insertBefore(animationBtn, messageInput);
-    } else {
-        messageInputContainer.insertBefore(animationBtn, messageInputContainer.firstChild);
-    }
-}
-
-// Set up input focus handling
-function setupGroupInputFocusHandling() {
-    const messageInput = document.getElementById('messageInput');
-    const animationBtn = document.getElementById('groupAnimationBtn');
     
-    if (!messageInput || !animationBtn) {
-        setTimeout(setupGroupInputFocusHandling, 1000);
-        return;
-    }
-
-    messageInput.addEventListener('focus', () => {
-        animationBtn.style.display = 'none';
-        messageInput.style.width = 'calc(100% - 120px)';
+    messageObserver = new MutationObserver((mutations) => {
+        let hasNewMessages = false;
+        
+        mutations.forEach((mutation) => {
+            if (mutation.addedNodes.length) {
+                hasNewMessages = true;
+            }
+        });
+        
+        if (hasNewMessages) {
+            setTimeout(() => {
+                processAllMessagesForStickers();
+            }, 200);
+        }
     });
 
-    messageInput.addEventListener('blur', () => {
-        setTimeout(() => {
-            animationBtn.style.display = 'flex';
-            messageInput.style.width = 'calc(100% - 170px)';
-        }, 100);
-    });
-
-    animationBtn.style.display = 'flex';
-    messageInput.style.width = 'calc(100% - 170px)';
-    messageInput.style.transition = 'width 0.3s ease';
+    messageObserver.observe(messagesContainer, { childList: true, subtree: true });
 }
 
-// Create animation library modal for group chat
-function createGroupAnimationModal() {
-    if (document.getElementById('groupAnimationLibraryModal')) return;
+// ============================================
+// IMPROVED: Process all messages for stickers
+// ============================================
+function processAllMessagesForStickers() {
+    const messagesContainer = document.getElementById('messagesContainer');
+    if (!messagesContainer) return;
 
-    const modal = document.createElement('div');
-    modal.id = 'groupAnimationLibraryModal';
-    modal.className = 'visual-animation-modal';
-    modal.innerHTML = `
-        <div class="visual-animation-modal-content">
-            <div class="visual-animation-modal-header">
-                <h3><i class="fas fa-bolt"></i> Visual Animations</h3>
-                <button class="close-group-animation-modal">&times;</button>
+    const messages = messagesContainer.querySelectorAll('.message-text, .message-group, .message, [class*="message"]');
+    console.log(`Processing ${messages.length} messages for stickers - Cache has ${stickerDataCache.size} items`);
+    
+    let processed = 0;
+    messages.forEach(message => {
+        const success = checkAndReplaceWithSticker(message);
+        if (success) processed++;
+    });
+    
+    if (processed > 0) {
+        console.log(`✅ Processed ${processed} sticker messages`);
+    }
+    
+    // If we have fewer processed than cache items, try again after a delay
+    if (stickerDataCache.size > 0 && processed < stickerDataCache.size) {
+        console.log(`⚠️ Only processed ${processed}/${stickerDataCache.size} stickers, retrying in 1 second...`);
+        setTimeout(() => {
+            processAllMessagesForStickers();
+        }, 1000);
+    }
+}
+
+// ============================================
+// IMPROVED: Check and replace with sticker
+// ============================================
+function checkAndReplaceWithSticker(messageElement) {
+    // Skip if already processed
+    if (messageElement.dataset.stickerProcessed === 'true') return false;
+
+    // Find the text element that might contain [STICKER]
+    const messageText = messageElement.querySelector('p, .message-content, .message-content-wrapper, .message-text, .text');
+    if (!messageText) return false;
+
+    const text = messageText.textContent || '';
+    
+    // If it's our sticker marker
+    if (text === '[STICKER]' || text.includes('[STICKER]')) {
+        // Get message ID from various possible locations
+        let messageId = messageElement.dataset.messageId || 
+                       messageElement.dataset.id || 
+                       messageElement.id;
+        
+        // If we still don't have an ID, try to find it in the message content
+        if (!messageId) {
+            const idElement = messageElement.querySelector('[data-message-id]');
+            if (idElement) {
+                messageId = idElement.dataset.messageId;
+            }
+        }
+        
+        // If still no ID, try to extract from the message
+        if (!messageId) {
+            // Look for any element with an ID that looks like a message ID
+            const elementsWithId = messageElement.querySelectorAll('[id^="msg_"], [id^="message_"]');
+            if (elementsWithId.length > 0) {
+                messageId = elementsWithId[0].id;
+            }
+        }
+        
+        // Get sticker data from cache
+        let stickerData = null;
+        
+        if (messageId) {
+            stickerData = stickerDataCache.get(messageId);
+            if (stickerData) {
+                console.log(`✅ Found cached sticker for message ${messageId}:`, stickerData.name);
+            }
+        }
+        
+        // If still no sticker data, create a default one
+        if (!stickerData) {
+            stickerData = {
+                id: 'default_sticker',
+                name: 'Sticker',
+                type: 'text',
+                url: '',
+                emoji: '😊',
+                text: 'Sticker'
+            };
+            console.log(`⚠️ Using default sticker for message ${messageId || 'unknown'}`);
+        }
+        
+        replaceMessageWithSticker(messageElement, messageText, stickerData);
+        messageElement.dataset.stickerProcessed = 'true';
+        return true;
+    }
+    return false;
+}
+
+function replaceMessageWithSticker(messageElement, textElement, stickerData) {
+    // Create sticker HTML based on type
+    let stickerHTML = '';
+    
+    if (stickerData.type === 'image' && stickerData.url) {
+        stickerHTML = `
+            <div class="sticker-message-content">
+                <div class="sticker-image-container">
+                    <img src="${stickerData.url}" 
+                         alt="${stickerData.name || 'Sticker'}" 
+                         class="sticker-message-image"
+                         loading="lazy"
+                         onerror="this.onerror=null;this.src='https://via.placeholder.com/150/667eea/FFFFFF?text=Sticker'">
+                    ${stickerData.text ? `<div class="sticker-text-on-image">${stickerData.text}</div>` : ''}
+                </div>
             </div>
-            <div class="visual-animation-grid">
-                ${VISUAL_ANIMATIONS.map(anim => `
-                    <div class="visual-animation-item" data-animation="${anim.animation}">
-                        <div class="visual-animation-preview" style="background: ${anim.color}">
-                            <div class="visual-animation-effect ${anim.animation}-preview"></div>
-                        </div>
-                        <span class="visual-animation-name">${anim.displayName}</span>
-                        <span class="visual-animation-desc">${anim.description}</span>
+        `;
+    } else {
+        // Text sticker
+        stickerHTML = `
+            <div class="sticker-message-content">
+                <div class="text-sticker-message">
+                    <span class="sticker-emoji-large">${stickerData.emoji || '😊'}</span>
+                    <span class="sticker-text-large">${stickerData.text || stickerData.name || 'Sticker'}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Replace the text content with sticker HTML
+    textElement.innerHTML = stickerHTML;
+    textElement.classList.add('sticker-display');
+    
+    // Determine if message is sent or received
+    const isSent = messageElement.classList.contains('sent') || 
+                   messageElement.querySelector('[style*="margin-left: auto"]') !== null ||
+                   (messageElement.style.marginLeft === 'auto');
+    
+    // Style based on sent/received
+    const content = textElement.querySelector('.sticker-message-content');
+    if (content) {
+        if (isSent) {
+            content.style.background = '#000000';
+            content.style.borderColor = '#333333';
+            content.style.color = 'white';
+        } else {
+            content.style.background = 'white';
+            content.style.borderColor = '#e8e8e8';
+            content.style.color = '#333';
+        }
+    }
+    
+    // Hide any default message background
+    messageElement.style.background = 'transparent';
+    messageElement.style.border = 'none';
+    messageElement.style.boxShadow = 'none';
+    messageElement.style.padding = '5px';
+    messageElement.style.maxWidth = '200px';
+    messageElement.classList.add('sticker-message');
+}
+
+// ============================================
+// ADD STICKER BUTTON
+// ============================================
+function addStickerButton() {
+    const findContainer = () => {
+        const container = document.querySelector('.message-input-container');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        
+        if (!container || !messageInput) {
+            setTimeout(findContainer, 500);
+            return;
+        }
+
+        const existingBtn = document.getElementById('stickerPickerBtn');
+        if (existingBtn) {
+            existingBtn.remove();
+        }
+
+        const stickerBtn = document.createElement('button');
+        stickerBtn.id = 'stickerPickerBtn';
+        stickerBtn.className = 'sticker-picker-btn';
+        stickerBtn.innerHTML = '<i class="fas fa-smile"></i>';
+        stickerBtn.title = 'Stickers';
+        stickerBtn.type = 'button';
+        stickerBtn.addEventListener('click', toggleStickerPicker);
+
+        if (sendBtn) {
+            container.insertBefore(stickerBtn, sendBtn);
+        } else {
+            container.appendChild(stickerBtn);
+        }
+
+        messageInput.style.paddingRight = '110px';
+    };
+    
+    findContainer();
+}
+
+// ============================================
+// STICKER PICKER UI
+// ============================================
+function createStickerPicker() {
+    if (document.getElementById('stickerPickerPanel')) return;
+
+    const pickerPanel = document.createElement('div');
+    pickerPanel.id = 'stickerPickerPanel';
+    pickerPanel.className = 'sticker-picker-panel';
+    
+    pickerPanel.innerHTML = `
+        <div class="sticker-picker-header">
+            <h4><i class="fas fa-smile"></i> My Stickers</h4>
+            <button class="create-sticker-btn" id="createStickerBtn">
+                <i class="fas fa-plus"></i> Create
+            </button>
+        </div>
+        
+        <div class="sticker-tabs">
+            <button class="sticker-tab active" data-tab="my-stickers">My Stickers</button>
+            <button class="sticker-tab" data-tab="saved-stickers">Saved</button>
+            <button class="sticker-tab" data-tab="packs">Packs</button>
+        </div>
+        
+        <div class="sticker-content">
+            <div class="tab-content active" id="my-stickers-tab">
+                <div class="sticker-grid" id="myStickersGrid">
+                    <div class="no-stickers" id="noStickersMessage">
+                        <i class="fas fa-smile-wink"></i>
+                        <p>No stickers yet</p>
+                        <button class="create-first-sticker">Create your first sticker</button>
                     </div>
-                `).join('')}
+                </div>
             </div>
-            <div class="visual-animation-premium-notice" id="groupPremiumNotice" style="display: none;">
-                <i class="fas fa-crown"></i>
-                <p>Premium feature: Upgrade to send visual animations</p>
+            
+            <div class="tab-content" id="saved-stickers-tab">
+                <div class="sticker-grid" id="savedStickersGrid">
+                    <div class="no-stickers">
+                        <i class="fas fa-heart"></i>
+                        <p>No saved stickers</p>
+                        <p class="hint">Stickers you receive will appear here</p>
+                    </div>
+                </div>
             </div>
+            
+            <div class="tab-content" id="packs-tab">
+                <div class="sticker-grid" id="packsStickersGrid">
+                    <div class="no-stickers">
+                        <i class="fas fa-layer-group"></i>
+                        <p>No sticker packs</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="sticker-picker-footer">
+            <button class="close-sticker-picker">
+                <i class="fas fa-times"></i> Close
+            </button>
         </div>
     `;
 
-    document.body.appendChild(modal);
+    document.body.appendChild(pickerPanel);
+    setupStickerPickerEvents();
+}
 
-    modal.querySelector('.close-group-animation-modal').addEventListener('click', closeGroupAnimationLibrary);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeGroupAnimationLibrary();
+function setupStickerPickerEvents() {
+    const pickerPanel = document.getElementById('stickerPickerPanel');
+    if (!pickerPanel) return;
+    
+    const closeBtn = pickerPanel.querySelector('.close-sticker-picker');
+    const createBtn = pickerPanel.querySelector('#createStickerBtn');
+    const createFirstBtn = pickerPanel.querySelector('.create-first-sticker');
+    const tabButtons = pickerPanel.querySelectorAll('.sticker-tab');
+    const tabContents = pickerPanel.querySelectorAll('.tab-content');
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeStickerPicker);
+    }
+
+    if (createBtn) {
+        createBtn.addEventListener('click', openStickerCreator);
+    }
+    if (createFirstBtn) {
+        createFirstBtn.addEventListener('click', openStickerCreator);
+    }
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
+            
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === `${tabName}-tab`) {
+                    content.classList.add('active');
+                }
+            });
+            
+            if (tabName === 'saved-stickers') {
+                loadSavedStickers();
+            } else if (tabName === 'packs') {
+                loadStickerPacks();
+            }
+        });
     });
 
-    const animationItems = modal.querySelectorAll('.visual-animation-item');
-    animationItems.forEach(item => {
-        item.addEventListener('click', () => selectGroupAnimation(item.dataset.animation));
+    document.addEventListener('click', (e) => {
+        if (stickerPickerOpen && 
+            !pickerPanel.contains(e.target) && 
+            !e.target.closest('#stickerPickerBtn')) {
+            closeStickerPicker();
+        }
     });
 }
 
-// Toggle animation library
-function toggleGroupAnimationLibrary() {
-    const modal = document.getElementById('groupAnimationLibraryModal');
-    if (!modal) return;
-
-    if (animationLibraryOpen) {
-        closeGroupAnimationLibrary();
+function toggleStickerPicker(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    if (stickerPickerOpen) {
+        closeStickerPicker();
     } else {
-        openGroupAnimationLibrary();
+        openStickerPicker();
     }
 }
 
-// Open animation library
-function openGroupAnimationLibrary() {
-    const modal = document.getElementById('groupAnimationLibraryModal');
-    if (!modal) return;
-
-    modal.style.display = 'flex';
-    animationLibraryOpen = true;
-
-    const premiumNotice = document.getElementById('groupPremiumNotice');
-    if (premiumNotice) {
-        premiumNotice.style.display = userHasPremium ? 'none' : 'flex';
-    }
-
-    const animationItems = document.querySelectorAll('.visual-animation-item');
-    animationItems.forEach(item => {
-        if (!userHasPremium) {
-            item.classList.add('premium-locked');
-        } else {
-            item.classList.remove('premium-locked');
-        }
-    });
+function openStickerPicker() {
+    const pickerPanel = document.getElementById('stickerPickerPanel');
+    const messageInput = document.getElementById('messageInput');
+    
+    if (!pickerPanel || !messageInput) return;
+    
+    messageInput.blur();
+    pickerPanel.style.display = 'block';
+    
+    setTimeout(() => {
+        pickerPanel.classList.add('open');
+    }, 10);
+    
+    stickerPickerOpen = true;
+    updateStickerGrid();
 }
 
-// Close animation library
-function closeGroupAnimationLibrary() {
-    const modal = document.getElementById('groupAnimationLibraryModal');
-    if (!modal) return;
-
-    modal.style.display = 'none';
-    animationLibraryOpen = false;
+function closeStickerPicker() {
+    const pickerPanel = document.getElementById('stickerPickerPanel');
+    
+    if (!pickerPanel) return;
+    
+    pickerPanel.classList.remove('open');
+    
+    setTimeout(() => {
+        pickerPanel.style.display = 'none';
+    }, 300);
+    
+    stickerPickerOpen = false;
 }
 
-// Select animation for group chat
-async function selectGroupAnimation(animationType) {
-    if (!userHasPremium) {
-        showVisualNotification('Premium feature: Upgrade to send visual animations', 'warning');
-        return;
-    }
-
-    if (!currentGroupId) {
-        showVisualNotification('No active group chat', 'error');
-        return;
-    }
-
-    try {
-        const animationData = VISUAL_ANIMATIONS.find(anim => anim.animation === animationType);
-        if (!animationData) return;
-
-        await sendGroupAnimationMessage(animationData);
-        closeGroupAnimationLibrary();
-        showVisualNotification(`${animationData.displayName} animation sent!`, 'success');
-    } catch (error) {
-        showVisualNotification('Error sending animation', 'error');
-    }
-}
-
-// Send animation message to group
-async function sendGroupAnimationMessage(animationData) {
-    if (!currentUser || !currentGroupId) {
-        return;
-    }
-
-    try {
-        if (window.groupChat && window.groupChat.sendMessage) {
-            await window.groupChat.sendMessage(
-                currentGroupId,
-                `🎮 Sent ${animationData.displayName} animation`,
-                null,
-                null,
-                window.groupChat.replyingToMessage?.id
-            );
-        }
-    } catch (error) {
-        throw error;
-    }
-}
-
-// Check premium status
-async function checkPremiumStatus() {
-    if (!currentUser) return;
-
+// ============================================
+// STICKER MANAGEMENT
+// ============================================
+async function loadUserStickers() {
+    if (!currentUser || !db) return;
+    
     try {
         const userRef = doc(db, 'users', currentUser.uid);
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-            const userData = userSnap.data();
-            
-            userHasPremium = (userData.paymentHistory && 
-                userData.paymentHistory.some(payment => 
-                    (payment.plan === 'lifetime' && payment.status === 'approved') ||
-                    (userData.chatPoints >= 9999)
-                ));
-            
-            if (!userHasPremium) {
-                const groupUserRef = doc(db, 'group_users', currentUser.uid);
-                const groupUserSnap = await getDoc(groupUserRef);
-                
-                if (groupUserSnap.exists()) {
-                    const groupUserData = groupUserSnap.data();
-                    userHasPremium = groupUserData.premium || groupUserData.rewardTag || false;
-                }
-            }
-        } else {
-            const groupUserRef = doc(db, 'group_users', currentUser.uid);
-            const groupUserSnap = await getDoc(groupUserRef);
-            
-            if (groupUserSnap.exists()) {
-                const groupUserData = groupUserSnap.data();
-                userHasPremium = groupUserData.premium || groupUserData.rewardTag || false;
-            }
+            userStickers = userSnap.data().stickers || [];
+            updateStickerGrid();
         }
     } catch (error) {
-        console.error('Error checking premium status:', error);
-        userHasPremium = false;
+        console.error('Error loading user stickers:', error);
     }
 }
 
-// Setup animation listener for group messages
-function setupGroupAnimationListener() {
-    if (!currentUser || !currentGroupId) {
+async function loadSavedStickers() {
+    if (!currentUser || !db) return;
+    
+    try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+            const savedStickers = userSnap.data().savedStickers || [];
+            updateSavedStickersGrid(savedStickers);
+        }
+    } catch (error) {
+        console.error('Error loading saved stickers:', error);
+    }
+}
+
+function loadStickerPacks() {
+    const packs = [
+        {
+            id: 'pack_emojis',
+            name: 'Emoji Pack',
+            stickers: [
+                { emoji: '😊', text: 'Smile' },
+                { emoji: '😂', text: 'Laugh' },
+                { emoji: '❤️', text: 'Love' },
+                { emoji: '🎉', text: 'Party' },
+                { emoji: '🔥', text: 'Fire' },
+                { emoji: '✨', text: 'Sparkles' }
+            ]
+        },
+        {
+            id: 'pack_animals',
+            name: 'Animal Pack',
+            stickers: [
+                { emoji: '🐶', text: 'Dog' },
+                { emoji: '🐱', text: 'Cat' },
+                { emoji: '🐼', text: 'Panda' },
+                { emoji: '🦊', text: 'Fox' },
+                { emoji: '🐨', text: 'Koala' },
+                { emoji: '🦁', text: 'Lion' }
+            ]
+        }
+    ];
+    
+    updatePacksGrid(packs);
+}
+
+function updateStickerGrid() {
+    const myStickersGrid = document.getElementById('myStickersGrid');
+    const noStickersMessage = document.getElementById('noStickersMessage');
+    
+    if (!myStickersGrid) return;
+    
+    const existingStickers = myStickersGrid.querySelectorAll('.sticker-item');
+    existingStickers.forEach(sticker => sticker.remove());
+    
+    if (noStickersMessage) {
+        noStickersMessage.style.display = userStickers.length > 0 ? 'none' : 'flex';
+    }
+    
+    userStickers.forEach((sticker) => {
+        const stickerItem = createStickerElement(sticker);
+        stickerItem.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            sendSticker(sticker);
+        }, true);
+        myStickersGrid.appendChild(stickerItem);
+    });
+}
+
+function updateSavedStickersGrid(savedStickers) {
+    const savedStickersGrid = document.getElementById('savedStickersGrid');
+    if (!savedStickersGrid) return;
+    
+    savedStickersGrid.innerHTML = '';
+    
+    if (savedStickers.length === 0) {
+        savedStickersGrid.innerHTML = `
+            <div class="no-stickers">
+                <i class="fas fa-heart"></i>
+                <p>No saved stickers</p>
+                <p class="hint">Stickers you receive will appear here</p>
+            </div>
+        `;
+        return;
+    }
+    
+    savedStickers.forEach(sticker => {
+        const stickerItem = createStickerElement(sticker);
+        stickerItem.classList.add('saved');
+        stickerItem.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            sendSticker(sticker);
+        }, true);
+        savedStickersGrid.appendChild(stickerItem);
+    });
+}
+
+function updatePacksGrid(packs) {
+    const packsStickersGrid = document.getElementById('packsStickersGrid');
+    if (!packsStickersGrid) return;
+    
+    packsStickersGrid.innerHTML = '';
+    
+    packs.forEach(pack => {
+        const packElement = document.createElement('div');
+        packElement.className = 'sticker-pack';
+        packElement.innerHTML = `
+            <div class="pack-header">
+                <h5>${pack.name}</h5>
+                <button class="add-pack-btn" data-pack-id="${pack.id}">
+                    <i class="fas fa-plus"></i> Add
+                </button>
+            </div>
+            <div class="pack-stickers">
+                ${pack.stickers.map(s => `
+                    <div class="pack-sticker" data-emoji="${s.emoji}" data-text="${s.text}">
+                        <span class="pack-emoji">${s.emoji}</span>
+                        <span class="pack-text">${s.text}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        packElement.querySelectorAll('.pack-sticker').forEach(el => {
+            el.addEventListener('click', () => {
+                const sticker = {
+                    id: `pack_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    name: el.dataset.text,
+                    type: 'text',
+                    emoji: el.dataset.emoji,
+                    text: el.dataset.text
+                };
+                sendSticker(sticker);
+            });
+        });
+        
+        const addBtn = packElement.querySelector('.add-pack-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', async () => {
+                await addStickerPack(pack);
+            });
+        }
+        
+        packsStickersGrid.appendChild(packElement);
+    });
+}
+
+function createStickerElement(sticker) {
+    const stickerItem = document.createElement('div');
+    stickerItem.className = 'sticker-item';
+    stickerItem.dataset.stickerId = sticker.id;
+    
+    if (sticker.type === 'image' && sticker.url) {
+        stickerItem.innerHTML = `
+            <div class="sticker-item-image-container">
+                <img src="${sticker.url}" alt="${sticker.name || 'Custom Sticker'}" class="sticker-image" loading="lazy">
+                ${sticker.text ? `<div class="sticker-text-on-item">${sticker.text}</div>` : ''}
+            </div>
+        `;
+    } else {
+        stickerItem.innerHTML = `
+            <div class="text-sticker">
+                <span class="sticker-emoji">${sticker.emoji || '😊'}</span>
+                <span class="sticker-text">${sticker.text || sticker.name || 'Sticker'}</span>
+            </div>
+        `;
+    }
+    
+    return stickerItem;
+}
+
+// ============================================
+// SEND STICKER
+// ============================================
+async function sendSticker(sticker) {
+    if (!currentUser || !currentGroupId || !db) {
+        showNotification('Cannot send sticker', 'error');
         return;
     }
 
-    cleanupAnimationListener();
-    
-    const messagesRef = collection(db, 'groups', currentGroupId, 'messages');
-    const messagesQuery = query(messagesRef, orderBy('timestamp', 'desc'), limit(50));
-    
-    animationListenerUnsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+    if (isSendingSticker) {
+        return;
+    }
+
+    isSendingSticker = true;
+
+    try {
+        // Create sticker message with ALL data
+        const messageData = {
+            senderId: currentUser.uid,
+            senderName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+            senderAvatar: currentUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.uid}`,
+            text: '[STICKER]', // Special marker that we'll replace with visual sticker
+            
+            // Store all sticker data in the message
+            stickerId: sticker.id,
+            stickerName: sticker.name,
+            stickerType: sticker.type,
+            stickerUrl: sticker.url || '',
+            stickerEmoji: sticker.emoji || '😊',
+            stickerText: sticker.text || '',
+            
+            type: 'sticker',
+            isCustom: true,
+            timestamp: serverTimestamp()
+        };
+
+        console.log('Sending sticker to Firebase:', messageData);
+
+        // Send to Firebase
+        const docRef = await addDoc(collection(db, 'groups', currentGroupId, 'messages'), messageData);
+        const firestoreId = docRef.id;
+        
+        // Store sticker data in cache with the Firestore ID
+        stickerDataCache.set(firestoreId, sticker);
+        
+        // Update group
+        await updateDoc(doc(db, 'groups', currentGroupId), {
+            lastActivity: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+
+        // Close sticker picker
+        closeStickerPicker();
+        
+        showNotification('Sticker sent!', 'success');
+        
+    } catch (error) {
+        console.error('Error sending sticker:', error);
+        showNotification('Error sending sticker', 'error');
+    } finally {
+        setTimeout(() => {
+            isSendingSticker = false;
+        }, 1000);
+    }
+}
+
+// ============================================
+// FIXED: STICKER LISTENER - Cache ALL new messages
+// ============================================
+function setupStickerListener() {
+    if (!currentUser || !currentGroupId || !db) {
+        return;
+    }
+
+    const messagesQuery = query(
+        collection(db, 'groups', currentGroupId, 'messages'),
+        orderBy('timestamp', 'desc'),
+        limit(100)
+    );
+
+    if (stickerListenerUnsubscribe) {
+        stickerListenerUnsubscribe();
+    }
+
+    stickerListenerUnsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+        let newStickers = 0;
+        
         snapshot.docChanges().forEach(change => {
             if (change.type === 'added') {
                 const message = change.doc.data();
                 const messageId = change.doc.id;
-                const messageTime = message.timestamp?.toMillis?.() || Date.now();
                 
-                if (message.senderId !== currentUser.uid &&
-                    messageTime > lastProcessedMessageTime) {
+                // If this is a sticker message
+                if (message.type === 'sticker' || message.isSticker || message.stickerId) {
                     
-                    const messageText = message.text || '';
+                    // Create sticker data from message
+                    const stickerData = {
+                        id: message.stickerId || `sticker_${Date.now()}`,
+                        name: message.stickerName || 'Sticker',
+                        type: message.stickerType || 'text',
+                        url: message.stickerUrl || '',
+                        emoji: message.stickerEmoji || '😊',
+                        text: message.stickerText || ''
+                    };
                     
-                    VISUAL_ANIMATIONS.forEach(anim => {
-                        if (messageText.includes(anim.displayName) || messageText.includes(anim.name)) {
-                            const animationId = `${message.senderId}_${anim.animation}_${messageTime}`;
-                            
-                            if (!playedAnimations.has(animationId)) {
-                                playedAnimations.add(animationId);
-                                lastProcessedMessageTime = Math.max(lastProcessedMessageTime, messageTime);
-                                savePlayedAnimations();
-                                
-                                triggerVisualAnimation(anim.animation);
-                                
-                                showVisualNotification(`${anim.displayName} from ${message.senderName || 'User'}!`, 'info');
-                            }
-                        }
-                    });
+                    // Store in cache with the message ID
+                    stickerDataCache.set(messageId, stickerData);
+                    newStickers++;
+                    console.log(`Cached new sticker ${newStickers} for message ${messageId}:`, stickerData.name);
+                    
+                    // If it's not from current user, save it
+                    if (message.senderId !== currentUser.uid) {
+                        saveReceivedSticker(message);
+                    }
+                    
+                    // Try to find and replace the message in the DOM
+                    setTimeout(() => {
+                        findAndReplaceMessageById(messageId);
+                    }, 200);
                 }
             }
         });
+        
+        if (newStickers > 0) {
+            console.log(`✅ Added ${newStickers} new stickers to cache. Total: ${stickerDataCache.size}`);
+        }
     });
 }
 
-// Trigger visual animation based on type
-function triggerVisualAnimation(animationType) {
-    const effectContainer = document.createElement('div');
-    effectContainer.className = 'visual-animation-effect-container';
-    effectContainer.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 9999;
-        overflow: hidden;
-    `;
-    document.body.appendChild(effectContainer);
-
-    switch(animationType) {
-        case 'fireStrike': createFireStrikeEffect(effectContainer); break;
-        case 'headshotEffect': createHeadshotEffect(effectContainer); break;
-        case 'swordSlash': createSwordSlashEffect(effectContainer); break;
-        case 'shieldUp': createShieldUpEffect(effectContainer); break;
-        case 'grenadeExplosion': createGrenadeExplosionEffect(effectContainer); break;
-        case 'speedBoost': createSpeedBoostEffect(effectContainer); break;
-        case 'rankUp': createRankUpEffect(effectContainer); break;
-        case 'coinRain': createCoinRainEffect(effectContainer); break;
-        case 'comboAttack': createComboAttackEffect(effectContainer); break;
-        case 'damageHit': createDamageHitEffect(effectContainer); break;
-        case 'airdropFall': createAirdropEffect(effectContainer); break;
-        case 'arrowShot': createArrowShotEffect(effectContainer); break;
-        case 'killFeed': createKillFeedEffect(effectContainer); break;
-        case 'sprintEffect': createSprintEffect(effectContainer); break;
-        case 'victoryRoyale': createVictoryRoyaleEffect(effectContainer); break;
-        default: createFireStrikeEffect(effectContainer);
-    }
-
-    // Remove container after animation duration + 1 second buffer
-    const animationData = VISUAL_ANIMATIONS.find(anim => anim.animation === animationType);
-    const duration = animationData ? animationData.duration * 1000 : 6000;
+function findAndReplaceMessageById(messageId) {
+    const messagesContainer = document.getElementById('messagesContainer');
+    if (!messagesContainer) return;
     
-    setTimeout(() => {
-        if (effectContainer.parentNode) {
-            effectContainer.style.opacity = '0';
-            effectContainer.style.transition = 'opacity 0.5s ease-out';
-            setTimeout(() => {
-                if (effectContainer.parentNode) {
-                    effectContainer.parentNode.removeChild(effectContainer);
-                }
-            }, 500);
+    const messages = messagesContainer.querySelectorAll('.message-text, .message-group, .message, [class*="message"]');
+    messages.forEach(msg => {
+        if (msg.dataset.messageId === messageId || 
+            msg.dataset.id === messageId ||
+            msg.id === messageId) {
+            checkAndReplaceWithSticker(msg);
         }
-    }, duration);
+    });
 }
 
-// PURE VISUAL ANIMATION FUNCTIONS (No icons/emojis) - LONG DURATION
-
-function createFireStrikeEffect(container) {
-    // Create multiple fire particles
-    for (let i = 0; i < 35; i++) {
-        const fireParticle = document.createElement('div');
-        fireParticle.className = 'fire-particle';
-        fireParticle.style.cssText = `
-            position: absolute;
-            width: ${Math.random() * 15 + 5}px;
-            height: ${Math.random() * 15 + 5}px;
-            background: linear-gradient(45deg, #FF6B00, #FF9500, #FFD700);
-            border-radius: 50%;
-            left: ${Math.random() * 100}%;
-            top: ${Math.random() * 100}%;
-            box-shadow: 0 0 30px #FF6B00;
-            animation: fireParticleAnim 6s ease-out forwards;
-            filter: blur(${Math.random() * 2}px);
-            opacity: 0;
-        `;
-        container.appendChild(fireParticle);
-    }
+async function saveReceivedSticker(message) {
+    if (!currentUser || !db) return;
     
-    // Create main fire effect
-    const mainFire = document.createElement('div');
-    mainFire.className = 'main-fire';
-    mainFire.style.cssText = `
-        position: absolute;
-        width: 300px;
-        height: 300px;
-        background: radial-gradient(circle, #FF6B00 0%, transparent 70%);
-        border-radius: 50%;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        animation: fireExplosion 6s ease-out forwards;
-        filter: blur(15px);
-        opacity: 0;
-    `;
-    container.appendChild(mainFire);
-    
-    // Create secondary explosions
-    for (let i = 0; i < 3; i++) {
-        setTimeout(() => {
-            const secondaryFire = document.createElement('div');
-            secondaryFire.className = 'secondary-fire';
-            secondaryFire.style.cssText = `
-                position: absolute;
-                width: ${150 + i * 50}px;
-                height: ${150 + i * 50}px;
-                background: radial-gradient(circle, #FF9500 0%, transparent 70%);
-                border-radius: 50%;
-                left: ${30 + i * 20}%;
-                top: ${40 + i * 10}%;
-                animation: fireExplosion 4s ease-out ${i * 0.5}s forwards;
-                filter: blur(10px);
-                opacity: 0;
-            `;
-            container.appendChild(secondaryFire);
-        }, i * 800);
-    }
-}
-
-function createHeadshotEffect(container) {
-    const headshot = document.createElement('div');
-    headshot.className = 'headshot-effect';
-    headshot.innerHTML = '<div class="headshot-text">HEADSHOT</div>';
-    headshot.style.cssText = `
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 10000;
-    `;
-    
-    const text = headshot.querySelector('.headshot-text');
-    text.style.cssText = `
-        font-size: 72px;
-        font-weight: bold;
-        color: #FF0000;
-        text-shadow: 0 0 40px #FF0000, 0 0 80px #FF0000;
-        animation: headshotTextAnim 5.5s ease-out forwards;
-        letter-spacing: 8px;
-        font-family: 'Arial Black', sans-serif;
-        opacity: 0;
-    `;
-    
-    container.appendChild(headshot);
-    
-    // Create blood splatter effect
-    for (let i = 0; i < 25; i++) {
-        setTimeout(() => {
-            const bloodDrop = document.createElement('div');
-            bloodDrop.className = 'blood-drop';
-            bloodDrop.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 20 + 10}px;
-                height: ${Math.random() * 20 + 10}px;
-                background: radial-gradient(circle, #FF0000 0%, #8B0000 100%);
-                border-radius: 50% 50% 50% 0;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%) rotate(${Math.random() * 360}deg);
-                animation: bloodSplatterAnim 4s ease-out ${i * 0.1}s forwards;
-                filter: blur(${Math.random() * 3}px);
-                opacity: 0;
-            `;
-            container.appendChild(bloodDrop);
-        }, i * 150);
-    }
-    
-    // Create crack effect
-    for (let i = 0; i < 12; i++) {
-        setTimeout(() => {
-            const crack = document.createElement('div');
-            crack.className = 'headshot-crack';
-            crack.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 80 + 40}px;
-                height: ${Math.random() * 3 + 2}px;
-                background: linear-gradient(90deg, #8B0000, #FF0000, #8B0000);
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%) rotate(${i * 30}deg);
-                animation: crackAnim 3s ease-out ${i * 0.2}s forwards;
-                border-radius: 2px;
-                filter: blur(1px);
-                opacity: 0;
-            `;
-            container.appendChild(crack);
-        }, i * 200);
-    }
-}
-
-function createSwordSlashEffect(container) {
-    // Create multiple slash effects
-    for (let i = 0; i < 8; i++) {
-        setTimeout(() => {
-            const slash = document.createElement('div');
-            slash.className = 'sword-slash';
-            slash.style.cssText = `
-                position: absolute;
-                width: ${150 + i * 30}px;
-                height: 5px;
-                background: linear-gradient(90deg, transparent, #00FF00, #00FF00, transparent);
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                transform: rotate(${Math.random() * 360}deg);
-                animation: swordSlashAnim 3s ease-out forwards;
-                box-shadow: 0 0 30px #00FF00, 0 0 60px #00FF00;
-                filter: blur(2px);
-                opacity: 0;
-            `;
-            container.appendChild(slash);
-        }, i * 400);
-    }
-    
-    // Create impact effects
-    for (let i = 0; i < 3; i++) {
-        setTimeout(() => {
-            const impact = document.createElement('div');
-            impact.className = 'slash-impact';
-            impact.style.cssText = `
-                position: absolute;
-                width: ${100 + i * 50}px;
-                height: ${100 + i * 50}px;
-                background: radial-gradient(circle, #00FF00 0%, transparent 70%);
-                border-radius: 50%;
-                left: ${30 + i * 20}%;
-                top: ${40 + i * 15}%;
-                transform: translate(-50%, -50%);
-                animation: slashImpactAnim 4s ease-out ${i * 0.3}s forwards;
-                filter: blur(20px);
-                opacity: 0;
-            `;
-            container.appendChild(impact);
-        }, i * 1000);
-    }
-    
-    // Create spark particles
-    for (let i = 0; i < 40; i++) {
-        setTimeout(() => {
-            const spark = document.createElement('div');
-            spark.className = 'sword-spark';
-            spark.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 6 + 3}px;
-                height: ${Math.random() * 6 + 3}px;
-                background: radial-gradient(circle, #00FF00, #FFFFFF);
-                border-radius: 50%;
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                animation: sparkAnim 3s ease-out forwards;
-                box-shadow: 0 0 15px #00FF00;
-                filter: blur(1px);
-                opacity: 0;
-            `;
-            container.appendChild(spark);
-        }, i * 75);
-    }
-}
-
-function createShieldUpEffect(container) {
-    // Create shield circles
-    for (let i = 5; i > 0; i--) {
-        const shieldRing = document.createElement('div');
-        shieldRing.className = 'shield-ring';
-        shieldRing.style.cssText = `
-            position: absolute;
-            width: ${200 + i * 80}px;
-            height: ${200 + i * 80}px;
-            border: ${8 + i * 3}px solid rgba(0, 255, 255, ${0.4 - i * 0.05});
-            border-radius: 50%;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            animation: shieldRingAnim 6s ease-out ${i * 0.3}s forwards;
-            box-shadow: 0 0 50px rgba(0, 255, 255, 0.7);
-            filter: blur(${i * 2}px);
-            opacity: 0;
-        `;
-        container.appendChild(shieldRing);
-    }
-    
-    // Create shield energy effect
-    const shieldEnergy = document.createElement('div');
-    shieldEnergy.className = 'shield-energy';
-    shieldEnergy.style.cssText = `
-        position: absolute;
-        width: 350px;
-        height: 350px;
-        background: radial-gradient(circle, rgba(0, 255, 255, 0.4) 0%, transparent 70%);
-        border-radius: 50%;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        animation: shieldEnergyAnim 6s ease-in-out infinite;
-        filter: blur(30px);
-        opacity: 0.7;
-    `;
-    container.appendChild(shieldEnergy);
-    
-    // Create shield hexagons
-    for (let i = 0; i < 12; i++) {
-        setTimeout(() => {
-            const hexagon = document.createElement('div');
-            hexagon.className = 'shield-hexagon';
-            hexagon.style.cssText = `
-                position: absolute;
-                width: 40px;
-                height: 40px;
-                background: rgba(0, 255, 255, 0.3);
-                clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                animation: hexagonFloat 4s ease-in-out ${i * 0.2}s infinite;
-                box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
-                opacity: 0.6;
-            `;
-            container.appendChild(hexagon);
-        }, i * 200);
-    }
-}
-
-function createGrenadeExplosionEffect(container) {
-    // Create multiple explosions
-    for (let exp = 0; exp < 3; exp++) {
-        setTimeout(() => {
-            // Create explosion core
-            const explosionCore = document.createElement('div');
-            explosionCore.className = 'explosion-core';
-            explosionCore.style.cssText = `
-                position: absolute;
-                width: 0;
-                height: 0;
-                background: radial-gradient(circle, #FF4500, #FF0000);
-                border-radius: 50%;
-                left: ${30 + exp * 20}%;
-                top: ${40 + exp * 10}%;
-                transform: translate(-50%, -50%);
-                animation: explosionCoreAnim 3s ease-out forwards;
-                box-shadow: 0 0 80px #FF4500;
-                filter: blur(8px);
-                opacity: 0;
-            `;
-            container.appendChild(explosionCore);
-            
-            // Create shockwaves
-            for (let i = 0; i < 3; i++) {
-                setTimeout(() => {
-                    const shockwave = document.createElement('div');
-                    shockwave.className = 'shockwave';
-                    shockwave.style.cssText = `
-                        position: absolute;
-                        width: 0;
-                        height: 0;
-                        border: ${3 + i}px solid rgba(255, 69, 0, ${0.6 - i * 0.2});
-                        border-radius: 50%;
-                        left: ${30 + exp * 20}%;
-                        top: ${40 + exp * 10}%;
-                        transform: translate(-50%, -50%);
-                        animation: shockwaveAnim 4s ease-out ${i * 0.3}s forwards;
-                        filter: blur(${i}px);
-                        opacity: 0;
-                    `;
-                    container.appendChild(shockwave);
-                }, i * 300);
-            }
-            
-            // Create debris particles
-            for (let i = 0; i < 30; i++) {
-                setTimeout(() => {
-                    const debris = document.createElement('div');
-                    debris.className = 'debris-particle';
-                    debris.style.cssText = `
-                        position: absolute;
-                        width: ${Math.random() * 15 + 8}px;
-                        height: ${Math.random() * 15 + 8}px;
-                        background: linear-gradient(45deg, #FF4500, #FFA500, #FFD700);
-                        left: ${30 + exp * 20}%;
-                        top: ${40 + exp * 10}%;
-                        border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
-                        animation: debrisAnim 5s ease-out forwards;
-                        filter: blur(${Math.random() * 2}px);
-                        opacity: 0;
-                    `;
-                    container.appendChild(debris);
-                }, i * 100);
-            }
-        }, exp * 1500);
-    }
-    
-    // Screen shake effect
-    container.style.animation = 'screenShake 5s ease-out';
-}
-
-function createSpeedBoostEffect(container) {
-    // Create speed lines continuously
-    let lineCount = 0;
-    const lineInterval = setInterval(() => {
-        if (lineCount < 50) {
-            const speedLine = document.createElement('div');
-            speedLine.className = 'speed-line';
-            speedLine.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 150 + 80}px;
-                height: 3px;
-                background: linear-gradient(90deg, transparent, #FFFF00, #FFFF00, transparent);
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                transform: rotate(${Math.random() * 360}deg);
-                animation: speedLineAnim 2s linear forwards;
-                box-shadow: 0 0 25px #FFFF00;
-                filter: blur(1px);
-                opacity: 0;
-            `;
-            container.appendChild(speedLine);
-            lineCount++;
-        } else {
-            clearInterval(lineInterval);
-        }
-    }, 80);
-    
-    // Create motion trails
-    for (let i = 0; i < 20; i++) {
-        setTimeout(() => {
-            const trail = document.createElement('div');
-            trail.className = 'speed-trail';
-            trail.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 200 + 100}px;
-                height: 8px;
-                background: linear-gradient(90deg, rgba(255, 255, 0, 0.8), transparent);
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                transform: rotate(${Math.random() * 30 - 15}deg);
-                animation: speedTrailAnim 3s ease-out forwards;
-                filter: blur(3px);
-                opacity: 0;
-            `;
-            container.appendChild(trail);
-        }, i * 200);
-    }
-    
-    // Create afterimages
-    for (let i = 0; i < 5; i++) {
-        setTimeout(() => {
-            const afterimage = document.createElement('div');
-            afterimage.className = 'afterimage';
-            afterimage.style.cssText = `
-                position: absolute;
-                width: 100px;
-                height: 100px;
-                background: radial-gradient(ellipse at center, rgba(255, 255, 0, 0.2), transparent 70%);
-                left: ${20 + i * 15}%;
-                top: ${30 + i * 10}%;
-                animation: afterimageAnim 2s ease-out ${i * 0.2}s forwards;
-                filter: blur(10px);
-                opacity: 0;
-            `;
-            container.appendChild(afterimage);
-        }, i * 600);
-    }
-}
-
-function createRankUpEffect(container) {
-    // Create rank stars
-    for (let i = 0; i < 15; i++) {
-        const star = document.createElement('div');
-        star.className = 'rank-star';
-        star.style.cssText = `
-            position: absolute;
-            width: ${Math.random() * 40 + 20}px;
-            height: ${Math.random() * 40 + 20}px;
-            background: linear-gradient(45deg, #FFD700, #FFA500, #FFD700);
-            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-            left: ${Math.random() * 100}%;
-            top: ${Math.random() * 100}%;
-            animation: rankStarAnim 4s ease-out ${i * 0.2}s forwards;
-            box-shadow: 0 0 30px #FFD700, 0 0 60px #FFD700;
-            opacity: 0;
-            filter: drop-shadow(0 0 10px #FFD700);
-        `;
-        container.appendChild(star);
-    }
-    
-    // Create rank text with multiple stages
-    const rankText = document.createElement('div');
-    rankText.className = 'rank-text';
-    rankText.innerHTML = '<div class="rank-text-content">RANK UP!</div>';
-    rankText.style.cssText = `
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 10000;
-    `;
-    
-    const textContent = rankText.querySelector('.rank-text-content');
-    textContent.style.cssText = `
-        font-size: 82px;
-        font-weight: bold;
-        color: #FFD700;
-        text-shadow: 0 0 40px #FFD700, 0 0 80px #FF6B00, 0 0 120px #FF4500;
-        animation: rankTextAnim 6.5s ease-out forwards;
-        letter-spacing: 8px;
-        font-family: 'Arial Black', sans-serif;
-        text-align: center;
-        opacity: 0;
-    `;
-    
-    container.appendChild(rankText);
-    
-    // Create level up particles
-    for (let i = 0; i < 40; i++) {
-        setTimeout(() => {
-            const levelParticle = document.createElement('div');
-            levelParticle.className = 'level-particle';
-            levelParticle.textContent = '↑';
-            levelParticle.style.cssText = `
-                position: absolute;
-                font-size: ${Math.random() * 24 + 16}px;
-                color: #FFD700;
-                font-weight: bold;
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                animation: levelParticleAnim 4s ease-out ${i * 0.1}s forwards;
-                text-shadow: 0 0 20px #FFD700;
-                opacity: 0;
-            `;
-            container.appendChild(levelParticle);
-        }, i * 100);
-    }
-    
-    // Create rank circles
-    for (let i = 0; i < 8; i++) {
-        const rankCircle = document.createElement('div');
-        rankCircle.className = 'rank-circle';
-        rankCircle.style.cssText = `
-            position: absolute;
-            width: ${100 + i * 50}px;
-            height: ${100 + i * 50}px;
-            border: ${3 + i}px solid rgba(255, 215, 0, ${0.3 - i * 0.03});
-            border-radius: 50%;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            animation: rankCircleAnim 5s ease-out ${i * 0.4}s forwards;
-            filter: blur(${i}px);
-            opacity: 0;
-        `;
-        container.appendChild(rankCircle);
-    }
-}
-
-function createCoinRainEffect(container) {
-    // Create coins continuously for longer duration
-    let coinCount = 0;
-    const coinInterval = setInterval(() => {
-        if (coinCount < 100) {
-            const coin = document.createElement('div');
-            coin.className = 'coin';
-            coin.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 35 + 15}px;
-                height: ${Math.random() * 35 + 15}px;
-                background: radial-gradient(circle at 30% 30%, #FFD700 40%, #FFA500 100%);
-                border-radius: 50%;
-                left: ${Math.random() * 100}%;
-                top: -50px;
-                animation: coinRainAnim ${Math.random() * 3 + 3}s ease-in forwards;
-                box-shadow: 0 0 25px #FFD700;
-                transform-style: preserve-3d;
-                opacity: 0;
-            `;
-            
-            // Add shine effect
-            const shine = document.createElement('div');
-            shine.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 12 + 6}px;
-                height: ${Math.random() * 12 + 6}px;
-                background: radial-gradient(circle, white, transparent 70%);
-                border-radius: 50%;
-                top: ${Math.random() * 10 + 5}px;
-                left: ${Math.random() * 10 + 5}px;
-                filter: blur(2px);
-                opacity: ${Math.random() * 0.5 + 0.3};
-            `;
-            coin.appendChild(shine);
-            
-            container.appendChild(coin);
-            coinCount++;
-        } else {
-            clearInterval(coinInterval);
-        }
-    }, 50);
-    
-    // Create coin glow effects on ground
-    for (let i = 0; i < 20; i++) {
-        setTimeout(() => {
-            const coinGlow = document.createElement('div');
-            coinGlow.className = 'coin-glow';
-            coinGlow.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 60 + 30}px;
-                height: ${Math.random() * 60 + 30}px;
-                background: radial-gradient(circle, rgba(255, 215, 0, 0.3), transparent 70%);
-                border-radius: 50%;
-                left: ${Math.random() * 100}%;
-                top: 85%;
-                animation: coinGlowAnim 4s ease-out ${i * 0.2}s infinite;
-                filter: blur(15px);
-                opacity: 0.6;
-            `;
-            container.appendChild(coinGlow);
-        }, i * 200);
-    }
-    
-    // Create coin pile effect
-    setTimeout(() => {
-        const coinPile = document.createElement('div');
-        coinPile.className = 'coin-pile';
-        coinPile.style.cssText = `
-            position: absolute;
-            width: 200px;
-            height: 100px;
-            background: radial-gradient(ellipse at center, 
-                rgba(255, 215, 0, 0.4) 0%,
-                rgba(255, 215, 0, 0.2) 30%,
-                transparent 70%);
-            left: 50%;
-            top: 85%;
-            transform: translateX(-50%);
-            animation: coinPileAnim 4s ease-out forwards;
-            filter: blur(20px);
-            opacity: 0;
-        `;
-        container.appendChild(coinPile);
-    }, 3000);
-}
-
-function createComboAttackEffect(container) {
-    // Create multiple combo stages
-    for (let stage = 1; stage <= 5; stage++) {
-        setTimeout(() => {
-            // Combo number for this stage
-            const comboNumber = document.createElement('div');
-            comboNumber.className = 'combo-number';
-            comboNumber.textContent = `COMBO x${stage}`;
-            comboNumber.style.cssText = `
-                position: absolute;
-                font-size: ${96 - stage * 12}px;
-                font-weight: bold;
-                color: #FF00FF;
-                text-shadow: 0 0 30px #FF00FF, 0 0 60px #FF00FF, 0 0 90px #FF00FF;
-                left: 50%;
-                top: ${20 + stage * 12}%;
-                transform: translateX(-50%);
-                animation: comboNumberAnim 3s ease-out forwards;
-                font-family: 'Arial Black', sans-serif;
-                letter-spacing: 4px;
-                opacity: 0;
-                z-index: 10000;
-            `;
-            container.appendChild(comboNumber);
-            
-            // Combo energy pulses for this stage
-            for (let i = 0; i < 3; i++) {
-                const pulse = document.createElement('div');
-                pulse.className = 'combo-pulse';
-                pulse.style.cssText = `
-                    position: absolute;
-                    width: 0;
-                    height: 0;
-                    border: ${4 + i}px solid rgba(255, 0, 255, ${0.4 - i * 0.1});
-                    border-radius: 50%;
-                    left: 50%;
-                    top: ${20 + stage * 12}%;
-                    transform: translate(-50%, -50%);
-                    animation: comboPulseAnim 2.5s ease-out ${i * 0.3}s forwards;
-                    filter: blur(${i}px);
-                    opacity: 0;
-                `;
-                container.appendChild(pulse);
-            }
-            
-            // Combo hit markers
-            for (let i = 0; i < 8; i++) {
-                setTimeout(() => {
-                    const hitMarker = document.createElement('div');
-                    hitMarker.className = 'hit-marker';
-                    hitMarker.style.cssText = `
-                        position: absolute;
-                        width: ${Math.random() * 60 + 30}px;
-                        height: ${Math.random() * 60 + 30}px;
-                        background: radial-gradient(circle, rgba(255, 0, 255, 0.3), transparent 70%);
-                        border-radius: 50%;
-                        left: ${Math.random() * 100}%;
-                        top: ${Math.random() * 100}%;
-                        animation: hitMarkerAnim 2s ease-out forwards;
-                        filter: blur(10px);
-                        opacity: 0;
-                    `;
-                    container.appendChild(hitMarker);
-                }, i * 150);
-            }
-        }, stage * 1000);
-    }
-    
-    // Create combo streak effect
-    const comboStreak = document.createElement('div');
-    comboStreak.className = 'combo-streak';
-    comboStreak.style.cssText = `
-        position: absolute;
-        width: 100%;
-        height: 4px;
-        background: linear-gradient(90deg, transparent, #FF00FF, #FF00FF, transparent);
-        top: 50%;
-        animation: comboStreakAnim 5s linear infinite;
-        filter: blur(2px);
-        opacity: 0.7;
-    `;
-    container.appendChild(comboStreak);
-}
-
-function createDamageHitEffect(container) {
-    // Create multiple damage impacts
-    for (let hit = 0; hit < 4; hit++) {
-        setTimeout(() => {
-            // Damage impact
-            const damageImpact = document.createElement('div');
-            damageImpact.className = 'damage-impact';
-            damageImpact.style.cssText = `
-                position: absolute;
-                width: ${200 + hit * 50}px;
-                height: ${200 + hit * 50}px;
-                background: radial-gradient(circle, #FF1493 0%, transparent 70%);
-                border-radius: 50%;
-                left: ${30 + hit * 15}%;
-                top: ${40 + hit * 10}%;
-                transform: translate(-50%, -50%);
-                animation: damageImpactAnim 3s ease-out forwards;
-                filter: blur(25px);
-                opacity: 0;
-            `;
-            container.appendChild(damageImpact);
-            
-            // Crack effects
-            for (let i = 0; i < 12; i++) {
-                const crack = document.createElement('div');
-                crack.className = 'damage-crack';
-                crack.style.cssText = `
-                    position: absolute;
-                    width: ${Math.random() * 100 + 50}px;
-                    height: ${Math.random() * 4 + 3}px;
-                    background: linear-gradient(90deg, #FF1493, #8B008B, #FF1493);
-                    left: ${30 + hit * 15}%;
-                    top: ${40 + hit * 10}%;
-                    transform: translate(-50%, -50%) rotate(${i * 30}deg);
-                    animation: damageCrackAnim 2.5s ease-out ${i * 0.15}s forwards;
-                    border-radius: 2px;
-                    filter: blur(2px);
-                    opacity: 0;
-                `;
-                container.appendChild(crack);
-            }
-            
-            // Damage particles
-            for (let i = 0; i < 25; i++) {
-                setTimeout(() => {
-                    const particle = document.createElement('div');
-                    particle.className = 'damage-particle';
-                    particle.style.cssText = `
-                        position: absolute;
-                        width: ${Math.random() * 10 + 5}px;
-                        height: ${Math.random() * 10 + 5}px;
-                        background: radial-gradient(circle, #FF1493, #8B008B);
-                        border-radius: 50%;
-                        left: ${30 + hit * 15}%;
-                        top: ${40 + hit * 10}%;
-                        animation: damageParticleAnim 3s ease-out forwards;
-                        box-shadow: 0 0 15px #FF1493;
-                        filter: blur(${Math.random() * 2}px);
-                        opacity: 0;
-                    `;
-                    container.appendChild(particle);
-                }, i * 80);
-            }
-        }, hit * 1200);
-    }
-    
-    // Screen shake effect for longer duration
-    container.style.animation = 'screenShake 4s ease-out';
-}
-
-// IMPROVED AIRDROP ANIMATION WITH LONGER DURATION
-function createAirdropEffect(container) {
-    // Create helicopter
-    const helicopter = document.createElement('div');
-    helicopter.className = 'helicopter';
-    helicopter.style.cssText = `
-        position: absolute;
-        width: 150px;
-        height: 50px;
-        background: linear-gradient(45deg, #2C3E50, #34495E);
-        border-radius: 12px;
-        top: -150px;
-        left: -200px;
-        animation: helicopterFlyIn 7s ease-in-out forwards;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.6);
-        z-index: 10000;
-        opacity: 0;
-    `;
-    
-    // Helicopter cockpit
-    const cockpit = document.createElement('div');
-    cockpit.style.cssText = `
-        position: absolute;
-        width: 50px;
-        height: 30px;
-        background: linear-gradient(45deg, #3498DB, #2980B9);
-        border-radius: 10px;
-        top: -18px;
-        left: 50px;
-        box-shadow: inset 0 0 15px rgba(255,255,255,0.3);
-    `;
-    helicopter.appendChild(cockpit);
-    
-    // Helicopter tail
-    const tail = document.createElement('div');
-    tail.style.cssText = `
-        position: absolute;
-        width: 80px;
-        height: 20px;
-        background: linear-gradient(45deg, #2C3E50, #34495E);
-        border-radius: 6px;
-        top: 15px;
-        right: -70px;
-    `;
-    helicopter.appendChild(tail);
-    
-    // Helicopter rotor (main)
-    const mainRotor = document.createElement('div');
-    mainRotor.className = 'main-rotor';
-    mainRotor.style.cssText = `
-        position: absolute;
-        width: 240px;
-        height: 10px;
-        background: linear-gradient(90deg, transparent, #7F8C8D, #7F8C8D, transparent);
-        top: -35px;
-        left: -50px;
-        border-radius: 5px;
-        animation: rotorSpin 0.15s linear infinite;
-    `;
-    helicopter.appendChild(mainRotor);
-    
-    // Helicopter rotor (tail)
-    const tailRotor = document.createElement('div');
-    tailRotor.className = 'tail-rotor';
-    tailRotor.style.cssText = `
-        position: absolute;
-        width: 60px;
-        height: 6px;
-        background: linear-gradient(90deg, transparent, #7F8C8D, transparent);
-        top: 8px;
-        right: -85px;
-        border-radius: 3px;
-        animation: tailRotorSpin 0.08s linear infinite;
-    `;
-    helicopter.appendChild(tailRotor);
-    
-    container.appendChild(helicopter);
-    
-    // Create airdrop crate
-    setTimeout(() => {
-        const airdropCrate = document.createElement('div');
-        airdropCrate.className = 'airdrop-crate';
-        airdropCrate.style.cssText = `
-            position: absolute;
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(45deg, #E74C3C, #C0392B);
-            border: 6px solid #F1C40F;
-            top: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            animation: crateRelease 7s ease-in-out forwards;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-            z-index: 9999;
-            opacity: 0;
-        `;
+    try {
+        if (message.isCustom !== true) return;
         
-        // Create crate straps
-        for (let i = 0; i < 2; i++) {
-            const strap = document.createElement('div');
-            strap.style.cssText = `
-                position: absolute;
-                width: ${i === 0 ? '100%' : '6px'};
-                height: ${i === 0 ? '6px' : '100%'};
-                background: #F1C40F;
-                ${i === 0 ? 'top: 50%; left: 0; transform: translateY(-50%);' : 'left: 50%; top: 0; transform: translateX(-50%);'}
-                box-shadow: 0 0 10px #F1C40F;
-            `;
-            airdropCrate.appendChild(strap);
-        }
-        
-        // Create crate corners
-        for (let i = 0; i < 4; i++) {
-            const corner = document.createElement('div');
-            corner.style.cssText = `
-                position: absolute;
-                width: 15px;
-                height: 15px;
-                background: #F1C40F;
-                ${i === 0 ? 'top: 0; left: 0;' : 
-                  i === 1 ? 'top: 0; right: 0;' : 
-                  i === 2 ? 'bottom: 0; left: 0;' : 
-                  'bottom: 0; right: 0;'}
-                border-radius: 3px;
-            `;
-            airdropCrate.appendChild(corner);
-        }
-        
-        container.appendChild(airdropCrate);
-        
-        // Create parachute
-        const parachute = document.createElement('div');
-        parachute.className = 'parachute';
-        parachute.style.cssText = `
-            position: absolute;
-            width: 140px;
-            height: 70px;
-            background: linear-gradient(45deg, #1ABC9C, #16A085, #1ABC9C);
-            border-radius: 70px 70px 0 0;
-            top: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            animation: parachuteFloat 7s ease-in-out forwards;
-            opacity: 0;
-            z-index: 9998;
-            box-shadow: 0 8px 25px rgba(26, 188, 156, 0.4);
-        `;
-        
-        // Parachute lines
-        for (let i = 0; i < 6; i++) {
-            const line = document.createElement('div');
-            line.style.cssText = `
-                position: absolute;
-                width: 3px;
-                height: 60px;
-                background: linear-gradient(to bottom, #F1C40F, #D4AC0D);
-                left: ${14 + (i * 14.4)}%;
-                top: 70px;
-                animation: lineSwing 2s ease-in-out infinite;
-                animation-delay: ${i * 0.2}s;
-            `;
-            parachute.appendChild(line);
-        }
-        
-        container.appendChild(parachute);
-        
-        // Create landing effects
-        setTimeout(() => {
-            // Landing dust
-            const landingEffect = document.createElement('div');
-            landingEffect.className = 'airdrop-landing';
-            landingEffect.style.cssText = `
-                position: absolute;
-                width: 200px;
-                height: 80px;
-                background: radial-gradient(ellipse at center, 
-                    rgba(149, 165, 166, 0.5) 0%, 
-                    rgba(149, 165, 166, 0.3) 30%, 
-                    transparent 70%);
-                left: 50%;
-                top: 85%;
-                transform: translateX(-50%);
-                animation: landingDust 3s ease-out forwards;
-                filter: blur(12px);
-                z-index: 9997;
-                opacity: 0;
-            `;
-            container.appendChild(landingEffect);
-            
-            // Supply glow effect
-            const supplyGlow = document.createElement('div');
-            supplyGlow.className = 'supply-glow';
-            supplyGlow.style.cssText = `
-                position: absolute;
-                width: 150px;
-                height: 150px;
-                background: radial-gradient(circle, 
-                    rgba(241, 196, 15, 0.4) 0%, 
-                    rgba(241, 196, 15, 0.2) 50%, 
-                    transparent 70%);
-                left: 50%;
-                top: 85%;
-                transform: translate(-50%, -50%);
-                animation: supplyGlowPulse 3s ease-in-out infinite;
-                filter: blur(20px);
-                z-index: 9996;
-                opacity: 0;
-            `;
-            container.appendChild(supplyGlow);
-            
-            // Create loot particles burst
-            for (let burst = 0; burst < 3; burst++) {
-                setTimeout(() => {
-                    for (let i = 0; i < 15; i++) {
-                        const lootParticle = document.createElement('div');
-                        lootParticle.className = 'loot-particle';
-                        lootParticle.style.cssText = `
-                            position: absolute;
-                            width: ${Math.random() * 20 + 10}px;
-                            height: ${Math.random() * 20 + 10}px;
-                            background: ${burst === 0 ? 'linear-gradient(45deg, #3498DB, #2980B9)' : 
-                                         burst === 1 ? 'linear-gradient(45deg, #9B59B6, #8E44AD)' : 
-                                         'linear-gradient(45deg, #2ECC71, #27AE60)'};
-                            border-radius: ${Math.random() > 0.5 ? '50%' : '6px'};
-                            left: 50%;
-                            top: 85%;
-                            transform: translate(-50%, -50%);
-                            animation: lootBurst 2.5s ease-out forwards;
-                            box-shadow: 0 0 25px ${burst === 0 ? '#3498DB' : burst === 1 ? '#9B59B6' : '#2ECC71'};
-                            filter: blur(${Math.random() * 2}px);
-                            opacity: 0;
-                        `;
-                        container.appendChild(lootParticle);
-                    }
-                }, burst * 800);
-            }
-            
-            // Create loot glow around crate
-            const lootRadiance = document.createElement('div');
-            lootRadiance.className = 'loot-radiance';
-            lootRadiance.style.cssText = `
-                position: absolute;
-                width: 120px;
-                height: 120px;
-                background: 
-                    radial-gradient(circle at 30% 30%, rgba(52, 152, 219, 0.3) 0%, transparent 50%),
-                    radial-gradient(circle at 70% 70%, rgba(155, 89, 182, 0.3) 0%, transparent 50%),
-                    radial-gradient(circle at 30% 70%, rgba(46, 204, 113, 0.3) 0%, transparent 50%),
-                    radial-gradient(circle at 70% 30%, rgba(241, 196, 15, 0.3) 0%, transparent 50%);
-                left: 50%;
-                top: 85%;
-                transform: translate(-50%, -50%);
-                animation: lootRadianceAnim 4s ease-in-out infinite;
-                filter: blur(15px);
-                z-index: 9995;
-                opacity: 0.8;
-            `;
-            container.appendChild(lootRadiance);
-            
-        }, 5000); // Landing effects start at 5 seconds
-    }, 1500); // Crate release starts at 1.5 seconds
+        const stickerData = {
+            id: message.stickerId,
+            name: message.stickerName,
+            type: message.stickerType,
+            text: message.stickerText || '',
+            emoji: message.stickerEmoji || '',
+            url: message.stickerUrl || '',
+            savedAt: Date.now(),
+            savedFrom: message.senderId
+        };
+
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, {
+            savedStickers: arrayUnion(stickerData)
+        });
+
+        showNotification(`Saved "${message.stickerName}" sticker`, 'info');
+    } catch (error) {
+        console.error('Error saving received sticker:', error);
+    }
 }
 
-function createArrowShotEffect(container) {
-    // Create arrow volleys
-    for (let volley = 0; volley < 3; volley++) {
-        setTimeout(() => {
-            for (let i = 0; i < 5; i++) {
-                setTimeout(() => {
-                    const arrow = document.createElement('div');
-                    arrow.className = 'arrow';
-                    arrow.style.cssText = `
-                        position: absolute;
-                        width: ${100 + volley * 20}px;
-                        height: 5px;
-                        background: linear-gradient(90deg, #8B4513, #D2691E, #8B4513);
-                        left: -150px;
-                        top: ${20 + volley * 20 + i * 15}%;
-                        animation: arrowShotAnim 2.5s ease-out forwards;
-                        transform: rotate(${Math.random() * 10 - 5}deg);
-                        filter: blur(1px);
-                        opacity: 0;
-                    `;
-                    
-                    // Arrow head
-                    const arrowHead = document.createElement('div');
-                    arrowHead.style.cssText = `
-                        position: absolute;
-                        width: 0;
-                        height: 0;
-                        border-left: 15px solid #D2691E;
-                        border-top: 8px solid transparent;
-                        border-bottom: 8px solid transparent;
-                        right: -15px;
-                        top: -5px;
-                    `;
-                    arrow.appendChild(arrowHead);
-                    
-                    // Arrow feathers
-                    const feathers = document.createElement('div');
-                    feathers.style.cssText = `
-                        position: absolute;
-                        width: 20px;
-                        height: 12px;
-                        background: linear-gradient(90deg, #8B4513, #A0522D);
-                        left: -20px;
-                        top: -4px;
-                        clip-path: polygon(100% 0, 0 50%, 100% 100%);
-                    `;
-                    arrow.appendChild(feathers);
-                    
-                    // Arrow glow
-                    const arrowGlow = document.createElement('div');
-                    arrowGlow.style.cssText = `
-                        position: absolute;
-                        width: 100%;
-                        height: 100%;
-                        background: linear-gradient(90deg, transparent, rgba(210, 105, 30, 0.3), transparent);
-                        filter: blur(3px);
-                    `;
-                    arrow.appendChild(arrowGlow);
-                    
-                    container.appendChild(arrow);
-                }, i * 200);
-            }
+async function addStickerPack(pack) {
+    if (!currentUser || !db) return;
+    
+    const stickers = pack.stickers.map(s => ({
+        id: `pack_${pack.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: s.text,
+        type: 'text',
+        emoji: s.emoji,
+        text: s.text,
+        packId: pack.id,
+        createdAt: Date.now()
+    }));
+    
+    const userRef = doc(db, 'users', currentUser.uid);
+    await updateDoc(userRef, {
+        stickers: arrayUnion(...stickers)
+    });
+    
+    showNotification(`Added ${pack.name} to your stickers!`, 'success');
+    loadUserStickers();
+}
+
+// ============================================
+// STICKER CREATOR
+// ============================================
+function openStickerCreator() {
+    closeStickerPicker();
+    
+    stickerCreator = {
+        currentStep: 1,
+        type: '',
+        selectedImage: null,
+        selectedEmoji: '😊',
+        imageFile: null,
+        name: '',
+        text: ''
+    };
+
+    const modal = document.createElement('div');
+    modal.id = 'stickerCreatorModal';
+    modal.className = 'sticker-creator-modal';
+    modal.innerHTML = `
+        <div class="sticker-creator-content">
+            <div class="sticker-creator-header">
+                <h3><i class="fas fa-plus-circle"></i> Create New Sticker</h3>
+                <button class="close-creator">&times;</button>
+            </div>
             
-            // Create target hit effects for this volley
-            setTimeout(() => {
-                for (let i = 0; i < 3; i++) {
-                    const targetHit = document.createElement('div');
-                    targetHit.className = 'target-hit';
-                    targetHit.style.cssText = `
-                        position: absolute;
-                        width: ${120 + i * 40}px;
-                        height: ${120 + i * 40}px;
-                        border: ${6 + i}px solid rgba(139, 0, 0, ${0.6 - i * 0.2});
-                        border-radius: 50%;
-                        left: 90%;
-                        top: ${30 + volley * 20}%;
-                        transform: translate(-50%, -50%);
-                        animation: targetHitAnim 3s ease-out ${i * 0.3}s forwards;
-                        box-shadow: 0 0 40px rgba(255, 0, 0, 0.6);
-                        filter: blur(${i}px);
-                        opacity: 0;
-                    `;
-                    container.appendChild(targetHit);
-                }
+            <div class="sticker-creator-body">
+                <div class="creator-step active" id="step1">
+                    <h4>Choose Sticker Type</h4>
+                    <div class="type-options">
+                        <div class="type-option" data-type="image">
+                            <div class="type-icon"><i class="fas fa-image"></i></div>
+                            <div class="type-info">
+                                <h5>Photo Sticker</h5>
+                                <p>Upload a photo and add text</p>
+                            </div>
+                        </div>
+                        <div class="type-option" data-type="text">
+                            <div class="type-icon"><i class="fas fa-font"></i></div>
+                            <div class="type-info">
+                                <h5>Text Sticker</h5>
+                                <p>Create with emoji and text</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
-                // Create impact particles
-                for (let i = 0; i < 20; i++) {
-                    setTimeout(() => {
-                        const impactParticle = document.createElement('div');
-                        impactParticle.className = 'impact-particle';
-                        impactParticle.style.cssText = `
-                            position: absolute;
-                            width: ${Math.random() * 10 + 5}px;
-                            height: ${Math.random() * 10 + 5}px;
-                            background: radial-gradient(circle, #8B0000, #FF0000);
-                            border-radius: 50%;
-                            left: 90%;
-                            top: ${30 + volley * 20}%;
-                            animation: impactParticleAnim 2.5s ease-out forwards;
-                            box-shadow: 0 0 20px #FF0000;
-                            filter: blur(${Math.random()}px);
-                            opacity: 0;
-                        `;
-                        container.appendChild(impactParticle);
-                    }, i * 100);
-                }
-            }, 1500);
-        }, volley * 2000);
-    }
+                <div class="creator-step" id="step2">
+                    <h4>Upload Photo</h4>
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Click to upload or drag & drop</p>
+                        <p class="upload-hint">Max size: 5MB • PNG, JPG, GIF</p>
+                        <input type="file" id="imageUpload" accept="image/*" hidden>
+                    </div>
+                    <div class="image-preview" id="imagePreview" style="display: none;">
+                        <img id="previewImage" src="" alt="Preview">
+                        <button class="remove-image" id="removeImage"><i class="fas fa-times"></i></button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="stickerName">Sticker Name</label>
+                        <input type="text" id="stickerName" placeholder="My Awesome Sticker" maxlength="20">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="stickerText">Add Text (Optional)</label>
+                        <input type="text" id="stickerText" placeholder="Add text to your sticker" maxlength="30">
+                    </div>
+                </div>
+                
+                <div class="creator-step" id="step3">
+                    <h4>Create Text Sticker</h4>
+                    
+                    <div class="form-group">
+                        <label for="textStickerName">Sticker Name</label>
+                        <input type="text" id="textStickerName" placeholder="My Text Sticker" maxlength="20">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Choose Emoji</label>
+                        <div class="emoji-grid">
+                            <span class="emoji" data-emoji="😊">😊</span>
+                            <span class="emoji" data-emoji="❤️">❤️</span>
+                            <span class="emoji" data-emoji="😂">😂</span>
+                            <span class="emoji" data-emoji="😍">😍</span>
+                            <span class="emoji" data-emoji="🥰">🥰</span>
+                            <span class="emoji" data-emoji="😎">😎</span>
+                            <span class="emoji" data-emoji="🤔">🤔</span>
+                            <span class="emoji" data-emoji="🎉">🎉</span>
+                            <span class="emoji" data-emoji="🔥">🔥</span>
+                            <span class="emoji" data-emoji="💯">💯</span>
+                            <span class="emoji" data-emoji="✨">✨</span>
+                            <span class="emoji" data-emoji="🌟">🌟</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="textStickerText">Sticker Text</label>
+                        <input type="text" id="textStickerText" placeholder="Enter your text" maxlength="40">
+                    </div>
+                    
+                    <div class="preview-area">
+                        <div class="text-sticker-preview" id="textStickerPreview">
+                            <span class="preview-emoji">😊</span>
+                            <span class="preview-text">Your Text Here</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="creator-navigation">
+                    <button class="nav-btn prev-btn" id="prevBtn" style="display: none;">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <button class="nav-btn next-btn" id="nextBtn">
+                        Next <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button class="nav-btn create-btn" id="createBtn" style="display: none;">
+                        <i class="fas fa-check"></i> Create Sticker
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    setupStickerCreatorEvents(modal);
 }
 
-function createKillFeedEffect(container) {
-    // Create multiple kill feed notifications
-    for (let feed = 0; feed < 3; feed++) {
-        setTimeout(() => {
-            const killFeed = document.createElement('div');
-            killFeed.className = 'kill-feed';
-            killFeed.innerHTML = `<div class="kill-feed-text">${feed === 0 ? 'ELIMINATED' : feed === 1 ? 'DOUBLE KILL' : 'TRIPLE KILL'}</div>`;
-            killFeed.style.cssText = `
-                position: absolute;
-                top: ${20 + feed * 25}%;
-                right: -100%;
-                background: linear-gradient(90deg, 
-                    rgba(220, 20, 60, ${0.9 - feed * 0.1}), 
-                    rgba(139, 0, 0, ${0.9 - feed * 0.1}));
-                padding: ${20 + feed * 5}px ${35 + feed * 5}px;
-                border-radius: 12px;
-                border-left: 8px solid #FF0000;
-                animation: killFeedSlide 4s ease-out ${feed * 0.5}s forwards;
-                z-index: 10000;
-                box-shadow: 0 8px 35px rgba(220, 20, 60, 0.6);
-                opacity: 0;
-            `;
-            
-            const killText = killFeed.querySelector('.kill-feed-text');
-            killText.style.cssText = `
-                color: white;
-                font-size: ${28 + feed * 8}px;
-                font-weight: bold;
-                text-shadow: 0 0 15px rgba(255, 255, 255, 0.7);
-                font-family: 'Arial Black', sans-serif;
-                letter-spacing: ${3 + feed}px;
-            `;
-            
-            container.appendChild(killFeed);
-            
-            // Create skull icon for each feed
-            const skullIcon = document.createElement('div');
-            skullIcon.className = 'skull-icon';
-            skullIcon.style.cssText = `
-                position: absolute;
-                width: ${50 + feed * 10}px;
-                height: ${60 + feed * 10}px;
-                background: linear-gradient(45deg, white, #F0F0F0);
-                border-radius: 50% 50% 0 0;
-                top: -${30 + feed * 5}px;
-                right: 25px;
-                box-shadow: 0 0 25px white;
-                animation: skullFloat 2s ease-in-out infinite;
-                animation-delay: ${feed * 0.3}s;
-            `;
-            
-            // Skull eyes
-            for (let i = 0; i < 2; i++) {
-                const eye = document.createElement('div');
-                eye.style.cssText = `
-                    position: absolute;
-                    width: ${12 + feed * 2}px;
-                    height: ${12 + feed * 2}px;
-                    background: radial-gradient(circle, black, #333);
-                    border-radius: 50%;
-                    top: ${20 + feed * 3}px;
-                    ${i === 0 ? 'left: 12px' : 'right: 12px'};
-                    box-shadow: 0 0 10px black;
-                `;
-                skullIcon.appendChild(eye);
-            }
-            
-            // Skull mouth
-            const mouth = document.createElement('div');
-            mouth.style.cssText = `
-                position: absolute;
-                width: ${30 + feed * 5}px;
-                height: ${15 + feed * 3}px;
-                background: radial-gradient(ellipse at center, black, #333);
-                border-radius: 0 0 15px 15px;
-                bottom: ${15 + feed * 3}px;
-                left: ${10 + feed * 2}px;
-            `;
-            skullIcon.appendChild(mouth);
-            
-            killFeed.appendChild(skullIcon);
-            
-            // Create blood splatter for each kill
-            for (let i = 0; i < 10; i++) {
-                setTimeout(() => {
-                    const bloodSplat = document.createElement('div');
-                    bloodSplat.className = 'blood-splat';
-                    bloodSplat.style.cssText = `
-                        position: absolute;
-                        width: ${Math.random() * 25 + 15}px;
-                        height: ${Math.random() * 25 + 15}px;
-                        background: radial-gradient(circle, #FF0000, #8B0000);
-                        border-radius: 50% 50% 50% 0;
-                        right: ${Math.random() * 100 + 50}px;
-                        top: ${20 + feed * 25 + Math.random() * 30}%;
-                        transform: rotate(${Math.random() * 360}deg);
-                        animation: bloodSplatAnim 3s ease-out forwards;
-                        filter: blur(${Math.random() * 3}px);
-                        opacity: 0;
-                    `;
-                    container.appendChild(bloodSplat);
-                }, i * 200);
-            }
-        }, feed * 1500);
-    }
-    
-    // Create kill streak effect
-    const killStreak = document.createElement('div');
-    killStreak.className = 'kill-streak';
-    killStreak.innerHTML = '<div class="kill-streak-text">KILLING SPREE</div>';
-    killStreak.style.cssText = `
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 10001;
-    `;
-    
-    const streakText = killStreak.querySelector('.kill-streak-text');
-    streakText.style.cssText = `
-        font-size: 64px;
-        font-weight: bold;
-        color: #FF0000;
-        text-shadow: 0 0 35px #FF0000, 0 0 70px #FF0000, 0 0 105px #FF0000;
-        animation: killStreakAnim 5.5s ease-out forwards;
-        letter-spacing: 6px;
-        font-family: 'Arial Black', sans-serif;
-        opacity: 0;
-    `;
-    
-    container.appendChild(killStreak);
-}
+function setupStickerCreatorEvents(modal) {
+    const closeBtn = modal.querySelector('.close-creator');
+    const typeOptions = modal.querySelectorAll('.type-option');
+    const nextBtn = modal.querySelector('#nextBtn');
+    const prevBtn = modal.querySelector('#prevBtn');
+    const createBtn = modal.querySelector('#createBtn');
+    const uploadArea = modal.querySelector('#uploadArea');
+    const imageUpload = modal.querySelector('#imageUpload');
+    const removeImageBtn = modal.querySelector('#removeImage');
+    const emojiElements = modal.querySelectorAll('.emoji');
+    const textPreview = modal.querySelector('#textStickerPreview');
+    const previewEmoji = textPreview?.querySelector('.preview-emoji');
+    const previewText = textPreview?.querySelector('.preview-text');
+    const textStickerText = modal.querySelector('#textStickerText');
+    const stickerNameInput = modal.querySelector('#stickerName');
+    const textStickerNameInput = modal.querySelector('#textStickerName');
 
-function createSprintEffect(container) {
-    // Create continuous motion trails
-    let trailCount = 0;
-    const trailInterval = setInterval(() => {
-        if (trailCount < 80) {
-            const trail = document.createElement('div');
-            trail.className = 'sprint-trail';
-            trail.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 150 + 80}px;
-                height: 4px;
-                background: linear-gradient(90deg, #1E90FF, rgba(30, 144, 255, 0.7), transparent);
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                transform: rotate(${Math.random() * 30 - 15}deg);
-                animation: sprintTrailAnim 2.5s ease-out forwards;
-                filter: blur(3px);
-                opacity: 0;
-            `;
-            container.appendChild(trail);
-            trailCount++;
-        } else {
-            clearInterval(trailInterval);
+    closeBtn.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+
+    typeOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            typeOptions.forEach(opt => opt.classList.remove('selected'));
+            option.classList.add('selected');
+            stickerCreator.type = option.dataset.type;
+            nextBtn.disabled = false;
+        });
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (stickerCreator.currentStep === 1 && stickerCreator.type) {
+            goToCreatorStep(modal, stickerCreator.type === 'image' ? 2 : 3);
+        } else if (stickerCreator.currentStep === 2) {
+            const name = stickerNameInput?.value.trim();
+            if (!name) {
+                showNotification('Please enter a sticker name', 'error');
+                return;
+            }
+            if (!stickerCreator.imageFile) {
+                showNotification('Please upload an image', 'error');
+                return;
+            }
+            showCreateButton(modal);
+        } else if (stickerCreator.currentStep === 3) {
+            const name = textStickerNameInput?.value.trim();
+            const text = textStickerText?.value.trim();
+            if (!name) {
+                showNotification('Please enter a sticker name', 'error');
+                return;
+            }
+            if (!text) {
+                showNotification('Please enter sticker text', 'error');
+                return;
+            }
+            showCreateButton(modal);
         }
-    }, 60);
-    
-    // Create wind lines continuously
-    let windCount = 0;
-    const windInterval = setInterval(() => {
-        if (windCount < 60) {
-            const windLine = document.createElement('div');
-            windLine.className = 'wind-line';
-            windLine.style.cssText = `
-                position: absolute;
-                width: 3px;
-                height: ${Math.random() * 80 + 40}px;
-                background: linear-gradient(to bottom, #1E90FF, rgba(30, 144, 255, 0.5), transparent);
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                animation: windLineAnim ${Math.random() * 2 + 1.5}s linear infinite;
-                filter: blur(2px);
-                opacity: ${Math.random() * 0.5 + 0.3};
-            `;
-            container.appendChild(windLine);
-            windCount++;
-        } else {
-            clearInterval(windInterval);
+    });
+
+    prevBtn.addEventListener('click', () => {
+        if (stickerCreator.currentStep === 2 || stickerCreator.currentStep === 3) {
+            goToCreatorStep(modal, 1);
         }
-    }, 80);
-    
-    // Create speed bursts
-    for (let burst = 0; burst < 5; burst++) {
-        setTimeout(() => {
-            const speedBurst = document.createElement('div');
-            speedBurst.className = 'speed-burst';
-            speedBurst.style.cssText = `
-                position: absolute;
-                width: ${200 + burst * 50}px;
-                height: ${200 + burst * 50}px;
-                background: radial-gradient(circle, rgba(30, 144, 255, 0.2), transparent 70%);
-                border-radius: 50%;
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                transform: translate(-50%, -50%);
-                animation: speedBurstAnim 3s ease-out ${burst * 0.3}s forwards;
-                filter: blur(25px);
-                opacity: 0;
-            `;
-            container.appendChild(speedBurst);
+    });
+
+    createBtn.addEventListener('click', async () => {
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+        
+        try {
+            let stickerData;
             
-            // Create burst particles
-            for (let i = 0; i < 20; i++) {
-                setTimeout(() => {
-                    const burstParticle = document.createElement('div');
-                    burstParticle.className = 'burst-particle';
-                    burstParticle.style.cssText = `
-                        position: absolute;
-                        width: ${Math.random() * 8 + 4}px;
-                        height: ${Math.random() * 8 + 4}px;
-                        background: radial-gradient(circle, #1E90FF, #00BFFF);
-                        border-radius: 50%;
-                        left: ${Math.random() * 100}%;
-                        top: ${Math.random() * 100}%;
-                        animation: burstParticleAnim 2.5s ease-out forwards;
-                        box-shadow: 0 0 20px #1E90FF;
-                        filter: blur(1px);
-                        opacity: 0;
-                    `;
-                    container.appendChild(burstParticle);
-                }, i * 100);
+            if (stickerCreator.type === 'image') {
+                stickerData = await createImageSticker(modal);
+            } else {
+                stickerData = await createTextSticker(modal);
             }
-        }, burst * 1000);
+            
+            await saveStickerToFirebase(stickerData);
+            
+            showNotification('Sticker created successfully!', 'success');
+            modal.remove();
+            loadUserStickers();
+        } catch (error) {
+            console.error('Error creating sticker:', error);
+            showNotification('Error creating sticker. Please try again.', 'error');
+            createBtn.disabled = false;
+            createBtn.innerHTML = '<i class="fas fa-check"></i> Create Sticker';
+        }
+    });
+
+    if (uploadArea && imageUpload) {
+        uploadArea.addEventListener('click', () => imageUpload.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleImageUpload(e.dataTransfer.files[0], modal);
+            }
+        });
+
+        imageUpload.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleImageUpload(e.target.files[0], modal);
+            }
+        });
     }
-    
-    // Create motion blur overlay
-    const motionBlur = document.createElement('div');
-    motionBlur.className = 'motion-blur';
-    motionBlur.style.cssText = `
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, 
-            transparent 0%, 
-            rgba(30, 144, 255, 0.05) 20%,
-            rgba(30, 144, 255, 0.1) 50%,
-            rgba(30, 144, 255, 0.05) 80%,
-            transparent 100%);
-        animation: motionBlurWave 5s linear infinite;
-        filter: blur(8px);
-        opacity: 0.4;
-    `;
-    container.appendChild(motionBlur);
+
+    if (removeImageBtn) {
+        removeImageBtn.addEventListener('click', () => {
+            stickerCreator.imageFile = null;
+            const imagePreview = modal.querySelector('#imagePreview');
+            if (imagePreview) imagePreview.style.display = 'none';
+            if (uploadArea) uploadArea.style.display = 'flex';
+            nextBtn.disabled = true;
+        });
+    }
+
+    if (emojiElements.length > 0) {
+        emojiElements.forEach(emoji => {
+            emoji.addEventListener('click', () => {
+                emojiElements.forEach(e => e.classList.remove('selected'));
+                emoji.classList.add('selected');
+                stickerCreator.selectedEmoji = emoji.dataset.emoji;
+                if (previewEmoji) previewEmoji.textContent = stickerCreator.selectedEmoji;
+            });
+        });
+    }
+
+    if (textStickerText && previewText) {
+        textStickerText.addEventListener('input', () => {
+            previewText.textContent = textStickerText.value || 'Your Text Here';
+        });
+    }
 }
 
-function createVictoryRoyaleEffect(container) {
-    // Create victory crown with pulsing effect
-    const crown = document.createElement('div');
-    crown.className = 'victory-crown';
-    crown.style.cssText = `
-        position: absolute;
-        width: 180px;
-        height: 120px;
-        background: linear-gradient(45deg, #FFD700, #FFA500, #FFD700, #FFA500);
-        clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-        left: 50%;
-        top: 20%;
-        transform: translateX(-50%);
-        animation: crownFloat 7.5s ease-in-out infinite;
-        filter: drop-shadow(0 0 40px #FFD700);
+function goToCreatorStep(modal, step) {
+    modal.querySelectorAll('.creator-step').forEach(s => s.classList.remove('active'));
+    const stepElement = modal.querySelector(`#step${step}`);
+    if (stepElement) stepElement.classList.add('active');
+    stickerCreator.currentStep = step;
+    
+    const prevBtn = modal.querySelector('#prevBtn');
+    const nextBtn = modal.querySelector('#nextBtn');
+    const createBtn = modal.querySelector('#createBtn');
+    
+    if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-flex';
+    if (nextBtn) nextBtn.style.display = step === 3 ? 'none' : 'inline-flex';
+    if (createBtn) createBtn.style.display = step === 3 ? 'inline-flex' : 'none';
+}
+
+function showCreateButton(modal) {
+    const prevBtn = modal.querySelector('#prevBtn');
+    const nextBtn = modal.querySelector('#nextBtn');
+    const createBtn = modal.querySelector('#createBtn');
+    
+    if (prevBtn) prevBtn.style.display = 'inline-flex';
+    if (nextBtn) nextBtn.style.display = 'none';
+    if (createBtn) createBtn.style.display = 'inline-flex';
+}
+
+function handleImageUpload(file, modal) {
+    if (!file.type.match('image.*')) {
+        showNotification('Please upload an image file (PNG, JPG, GIF)', 'error');
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+        showNotification('Image must be less than 5MB', 'error');
+        return;
+    }
+    
+    stickerCreator.imageFile = file;
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+        const preview = modal.querySelector('#previewImage');
+        const imagePreview = modal.querySelector('#imagePreview');
+        const uploadArea = modal.querySelector('#uploadArea');
+        const nextBtn = modal.querySelector('#nextBtn');
+        
+        if (preview) preview.src = e.target.result;
+        if (imagePreview) imagePreview.style.display = 'block';
+        if (uploadArea) uploadArea.style.display = 'none';
+        if (nextBtn) nextBtn.disabled = false;
+    };
+    
+    reader.onerror = () => {
+        showNotification('Error reading image file', 'error');
+    };
+    
+    reader.readAsDataURL(file);
+}
+
+async function uploadToCloudinary(imageFile) {
+    if (!CLOUDINARY_CONFIG.cloudName || !CLOUDINARY_CONFIG.uploadPreset) {
+        throw new Error('Cloudinary configuration missing');
+    }
+    
+    const formData = new FormData();
+    formData.append('file', imageFile);
+    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+    formData.append('folder', 'dating_connect/stickers');
+    
+    const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`,
+        {
+            method: 'POST',
+            body: formData
+        }
+    );
+    
+    if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.secure_url) {
+        throw new Error('Upload failed: No URL returned');
+    }
+    
+    return data.secure_url;
+}
+
+async function createImageSticker(modal) {
+    const nameInput = modal.querySelector('#stickerName');
+    const textInput = modal.querySelector('#stickerText');
+    
+    const name = nameInput ? nameInput.value.trim() : '';
+    const text = textInput ? textInput.value.trim() : '';
+    
+    if (!stickerCreator.imageFile) {
+        throw new Error('No image file selected');
+    }
+    
+    const imageUrl = await uploadToCloudinary(stickerCreator.imageFile);
+    
+    return {
+        id: `sticker_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: name,
+        type: 'image',
+        text: text,
+        url: imageUrl,
+        emoji: '📷',
+        createdAt: Date.now(),
+        createdBy: currentUser?.uid
+    };
+}
+
+async function createTextSticker(modal) {
+    const nameInput = modal.querySelector('#textStickerName');
+    const textInput = modal.querySelector('#textStickerText');
+    
+    const name = nameInput ? nameInput.value.trim() : '';
+    const text = textInput ? textInput.value.trim() : '';
+    
+    return {
+        id: `sticker_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: name,
+        type: 'text',
+        text: text,
+        emoji: stickerCreator.selectedEmoji,
+        createdAt: Date.now(),
+        createdBy: currentUser?.uid
+    };
+}
+
+async function saveStickerToFirebase(stickerData) {
+    if (!currentUser || !db) throw new Error('User not authenticated');
+
+    const userRef = doc(db, 'users', currentUser.uid);
+    await updateDoc(userRef, {
+        stickers: arrayUnion(stickerData)
+    });
+}
+
+// ============================================
+// NOTIFICATION SYSTEM
+// ============================================
+function showNotification(message, type = 'info') {
+    const existing = document.querySelectorAll('.sticker-notification');
+    existing.forEach(n => n.remove());
+    
+    const notification = document.createElement('div');
+    notification.className = 'sticker-notification';
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4CAF50' : type === 'warning' ? '#ff9800' : '#2196F3'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
         z-index: 10000;
-        opacity: 0;
+        max-width: 300px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        font-weight: 500;
+        animation: slideIn 0.3s ease;
     `;
-    container.appendChild(crown);
+    notification.textContent = message;
+    document.body.appendChild(notification);
     
-    // Create multiple victory texts
-    for (let text = 0; text < 3; text++) {
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => {
-            const victoryText = document.createElement('div');
-            victoryText.className = 'victory-text';
-            victoryText.innerHTML = '<div class="victory-text-content">VICTORY<br>ROYALE</div>';
-            victoryText.style.cssText = `
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                text-align: center;
-                z-index: 10000;
-                animation: victoryTextFloat 4s ease-in-out ${text * 1.5}s infinite;
-            `;
-            
-            const textContent = victoryText.querySelector('.victory-text-content');
-            textContent.style.cssText = `
-                font-size: ${96 - text * 20}px;
-                font-weight: bold;
-                color: #FFD700;
-                text-shadow: 
-                    0 0 40px #FFD700, 
-                    0 0 80px #FF6B00, 
-                    0 0 120px #FF4500,
-                    0 0 160px #FF0000;
-                line-height: 1.2;
-                font-family: 'Arial Black', sans-serif;
-                letter-spacing: 6px;
-                opacity: ${0.8 - text * 0.2};
-            `;
-            
-            container.appendChild(victoryText);
-        }, text * 500);
-    }
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 300);
+    }, 3000);
     
-    // Create continuous confetti
-    let confettiCount = 0;
-    const confettiInterval = setInterval(() => {
-        if (confettiCount < 200) {
-            const confetti = document.createElement('div');
-            confetti.className = 'confetti';
-            confetti.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 20 + 10}px;
-                height: ${Math.random() * 20 + 10}px;
-                background: ${confettiCount % 5 === 0 ? '#FF0000' : 
-                            confettiCount % 5 === 1 ? '#00FF00' : 
-                            confettiCount % 5 === 2 ? '#0000FF' : 
-                            confettiCount % 5 === 3 ? '#FFD700' : 
-                            '#FF00FF'};
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                animation: confettiFall ${Math.random() * 3 + 2}s linear infinite;
-                opacity: ${Math.random() * 0.7 + 0.3};
-                border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
-                transform: rotate(${Math.random() * 360}deg);
-                box-shadow: 0 0 15px currentColor;
-            `;
-            container.appendChild(confetti);
-            confettiCount++;
-        } else {
-            clearInterval(confettiInterval);
-        }
-    }, 30);
-    
-    // Create light rays
-    for (let i = 0; i < 16; i++) {
-        const lightRay = document.createElement('div');
-        lightRay.className = 'light-ray';
-        lightRay.style.cssText = `
-            position: absolute;
-            width: 6px;
-            height: 400px;
-            background: linear-gradient(to bottom, 
-                rgba(255, 215, 0, 0.6), 
-                rgba(255, 215, 0, 0.3), 
-                transparent);
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%) rotate(${i * 22.5}deg);
-            transform-origin: center bottom;
-            animation: lightRayRotate 15s linear infinite;
-            filter: blur(3px);
-            opacity: 0.6;
+    if (!document.getElementById('notification-styles')) {
+        const style = document.createElement('style');
+        style.id = 'notification-styles';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
         `;
-        container.appendChild(lightRay);
+        document.head.appendChild(style);
     }
-    
-    // Create victory particles
-    for (let i = 0; i < 50; i++) {
-        setTimeout(() => {
-            const victoryParticle = document.createElement('div');
-            victoryParticle.className = 'victory-particle';
-            victoryParticle.style.cssText = `
-                position: absolute;
-                width: ${Math.random() * 15 + 8}px;
-                height: ${Math.random() * 15 + 8}px;
-                background: radial-gradient(circle, 
-                    ${Math.random() > 0.5 ? '#FFD700' : '#FF6B00'}, 
-                    ${Math.random() > 0.5 ? '#FFA500' : '#FF4500'});
-                border-radius: 50%;
-                left: ${Math.random() * 100}%;
-                top: ${Math.random() * 100}%;
-                animation: victoryParticleAnim 4s ease-out ${i * 0.1}s forwards;
-                box-shadow: 0 0 30px #FFD700;
-                filter: blur(${Math.random()}px);
-                opacity: 0;
-            `;
-            container.appendChild(victoryParticle);
-        }, i * 100);
-    }
-    
-    // Create victory platform
-    const victoryPlatform = document.createElement('div');
-    victoryPlatform.className = 'victory-platform';
-    victoryPlatform.style.cssText = `
-        position: absolute;
-        width: 400px;
-        height: 100px;
-        background: linear-gradient(45deg, 
-            rgba(255, 215, 0, 0.2), 
-            rgba(255, 107, 0, 0.1), 
-            rgba(255, 215, 0, 0.2));
-        left: 50%;
-        top: 80%;
-        transform: translateX(-50%);
-        animation: platformGlow 7.5s ease-in-out infinite;
-        filter: blur(20px);
-        border-radius: 50px;
-        opacity: 0.5;
-    `;
-    container.appendChild(victoryPlatform);
 }
 
-// Load visual animation styles with LONG DURATION animations
-function loadVisualAnimationStyles() {
-    if (document.getElementById('visual-animation-styles')) return;
+// ============================================
+// LOAD STICKER STYLES
+// ============================================
+function loadStickerStyles() {
+    if (document.getElementById('sticker-styles')) return;
 
     const styles = `
-        /* Visual Animation Library Styles */
-        .visual-animation-btn {
-            background: linear-gradient(135deg, #FF6B00 0%, #FF9500 100%);
+        /* Sticker Picker Button */
+        .sticker-picker-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
             border-radius: 50%;
-            width: 35px;
-            height: 35px;
+            width: 40px;
+            height: 40px;
             color: white;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 18px;
             transition: all 0.3s ease;
-            flex-shrink: 0;
-            margin: 0 5px;
-            box-shadow: 0 4px 10px rgba(255, 107, 0, 0.3);
+            margin-left: 10px;
+            position: absolute;
+            right: 60px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
         }
         
-        .visual-animation-btn:hover { 
-            background: linear-gradient(135deg, #FF9500 0%, #FF6B00 100%);
-            transform: scale(1.1); 
-            box-shadow: 0 6px 20px rgba(255, 107, 0, 0.5);
+        .sticker-picker-btn:hover {
+            transform: translateY(-50%) scale(1.1);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
         
-        .visual-animation-modal { 
-            display: none; 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(0,0,0,0.85); 
-            z-index: 10000; 
+        .sticker-picker-panel {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 70vh;
+            background: white;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .sticker-picker-panel.open {
+            transform: translateY(0);
+        }
+        
+        .sticker-picker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px 20px 0 0;
+        }
+        
+        .sticker-picker-header h4 {
+            margin: 0;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .create-sticker-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .create-sticker-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.05);
+        }
+        
+        .sticker-tabs {
+            display: flex;
+            border-bottom: 1px solid #e8e8e8;
+            background: #f8f9fa;
+        }
+        
+        .sticker-tab {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .sticker-tab.active {
+            color: #667eea;
+        }
+        
+        .sticker-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 3px 3px 0 0;
+        }
+        
+        .sticker-content {
+            height: calc(100% - 130px);
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .sticker-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            padding: 10px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .sticker-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .sticker-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .sticker-item {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            background: white;
+            border: 2px solid #e8e8e8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .sticker-item:hover {
+            transform: scale(1.05);
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+        
+        .sticker-item-image-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        .sticker-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 5px;
+        }
+        
+        .sticker-text-on-item {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 8px;
+            font-size: 11px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .text-sticker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .sticker-emoji {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+        }
+        
+        .sticker-text {
+            font-size: 12px;
+            text-align: center;
+            color: #333;
+            font-weight: 500;
+            word-break: break-word;
+            max-width: 100%;
+        }
+        
+        .no-stickers {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+            color: #666;
+        }
+        
+        .no-stickers i {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 15px;
+            opacity: 0.7;
+        }
+        
+        .no-stickers p {
+            margin: 0 0 15px 0;
+            font-size: 16px;
+        }
+        
+        .no-stickers .hint {
+            font-size: 13px;
+            color: #999;
+            margin: 5px 0 0;
+        }
+        
+        .create-first-sticker {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .create-first-sticker:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .sticker-picker-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e8e8e8;
+            text-align: center;
+        }
+        
+        .close-sticker-picker {
+            background: #f0f0f0;
+            color: #333;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .close-sticker-picker:hover {
+            background: #e0e0e0;
+            transform: scale(1.05);
+        }
+        
+        /* Sticker Pack Styles */
+        .sticker-pack {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 2px solid #e8e8e8;
+        }
+        
+        .pack-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .pack-header h5 {
+            margin: 0;
+            font-size: 16px;
+            color: #333;
+        }
+        
+        .add-pack-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .add-pack-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .pack-stickers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .pack-sticker {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            border: 2px solid #e8e8e8;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .pack-sticker:hover {
+            transform: scale(1.05);
+            border-color: #667eea;
+        }
+        
+        .pack-emoji {
+            font-size: 1.8rem;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .pack-text {
+            font-size: 11px;
+            color: #333;
+        }
+        
+        /* Sticker Message Styles */
+        .message.sticker-message {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 5px !important;
+            margin: 5px 0 !important;
+            max-width: 200px !important;
+        }
+        
+        .sticker-message-content {
+            display: inline-block;
+            border-radius: 18px;
+            padding: 12px;
+            border: 2px solid #e8e8e8;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 200px;
+            background: white;
+        }
+        
+        .message.sent .sticker-message-content {
+            background: #000000 !important;
+            border-color: #333333;
+            color: white;
+        }
+        
+        .message.received .sticker-message-content {
+            background: white !important;
+            border-color: #e8e8e8;
+            color: #333;
+        }
+        
+        .sticker-image-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 0 auto;
+        }
+        
+        .sticker-message-image {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            object-fit: cover;
+            display: block;
+            background: #f5f5f5;
+        }
+        
+        .sticker-text-on-image {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            color: white;
+            padding: 6px 10px;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 600;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            background: transparent;
+        }
+        
+        .text-sticker-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            min-height: 120px;
+        }
+        
+        .sticker-emoji-large {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        
+        .sticker-text-large {
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            word-break: break-word;
+            max-width: 180px;
+            line-height: 1.4;
+        }
+        
+        .message.sent .sticker-text-large {
+            color: white;
+        }
+        
+        .message.received .sticker-text-large {
+            color: #333;
+        }
+        
+        /* Sticker Creator Modal */
+        .sticker-creator-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1001;
             align-items: center;
             justify-content: center;
         }
         
-        .visual-animation-modal-content { 
-            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
-            border-radius: 15px; 
-            width: 95%; 
-            max-width: 550px; 
-            max-height: 85vh; 
-            overflow: hidden; 
-            box-shadow: 0 20px 60px rgba(255, 107, 0, 0.3);
-            border: 3px solid #ff6b00;
+        .sticker-creator-content {
+            background: white;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         
-        .visual-animation-modal-header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 20px; 
-            background: linear-gradient(135deg, #ff6b00 0%, #ff9500 100%);
-            color: white; 
+        .sticker-creator-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
         
-        .visual-animation-modal-header h3 { 
-            margin: 0; 
-            font-size: 1.3rem; 
+        .sticker-creator-header h3 {
+            margin: 0;
+            font-size: 18px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
         
-        .close-group-animation-modal { 
-            background: none; 
-            border: none; 
-            color: white; 
-            font-size: 28px; 
-            cursor: pointer; 
-            padding: 0; 
-            width: 35px; 
-            height: 35px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            border-radius: 50%;
-            transition: background 0.3s;
-        }
-        
-        .close-group-animation-modal:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-        
-        .visual-animation-grid { 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            gap: 20px; 
-            padding: 25px;
-            max-height: 450px;
-            overflow-y: auto;
-        }
-        
-        @media (max-width: 480px) {
-            .visual-animation-grid { 
-                grid-template-columns: repeat(2, 1fr); 
-            }
-        }
-        
-        .visual-animation-item { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            padding: 20px 15px; 
-            border-radius: 15px; 
-            cursor: pointer; 
-            transition: all 0.3s ease; 
-            border: 2px solid transparent; 
-            position: relative; 
-            background: rgba(255, 107, 0, 0.05);
-            backdrop-filter: blur(10px);
-        }
-        
-        .visual-animation-item:hover { 
-            background: rgba(255, 107, 0, 0.15); 
-            transform: translateY(-8px); 
-            border-color: #ff6b00;
-            box-shadow: 0 12px 25px rgba(255, 107, 0, 0.2);
-        }
-        
-        .visual-animation-item.premium-locked { 
-            opacity: 0.6; 
-            cursor: not-allowed; 
-            filter: grayscale(0.5);
-        }
-        
-        .visual-animation-item.premium-locked::after { 
-            content: '👑'; 
-            position: absolute; 
-            top: 10px; 
-            right: 10px; 
-            font-size: 14px; 
-            color: #ffd700;
-        }
-        
-        .visual-animation-preview {
-            width: 80px;
-            height: 80px;
-            border-radius: 15px;
-            margin-bottom: 10px;
+        .close-creator {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
-            overflow: hidden;
         }
         
-        .visual-animation-effect {
-            width: 100%;
-            height: 100%;
+        .sticker-creator-body {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
         }
         
-        .visual-animation-name { 
-            font-size: 0.9rem; 
-            text-align: center; 
-            text-transform: uppercase; 
-            color: #e2e8f0; 
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            margin-bottom: 5px;
+        .creator-step {
+            display: none;
         }
         
-        .visual-animation-desc {
-            font-size: 0.75rem;
+        .creator-step.active {
+            display: block;
+        }
+        
+        .creator-step h4 {
+            margin: 0 0 20px 0;
+            color: #333;
             text-align: center;
-            color: #a0aec0;
-            font-weight: 500;
-        }
-        
-        .visual-animation-premium-notice { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 12px; 
-            padding: 20px; 
-            background: linear-gradient(135deg, #ffd700 0%, #ff9500 100%);
-            color: #000; 
-            font-weight: bold;
-            font-size: 14px;
-        }
-        
-        .visual-animation-premium-notice i { 
-            color: #000; 
             font-size: 18px;
         }
         
-        /* Preview animations */
-        .fireStrike-preview {
-            background: radial-gradient(circle, #FF6B00 0%, transparent 70%);
-            animation: previewPulse 2s infinite;
+        .type-options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
         
-        .headshotEffect-preview {
-            background: linear-gradient(45deg, #FF0000 25%, transparent 25%, transparent 75%, #FF0000 75%);
-            background-size: 20px 20px;
-            animation: previewShake 2s infinite;
+        .type-option {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            border: 2px solid #e8e8e8;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
         
-        .swordSlash-preview {
-            background: linear-gradient(45deg, transparent 45%, #00FF00 45%, #00FF00 55%, transparent 55%);
-            animation: previewSlash 2s infinite;
+        .type-option:hover {
+            border-color: #667eea;
+            background: #f5f7ff;
         }
         
-        .shieldUp-preview {
-            background: 
-                radial-gradient(circle at 30% 30%, #00FFFF 5%, transparent 5%),
-                radial-gradient(circle at 70% 70%, #00FFFF 5%, transparent 5%),
-                radial-gradient(circle at 30% 70%, #00FFFF 5%, transparent 5%),
-                radial-gradient(circle at 70% 30%, #00FFFF 5%, transparent 5%);
-            background-size: 100% 100%;
-            animation: previewShield 3s infinite;
+        .type-option.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #f5f7ff, #f0f3ff);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
         }
         
-        .grenadeExplosion-preview {
-            background: radial-gradient(circle, #FF4500 0%, #FF0000 50%, transparent 70%);
-            animation: previewExplosion 2s infinite;
+        .type-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            color: white;
+            font-size: 24px;
         }
         
-        .speedBoost-preview {
-            background: linear-gradient(90deg, transparent 30%, #FFFF00 50%, transparent 70%);
-            background-size: 200% 100%;
-            animation: previewSpeed 1s infinite linear;
+        .type-info h5 {
+            margin: 0 0 5px 0;
+            color: #333;
         }
         
-        .rankUp-preview {
-            background: linear-gradient(45deg, #FFD700 25%, transparent 25%, transparent 75%, #FFD700 75%);
-            background-size: 20px 20px;
-            animation: previewSparkle 2s infinite;
+        .type-info p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
         }
         
-        .coinRain-preview {
-            background: 
-                radial-gradient(circle at 20% 30%, #FFD700 10%, transparent 10%),
-                radial-gradient(circle at 50% 50%, #FFD700 10%, transparent 10%),
-                radial-gradient(circle at 80% 70%, #FFD700 10%, transparent 10%);
-            animation: previewRain 2s infinite;
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+            background: #f5f7ff;
+            transition: all 0.3s ease;
         }
         
-        .comboAttack-preview {
-            background: 
-                linear-gradient(45deg, transparent 45%, #FF00FF 45%, #FF00FF 55%, transparent 55%),
-                linear-gradient(-45deg, transparent 45%, #FF00FF 45%, #FF00FF 55%, transparent 55%);
-            animation: previewCombo 2s infinite;
+        .upload-area.dragover {
+            background: #e0e7ff;
+            border-color: #764ba2;
         }
         
-        .damageHit-preview {
-            background: radial-gradient(circle, #FF1493 0%, transparent 60%);
-            animation: previewDamage 2s infinite;
+        .upload-area i {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 15px;
         }
         
-        .airdropFall-preview {
-            background: 
-                radial-gradient(ellipse at 30% 20%, #3498DB 10%, transparent 10%),
-                radial-gradient(circle at 50% 50%, #E74C3C 20%, transparent 20%),
-                radial-gradient(ellipse at 70% 80%, #1ABC9C 15%, transparent 15%);
-            animation: previewAirdrop 3s infinite ease-in-out;
+        .upload-hint {
+            color: #666;
+            font-size: 12px;
         }
         
-        .arrowShot-preview {
-            background: linear-gradient(45deg, transparent 45%, #8B4513 45%, #8B4513 55%, transparent 55%);
-            animation: previewArrow 2s infinite;
-        }
-        
-        .killFeed-preview {
-            background: linear-gradient(45deg, #DC143C 0%, #8B0000 100%);
-            animation: previewKillFeed 2s infinite;
-        }
-        
-        .sprintEffect-preview {
-            background: linear-gradient(90deg, transparent 30%, #1E90FF 50%, transparent 70%);
-            background-size: 200% 100%;
-            animation: previewSprint 1s infinite linear;
-        }
-        
-        .victoryRoyale-preview {
-            background: 
-                radial-gradient(circle at center, #FFD700 0%, transparent 70%),
-                linear-gradient(45deg, transparent 45%, #FF6B00 45%, #FF6B00 55%, transparent 55%),
-                linear-gradient(-45deg, transparent 45%, #FF6B00 45%, #FF6B00 55%, transparent 55%);
-            animation: previewVictory 4s infinite;
-        }
-        
-        /* Preview Animation Keyframes */
-        @keyframes previewPulse {
-            0%, 100% { transform: scale(1); opacity: 0.7; }
-            50% { transform: scale(1.2); opacity: 1; }
-        }
-        
-        @keyframes previewShake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-        
-        @keyframes previewSlash {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes previewShield {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-        
-        @keyframes previewExplosion {
-            0% { transform: scale(0.5); opacity: 0; }
-            50% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(1); opacity: 0.7; }
-        }
-        
-        @keyframes previewSpeed {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-        
-        @keyframes previewSparkle {
-            0% { background-position: 0 0; }
-            100% { background-position: 40px 40px; }
-        }
-        
-        @keyframes previewRain {
-            0% { background-position: 0 0; }
-            100% { background-position: 0 40px; }
-        }
-        
-        @keyframes previewCombo {
-            0% { transform: scale(0.8); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(0.8); }
-        }
-        
-        @keyframes previewDamage {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.3); }
-        }
-        
-        @keyframes previewAirdrop {
-            0% { transform: translateY(-20px); }
-            50% { transform: translateY(0); }
-            100% { transform: translateY(-20px); }
-        }
-        
-        @keyframes previewArrow {
-            0% { transform: translateX(-20px); }
-            50% { transform: translateX(20px); }
-            100% { transform: translateX(-20px); }
-        }
-        
-        @keyframes previewKillFeed {
-            0%, 100% { opacity: 0.7; }
-            50% { opacity: 1; }
-        }
-        
-        @keyframes previewSprint {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-        
-        @keyframes previewVictory {
-            0% { transform: rotate(0deg) scale(1); }
-            50% { transform: rotate(180deg) scale(1.1); }
-            100% { transform: rotate(360deg) scale(1); }
-        }
-        
-        /* Visual Animation Effect Container */
-        .visual-animation-effect-container { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            pointer-events: none; 
-            z-index: 9999; 
+        .image-preview {
+            position: relative;
+            margin-bottom: 20px;
+            border-radius: 15px;
             overflow: hidden;
         }
         
-        /* LONG DURATION ANIMATION KEYFRAMES (5-7 seconds) */
-        
-        /* Fire Strike Animation (6 seconds) */
-        @keyframes fireParticleAnim {
-            0% { transform: scale(0) rotate(0deg); opacity: 0; }
-            20% { transform: scale(1.2) rotate(180deg); opacity: 1; }
-            40% { transform: scale(1) rotate(360deg); opacity: 0.8; }
-            60% { transform: scale(0.8) rotate(540deg); opacity: 0.6; }
-            80% { transform: scale(0.5) rotate(720deg); opacity: 0.3; }
-            100% { transform: scale(0) rotate(900deg); opacity: 0; }
+        .image-preview img {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            background: #f8f9fa;
         }
         
-        @keyframes fireExplosion {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            20% { transform: translate(-50%, -50%) scale(2.5); opacity: 0.9; }
-            40% { transform: translate(-50%, -50%) scale(2); opacity: 0.8; }
-            60% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.6; }
-            80% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+        .remove-image {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
-        /* Headshot Animation (5.5 seconds) */
-        @keyframes headshotTextAnim {
-            0% { transform: scale(0.5) translateX(-50%); opacity: 0; text-shadow: 0 0 0 #FF0000; }
-            15% { transform: scale(1.3) translateX(-50%); opacity: 1; text-shadow: 0 0 60px #FF0000; }
-            30% { transform: scale(1.1) translateX(-50%); opacity: 1; text-shadow: 0 0 80px #FF0000; }
-            50% { transform: scale(1) translateX(-50%); opacity: 0.9; text-shadow: 0 0 60px #FF0000; }
-            70% { transform: scale(0.9) translateX(-50%); opacity: 0.6; text-shadow: 0 0 40px #FF0000; }
-            90% { transform: scale(0.8) translateX(-50%); opacity: 0.3; text-shadow: 0 0 20px #FF0000; }
-            100% { transform: scale(0.7) translateX(-50%); opacity: 0; text-shadow: 0 0 0 #FF0000; }
+        .form-group {
+            margin-bottom: 20px;
         }
         
-        @keyframes bloodSplatterAnim {
-            0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); opacity: 0; }
-            20% { transform: translate(-50%, -50%) scale(1.8) rotate(180deg); opacity: 0.9; }
-            40% { transform: translate(calc(-50% + ${Math.random() * 100 - 50}px), calc(-50% + ${Math.random() * 100 - 50}px)) scale(1.2) rotate(360deg); opacity: 0.7; }
-            60% { transform: translate(calc(-50% + ${Math.random() * 200 - 100}px), calc(-50% + ${Math.random() * 200 - 100}px)) scale(0.8) rotate(540deg); opacity: 0.5; }
-            80% { transform: translate(calc(-50% + ${Math.random() * 300 - 150}px), calc(-50% + ${Math.random() * 300 - 150}px)) scale(0.4) rotate(720deg); opacity: 0.2; }
-            100% { transform: translate(calc(-50% + ${Math.random() * 400 - 200}px), calc(-50% + ${Math.random() * 400 - 200}px)) scale(0.1) rotate(900deg); opacity: 0; }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
         }
         
-        @keyframes crackAnim {
-            0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); opacity: 0; }
-            30% { transform: translate(-50%, -50%) scale(2) rotate(0deg); opacity: 1; }
-            60% { transform: translate(-50%, -50%) scale(2.5) rotate(0deg); opacity: 0.7; }
-            90% { transform: translate(-50%, -50%) scale(3) rotate(0deg); opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(3.5) rotate(0deg); opacity: 0; }
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
         }
         
-        /* Sword Slash Animation (5 seconds) */
-        @keyframes swordSlashAnim {
-            0% { transform: translateX(-150%) rotate(0deg); opacity: 0; }
-            20% { transform: translateX(-50%) rotate(180deg); opacity: 1; }
-            40% { transform: translateX(50%) rotate(360deg); opacity: 0.8; }
-            60% { transform: translateX(150%) rotate(540deg); opacity: 0.5; }
-            80% { transform: translateX(250%) rotate(720deg); opacity: 0.2; }
-            100% { transform: translateX(350%) rotate(900deg); opacity: 0; }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
-        @keyframes slashImpactAnim {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            20% { transform: translate(-50%, -50%) scale(1.8); opacity: 1; }
-            40% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.8; }
-            60% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.6; }
-            80% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+        .emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
         }
         
-        @keyframes sparkAnim {
-            0% { transform: scale(0) rotate(0deg); opacity: 0; }
-            20% { transform: scale(1.2) rotate(180deg); opacity: 1; }
-            50% { transform: scale(1) rotate(360deg); opacity: 0.7; }
-            80% { transform: scale(0.5) rotate(540deg); opacity: 0.3; }
-            100% { transform: scale(0) rotate(720deg); opacity: 0; }
+        .emoji {
+            font-size: 24px;
+            text-align: center;
+            padding: 10px;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
         
-        /* Shield Up Animation (6 seconds) */
-        @keyframes shieldRingAnim {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            20% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-            40% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
-            60% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; }
-            80% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.4; }
-            100% { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+        .emoji:hover {
+            border-color: #667eea;
+            background: #f5f7ff;
         }
         
-        @keyframes shieldEnergyAnim {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
-            50% { transform: translate(-50%, -50%) scale(1.3); opacity: 0.8; }
+        .emoji.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.1);
         }
         
-        @keyframes hexagonFloat {
-            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
-            50% { transform: translateY(-20px) rotate(180deg); opacity: 0.9; }
+        .preview-area {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin-top: 20px;
         }
         
-        /* Grenade Explosion Animation (5.5 seconds) */
-        @keyframes explosionCoreAnim {
-            0% { width: 0; height: 0; opacity: 0; }
-            20% { width: 250px; height: 250px; opacity: 1; }
-            40% { width: 300px; height: 300px; opacity: 0.9; }
-            60% { width: 250px; height: 250px; opacity: 0.7; }
-            80% { width: 150px; height: 150px; opacity: 0.4; }
-            100% { width: 50px; height: 50px; opacity: 0; }
+        .text-sticker-preview {
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px 30px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
         }
         
-        @keyframes shockwaveAnim {
-            0% { width: 0; height: 0; opacity: 0.8; }
-            100% { width: 800px; height: 800px; opacity: 0; }
+        .preview-emoji {
+            font-size: 3rem;
         }
         
-        @keyframes debrisAnim {
-            0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
-            20% { transform: translate(calc(-50% + ${Math.random() * 100 - 50}px), calc(-50% + ${Math.random() * 100 - 50}px)) scale(1.2) rotate(180deg); opacity: 0.9; }
-            50% { transform: translate(calc(-50% + ${Math.random() * 200 - 100}px), calc(-50% + ${Math.random() * 200 - 100}px)) scale(1) rotate(360deg); opacity: 0.7; }
-            80% { transform: translate(calc(-50% + ${Math.random() * 400 - 200}px), calc(-50% + ${Math.random() * 400 - 200}px)) scale(0.5) rotate(540deg); opacity: 0.3; }
-            100% { transform: translate(calc(-50% + ${Math.random() * 600 - 300}px), calc(-50% + ${Math.random() * 600 - 300}px)) scale(0) rotate(720deg); opacity: 0; }
+        .preview-text {
+            font-size: 1.2rem;
+            color: #333;
+            font-weight: 600;
         }
         
-        @keyframes screenShake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-15px); }
-            20%, 40%, 60%, 80% { transform: translateX(15px); }
+        .creator-navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e8e8e8;
         }
         
-        /* Speed Boost Animation (5 seconds) */
-        @keyframes speedLineAnim {
-            0% { transform: translateX(0) rotate(0deg); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 0.7; }
-            100% { transform: translateX(400px) rotate(0deg); opacity: 0; }
+        .nav-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
         }
         
-        @keyframes speedTrailAnim {
-            0% { transform: translateX(0) rotate(0deg); opacity: 0; }
-            20% { opacity: 1; }
-            80% { opacity: 0.5; }
-            100% { transform: translateX(300px) rotate(0deg); opacity: 0; }
+        .prev-btn {
+            background: #f0f0f0;
+            color: #333;
         }
         
-        @keyframes afterimageAnim {
-            0% { transform: scale(1); opacity: 0; }
-            30% { transform: scale(1.5); opacity: 0.5; }
-            70% { transform: scale(2); opacity: 0.2; }
-            100% { transform: scale(2.5); opacity: 0; }
+        .prev-btn:hover {
+            background: #e0e0e0;
         }
         
-        @keyframes motionBlurWave {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
+        .next-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
         
-        /* Rank Up Animation (6.5 seconds) */
-        @keyframes rankStarAnim {
-            0% { transform: scale(0) rotate(0deg); opacity: 0; }
-            20% { transform: scale(1.5) rotate(180deg); opacity: 1; }
-            40% { transform: scale(1.3) rotate(360deg); opacity: 0.9; }
-            60% { transform: scale(1.1) rotate(540deg); opacity: 0.7; }
-            80% { transform: scale(0.8) rotate(720deg); opacity: 0.4; }
-            100% { transform: scale(0.5) rotate(900deg); opacity: 0; }
+        .next-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
         }
         
-        @keyframes rankTextAnim {
-            0% { transform: scale(0.5) translateX(-50%); opacity: 0; text-shadow: 0 0 0 #FFD700; }
-            15% { transform: scale(1.4) translateX(-50%); opacity: 1; text-shadow: 0 0 70px #FFD700; }
-            30% { transform: scale(1.2) translateX(-50%); opacity: 1; text-shadow: 0 0 90px #FF6B00; }
-            50% { transform: scale(1.1) translateX(-50%); opacity: 0.9; text-shadow: 0 0 70px #FFD700; }
-            70% { transform: scale(0.9) translateX(-50%); opacity: 0.6; text-shadow: 0 0 50px #FFD700; }
-            90% { transform: scale(0.7) translateX(-50%); opacity: 0.3; text-shadow: 0 0 30px #FFD700; }
-            100% { transform: scale(0.5) translateX(-50%); opacity: 0; text-shadow: 0 0 0 #FFD700; }
+        .next-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         
-        @keyframes levelParticleAnim {
-            0% { transform: translateY(0) scale(0); opacity: 0; }
-            20% { transform: translateY(-50px) scale(1.2); opacity: 1; }
-            50% { transform: translateY(-100px) scale(1); opacity: 0.8; }
-            80% { transform: translateY(-150px) scale(0.5); opacity: 0.3; }
-            100% { transform: translateY(-200px) scale(0); opacity: 0; }
+        .create-btn {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
         }
         
-        @keyframes rankCircleAnim {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            30% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
-            60% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
-            90% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+        .create-btn:hover:not(:disabled) {
+            transform: scale(1.05);
         }
         
-        /* Coin Rain Animation (6 seconds) */
-        @keyframes coinRainAnim {
-            0% { transform: translateY(0) rotateY(0deg); opacity: 0; }
-            10% { opacity: 1; }
-            20% { transform: translateY(20vh) rotateY(180deg); }
-            40% { transform: translateY(40vh) rotateY(360deg); }
-            60% { transform: translateY(60vh) rotateY(540deg); opacity: 0.8; }
-            80% { transform: translateY(80vh) rotateY(720deg); opacity: 0.5; }
-            100% { transform: translateY(100vh) rotateY(900deg); opacity: 0; }
-        }
-        
-        @keyframes coinGlowAnim {
-            0%, 100% { transform: scale(1); opacity: 0.6; }
-            50% { transform: scale(1.2); opacity: 0.9; }
-        }
-        
-        @keyframes coinPileAnim {
-            0% { transform: translateX(-50%) scale(0); opacity: 0; }
-            30% { transform: translateX(-50%) scale(1.5); opacity: 0.8; }
-            60% { transform: translateX(-50%) scale(1.2); opacity: 0.6; }
-            90% { transform: translateX(-50%) scale(1); opacity: 0.3; }
-            100% { transform: translateX(-50%) scale(0.8); opacity: 0; }
-        }
-        
-        /* Combo Attack Animation (5.5 seconds) */
-        @keyframes comboNumberAnim {
-            0% { transform: translateX(-50%) scale(0.5); opacity: 0; }
-            20% { transform: translateX(-50%) scale(1.3); opacity: 1; }
-            40% { transform: translateX(-50%) scale(1.1); opacity: 0.9; }
-            60% { transform: translateX(-50%) scale(0.9); opacity: 0.7; }
-            80% { transform: translateX(-50%) scale(0.7); opacity: 0.4; }
-            100% { transform: translateX(-50%) scale(0.5); opacity: 0; }
-        }
-        
-        @keyframes comboPulseAnim {
-            0% { width: 0; height: 0; opacity: 1; }
-            100% { width: 700px; height: 700px; opacity: 0; }
-        }
-        
-        @keyframes hitMarkerAnim {
-            0% { transform: scale(0); opacity: 0; }
-            30% { transform: scale(1.5); opacity: 0.8; }
-            60% { transform: scale(1.2); opacity: 0.6; }
-            90% { transform: scale(0.8); opacity: 0.3; }
-            100% { transform: scale(0.5); opacity: 0; }
-        }
-        
-        @keyframes comboStreakAnim {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-        
-        /* Damage Hit Animation (5 seconds) */
-        @keyframes damageImpactAnim {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            20% { transform: translate(-50%, -50%) scale(2); opacity: 1; }
-            40% { transform: translate(-50%, -50%) scale(1.8); opacity: 0.8; }
-            60% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.6; }
-            80% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
-        }
-        
-        @keyframes damageCrackAnim {
-            0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); opacity: 0; }
-            30% { transform: translate(-50%, -50%) scale(2) rotate(0deg); opacity: 1; }
-            60% { transform: translate(-50%, -50%) scale(2.5) rotate(0deg); opacity: 0.7; }
-            90% { transform: translate(-50%, -50%) scale(3) rotate(0deg); opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(3.5) rotate(0deg); opacity: 0; }
-        }
-        
-        @keyframes damageParticleAnim {
-            0% { transform: scale(0) rotate(0deg); opacity: 0; }
-            20% { transform: scale(1.2) rotate(180deg); opacity: 1; }
-            50% { transform: scale(1) rotate(360deg); opacity: 0.8; }
-            80% { transform: scale(0.5) rotate(540deg); opacity: 0.3; }
-            100% { transform: scale(0) rotate(720deg); opacity: 0; }
-        }
-        
-        /* Airdrop Animation (7 seconds) */
-        @keyframes helicopterFlyIn {
-            0% { left: -200px; top: -150px; opacity: 0; }
-            15% { left: 10%; top: 20%; opacity: 1; }
-            30% { left: 30%; top: 25%; }
-            45% { left: 50%; top: 20%; }
-            60% { left: 70%; top: 25%; }
-            75% { left: 90%; top: 20%; opacity: 1; }
-            90% { left: 110%; top: -150px; opacity: 0; }
-            100% { left: 110%; top: -150px; opacity: 0; }
-        }
-        
-        @keyframes rotorSpin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes tailRotorSpin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes crateRelease {
-            0% { top: 100px; opacity: 0; transform: translateX(-50%) scale(0.5); }
-            20% { top: 30%; opacity: 1; transform: translateX(-50%) scale(1); }
-            40% { top: 50%; transform: translateX(-50%) scale(1); }
-            60% { top: 70%; transform: translateX(-50%) scale(1); }
-            80% { top: 85%; opacity: 1; transform: translateX(-50%) scale(1); }
-            100% { top: 85%; opacity: 1; transform: translateX(-50%) scale(1); }
-        }
-        
-        @keyframes parachuteFloat {
-            0% { top: 30px; opacity: 0; transform: translateX(-50%) scale(0.8); }
-            20% { top: 10%; opacity: 1; transform: translateX(-50%) scale(1); }
-            40% { top: 30%; transform: translateX(-50%) scale(1); }
-            60% { top: 50%; transform: translateX(-50%) scale(1); }
-            80% { top: 65%; opacity: 1; transform: translateX(-50%) scale(1); }
-            100% { top: 65%; opacity: 0; transform: translateX(-50%) scale(0.8); }
-        }
-        
-        @keyframes lineSwing {
-            0%, 100% { transform: translateX(0) rotate(0deg); }
-            50% { transform: translateX(10px) rotate(10deg); }
-        }
-        
-        @keyframes landingDust {
-            0% { transform: translateX(-50%) scale(0); opacity: 0; }
-            30% { transform: translateX(-50%) scale(2); opacity: 0.9; }
-            60% { transform: translateX(-50%) scale(2.5); opacity: 0.6; }
-            90% { transform: translateX(-50%) scale(3); opacity: 0.3; }
-            100% { transform: translateX(-50%) scale(3.5); opacity: 0; }
-        }
-        
-        @keyframes supplyGlowPulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
-            50% { transform: translate(-50%, -50%) scale(1.3); opacity: 0.9; }
-        }
-        
-        @keyframes lootBurst {
-            0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 0; }
-            20% { opacity: 1; }
-            50% { opacity: 0.8; }
-            80% { opacity: 0.3; }
-            100% { 
-                transform: translate(
-                    calc(-50% + ${Math.random() * 300 - 150}px), 
-                    calc(-50% + ${Math.random() * 300 - 150}px)
-                ) scale(0) rotate(1080deg); 
-                opacity: 0; 
-            }
-        }
-        
-        @keyframes lootRadianceAnim {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
-            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-        }
-        
-        /* Arrow Shot Animation (5 seconds) */
-        @keyframes arrowShotAnim {
-            0% { left: -150px; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 0.8; }
-            100% { left: 100%; opacity: 0; }
-        }
-        
-        @keyframes targetHitAnim {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            20% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
-            40% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
-            60% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
-            80% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
-        }
-        
-        @keyframes impactParticleAnim {
-            0% { transform: scale(0) rotate(0deg); opacity: 0; }
-            20% { transform: scale(1.2) rotate(180deg); opacity: 1; }
-            50% { transform: scale(1) rotate(360deg); opacity: 0.8; }
-            80% { transform: scale(0.5) rotate(540deg); opacity: 0.3; }
-            100% { transform: scale(0) rotate(720deg); opacity: 0; }
-        }
-        
-        /* Kill Feed Animation (5.5 seconds) */
-        @keyframes killFeedSlide {
-            0% { right: -100%; opacity: 0; }
-            15% { right: 20px; opacity: 1; }
-            70% { right: 20px; opacity: 1; }
-            85% { right: -100%; opacity: 0; }
-            100% { right: -100%; opacity: 0; }
-        }
-        
-        @keyframes skullFloat {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
-        
-        @keyframes bloodSplatAnim {
-            0% { transform: scale(0) rotate(0deg); opacity: 0; }
-            20% { transform: scale(1.5) rotate(180deg); opacity: 1; }
-            50% { transform: scale(1.2) rotate(360deg); opacity: 0.7; }
-            80% { transform: scale(0.8) rotate(540deg); opacity: 0.3; }
-            100% { transform: scale(0.5) rotate(720deg); opacity: 0; }
-        }
-        
-        @keyframes killStreakAnim {
-            0% { transform: scale(0.5) translate(-50%, -50%); opacity: 0; text-shadow: 0 0 0 #FF0000; }
-            20% { transform: scale(1.3) translate(-50%, -50%); opacity: 1; text-shadow: 0 0 50px #FF0000; }
-            40% { transform: scale(1.2) translate(-50%, -50%); opacity: 1; text-shadow: 0 0 70px #FF0000; }
-            60% { transform: scale(1.1) translate(-50%, -50%); opacity: 0.8; text-shadow: 0 0 50px #FF0000; }
-            80% { transform: scale(0.9) translate(-50%, -50%); opacity: 0.5; text-shadow: 0 0 30px #FF0000; }
-            100% { transform: scale(0.7) translate(-50%, -50%); opacity: 0; text-shadow: 0 0 0 #FF0000; }
-        }
-        
-        /* Sprint Animation (5 seconds) */
-        @keyframes sprintTrailAnim {
-            0% { transform: translateX(0) rotate(0deg); opacity: 0; }
-            20% { opacity: 1; }
-            80% { opacity: 0.6; }
-            100% { transform: translateX(500px) rotate(0deg); opacity: 0; }
-        }
-        
-        @keyframes windLineAnim {
-            0% { transform: translateY(-100px); opacity: 0; }
-            20% { opacity: 1; }
-            80% { opacity: 0.5; }
-            100% { transform: translateY(200px); opacity: 0; }
-        }
-        
-        @keyframes speedBurstAnim {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            30% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.8; }
-            60% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.6; }
-            90% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
-        }
-        
-        @keyframes burstParticleAnim {
-            0% { transform: scale(0) rotate(0deg); opacity: 0; }
-            20% { transform: scale(1.2) rotate(180deg); opacity: 1; }
-            50% { transform: scale(1) rotate(360deg); opacity: 0.8; }
-            80% { transform: scale(0.5) rotate(540deg); opacity: 0.3; }
-            100% { transform: scale(0) rotate(720deg); opacity: 0; }
-        }
-        
-        /* Victory Royale Animation (7.5 seconds) */
-        @keyframes crownFloat {
-            0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); opacity: 0; }
-            10% { opacity: 1; }
-            30% { transform: translateX(-50%) translateY(-30px) rotate(5deg); opacity: 1; }
-            50% { transform: translateX(-50%) translateY(0) rotate(0deg); opacity: 1; }
-            70% { transform: translateX(-50%) translateY(-30px) rotate(-5deg); opacity: 1; }
-            90% { transform: translateX(-50%) translateY(0) rotate(0deg); opacity: 1; }
-            100% { transform: translateX(-50%) translateY(0) rotate(0deg); opacity: 0; }
-        }
-        
-        @keyframes victoryTextFloat {
-            0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
-            25% { transform: translate(-50%, -50%) scale(1.1) rotate(2deg); }
-            75% { transform: translate(-50%, -50%) scale(1.1) rotate(-2deg); }
-        }
-        
-        @keyframes confettiFall {
-            0% { transform: translateY(-100px) rotate(0deg); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translateY(100vh) rotate(1440deg); opacity: 0; }
-        }
-        
-        @keyframes lightRayRotate {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-        
-        @keyframes victoryParticleAnim {
-            0% { transform: scale(0) rotate(0deg); opacity: 0; }
-            20% { transform: scale(1.2) rotate(180deg); opacity: 1; }
-            50% { transform: scale(1) rotate(360deg); opacity: 0.8; }
-            80% { transform: scale(0.5) rotate(540deg); opacity: 0.3; }
-            100% { transform: scale(0) rotate(720deg); opacity: 0; }
-        }
-        
-        @keyframes platformGlow {
-            0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.5; }
-            50% { transform: translateX(-50%) scale(1.1); opacity: 0.8; }
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .visual-animation-modal-content {
-                width: 98%;
-                max-height: 90vh;
-            }
-            
-            .visual-animation-grid {
-                gap: 15px;
-            }
-            
-            .visual-animation-item {
-                padding: 15px 10px;
-            }
-            
-            .visual-animation-preview {
-                width: 60px;
-                height: 60px;
-            }
+        .create-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
     `;
 
     const styleSheet = document.createElement('style');
-    styleSheet.id = 'visual-animation-styles';
+    styleSheet.id = 'sticker-styles';
     styleSheet.textContent = styles;
     document.head.appendChild(styleSheet);
 }
 
-// Simple notification function
-window.showVisualNotification = function(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#ff0000' : type === 'success' ? '#4CAF50' : type === 'warning' ? '#ff9800' : '#2196F3'};
-        color: white;
-        padding: 15px 25px;
-        border-radius: 10px;
-        z-index: 10000;
-        max-width: 300px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.4);
-        font-weight: 600;
-        animation: slideIn 0.3s ease;
-        border-left: 5px solid ${type === 'error' ? '#cc0000' : type === 'success' ? '#2E7D32' : type === 'warning' ? '#f57c00' : '#1565C0'};
-        font-family: Arial, sans-serif;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
-};
-
-// Add slideIn and slideOut animations
-if (!document.getElementById('visual-notification-animations')) {
-    const animationStyles = document.createElement('style');
-    animationStyles.id = 'visual-notification-animations';
-    animationStyles.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(animationStyles);
-}
-
 // Clean up when page unloads
 window.addEventListener('beforeunload', () => {
-    cleanupAnimationListener();
+    closeStickerPicker();
+    if (stickerListenerUnsubscribe) {
+        stickerListenerUnsubscribe();
+    }
+    if (messageObserver) {
+        messageObserver.disconnect();
+    }
 });
 
-// Export for use with group.js
-window.visualAnimations = {
-    VISUAL_ANIMATIONS,
-    triggerVisualAnimation,
-    showVisualNotification,
-    initGroupAnimationLibrary
+// Make functions available globally
+window.stickerFunctions = {
+    openStickerPicker,
+    closeStickerPicker,
+    loadUserStickers,
+    loadSavedStickers
 };

@@ -1,4 +1,3 @@
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -42,19 +41,20 @@
     margin-bottom: 4px !important;
 }
 
-/* Your messages (sent by you) - Darker gray on right */
+/* REMOVED ALL BACKGROUND COLORS FROM MESSAGES */
+/* Your messages (sent by you) - NO BACKGROUND */
 .message-text[style*="margin-left: auto;"] {
-    background: #202c33 !important; /* Dark gray */
+    background: transparent !important; /* NO BACKGROUND */
     color: #e9edef !important; /* Light text */
-    border: 1px solid #2a3942 !important;
+    border: none !important; /* NO BORDER */
     margin-left: auto !important;
 }
 
-/* Others' messages - Slightly lighter dark gray on left */
+/* Others' messages - NO BACKGROUND */
 .message-text[style*="margin-right: auto;"] {
-    background: #2a3942 !important; /* Slightly lighter dark gray */
+    background: transparent !important; /* NO BACKGROUND */
     color: #e9edef !important; /* Light text */
-    border: 1px solid #202c33 !important;
+    border: none !important; /* NO BORDER */
     margin-right: auto !important;
 }
 
@@ -1624,7 +1624,7 @@ video:hover {
             background: var(--bg-primary);
             position: relative;
             width: 100%;
-            background-image: url('darkwallpaper.jpg');
+            background-image: url('darkwallpapers.jpgh');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -1688,12 +1688,14 @@ video:hover {
             cursor: pointer;
             max-width: 100%;
             overflow-wrap: break-word;
-            color:black;
+            color: #e9edef !important;
+            background: transparent !important; /* REMOVED ALL BACKGROUNDS */
+            border: none !important; /* REMOVED ALL BORDERS */
         }
 
         /* System message styling */
         .system-message {
-            background: rgba(0,0,0,0.02);
+            background: transparent !important;
             text-align: center;
             color: var(--text-light);
             font-style: italic;
@@ -1705,7 +1707,7 @@ video:hover {
 
         /* Reply preview in messages */
         .replying-to {
-            background: rgba(114, 137, 218, 0.08);
+            background: transparent !important;
             border-left: 3px solid #7289da;
             padding: 6px 10px;
             margin-bottom: 6px;
@@ -1729,7 +1731,7 @@ video:hover {
 
         /* Reply Indicator (shown when replying to a message) */
         .reply-indicator {
-            background: rgba(114, 137, 218, 0.1);
+            background: transparent !important;
             border-left: 3px solid #7289da;
             padding: 10px 12px;
             margin: 0;
