@@ -5,13 +5,13 @@ import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyC8_PEsfTOr-gJ8P1MoXobOAfqwTVqEZWo",
-    authDomain: "usa-dating-23bc3.firebaseapp.com",
-    projectId: "usa-dating-23bc3",
-    storageBucket: "usa-dating-23bc3.firebasestorage.app",
-    messagingSenderId: "423286263327",
-    appId: "1:423286263327:web:17f0caf843dc349c144f2a"
-  };
+    apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
+    authDomain: "crypto-6517d.firebaseapp.com",
+    projectId: "crypto-6517d",
+    storageBucket: "crypto-6517d.firebasestorage.app",
+    messagingSenderId: "60263975159",
+    appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
+};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);

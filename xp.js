@@ -23,7 +23,7 @@ const firebaseConfig = {
     storageBucket: "crypto-6517d.firebasestorage.app",
     messagingSenderId: "60263975159",
     appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-  }
+}
 
 // Initialize Firebase
 let app, auth, db;
@@ -149,6 +149,8 @@ class XPSystem {
         this.dailyCheckIn = false;
         this.onlineTimer = null;
         this.onlineStartTime = null;
+        // NEW: Track XP rewards per day
+        this.dailyXPLimit = 2; // Maximum XP rewards per day
     }
 
     async initialize() {
@@ -239,6 +241,9 @@ class XPSystem {
                 type: "earned"
             };
 
+            // NEW: Initialize daily reward tracking
+            const today = new Date().toDateString();
+            
             const initialXPData = {
                 userId: this.currentUser.uid,
                 totalXP: 10,
@@ -250,7 +255,16 @@ class XPSystem {
                 achievements: [],
                 created: Timestamp.now(),
                 updated: Timestamp.now(),
-                lastDailyCheckIn: null
+                lastDailyCheckIn: null,
+                // NEW: Track daily XP rewards
+                dailyRewards: {
+                    date: today,
+                    count: 1, // Welcome bonus counts as 1 reward
+                    rewards: [{
+                        reason: "Welcome Bonus",
+                        timestamp: Timestamp.now()
+                    }]
+                }
             };
 
             await setDoc(doc(db, 'xpData', this.currentUser.uid), initialXPData);
@@ -273,8 +287,12 @@ class XPSystem {
                 const data = xpSnap.data();
                 // Check if user has less than 50 XP (likely new)
                 if (data.totalXP < 50 && data.xpHistory && data.xpHistory.length <= 1) {
-                    await this.addXP(10, "Welcome to Gamers Network!");
-                    this.showXPGainAnimation(10, "Welcome Bonus!");
+                    // NEW: Check daily limit before awarding
+                    const canAward = await this.checkDailyRewardLimit("Welcome Bonus");
+                    if (canAward) {
+                        await this.addXP(10, "Welcome to Gamers Network!");
+                        this.showXPGainAnimation(10, "Welcome Bonus!");
+                    }
                 }
             }
         } catch (error) {
@@ -282,9 +300,176 @@ class XPSystem {
         }
     }
 
+    // NEW: Check if user hasn't exceeded daily XP reward limit
+    async checkDailyRewardLimit(reason) {
+        try {
+            if (!this.currentUser || !this.xpData) return false;
+            
+            const today = new Date().toDateString();
+            const xpRef = doc(db, 'xpData', this.currentUser.uid);
+            
+            // Get fresh data
+            const xpSnap = await getDoc(xpRef);
+            if (!xpSnap.exists()) return false;
+            
+            const data = xpSnap.data();
+            
+            // Initialize daily rewards tracking if it doesn't exist
+            if (!data.dailyRewards) {
+                const initialDailyRewards = {
+                    date: today,
+                    count: 0,
+                    rewards: []
+                };
+                
+                await updateDoc(xpRef, {
+                    dailyRewards: initialDailyRewards
+                });
+                
+                // Reload data
+                const newSnap = await getDoc(xpRef);
+                this.xpData = newSnap.data();
+                return true; // First reward of the day
+            }
+            
+            // Check if it's a new day
+            if (data.dailyRewards.date !== today) {
+                // Reset daily counter for new day
+                await updateDoc(xpRef, {
+                    'dailyRewards.date': today,
+                    'dailyRewards.count': 0,
+                    'dailyRewards.rewards': []
+                });
+                
+                // Reload data
+                const newSnap = await getDoc(xpRef);
+                this.xpData = newSnap.data();
+                return true; // New day, can reward
+            }
+            
+            // Check if user has reached the daily limit
+            if (data.dailyRewards.count >= this.dailyXPLimit) {
+                console.log(`XP System: Daily limit reached (${this.dailyXPLimit}/${this.dailyXPLimit}) - No more XP today`);
+                
+                // Show notification that daily limit is reached
+                this.showDailyLimitNotification();
+                
+                return false; // Limit reached
+            }
+            
+            return true; // Within limit
+        } catch (error) {
+            console.error('XP System: Error checking daily reward limit:', error);
+            return false;
+        }
+    }
+
+    // NEW: Track daily reward usage
+    async trackDailyReward(reason) {
+        try {
+            if (!this.currentUser || !this.xpData) return;
+            
+            const today = new Date().toDateString();
+            const xpRef = doc(db, 'xpData', this.currentUser.uid);
+            
+            const rewardEntry = {
+                reason: reason,
+                timestamp: Timestamp.now()
+            };
+            
+            // Update daily rewards count and list
+            await updateDoc(xpRef, {
+                'dailyRewards.count': increment(1),
+                'dailyRewards.rewards': arrayUnion(rewardEntry)
+            });
+            
+            // Reload data
+            const xpSnap = await getDoc(xpRef);
+            this.xpData = xpSnap.data();
+            
+            console.log(`XP System: Daily reward tracked (${this.xpData.dailyRewards.count}/${this.dailyXPLimit})`);
+        } catch (error) {
+            console.error('XP System: Error tracking daily reward:', error);
+        }
+    }
+
+    // NEW: Show notification when daily limit is reached
+    showDailyLimitNotification() {
+        if (window.location.pathname.includes('xp.html')) return;
+        
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            background: linear-gradient(135deg, #ff6b6b, #ff4757);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.3);
+            animation: slideInRight 0.3s ease-out;
+        `;
+        
+        notification.innerHTML = `
+            <span style="font-size: 20px;">⏰</span>
+            <div>
+                <div style="font-weight: bold;">Daily Limit Reached!</div>
+                <div style="font-size: 12px; opacity: 0.9;">Come back tomorrow for more XP</div>
+            </div>
+            <button onclick="this.parentElement.remove()" style="
+                background: transparent;
+                border: none;
+                color: white;
+                font-size: 18px;
+                cursor: pointer;
+                margin-left: 10px;
+                opacity: 0.8;
+            ">×</button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 4000);
+        
+        if (!document.getElementById('slideInRightAnimation')) {
+            const style = document.createElement('style');
+            style.id = 'slideInRightAnimation';
+            style.textContent = `
+                @keyframes slideInRight {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    // MODIFIED: addXP with daily limit check
     async addXP(amount, reason) {
         try {
             if (!this.currentUser || !this.xpData) return false;
+            
+            // NEW: Check daily limit for non-bonus rewards
+            // Skip limit check for level up bonuses and welcome bonus
+            const skipLimitCheck = reason.includes("Level") || reason.includes("Welcome") || reason.includes("Daily Login");
+            
+            if (!skipLimitCheck) {
+                const canAward = await this.checkDailyRewardLimit(reason);
+                if (!canAward) {
+                    console.log(`XP System: Daily limit reached - not awarding ${amount} XP for "${reason}"`);
+                    return false;
+                }
+            }
             
             const xpRef = doc(db, 'xpData', this.currentUser.uid);
             
@@ -303,6 +488,11 @@ class XPSystem {
                 updated: Timestamp.now(),
                 xpHistory: arrayUnion(historyItem)
             });
+            
+            // NEW: Track daily reward (skip for level up and welcome bonuses)
+            if (!skipLimitCheck) {
+                await this.trackDailyReward(reason);
+            }
             
             // Reload XP data
             const xpSnap = await getDoc(xpRef);
@@ -383,7 +573,7 @@ class XPSystem {
                     xpHistory: arrayUnion(historyItem)
                 });
                 
-                // Add bonus coins for leveling up
+                // Add bonus coins for leveling up (this doesn't count toward daily XP limit)
                 await this.addCoins(50, `Level ${nextLevel} Bonus`);
                 
                 // Show level up notification
@@ -447,7 +637,7 @@ class XPSystem {
                     new Date(data.lastDailyCheckIn.seconds * 1000).toDateString() : null;
                 
                 if (lastCheckIn !== today) {
-                    // Give daily XP
+                    // Give daily XP (this doesn't count toward the 2-reward limit)
                     await updateDoc(xpRef, {
                         lastDailyCheckIn: Timestamp.now(),
                         dailyCheckIns: arrayUnion(today)
@@ -484,16 +674,20 @@ class XPSystem {
                 
                 // Only award if at least 3 minutes have passed since last award
                 if (!lastXPTime || (now - lastXPTime.seconds * 1000) >= 3 * 60 * 1000) {
-                    await this.addXP(10, "3 Minutes Online Activity");
-                    await this.addCoins(1, "Online Time Bonus");
-                    
-                    // Update last XP time
-                    const xpRef = doc(db, 'xpData', this.currentUser.uid);
-                    await updateDoc(xpRef, {
-                        lastOnlineXP: Timestamp.now()
-                    });
-                    
-                    console.log('XP System: Awarded online activity XP');
+                    // NEW: Check daily limit before awarding online XP
+                    const canAward = await this.checkDailyRewardLimit("3 Minutes Online");
+                    if (canAward) {
+                        await this.addXP(10, "3 Minutes Online Activity");
+                        await this.addCoins(1, "Online Time Bonus");
+                        
+                        // Update last XP time
+                        const xpRef = doc(db, 'xpData', this.currentUser.uid);
+                        await updateDoc(xpRef, {
+                            lastOnlineXP: Timestamp.now()
+                        });
+                        
+                        console.log('XP System: Awarded online activity XP');
+                    }
                 }
             }
         }, 60000);
@@ -1240,6 +1434,23 @@ class XPSystem {
         return false;
     }
 
+    // NEW: Get remaining daily rewards
+    getRemainingDailyRewards() {
+        if (!this.xpData || !this.xpData.dailyRewards) {
+            return this.dailyXPLimit;
+        }
+        
+        const today = new Date().toDateString();
+        
+        // Reset if it's a new day
+        if (this.xpData.dailyRewards.date !== today) {
+            return this.dailyXPLimit;
+        }
+        
+        const used = this.xpData.dailyRewards.count || 0;
+        return Math.max(0, this.dailyXPLimit - used);
+    }
+
     getRankInfo(level) {
         return XP_RANKS[level - 1] || XP_RANKS[XP_RANKS.length - 1];
     }
@@ -1253,7 +1464,10 @@ class XPSystem {
             totalXP: this.xpData.totalXP || 0,
             coins: this.xpData.coins || 0,
             progress: this.getProgressPercentage(),
-            nextRank: this.getNextRank()
+            nextRank: this.getNextRank(),
+            // NEW: Include daily reward info in stats
+            dailyRewardsRemaining: this.getRemainingDailyRewards(),
+            dailyRewardLimit: this.dailyXPLimit
         };
     }
 }
@@ -1274,6 +1488,7 @@ window.awardXP = (amount, reason) => xpSystem.addXP(amount, reason);
 window.awardCoins = (amount, reason) => xpSystem.addCoins(amount, reason);
 window.getUserXPStats = () => xpSystem.getUserStats();
 window.getRankInfo = (level) => xpSystem.getRankInfo(level);
+window.getRemainingDailyRewards = () => xpSystem.getRemainingDailyRewards(); // NEW
 
 // Function to initialize XP system from other pages
 window.initializeXPSystem = function() {
