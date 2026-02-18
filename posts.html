@@ -1471,18 +1471,10 @@
             if (typeof feather !== 'undefined') {
                 feather.replace();
             }
-            
-            // Mobile menu toggle
-            const mobileMenu = document.getElementById('mobile-menu');
-            const navMenu = document.getElementById('nav-menu');
-            
-            if (mobileMenu) {
-                mobileMenu.addEventListener('click', function() {
-                    navMenu.classList.toggle('active');
-                });
-            }
+
         });
         
+
         // Helper function for your JavaScript
         window.clearLoadingStates = function() {
             const postsContainer = document.getElementById('postsContainer');
