@@ -29,8 +29,7 @@ const firebaseConfig = {
     storageBucket: "crypto-6517d.firebasestorage.app",
     messagingSenderId: "60263975159",
     appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-  };
-
+};
 
 // Initialize Firebase
 let app, auth, db;
@@ -856,8 +855,9 @@ async function saveIntroSelection() {
         });
         
         // Also update gamer profile if it exists
-        const gamerProfileRef = collection(db, 'users', currentUser.uid, 'gamerProfile');
-        const gamerProfileSnap = await getDocs(gamerProfileRef);
+        const gamerProfileRef = collection(db, 'gamerProfile');
+        const gamerProfileQuery = query(gamerProfileRef, where("userId", "==", currentUser.uid));
+        const gamerProfileSnap = await getDocs(gamerProfileQuery);
         
         if (!gamerProfileSnap.empty) {
             const profileDoc = gamerProfileSnap.docs[0];
@@ -920,8 +920,9 @@ async function initGamersProfilePage() {
                 const userData = userDoc.data();
                 if (userData.introAnimation) {
                     // Get gamer profile data for animation
-                    const gamerProfileRef = collection(db, 'users', userId, 'gamerProfile');
-                    const gamerProfileSnap = await getDocs(gamerProfileRef);
+                    const gamerProfileRef = collection(db, 'gamerProfile');
+                    const gamerProfileQuery = query(gamerProfileRef, where("userId", "==", userId));
+                    const gamerProfileSnap = await getDocs(gamerProfileQuery);
                     
                     if (!gamerProfileSnap.empty) {
                         let gamerProfileData = null;
@@ -1850,9 +1851,9 @@ async function loadPublicGamerProfile(userId, profileId) {
         
         const userData = userDoc.data();
         
-        // Get gamer profile
-        const gamerProfileRef = collection(db, 'users', userId, 'gamerProfile');
-        const gamerProfileQuery = query(gamerProfileRef);
+        // Get gamer profile from main gamerProfile collection
+        const gamerProfileRef = collection(db, 'gamerProfile');
+        const gamerProfileQuery = query(gamerProfileRef, where("userId", "==", userId));
         const gamerProfileSnap = await getDocs(gamerProfileQuery);
         
         if (gamerProfileSnap.empty) {
@@ -1877,7 +1878,7 @@ async function loadPublicGamerProfile(userId, profileId) {
             return;
         }
         
-        console.log('Found gamer profile:', gamerProfileData.gamerTag);
+        console.log('Found gamer profile:', gamerProfileData);
         
         // Update UI
         updateGamersProfileUI(userData, gamerProfileData);
@@ -1892,6 +1893,8 @@ async function loadPublicGamerProfile(userId, profileId) {
 }
 
 function updateGamersProfileUI(userData, gamerProfileData) {
+    console.log('Updating UI with profile data:', gamerProfileData);
+    
     // Profile Avatar
     const profileAvatar = document.getElementById('profileAvatar');
     if (profileAvatar) {
@@ -2357,13 +2360,13 @@ async function loadGamerProfile(userId) {
     try {
         console.log('Loading gamer profile for user:', userId);
         
-        const gamerProfileRef = collection(db, 'users', userId, 'gamerProfile');
-        const gamerProfileQuery = query(gamerProfileRef);
+        const gamerProfileRef = collection(db, 'gamerProfile');
+        const gamerProfileQuery = query(gamerProfileRef, where("userId", "==", userId));
         const gamerProfileSnap = await getDocs(gamerProfileQuery);
         
         if (!gamerProfileSnap.empty) {
             const profileData = gamerProfileSnap.docs[0].data();
-            console.log('Found existing gamer profile:', profileData.gamerTag);
+            console.log('Found existing gamer profile:', profileData);
             
             // Display current profile
             displayCurrentProfile(profileData);
@@ -2543,6 +2546,7 @@ async function handleGamerProfileSubmit(e) {
             micPreference: document.getElementById('micPreference').value,
             achievements: document.getElementById('achievements').value.trim(),
             hoursPlayed: parseInt(document.getElementById('hoursPlayed').value) || null,
+            userId: currentUser.uid,
             updatedAt: serverTimestamp()
         };
         
@@ -2578,8 +2582,8 @@ async function handleGamerProfileSubmit(e) {
         
         if (existingProfile) {
             // Update existing profile
-            const gamerProfileRef = collection(db, 'users', currentUser.uid, 'gamerProfile');
-            const gamerProfileQuery = query(gamerProfileRef);
+            const gamerProfileRef = collection(db, 'gamerProfile');
+            const gamerProfileQuery = query(gamerProfileRef, where("userId", "==", currentUser.uid));
             const gamerProfileSnap = await getDocs(gamerProfileQuery);
             
             if (!gamerProfileSnap.empty) {
@@ -2590,9 +2594,8 @@ async function handleGamerProfileSubmit(e) {
         } else {
             // Create new profile
             gamerProfileData.createdAt = serverTimestamp();
-            gamerProfileData.userId = currentUser.uid;
             
-            await addDoc(collection(db, 'users', currentUser.uid, 'gamerProfile'), gamerProfileData);
+            await addDoc(collection(db, 'gamerProfile'), gamerProfileData);
             showNotification('Gamer profile created successfully!', 'success');
         }
         
@@ -2607,8 +2610,8 @@ async function handleGamerProfileSubmit(e) {
 
 async function getCurrentGamerProfile(userId) {
     try {
-        const gamerProfileRef = collection(db, 'users', userId, 'gamerProfile');
-        const gamerProfileQuery = query(gamerProfileRef);
+        const gamerProfileRef = collection(db, 'gamerProfile');
+        const gamerProfileQuery = query(gamerProfileRef, where("userId", "==", userId));
         const gamerProfileSnap = await getDocs(gamerProfileQuery);
         
         if (!gamerProfileSnap.empty) {
@@ -2689,8 +2692,8 @@ async function generatePublicProfile() {
         const profileId = generateProfileId();
         
         // Save public profile ID
-        const gamerProfileRef = collection(db, 'users', currentUser.uid, 'gamerProfile');
-        const gamerProfileQuery = query(gamerProfileRef);
+        const gamerProfileRef = collection(db, 'gamerProfile');
+        const gamerProfileQuery = query(gamerProfileRef, where("userId", "==", currentUser.uid));
         const gamerProfileSnap = await getDocs(gamerProfileQuery);
         
         if (!gamerProfileSnap.empty) {
@@ -2802,14 +2805,15 @@ async function loadProfileGamerInfo(profileId) {
     try {
         console.log('Loading gamer info for profile:', profileId);
         
-        const gamerProfileRef = collection(db, 'users', profileId, 'gamerProfile');
-        const gamerProfileQuery = query(gamerProfileRef);
+        // Query the main gamerProfile collection for profiles with this userId
+        const gamerProfileRef = collection(db, 'gamerProfile');
+        const gamerProfileQuery = query(gamerProfileRef, where("userId", "==", profileId));
         const gamerProfileSnap = await getDocs(gamerProfileQuery);
         
         if (!gamerProfileSnap.empty) {
             const profileData = gamerProfileSnap.docs[0].data();
             
-            console.log('Found gamer profile:', profileData.gamerTag);
+            console.log('Found gamer profile:', profileData);
             
             // Show gamer badge
             const gamerBadge = document.getElementById('gamerBadge');
@@ -2822,65 +2826,88 @@ async function loadProfileGamerInfo(profileId) {
             if (gamerProfileSection) {
                 gamerProfileSection.style.display = 'block';
                 
-                // Update basic info
+                // Update basic info - this matches your screenshot
                 const gamerBasicInfo = document.getElementById('gamerBasicInfo');
                 if (gamerBasicInfo) {
                     let basicInfoHTML = '';
+                    
+                    if (profileData.gamerTag) {
+                        basicInfoHTML += `
+                            <div class="gamer-info-row">
+                                <i class="fas fa-user"></i>
+                                <span><strong>Gamer Tag:</strong> ${profileData.gamerTag}</span>
+                            </div>
+                        `;
+                    }
                     
                     if (profileData.primaryGame) {
                         basicInfoHTML += `
                             <div class="gamer-info-row">
                                 <i class="fas fa-gamepad"></i>
-                                <span><strong>Game:</strong> ${profileData.primaryGame}</span>
+                                <span><strong>Primary Game:</strong> ${profileData.primaryGame}</span>
                             </div>
                         `;
                     }
                     
-                    if (profileData.platform) {
+                    if (profileData.rank) {
                         basicInfoHTML += `
                             <div class="gamer-info-row">
-                                <i class="fas fa-tv"></i>
-                                <span><strong>Platform:</strong> ${profileData.platform}</span>
+                                <i class="fas fa-trophy"></i>
+                                <span><strong>Rank:</strong> ${profileData.rank}</span>
                             </div>
                         `;
                     }
                     
-                    if (profileData.playStyle) {
+                    if (profileData.level) {
                         basicInfoHTML += `
                             <div class="gamer-info-row">
-                                <i class="fas fa-users"></i>
-                                <span><strong>Play Style:</strong> ${profileData.playStyle}</span>
+                                <i class="fas fa-level-up-alt"></i>
+                                <span><strong>Level:</strong> ${profileData.level}</span>
                             </div>
                         `;
                     }
                     
-                    gamerBasicInfo.innerHTML = basicInfoHTML;
+                    gamerBasicInfo.innerHTML = basicInfoHTML || '<div class="gamer-info-row">No gaming info available</div>';
                 }
                 
-                // Update stats grid
+                // Update stats grid - this matches your screenshot with WINS, LOSSES, K/D, HOURS
                 const gamerStatsGrid = document.getElementById('gamerStatsGrid');
                 if (gamerStatsGrid) {
                     let statsHTML = '';
                     
-                    const stats = [
-                        { label: 'Rank', value: profileData.rank, icon: 'fa-trophy' },
-                        { label: 'Level', value: profileData.level, icon: 'fa-level-up-alt' },
-                        { label: 'K/D', value: profileData.kdRatio, icon: 'fa-crosshairs' },
-                        { label: 'Win Rate', value: profileData.winRate ? `${profileData.winRate}%` : null, icon: 'fa-chart-line' },
-                        { label: 'Total Kills', value: profileData.totalKills, icon: 'fa-skull' },
-                        { label: 'Hours', value: profileData.hoursPlayed, icon: 'fa-clock' }
-                    ];
+                    // Wins (you might need to calculate this from totalKills or have a separate wins field)
+                    // For now, let's use totalKills as an example or create a wins field
+                    const wins = profileData.wins || 0;
+                    const losses = profileData.losses || 0;
                     
-                    stats.forEach(stat => {
-                        if (stat.value) {
-                            statsHTML += `
-                                <div class="gamer-stat-card">
-                                    <div class="stat-value">${stat.value}</div>
-                                    <div class="stat-label">${stat.label}</div>
-                                </div>
-                            `;
-                        }
-                    });
+                    statsHTML += `
+                        <div class="gamer-stat-card">
+                            <div class="stat-value">${wins}</div>
+                            <div class="stat-label">WINS</div>
+                        </div>
+                        <div class="gamer-stat-card">
+                            <div class="stat-value">${losses}</div>
+                            <div class="stat-label">LOSSES</div>
+                        </div>
+                    `;
+                    
+                    if (profileData.kdRatio) {
+                        statsHTML += `
+                            <div class="gamer-stat-card">
+                                <div class="stat-value">${profileData.kdRatio}</div>
+                                <div class="stat-label">K/D RATIO</div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (profileData.hoursPlayed) {
+                        statsHTML += `
+                            <div class="gamer-stat-card">
+                                <div class="stat-value">${profileData.hoursPlayed}</div>
+                                <div class="stat-label">HOURS PLAYED</div>
+                            </div>
+                        `;
+                    }
                     
                     gamerStatsGrid.innerHTML = statsHTML;
                 }
@@ -2911,6 +2938,12 @@ async function loadProfileGamerInfo(profileId) {
             }
         } else {
             console.log('No gamer profile found for this user');
+            
+            // Hide gamer section if no profile
+            const gamerProfileSection = document.getElementById('gamerProfileSection');
+            if (gamerProfileSection) {
+                gamerProfileSection.style.display = 'none';
+            }
         }
     } catch (error) {
         console.error('Error loading profile gamer info:', error);
