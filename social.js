@@ -1,4 +1,4 @@
-// social.js - Complete independent social features module for dating site WITH POLLING, REPLIES, FOLLOWERS INTEGRATION, AND VIDEO POSTING
+// social.js - Complete independent social features module for dating site WITH POLLING, REPLIES, FOLLOWERS INTEGRATION, VIDEO POSTING, AND VOTE BUTTONS
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, 
@@ -100,6 +100,7 @@ class SocialManager {
         
         this.viewedPosts = new Set();
         this.likedPosts = new Set();
+        this.votedPosts = new Map(); // Store user votes for posts (up/down)
         this.lastVisiblePost = null;
         this.isLoading = false;
         this.hasMorePosts = true;
@@ -140,6 +141,7 @@ class SocialManager {
                 this.setupGlobalEventListeners();
                 this.loadViewedPosts();
                 this.loadLikedPosts();
+                this.loadVotedPosts();
                 this.loadViewedPYMKProfiles();
                 this.setupPollEventListeners();
             } else {
@@ -150,6 +152,143 @@ class SocialManager {
                 }
             }
         });
+    }
+
+    // ==================== VOTE FUNCTIONS (UP/DOWN ARROWS) ====================
+    
+    loadVotedPosts() {
+        if (!this.currentUser) return;
+        const stored = localStorage.getItem(`votedPosts_${this.currentUser.uid}`);
+        if (stored) {
+            try {
+                this.votedPosts = new Map(JSON.parse(stored));
+            } catch (e) {
+                this.votedPosts = new Map();
+            }
+        }
+    }
+
+    saveVotedPosts() {
+        if (!this.currentUser) return;
+        try {
+            localStorage.setItem(`votedPosts_${this.currentUser.uid}`, JSON.stringify([...this.votedPosts]));
+        } catch (e) {
+            console.error('Error saving voted posts:', e);
+        }
+    }
+
+    getUserVoteForPost(postId) {
+        return this.votedPosts.get(postId) || null; // Returns 'up', 'down', or null
+    }
+
+    async handleVote(postId, voteType, voteButton) {
+        if (!this.currentUser) {
+            alert('Please login to vote');
+            return;
+        }
+
+        // Prevent multiple rapid clicks
+        if (voteButton.classList.contains('voting')) {
+            return;
+        }
+        
+        voteButton.classList.add('voting');
+
+        try {
+            const postRef = doc(db, 'posts', postId);
+            const postSnap = await getDoc(postRef);
+            
+            if (!postSnap.exists()) {
+                console.error('Post not found');
+                voteButton.classList.remove('voting');
+                return;
+            }
+
+            const post = postSnap.data();
+            const currentVote = this.getUserVoteForPost(postId);
+            
+            // Initialize vote counts if they don't exist
+            let upvotes = post.upvotes || 0;
+            let downvotes = post.downvotes || 0;
+            
+            let newVoteType = voteType;
+            
+            // If user clicked the same button, remove their vote
+            if (currentVote === voteType) {
+                if (voteType === 'up') {
+                    upvotes = Math.max(0, upvotes - 1);
+                } else if (voteType === 'down') {
+                    downvotes = Math.max(0, downvotes - 1);
+                }
+                this.votedPosts.delete(postId);
+                newVoteType = null;
+            } 
+            // If user had opposite vote, switch their vote
+            else if (currentVote === 'up' && voteType === 'down') {
+                upvotes = Math.max(0, upvotes - 1);
+                downvotes += 1;
+                this.votedPosts.set(postId, 'down');
+            }
+            else if (currentVote === 'down' && voteType === 'up') {
+                downvotes = Math.max(0, downvotes - 1);
+                upvotes += 1;
+                this.votedPosts.set(postId, 'up');
+            }
+            // If user had no vote, add their vote
+            else if (!currentVote) {
+                if (voteType === 'up') {
+                    upvotes += 1;
+                } else if (voteType === 'down') {
+                    downvotes += 1;
+                }
+                this.votedPosts.set(postId, voteType);
+            }
+            
+            // Update Firestore
+            await updateDoc(postRef, {
+                upvotes: upvotes,
+                downvotes: downvotes,
+                updatedAt: serverTimestamp()
+            });
+            
+            // Save to localStorage
+            this.saveVotedPosts();
+            
+            // Update UI
+            this.updateVoteUI(postId, upvotes, downvotes, this.votedPosts.get(postId) || null);
+            
+            this.showNotification(
+                newVoteType ? `Voted ${newVoteType}!` : 'Vote removed',
+                'success'
+            );
+            
+        } catch (error) {
+            console.error('Error voting:', error);
+            this.showNotification('Error voting: ' + error.message, 'error');
+        } finally {
+            voteButton.classList.remove('voting');
+        }
+    }
+
+    updateVoteUI(postId, upvotes, downvotes, userVote) {
+        const postElement = document.querySelector(`.post-item[data-post-id="${postId}"]`);
+        if (!postElement) return;
+        
+        const upvoteBtn = postElement.querySelector('.vote-btn.up');
+        const downvoteBtn = postElement.querySelector('.vote-btn.down');
+        const upvoteCount = postElement.querySelector('.upvote-count');
+        const downvoteCount = postElement.querySelector('.downvote-count');
+        
+        if (upvoteCount) upvoteCount.textContent = this.formatCount(upvotes);
+        if (downvoteCount) downvoteCount.textContent = this.formatCount(downvotes);
+        
+        // Update active states
+        if (upvoteBtn) {
+            upvoteBtn.classList.toggle('active', userVote === 'up');
+        }
+        if (downvoteBtn) {
+            downvoteBtn.classList.toggle('active', userVote === 'down');
+        }
     }
 
     // ==================== POLL EVENT LISTENERS ====================
@@ -260,6 +399,104 @@ class SocialManager {
             const style = document.createElement('style');
             style.id = 'socialManagerStyles';
             style.textContent = `
+                /* ========== VOTE BUTTON STYLES ========== */
+                .post-actions {
+                    display: flex;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 5px;
+                    padding: 10px 0;
+                }
+                
+                .vote-buttons {
+                    display: flex;
+                    align-items: center;
+                    gap: 2px;
+                    margin-right: 5px;
+                    background: rgba(255, 255, 255, 0.05);
+                    border-radius: 30px;
+                    padding: 2px;
+                }
+                
+                .vote-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    background: transparent;
+                    border: none;
+                    color: #b9bbbe;
+                    font-size: 13px;
+                    cursor: pointer;
+                    padding: 6px 10px;
+                    border-radius: 30px;
+                    transition: all 0.2s ease;
+                    min-width: 50px;
+                    justify-content: center;
+                }
+                
+                .vote-btn i {
+                    font-size: 16px;
+                    transition: transform 0.2s;
+                }
+                
+                .vote-btn.up:hover {
+                    background: rgba(52, 168, 83, 0.15);
+                    color: #34a853;
+                }
+        
+                .vote-btn.down:hover {
+                    background: rgba(234, 67, 53, 0.15);
+                    color: #ea4335;
+                }
+                
+                .vote-btn.up.active {
+                    color: #34a853;
+                    background: rgba(52, 168, 83, 0.2);
+                }
+                
+                .vote-btn.down.active {
+                    color: #ea4335;
+                    background: rgba(234, 67, 53, 0.2);
+                }
+                
+                .vote-count {
+                    font-weight: 600;
+                    min-width: 20px;
+                    text-align: center;
+                }
+                
+                .post-action {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: transparent;
+                    border: none;
+                    color: #b9bbbe;
+                    font-size: 13px;
+                    cursor: pointer;
+                    padding: 6px 12px;
+                    border-radius: 30px;
+                    transition: all 0.2s ease;
+                }
+                
+                .post-action:hover {
+                    background: rgba(255, 75, 110, 0.1);
+                    color: #ff4b6e;
+                }
+                
+                .post-action.liked {
+                    color: #ff4b6e;
+                }
+                
+                .post-action.liked i {
+                    color: #ff4b6e;
+                }
+                
+                .post-action.active {
+                    color: #ff4b6e;
+                    background: rgba(255, 75, 110, 0.1);
+                }
+
                 /* ========== VIDEO THUMBNAIL STYLES ========== */
                 .video-thumbnail-container {
                     position: relative;
@@ -1749,6 +1986,19 @@ class SocialManager {
                         width: 100%;
                         border-radius: 30px;
                     }
+                    
+                    .vote-buttons {
+                        margin-right: 2px;
+                    }
+                    
+                    .vote-btn {
+                        padding: 4px 8px;
+                        min-width: 40px;
+                    }
+                    
+                    .post-action {
+                        padding: 4px 10px;
+                    }
                 }
             `;
             document.head.appendChild(style);
@@ -2387,6 +2637,8 @@ class SocialManager {
                 updatedAt: serverTimestamp(),
                 likes: 0,
                 commentsCount: 0,
+                upvotes: 0,
+                downvotes: 0,
                 mediaType: 'poll',
                 poll: {
                     question: pollQuestion,
@@ -3141,7 +3393,9 @@ class SocialManager {
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
                 likes: 0,
-                commentsCount: 0
+                commentsCount: 0,
+                upvotes: 0,
+                downvotes: 0
             };
 
             if (mediaData) {
@@ -3640,6 +3894,9 @@ class SocialManager {
         }
         
         const isLiked = this.likedPosts.has(post.id);
+        const userVote = this.getUserVoteForPost(post.id);
+        const upvotes = post.upvotes || 0;
+        const downvotes = post.downvotes || 0;
         
         container.innerHTML = `
             <div class="post-item" data-post-id="${post.id}">
@@ -3657,6 +3914,17 @@ class SocialManager {
                 </div>
                 
                 <div class="post-actions">
+                    <div class="vote-buttons">
+                        <button class="vote-btn up ${userVote === 'up' ? 'active' : ''}" data-post-id="${post.id}" data-vote="up">
+                            <i class="fas fa-arrow-up"></i>
+                            <span class="vote-count upvote-count">${this.formatCount(upvotes)}</span>
+                        </button>
+                        <button class="vote-btn down ${userVote === 'down' ? 'active' : ''}" data-post-id="${post.id}" data-vote="down">
+                            <i class="fas fa-arrow-down"></i>
+                            <span class="vote-count downvote-count">${this.formatCount(downvotes)}</span>
+                        </button>
+                    </div>
+                    
                     <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${post.id}">
                         <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> 
                         <span class="like-count">${this.formatCount(post.likes || 0)}</span>
@@ -3685,6 +3953,8 @@ class SocialManager {
         const likeBtn = container.querySelector('.like-btn');
         const sendCommentBtn = container.querySelector('#sendCommentBtn');
         const commentInput = container.querySelector('#commentInput');
+        const upvoteBtn = container.querySelector('.vote-btn.up');
+        const downvoteBtn = container.querySelector('.vote-btn.down');
 
         if (likeBtn) {
             likeBtn.addEventListener('click', () => this.handleLike(post.id, likeBtn));
@@ -3700,6 +3970,14 @@ class SocialManager {
                     this.handleAddComment(post.id, true);
                 }
             });
+        }
+
+        if (upvoteBtn) {
+            upvoteBtn.addEventListener('click', () => this.handleVote(post.id, 'up', upvoteBtn));
+        }
+
+        if (downvoteBtn) {
+            downvoteBtn.addEventListener('click', () => this.handleVote(post.id, 'down', downvoteBtn));
         }
     }
 
@@ -3833,6 +4111,9 @@ class SocialManager {
         }
         
         const isLiked = this.likedPosts.has(postId);
+        const userVote = this.getUserVoteForPost(postId);
+        const upvotes = post.upvotes || 0;
+        const downvotes = post.downvotes || 0;
         
         const followButton = (this.currentUser && userId !== this.currentUser.uid) ? `
             <button class="follow-btn-post ${isFollowing ? 'following' : ''}" 
@@ -3869,6 +4150,17 @@ class SocialManager {
             </div>
             
             <div class="post-actions">
+                <div class="vote-buttons">
+                    <button class="vote-btn up ${userVote === 'up' ? 'active' : ''}" data-post-id="${postId}" data-vote="up">
+                        <i class="fas fa-arrow-up"></i>
+                        <span class="vote-count upvote-count">${this.formatCount(upvotes)}</span>
+                    </button>
+                    <button class="vote-btn down ${userVote === 'down' ? 'active' : ''}" data-post-id="${postId}" data-vote="down">
+                        <i class="fas fa-arrow-down"></i>
+                        <span class="vote-count downvote-count">${this.formatCount(downvotes)}</span>
+                    </button>
+                </div>
+                
                 <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${postId}">
                     <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> 
                     <span class="like-count">${this.formatCount(post.likes || 0)}</span>
@@ -3895,6 +4187,8 @@ class SocialManager {
         const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
         const commentInput = postDiv.querySelector('.comment-input');
         const followBtn = postDiv.querySelector('.follow-btn-post');
+        const upvoteBtn = postDiv.querySelector('.vote-btn.up');
+        const downvoteBtn = postDiv.querySelector('.vote-btn.down');
 
         if (likeBtn) {
             likeBtn.addEventListener('click', () => this.handleLike(postId, likeBtn));
@@ -3914,6 +4208,14 @@ class SocialManager {
                     this.handleAddComment(postId, false);
                 }
             });
+        }
+
+        if (upvoteBtn) {
+            upvoteBtn.addEventListener('click', () => this.handleVote(postId, 'up', upvoteBtn));
+        }
+
+        if (downvoteBtn) {
+            downvoteBtn.addEventListener('click', () => this.handleVote(postId, 'down', downvoteBtn));
         }
 
         if (followBtn) {
@@ -4861,6 +5163,9 @@ class SocialManager {
         }
         
         const isLiked = this.likedPosts.has(postId);
+        const userVote = this.getUserVoteForPost(postId);
+        const upvotes = post.upvotes || 0;
+        const downvotes = post.downvotes || 0;
         
         postDiv.innerHTML = `
             <div class="post-header">
@@ -4877,6 +5182,17 @@ class SocialManager {
             </div>
             
             <div class="post-actions">
+                <div class="vote-buttons">
+                    <button class="vote-btn up ${userVote === 'up' ? 'active' : ''}" data-post-id="${postId}" data-vote="up">
+                        <i class="fas fa-arrow-up"></i>
+                        <span class="vote-count upvote-count">${this.formatCount(upvotes)}</span>
+                    </button>
+                    <button class="vote-btn down ${userVote === 'down' ? 'active' : ''}" data-post-id="${postId}" data-vote="down">
+                        <i class="fas fa-arrow-down"></i>
+                        <span class="vote-count downvote-count">${this.formatCount(downvotes)}</span>
+                    </button>
+                </div>
+                
                 <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${postId}">
                     <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> <span class="like-count">${this.formatCount(post.likes || 0)}</span>
                 </button>
@@ -4900,6 +5216,8 @@ class SocialManager {
         const commentBtn = postDiv.querySelector('.comment-btn');
         const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
         const commentInput = postDiv.querySelector('.comment-input');
+        const upvoteBtn = postDiv.querySelector('.vote-btn.up');
+        const downvoteBtn = postDiv.querySelector('.vote-btn.down');
 
         if (likeBtn) {
             likeBtn.addEventListener('click', () => this.handleLike(postId, likeBtn));
@@ -4919,6 +5237,14 @@ class SocialManager {
                     this.handleAddComment(postId, false);
                 }
             });
+        }
+
+        if (upvoteBtn) {
+            upvoteBtn.addEventListener('click', () => this.handleVote(postId, 'up', upvoteBtn));
+        }
+
+        if (downvoteBtn) {
+            downvoteBtn.addEventListener('click', () => this.handleVote(postId, 'down', downvoteBtn));
         }
 
         this.loadComments(postId);
@@ -5133,6 +5459,9 @@ class SocialManager {
             postContentHTML += `<p class="post-caption">${shortCaption}</p>`;
         }
         
+        const upvotes = post.upvotes || 0;
+        const downvotes = post.downvotes || 0;
+        
         postDiv.innerHTML = `
             <div class="post-header">
                 <img src="${userData.profileImage || 'images/default-profile.jpg'}" 
@@ -5142,6 +5471,8 @@ class SocialManager {
                     <span class="post-time">${this.formatTime(post.createdAt)}</span>
                 </div>
                 <div class="post-stats">
+                    <span class="post-stat"><i class="fas fa-arrow-up"></i> ${this.formatCount(upvotes)}</span>
+                    <span class="post-stat"><i class="fas fa-arrow-down"></i> ${this.formatCount(downvotes)}</span>
                     <span class="post-stat"><i class="far fa-heart"></i> ${this.formatCount(post.likes || 0)}</span>
                     <span class="post-stat"><i class="far fa-comment"></i> ${this.formatCount(post.commentsCount || 0)}</span>
                 </div>
@@ -5260,6 +5591,9 @@ class SocialManager {
             this.likedPosts.delete(postId);
             this.saveLikedPosts();
 
+            this.votedPosts.delete(postId);
+            this.saveVotedPosts();
+
             modal.style.display = 'none';
             this.resetDeleteModal();
             await this.loadUserPosts();
@@ -5368,6 +5702,17 @@ class SocialManager {
             }
             if (e.target.id === 'loadMorePYMK' || e.target.closest('#loadMorePYMK')) {
                 this.loadMorePYMKProfiles();
+            }
+            if (e.target.classList.contains('vote-btn') || e.target.closest('.vote-btn')) {
+                const btn = e.target.classList.contains('vote-btn') ? e.target : e.target.closest('.vote-btn');
+                const postId = btn.dataset.postId;
+                const voteType = btn.dataset.vote;
+                
+                if (postId && voteType) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.handleVote(postId, voteType, btn);
+                }
             }
         });
     }
