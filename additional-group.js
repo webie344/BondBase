@@ -1,5 +1,6 @@
 // additional-group.js - COMPLETE FIXED VERSION
-// All stickers now display correctly even after page reload
+// FIXED: Sticker button disappears when input is active
+// FIXED: Prevent duplicate saved stickers
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
@@ -71,6 +72,7 @@ try {
 let currentUser = null;
 let currentGroupId = null;
 let userStickers = [];
+let savedStickers = new Map(); // Use Map to prevent duplicates (key = stickerId)
 let stickerPickerOpen = false;
 let stickerDataCache = new Map(); // messageId -> stickerData
 let isSendingSticker = false;
@@ -126,14 +128,57 @@ function initializeFeatures() {
     // Load user stickers
     loadUserStickers();
     
+    // Load saved stickers with deduplication
+    loadSavedStickers();
+    
     // Setup sticker listener for new messages
     setupStickerListener();
     
     // Setup sticker interceptor
     setupStickerInterceptor();
     
+    // Setup sticker button visibility
+    setupStickerButtonVisibility();
+    
     // Load all existing messages to populate cache
     loadAllMessagesForCache();
+}
+
+// ============================================
+// NEW: Setup sticker button visibility based on input focus
+// ============================================
+function setupStickerButtonVisibility() {
+    const messageInput = document.getElementById('messageInput');
+    const stickerBtn = document.getElementById('stickerPickerBtn');
+    
+    if (!messageInput || !stickerBtn) {
+        setTimeout(setupStickerButtonVisibility, 500);
+        return;
+    }
+    
+    // Remove any existing listeners to prevent duplicates
+    messageInput.removeEventListener('focus', handleInputFocus);
+    messageInput.removeEventListener('blur', handleInputBlur);
+    
+    // Add focus/blur listeners
+    messageInput.addEventListener('focus', handleInputFocus);
+    messageInput.addEventListener('blur', handleInputBlur);
+    
+    console.log('Sticker button visibility listener set up for groups');
+}
+
+function handleInputFocus() {
+    const stickerBtn = document.getElementById('stickerPickerBtn');
+    if (stickerBtn) {
+        stickerBtn.style.display = 'none';
+    }
+}
+
+function handleInputBlur() {
+    const stickerBtn = document.getElementById('stickerPickerBtn');
+    if (stickerBtn) {
+        stickerBtn.style.display = 'flex';
+    }
 }
 
 // ============================================
@@ -427,6 +472,9 @@ function addStickerButton() {
         }
 
         messageInput.style.paddingRight = '110px';
+        
+        // Setup visibility listener after button is added
+        setupStickerButtonVisibility();
     };
     
     findContainer();
@@ -534,7 +582,7 @@ function setupStickerPickerEvents() {
             });
             
             if (tabName === 'saved-stickers') {
-                loadSavedStickers();
+                updateSavedStickersDisplay(); // Update display without reloading from Firebase
             } else if (tabName === 'packs') {
                 loadStickerPacks();
             }
@@ -613,6 +661,7 @@ async function loadUserStickers() {
     }
 }
 
+// FIXED: Load saved stickers with deduplication
 async function loadSavedStickers() {
     if (!currentUser || !db) return;
     
@@ -621,12 +670,57 @@ async function loadSavedStickers() {
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-            const savedStickers = userSnap.data().savedStickers || [];
-            updateSavedStickersGrid(savedStickers);
+            const savedStickersArray = userSnap.data().savedStickers || [];
+            
+            // Clear the Map and add stickers with deduplication
+            savedStickers.clear();
+            
+            savedStickersArray.forEach(sticker => {
+                // Use sticker.id as the key to prevent duplicates
+                if (!savedStickers.has(sticker.id)) {
+                    savedStickers.set(sticker.id, sticker);
+                }
+            });
+            
+            console.log(`Loaded ${savedStickers.size} unique saved stickers`);
+            updateSavedStickersDisplay();
         }
     } catch (error) {
         console.error('Error loading saved stickers:', error);
     }
+}
+
+// FIXED: Update display using the Map instead of reloading from Firebase
+function updateSavedStickersDisplay() {
+    const savedStickersGrid = document.getElementById('savedStickersGrid');
+    if (!savedStickersGrid) return;
+    
+    // Clear current display
+    savedStickersGrid.innerHTML = '';
+    
+    if (savedStickers.size === 0) {
+        savedStickersGrid.innerHTML = `
+            <div class="no-stickers">
+                <i class="fas fa-heart"></i>
+                <p>No saved stickers</p>
+                <p class="hint">Stickers you receive will appear here</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Convert Map values to array and display
+    const stickersArray = Array.from(savedStickers.values());
+    stickersArray.forEach(sticker => {
+        const stickerItem = createStickerElement(sticker);
+        stickerItem.classList.add('saved');
+        stickerItem.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            sendSticker(sticker);
+        }, true);
+        savedStickersGrid.appendChild(stickerItem);
+    });
 }
 
 function loadStickerPacks() {
@@ -681,35 +775,6 @@ function updateStickerGrid() {
             sendSticker(sticker);
         }, true);
         myStickersGrid.appendChild(stickerItem);
-    });
-}
-
-function updateSavedStickersGrid(savedStickers) {
-    const savedStickersGrid = document.getElementById('savedStickersGrid');
-    if (!savedStickersGrid) return;
-    
-    savedStickersGrid.innerHTML = '';
-    
-    if (savedStickers.length === 0) {
-        savedStickersGrid.innerHTML = `
-            <div class="no-stickers">
-                <i class="fas fa-heart"></i>
-                <p>No saved stickers</p>
-                <p class="hint">Stickers you receive will appear here</p>
-            </div>
-        `;
-        return;
-    }
-    
-    savedStickers.forEach(sticker => {
-        const stickerItem = createStickerElement(sticker);
-        stickerItem.classList.add('saved');
-        stickerItem.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            sendSticker(sticker);
-        }, true);
-        savedStickersGrid.appendChild(stickerItem);
     });
 }
 
@@ -854,7 +919,7 @@ async function sendSticker(sticker) {
 }
 
 // ============================================
-// FIXED: STICKER LISTENER - Cache ALL new messages
+// FIXED: STICKER LISTENER - Cache ALL new messages with deduplication
 // ============================================
 function setupStickerListener() {
     if (!currentUser || !currentGroupId || !db) {
@@ -930,6 +995,7 @@ function findAndReplaceMessageById(messageId) {
     });
 }
 
+// FIXED: Save received sticker with deduplication
 async function saveReceivedSticker(message) {
     if (!currentUser || !db) return;
     
@@ -947,10 +1013,25 @@ async function saveReceivedSticker(message) {
             savedFrom: message.senderId
         };
 
+        // Check if sticker already exists in saved stickers Map
+        if (savedStickers.has(stickerData.id)) {
+            console.log('Sticker already saved, skipping duplicate');
+            return;
+        }
+
         const userRef = doc(db, 'users', currentUser.uid);
         await updateDoc(userRef, {
             savedStickers: arrayUnion(stickerData)
         });
+
+        // Add to local Map to prevent future duplicates
+        savedStickers.set(stickerData.id, stickerData);
+        
+        // Update the display if the saved stickers tab is active
+        const savedTab = document.querySelector('.sticker-tab[data-tab="saved-stickers"]');
+        if (savedTab && savedTab.classList.contains('active')) {
+            updateSavedStickersDisplay();
+        }
 
         showNotification(`Saved "${message.stickerName}" sticker`, 'info');
     } catch (error) {

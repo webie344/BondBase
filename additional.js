@@ -1,6 +1,8 @@
 // Additional features for Dating Connect App - STICKER CREATION VERSION
 // Profile picture navigation and custom sticker creation like WhatsApp/Telegram
 // FIXED: Stickers now persist after page reload
+// FIXED: Sticker button hides when input is active
+// FIXED: Prevent duplicate saved stickers
 
 // Import Firebase modules directly
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -24,7 +26,8 @@ import {
     limit,
     arrayUnion,
     getDocs,
-    Timestamp
+    Timestamp,
+    where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -75,6 +78,7 @@ let currentUser = null;
 let chatPartnerId = null;
 let currentThreadId = null;
 let userStickers = [];
+let savedStickers = new Map(); // Use Map to prevent duplicates (key = stickerId)
 let stickerPickerOpen = false;
 let stickerCreatorVars = {
     currentStep: 1,
@@ -128,10 +132,46 @@ function initializeBasicFeatures() {
                 addStickerButton();
                 setupStickerPickerEvents();
                 setupStickerInterceptor();
+                setupStickerButtonVisibility(); // NEW: Setup input focus listener
             } catch (e) {
                 console.log('Could not initialize all features:', e);
             }
         }, 1000);
+    }
+}
+
+// NEW: Setup sticker button visibility based on input focus
+function setupStickerButtonVisibility() {
+    const messageInput = document.getElementById('messageInput');
+    const stickerBtn = document.getElementById('stickerPickerBtn');
+    
+    if (!messageInput || !stickerBtn) {
+        setTimeout(setupStickerButtonVisibility, 500);
+        return;
+    }
+    
+    // Remove any existing listeners to prevent duplicates
+    messageInput.removeEventListener('focus', handleInputFocus);
+    messageInput.removeEventListener('blur', handleInputBlur);
+    
+    // Add focus/blur listeners
+    messageInput.addEventListener('focus', handleInputFocus);
+    messageInput.addEventListener('blur', handleInputBlur);
+    
+    console.log('Sticker button visibility listener set up');
+}
+
+function handleInputFocus() {
+    const stickerBtn = document.getElementById('stickerPickerBtn');
+    if (stickerBtn) {
+        stickerBtn.style.display = 'none';
+    }
+}
+
+function handleInputBlur() {
+    const stickerBtn = document.getElementById('stickerPickerBtn');
+    if (stickerBtn) {
+        stickerBtn.style.display = 'flex';
     }
 }
 
@@ -146,7 +186,9 @@ function initializeFeatures() {
     initProfilePictureNavigation();
     initStickerSystem();
     loadUserStickers();
+    loadSavedStickers(); // Load saved stickers with deduplication
     setupStickerInterceptor();
+    setupStickerButtonVisibility(); // NEW: Setup input focus listener
     
     if (window.location.pathname.includes('chat.html') && chatPartnerId) {
         // First load all existing messages to populate cache
@@ -433,6 +475,9 @@ function addStickerButton() {
     }
 
     messageInput.style.paddingRight = '50px';
+    
+    // Setup visibility listener after button is added
+    setupStickerButtonVisibility();
 }
 
 function createStickerPicker() {
@@ -523,7 +568,7 @@ function setupStickerPickerEvents() {
             });
             
             if (tabName === 'saved-stickers') {
-                loadSavedStickers();
+                updateSavedStickersDisplay(); // Update display without reloading from Firebase
             }
         });
     });
@@ -656,6 +701,7 @@ function createStickerElement(sticker, index) {
     return stickerItem;
 }
 
+// FIXED: Load saved stickers with deduplication
 async function loadSavedStickers() {
     if (!currentUser || !db) return;
     
@@ -664,21 +710,35 @@ async function loadSavedStickers() {
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-            const savedStickers = userSnap.data().savedStickers || [];
-            updateSavedStickersDisplay(savedStickers);
+            const savedStickersArray = userSnap.data().savedStickers || [];
+            
+            // Clear the Map and add stickers with deduplication
+            savedStickers.clear();
+            
+            savedStickersArray.forEach(sticker => {
+                // Use sticker.id as the key to prevent duplicates
+                if (!savedStickers.has(sticker.id)) {
+                    savedStickers.set(sticker.id, sticker);
+                }
+            });
+            
+            console.log(`Loaded ${savedStickers.size} unique saved stickers`);
+            updateSavedStickersDisplay();
         }
     } catch (error) {
         console.error('Error loading saved stickers:', error);
     }
 }
 
-function updateSavedStickersDisplay(savedStickers) {
+// FIXED: Update display using the Map instead of reloading from Firebase
+function updateSavedStickersDisplay() {
     const savedStickersGrid = document.getElementById('savedStickersGrid');
     if (!savedStickersGrid) return;
     
+    // Clear current display
     savedStickersGrid.innerHTML = '';
     
-    if (savedStickers.length === 0) {
+    if (savedStickers.size === 0) {
         savedStickersGrid.innerHTML = `
             <div class="no-stickers">
                 <i class="fas fa-heart"></i>
@@ -688,7 +748,9 @@ function updateSavedStickersDisplay(savedStickers) {
         return;
     }
     
-    savedStickers.forEach(sticker => {
+    // Convert Map values to array and display
+    const stickersArray = Array.from(savedStickers.values());
+    stickersArray.forEach(sticker => {
         const stickerItem = createStickerElement(sticker);
         stickerItem.classList.add('saved');
         stickerItem.addEventListener('click', (e) => {
@@ -890,7 +952,7 @@ function findAndReplaceMessageById(messageId) {
     });
 }
 
-// Save received sticker automatically
+// FIXED: Save received sticker with deduplication
 async function saveReceivedSticker(message) {
     if (!currentUser || !db) return;
     
@@ -910,10 +972,25 @@ async function saveReceivedSticker(message) {
             savedFrom: message.senderId
         };
 
+        // Check if sticker already exists in saved stickers Map
+        if (savedStickers.has(stickerData.id)) {
+            console.log('Sticker already saved, skipping duplicate');
+            return;
+        }
+
         const userRef = doc(db, 'users', currentUser.uid);
         await updateDoc(userRef, {
             savedStickers: arrayUnion(stickerData)
         });
+
+        // Add to local Map to prevent future duplicates
+        savedStickers.set(stickerData.id, stickerData);
+        
+        // Update the display if the saved stickers tab is active
+        const savedTab = document.querySelector('.sticker-tab[data-tab="saved-stickers"]');
+        if (savedTab && savedTab.classList.contains('active')) {
+            updateSavedStickersDisplay();
+        }
 
         showNotification(`Saved "${message.stickerName}" sticker`, 'info');
     } catch (error) {
