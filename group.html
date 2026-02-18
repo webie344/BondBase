@@ -2038,13 +2038,13 @@ video:hover {
             overflow: hidden;
         }
 
-        /* MODERN INPUT AREA STYLES */
+        /* MODERN INPUT AREA STYLES - FIXED FOR WIDER INPUT */
         .input-container {
             background: var(--bg-card);
             padding: 16px 20px;
             border-top: 1px solid var(--border);
             position: relative;
-            flex-shrink: 0; /* FIX: Prevent input container from expanding */
+            flex-shrink: 0;
             width: 100%;
         }
 
@@ -2059,6 +2059,7 @@ video:hover {
             transition: all 0.3s ease;
             width: 100%;
             box-sizing: border-box;
+            flex-wrap: nowrap;
         }
 
         .message-input-container:focus-within {
@@ -2110,9 +2111,9 @@ video:hover {
             stroke-width: 2;
         }
 
-        /* Main textarea */
+        /* Main textarea - FIXED: Now MUCH WIDER */
         .message-input {
-            flex: 1;
+            flex: 1 1 auto;
             background: transparent;
             border: none;
             color: var(--text-primary);
@@ -2125,7 +2126,13 @@ video:hover {
             line-height: 1.4;
             outline: none;
             width: 100%;
+            min-width: 200px; /* Much wider minimum width */
             box-sizing: border-box;
+            overflow-y: auto;
+            overflow-x: auto;
+            white-space: pre;
+            word-wrap: normal;
+            word-break: keep-all;
         }
 
         .message-input::placeholder {
@@ -2327,6 +2334,7 @@ video:hover {
             
             .message-input {
                 font-size: 0.9rem;
+                min-width: 150px;
             }
 
             /* Mobile call buttons adjustments */
@@ -2383,6 +2391,7 @@ video:hover {
                 font-size: 0.85rem;
                 padding: 6px 0;
                 min-height: 20px;
+                min-width: 120px;
             }
 
             .reply-indicator {
@@ -2537,7 +2546,7 @@ video:hover {
                 <p>No messages yet. Start the conversation!</p>
             </div>
 
-            <!-- MODERN INPUT AREA -->
+            <!-- MODERN INPUT AREA - FIXED FOR WIDER INPUT -->
             <div class="input-container">
                 <div class="message-input-container">
                     <!-- Left side controls (inside input) -->
@@ -2561,12 +2570,13 @@ video:hover {
                         </button>
                     </div>
                     
-                    <!-- Main textarea -->
+                    <!-- Main textarea - FIXED: Now stays on one line with horizontal scroll -->
                     <textarea 
                         class="message-input" 
                         id="messageInput" 
                         placeholder="Type your message here..."
-                        rows="1"></textarea>
+                        rows="1"
+                        wrap="off"></textarea>
                     
                     <!-- Right side controls (inside input) -->
                     <div class="input-controls-right">
@@ -2592,7 +2602,7 @@ video:hover {
     <script type="module" src="chat-customization.js"></script>
 
     <!-- Add AFTER group.js but BEFORE any other scripts -->
-    <script type="module" src="".js"></script>
+    <script type="module" src=".js"></script>
     <script type="module" src="lin.js"></script>
     <script type="module" src="ap.js"></script>
     <script type="module" src="additional-group.js"></script>
@@ -2815,6 +2825,22 @@ video:hover {
     document.getElementById('attachmentBtn')?.addEventListener('click', function() {
         document.getElementById('fileInput')?.click();
     });
+
+    // Fix for textarea - keep it on one line with horizontal scroll
+    const textarea = document.getElementById('messageInput');
+    if (textarea) {
+        // Remove auto-resize for vertical expansion
+        textarea.style.height = 'auto';
+        textarea.style.overflowX = 'auto';
+        textarea.style.overflowY = 'hidden';
+        textarea.style.whiteSpace = 'pre';
+        
+        // Optional: Add horizontal scroll as user types
+        textarea.addEventListener('input', function() {
+            // No height adjustment - stays single line
+            this.scrollLeft = this.scrollWidth; // Auto-scroll to the end
+        });
+    }
     </script>
 </body>
 </html>
