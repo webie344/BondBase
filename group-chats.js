@@ -32,7 +32,7 @@ import {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 
 // Import XP System
-import { XPSystem, xpSystem as importedXPSystem } from './XP.js';
+import { XPSystem } from './XP.js';
 
 const firebaseConfig = {
     apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
@@ -47,8 +47,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Initialize XP System - use the imported instance or create new one
-const xpSystem = importedXPSystem || new XPSystem();
+// Initialize XP System
+const xpSystem = new XPSystem();
 
 const cloudinaryConfig = {
     cloudName: "ddtdqrh1b",
@@ -172,44 +172,28 @@ for (let i = 1; i <= 100; i++) {
     });
 }
 
-// ==================== FIXED: Helper function to get user XP level and rank ====================
+// Helper function to get user XP level and rank
 async function getUserXPInfo(userId) {
     try {
-        // Try to get XP data from Firestore directly
-        const xpRef = doc(db, 'xpData', userId);
-        const xpSnap = await getDoc(xpRef);
+        const xpData = await xpSystem.getUserXPData(userId);
+        if (!xpData) return { level: 1, rank: XP_RANKS[0], totalXP: 0 };
         
-        if (xpSnap.exists()) {
-            const xpData = xpSnap.data();
-            const totalXP = xpData.totalXP || 0;
-            
-            // Calculate level based on total XP
-            let level = 1;
-            for (let i = XP_RANKS.length - 1; i >= 0; i--) {
-                if (totalXP >= XP_RANKS[i].xpNeeded) {
-                    level = XP_RANKS[i].level;
-                    break;
-                }
+        let level = 1;
+        for (let i = XP_RANKS.length - 1; i >= 0; i--) {
+            if (xpData.totalXP >= XP_RANKS[i].xpNeeded) {
+                level = XP_RANKS[i].level;
+                break;
             }
-            
-            return {
-                level: level,
-                rank: XP_RANKS[level - 1] || XP_RANKS[0],
-                totalXP: totalXP,
-                coins: xpData.coins || 0
-            };
-        } else {
-            // No XP data yet - return default level 1
-            return {
-                level: 1,
-                rank: XP_RANKS[0],
-                totalXP: 0,
-                coins: 0
-            };
         }
+        
+        return {
+            level: level,
+            rank: XP_RANKS[level - 1] || XP_RANKS[0],
+            totalXP: xpData.totalXP || 0
+        };
     } catch (error) {
         console.error('Error getting user XP info:', error);
-        return { level: 1, rank: XP_RANKS[0], totalXP: 0, coins: 0 };
+        return { level: 1, rank: XP_RANKS[0], totalXP: 0 };
     }
 }
 
@@ -723,6 +707,7 @@ async function syncOfflineMessages() {
             for (const message of pendingMessages) {
                 try {
                     // Re-send the message
+                    // You'll need to implement the actual resend logic based on your message structure
                     console.log('Resending offline message:', message);
                     
                     // Update status to sent
@@ -852,10 +837,6 @@ const REWARD_TAGS = {
 const MAX_VOICE_NOTE_DURATION = 120000; // 2 minutes
 const AUDIO_FORMATS = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/mpeg'];
 
-// ==================== FIXED: Message counter for XP rewards ====================
-let messageCounter = 0;
-const XP_PER_5_MESSAGES = 1; // 1 XP per 5 messages
-
 class GroupChat {
     constructor() {
         this.currentUser = null;
@@ -958,9 +939,6 @@ class GroupChat {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 1000;
-        
-        // ==================== FIXED: Message counter for XP rewards ====================
-        this.messageCounter = 0;
         
         this.setupNetworkListener();
         this.setupAuthListener();
@@ -1529,14 +1507,11 @@ class GroupChat {
         return false;
     }
     
-    // ==================== FIXED: Cancel voice recording button ====================
     cancelVoiceRecording() {
         if (this.mediaRecorder && this.isRecording) {
-            // Stop the recorder
             this.mediaRecorder.stop();
             this.isRecording = false;
             
-            // Clear the timer
             if (this.recordingTimer) {
                 clearTimeout(this.recordingTimer);
                 this.recordingTimer = null;
@@ -1547,7 +1522,7 @@ class GroupChat {
                 this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
             }
             
-            // Clear voice note data
+            // Clear voice note
             this.currentVoiceNote = null;
             this.audioChunks = [];
             
@@ -4167,7 +4142,6 @@ class GroupChat {
         }
     }
 
-    // ==================== FIXED: sendMessage with 1 XP per 5 messages instead of 5 XP per message ====================
     async sendMessage(groupId, text = null, imageUrl = null, videoUrl = null, replyTo = null, voiceUrl = null, duration = null) {
         try {
             // FIX: Check if offline before sending
@@ -4287,20 +4261,12 @@ class GroupChat {
                 }
             });
             
-            // ==================== FIXED: Award XP for messages (1 XP per 5 messages) ====================
-            this.messageCounter++;
+            // NEW: Award XP for sending a message (5 XP)
+            const xpAwarded = await this.xpSystem.addXP(5, "Sent a message in group chat");
             
-            // Only award XP every 5 messages
-            if (this.messageCounter % 5 === 0) {
-                const xpAwarded = await this.xpSystem.addXP(1, "Sent 5 messages in group chat");
-                
-                if (xpAwarded) {
-                    // Send system message about XP gain
-                    await this.sendXPSystemMessage(groupId, this.firebaseUser.uid, this.currentUser.name, 1, "Sent 5 messages");
-                    
-                    // Show XP gain animation
-                    this.showXPGainAnimation(1, "5 messages sent");
-                }
+            if (xpAwarded) {
+                // Send system message about XP gain
+                await this.sendXPSystemMessage(groupId, this.firebaseUser.uid, this.currentUser.name, 5, "Sent a message");
             }
             
             // NEW: Check and award user for activity (reward tags)
@@ -4335,25 +4301,6 @@ class GroupChat {
             this.pendingMessages.delete(messageId);
             throw error;
         }
-    }
-
-    // Helper method to show XP gain animation
-    showXPGainAnimation(amount, reason) {
-        const xpElement = document.createElement('div');
-        xpElement.className = 'xp-gain-animation';
-        xpElement.innerHTML = `
-            <span style="font-size: 20px;">🎮</span>
-            <span>+${amount} XP</span>
-            <span style="font-size: 12px; opacity: 0.8;">${reason}</span>
-        `;
-        
-        document.body.appendChild(xpElement);
-        
-        setTimeout(() => {
-            if (xpElement.parentElement) {
-                xpElement.remove();
-            }
-        }, 2000);
     }
 
     async sendMediaMessage(groupId, file, replyTo = null, onProgress = null, onCancel = null) {
@@ -6088,7 +6035,8 @@ function createXPProfileIcon(userId, userName, xpLevel, xpRank) {
         e.stopPropagation();
         
         // Get full XP data
-        const xpData = await getUserXPInfo(userId);
+        const xpData = await xpSystem.getUserXPData(userId);
+        const stats = xpSystem.getUserStats ? xpSystem.getUserStats() : null;
         
         // Show quick stats tooltip
         showXPQuickStats(userId, userName, xpData, xpLevel, xpRank, e.target);
@@ -6098,7 +6046,7 @@ function createXPProfileIcon(userId, userName, xpLevel, xpRank) {
 }
 
 // Function to show XP quick stats tooltip
-function showXPQuickStats(userId, userName, xpInfo, level, rank, targetElement) {
+function showXPQuickStats(userId, userName, xpData, level, rank, targetElement) {
     // Remove any existing tooltips
     const existingTooltip = document.querySelector('.xp-quick-stats');
     if (existingTooltip) existingTooltip.remove();
@@ -6109,9 +6057,9 @@ function showXPQuickStats(userId, userName, xpInfo, level, rank, targetElement) 
     let progress = 0;
     let xpToNext = 0;
     
-    if (nextRank && xpInfo) {
-        xpToNext = nextRank.xpNeeded - (xpInfo.totalXP || 0);
-        const xpInCurrent = (xpInfo.totalXP || 0) - rank.xpNeeded;
+    if (nextRank && xpData) {
+        xpToNext = nextRank.xpNeeded - (xpData.totalXP || 0);
+        const xpInCurrent = (xpData.totalXP || 0) - rank.xpNeeded;
         const xpNeeded = nextRank.xpNeeded - rank.xpNeeded;
         progress = (xpInCurrent / xpNeeded) * 100;
     }
@@ -6142,11 +6090,11 @@ function showXPQuickStats(userId, userName, xpInfo, level, rank, targetElement) 
         <div style="margin-bottom: 15px;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
                 <span style="color: #666;">Total XP:</span>
-                <span style="font-weight: bold; color: #667eea;">${xpInfo?.totalXP?.toLocaleString() || 0}</span>
+                <span style="font-weight: bold; color: #667eea;">${xpData?.totalXP?.toLocaleString() || 0}</span>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
                 <span style="color: #666;">Coins:</span>
-                <span style="font-weight: bold; color: #f1c40f;">🪙 ${xpInfo?.coins?.toLocaleString() || 0}</span>
+                <span style="font-weight: bold; color: #f1c40f;">🪙 ${xpData?.coins?.toLocaleString() || 0}</span>
             </div>
             ${nextRank ? `
                 <div style="margin-top: 15px;">
@@ -6182,6 +6130,25 @@ function showXPQuickStats(userId, userName, xpInfo, level, rank, targetElement) 
         };
         document.addEventListener('click', clickHandler);
     }, 100);
+}
+
+// Function to show XP gain animation
+function showXPGainAnimation(amount, reason) {
+    const xpElement = document.createElement('div');
+    xpElement.className = 'xp-gain-animation';
+    xpElement.innerHTML = `
+        <span style="font-size: 20px;">🎮</span>
+        <span>+${amount} XP</span>
+        <span style="font-size: 12px; opacity: 0.8;">${reason}</span>
+    `;
+    
+    document.body.appendChild(xpElement);
+    
+    setTimeout(() => {
+        if (xpElement.parentElement) {
+            xpElement.remove();
+        }
+    }, 2000);
 }
 
 // Initialize group chat page
@@ -7003,8 +6970,8 @@ function initGroupPage() {
                 const userId = icon.dataset.userId;
                 const member = members.find(m => m.id === userId);
                 if (member) {
-                    const xpInfo = await getUserXPInfo(userId);
-                    showXPQuickStats(userId, member.name, xpInfo, member.xpLevel || 1, member.xpRank || XP_RANKS[0], e.target);
+                    const xpData = await xpSystem.getUserXPData(userId);
+                    showXPQuickStats(userId, member.name, xpData, member.xpLevel || 1, member.xpRank || XP_RANKS[0], e.target);
                 }
             });
         });
@@ -7173,9 +7140,9 @@ function initGroupPage() {
                 const userId = icon.dataset.userId;
                 const member = members.find(m => m.id === userId);
                 if (member) {
-                    const xpInfo = await getUserXPInfo(userId);
+                    const xpData = await xpSystem.getUserXPData(userId);
                     const rank = XP_RANKS[member.xpLevel - 1] || XP_RANKS[0];
-                    showXPQuickStats(userId, member.name, xpInfo, member.xpLevel || 1, rank, e.target);
+                    showXPQuickStats(userId, member.name, xpData, member.xpLevel || 1, rank, e.target);
                 }
             });
         });
