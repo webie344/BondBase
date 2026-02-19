@@ -1,5 +1,5 @@
 // groupchat.js - Enhanced with IndexedDB Caching, Service Worker Support & Voice Notes
-// XP System Integration Added - Shows user XP levels and awards XP for messages
+// COMPLETE VERSION WITH XP SYSTEM INTEGRATED - LOADS ACTUAL USER XP DATA
 
 import { 
     getFirestore, 
@@ -31,44 +31,7 @@ import {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 
-// Import XP System
-import { XPSystem, xpSystem as importedXPSystem } from './XP.js';
-
-const firebaseConfig = {
-    apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
-    authDomain: "crypto-6517d.firebaseapp.com",
-    projectId: "crypto-6517d",
-    storageBucket: "crypto-6517d.firebasestorage.app",
-    messagingSenderId: "60263975159",
-    appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// Initialize XP System - use the imported instance or create new one
-const xpSystem = importedXPSystem || new XPSystem();
-
-const cloudinaryConfig = {
-    cloudName: "ddtdqrh1b",
-    uploadPreset: "profile-pictures",
-    apiUrl: "https://api.cloudinary.com/v1_1"
-};
-
-const AVATAR_OPTIONS = [
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user2',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user3',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user4',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user5',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user6',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user7',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=user8'
-];
-
-// ==================== XP RANK SYSTEM REFERENCE ====================
-// Import the XP_RANKS from XP.js or define locally
+// ==================== XP RANK SYSTEM (INTEGRATED) ====================
 const XP_RANKS = [];
 // Generate 100 ranks with progressive XP requirements
 for (let i = 1; i <= 100; i++) {
@@ -172,46 +135,39 @@ for (let i = 1; i <= 100; i++) {
     });
 }
 
-// ==================== FIXED: Helper function to get user XP level and rank ====================
-async function getUserXPInfo(userId) {
-    try {
-        // Try to get XP data from Firestore directly
-        const xpRef = doc(db, 'xpData', userId);
-        const xpSnap = await getDoc(xpRef);
-        
-        if (xpSnap.exists()) {
-            const xpData = xpSnap.data();
-            const totalXP = xpData.totalXP || 0;
-            
-            // Calculate level based on total XP
-            let level = 1;
-            for (let i = XP_RANKS.length - 1; i >= 0; i--) {
-                if (totalXP >= XP_RANKS[i].xpNeeded) {
-                    level = XP_RANKS[i].level;
-                    break;
-                }
-            }
-            
-            return {
-                level: level,
-                rank: XP_RANKS[level - 1] || XP_RANKS[0],
-                totalXP: totalXP,
-                coins: xpData.coins || 0
-            };
-        } else {
-            // No XP data yet - return default level 1
-            return {
-                level: 1,
-                rank: XP_RANKS[0],
-                totalXP: 0,
-                coins: 0
-            };
-        }
-    } catch (error) {
-        console.error('Error getting user XP info:', error);
-        return { level: 1, rank: XP_RANKS[0], totalXP: 0, coins: 0 };
-    }
-}
+const firebaseConfig = {
+    apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
+    authDomain: "crypto-6517d.firebaseapp.com",
+    projectId: "crypto-6517d",
+    storageBucket: "crypto-6517d.firebasestorage.app",
+    messagingSenderId: "60263975159",
+    appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
+  };
+
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const cloudinaryConfig = {
+    cloudName: "ddtdqrh1b",
+    uploadPreset: "profile-pictures",
+    apiUrl: "https://api.cloudinary.com/v1_1"
+};
+
+const AVATAR_OPTIONS = [
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=user2',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=user3',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=user4',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=user5',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=user6',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=user7',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=user8'
+];
+
+// ==================== XP DATA CACHE ====================
+const xpDataCache = new Map(); // userId -> { xpData, expiry }
 
 // ==================== INDEXEDDB CACHE SYSTEM ====================
 class GroupIndexedDBCache {
@@ -283,6 +239,10 @@ class GroupIndexedDBCache {
                 }
                 if (!db.objectStoreNames.contains('voice_notes')) {
                     db.createObjectStore('voice_notes', { keyPath: 'localId' });
+                }
+                // Add XP data store
+                if (!db.objectStoreNames.contains('xp_data')) {
+                    db.createObjectStore('xp_data', { keyPath: 'userId' });
                 }
             };
         });
@@ -554,6 +514,21 @@ class GroupIndexedDBCache {
         await this.init();
         return await this.delete('voice_notes', localId);
     }
+
+    // XP data methods
+    async setXPData(userId, xpData) {
+        await this.init();
+        return await this.set('xp_data', {
+            userId: userId,
+            ...xpData,
+            cachedAt: Date.now()
+        });
+    }
+
+    async getXPData(userId) {
+        await this.init();
+        return await this.get('xp_data', userId);
+    }
 }
 
 const indexedDBCache = new GroupIndexedDBCache();
@@ -723,6 +698,7 @@ async function syncOfflineMessages() {
             for (const message of pendingMessages) {
                 try {
                     // Re-send the message
+                    // You'll need to implement the actual resend logic based on your message structure
                     console.log('Resending offline message:', message);
                     
                     // Update status to sent
@@ -812,6 +788,213 @@ if (!document.getElementById('notification-styles')) {
     document.head.appendChild(style);
 }
 
+// ==================== XP FUNCTIONS ====================
+
+// Get user's XP data from Firebase
+async function getUserXPData(userId) {
+    try {
+        // Check cache first
+        const cached = xpDataCache.get(userId);
+        if (cached && cached.expiry > Date.now()) {
+            return cached.data;
+        }
+        
+        // Check IndexedDB
+        if (indexedDBCache) {
+            const indexedDBCached = await indexedDBCache.getXPData(userId);
+            if (indexedDBCached && indexedDBCached.cachedAt > Date.now() - 5 * 60 * 1000) {
+                // Cache for 5 minutes
+                xpDataCache.set(userId, {
+                    data: indexedDBCached,
+                    expiry: Date.now() + 5 * 60 * 1000
+                });
+                return indexedDBCached;
+            }
+        }
+        
+        // Fetch from Firebase
+        const xpRef = doc(db, 'xpData', userId);
+        const xpSnap = await getDoc(xpRef);
+        
+        let xpData = null;
+        if (xpSnap.exists()) {
+            xpData = xpSnap.data();
+        } else {
+            // Return default XP data for users who haven't earned any XP yet
+            xpData = {
+                totalXP: 0,
+                coins: 0,
+                currentLevel: 1,
+                userId: userId
+            };
+        }
+        
+        // Update cache
+        xpDataCache.set(userId, {
+            data: xpData,
+            expiry: Date.now() + 5 * 60 * 1000
+        });
+        
+        // Update IndexedDB
+        if (indexedDBCache) {
+            await indexedDBCache.setXPData(userId, xpData);
+        }
+        
+        return xpData;
+    } catch (error) {
+        console.error('Error getting user XP data:', error);
+        return {
+            totalXP: 0,
+            coins: 0,
+            currentLevel: 1,
+            userId: userId
+        };
+    }
+}
+
+// Get user's rank based on XP
+function getUserRankFromXP(xpData) {
+    if (!xpData || !xpData.totalXP) return XP_RANKS[0];
+    
+    let level = 1;
+    for (let i = XP_RANKS.length - 1; i >= 0; i--) {
+        if (xpData.totalXP >= XP_RANKS[i].xpNeeded) {
+            level = XP_RANKS[i].level;
+            break;
+        }
+    }
+    return XP_RANKS[level - 1] || XP_RANKS[0];
+}
+
+// Award XP to user
+async function awardXP(userId, amount, reason) {
+    try {
+        const xpRef = doc(db, 'xpData', userId);
+        const xpSnap = await getDoc(xpRef);
+        
+        // Create history item
+        const historyItem = {
+            amount: amount,
+            reason: reason,
+            timestamp: serverTimestamp(),
+            type: "earned"
+        };
+        
+        if (xpSnap.exists()) {
+            // Update existing XP data
+            await updateDoc(xpRef, {
+                totalXP: increment(amount),
+                coins: increment(Math.floor(amount / 10)),
+                updated: serverTimestamp(),
+                xpHistory: arrayUnion(historyItem)
+            });
+            
+            // Get updated data to check for level up
+            const updatedSnap = await getDoc(xpRef);
+            const updatedData = updatedSnap.data();
+            
+            // Check for level up
+            await checkLevelUp(userId, updatedData);
+            
+        } else {
+            // Create new XP data
+            await setDoc(xpRef, {
+                userId: userId,
+                totalXP: amount,
+                currentLevel: 1,
+                coins: Math.floor(amount / 10),
+                xpHistory: [historyItem],
+                dailyCheckIns: [],
+                achievements: [],
+                created: serverTimestamp(),
+                updated: serverTimestamp()
+            });
+        }
+        
+        // Clear cache
+        xpDataCache.delete(userId);
+        
+        return true;
+    } catch (error) {
+        console.error('Error awarding XP:', error);
+        return false;
+    }
+}
+
+// Check if user leveled up
+async function checkLevelUp(userId, xpData) {
+    if (!xpData) return false;
+    
+    let currentLevel = 1;
+    for (let i = XP_RANKS.length - 1; i >= 0; i--) {
+        if (xpData.totalXP >= XP_RANKS[i].xpNeeded) {
+            currentLevel = XP_RANKS[i].level;
+            break;
+        }
+    }
+    
+    if (currentLevel > (xpData.currentLevel || 1)) {
+        // Level up!
+        const xpRef = doc(db, 'xpData', userId);
+        
+        await updateDoc(xpRef, {
+            currentLevel: currentLevel,
+            coins: increment(50) // Level up bonus
+        });
+        
+        // Send system message if user is in current group
+        const currentGroupId = window.groupChat?.currentGroupId;
+        if (currentGroupId) {
+            const userProfile = await getUserProfile(userId);
+            await sendRewardSystemMessage(
+                currentGroupId, 
+                userId, 
+                userProfile?.name || 'User', 
+                XP_RANKS[currentLevel - 1].title,
+                'level_up'
+            );
+        }
+        
+        return true;
+    }
+    return false;
+}
+
+// Send system message for XP/reward upgrade
+async function sendRewardSystemMessage(groupId, userId, userName, rewardText, type = 'xp_gain') {
+    try {
+        const messagesRef = collection(db, 'groups', groupId, 'messages');
+        
+        let message = '';
+        if (type === 'xp_gain') {
+            message = `✨ ${userName} gained ${rewardText}! ✨`;
+        } else if (type === 'level_up') {
+            message = `🎉 Congratulations! ${userName} leveled up to "${rewardText}"! 🎉`;
+        } else if (type === 'milestone') {
+            message = `🏆 Amazing! ${userName} reached a milestone: ${rewardText}! 🏆`;
+        }
+        
+        await addDoc(messagesRef, {
+            type: 'system',
+            text: message,
+            timestamp: serverTimestamp(),
+            senderId: 'system',
+            senderName: 'System',
+            senderAvatar: '',
+            rewardUpgrade: true,
+            rewardedUserId: userId,
+            rewardedUserName: userName,
+            rewardText: rewardText,
+            rewardType: type
+        });
+        
+        return true;
+    } catch (error) {
+        console.error('Error sending reward system message:', error);
+        return false;
+    }
+}
+
 // ==================== MAIN GROUP CHAT CLASS ====================
 const CACHE_DURATION = {
     USER_PROFILE: 5 * 60 * 1000,
@@ -834,27 +1017,16 @@ const REACTION_EMOJIS = [
     '🎇', '🧨', '✨', '🎈', '🎉', '🎊', '🎋', '🎍', '🎎', '🎏'
 ];
 
-// New constants for typing indicators and reward system
+// Constants for typing indicators
 const TYPING_TIMEOUT = 5000; // 5 seconds
-const CONSECUTIVE_MESSAGES_THRESHOLD = 5; // Messages needed for glowing effect
-const REWARD_TIME_THRESHOLDS = {
-    THREE_MINUTES: 3 * 60 * 1000, // 3 minutes in milliseconds
-    TEN_MINUTES: 10 * 60 * 1000, // 10 minutes
-    TWENTY_MINUTES: 20 * 60 * 1000 // 20 minutes
+const XP_REWARDS = {
+    MESSAGE_SENT: 5, // XP for sending a message
+    IMAGE_SENT: 10, // XP for sending an image
+    VIDEO_SENT: 15, // XP for sending a video
+    VOICE_SENT: 12, // XP for sending a voice note
+    REACTION_ADDED: 2, // XP for adding a reaction
+    DAILY_LIMIT: 20 // Maximum XP per day from chat
 };
-const REWARD_TAGS = {
-    THREE_MINUTES: '🏆 Active Chatter',
-    TEN_MINUTES: '🔥 Chat Master',
-    TWENTY_MINUTES: '🌟 Ultimate Conversationalist'
-};
-
-// Voice recording constants
-const MAX_VOICE_NOTE_DURATION = 120000; // 2 minutes
-const AUDIO_FORMATS = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/mpeg'];
-
-// ==================== FIXED: Message counter for XP rewards ====================
-let messageCounter = 0;
-const XP_PER_5_MESSAGES = 1; // 1 XP per 5 messages
 
 class GroupChat {
     constructor() {
@@ -886,7 +1058,8 @@ class GroupChat {
             groupInvites: new Map(),
             adminGroups: new Map(),
             allGroups: new Map(),
-            messages: new Map()
+            messages: new Map(),
+            userXP: new Map() // Cache for user XP data
         };
         
         this.replyingToMessage = null;
@@ -924,18 +1097,14 @@ class GroupChat {
         this.activeListeners = new Map();
         this.reactionUnsubscribers = new Map();
         
-        // NEW: Typing indicators and reward tracking
+        // Typing indicators
         this.typingUsers = new Map(); // groupId -> Map(userId -> typingTimeout)
         this.lastMessageTimes = new Map(); // userId -> last message timestamp
-        this.userMessageStreaks = new Map(); // userId -> consecutive message count
-        this.userStreakTimers = new Map(); // userId -> streak timer
-        this.userRewards = new Map(); // userId -> current reward tag
-        this.userActiveDurations = new Map(); // userId -> active duration in ms
         
-        // NEW: Upload tracking
+        // Upload tracking
         this.activeUploads = new Map(); // uploadId -> { cancelFunction, progress, type }
         
-        // NEW: Voice recording
+        // Voice recording
         this.mediaRecorder = null;
         this.audioChunks = [];
         this.isRecording = false;
@@ -944,23 +1113,23 @@ class GroupChat {
         this.recordingDuration = 0;
         this.currentVoiceNote = null;
         
-        // FIX: Track processed messages PER GROUP to prevent duplicates on reconnection
+        // Track processed messages
         this.processedMessageIdsByGroup = new Map();
-        
-        // FIX: Track page processed messages PER GROUP (NEW - fixes duplicate issue)
         this.pageProcessedMessageIdsByGroup = new Map();
         
-        // FIX: Track offline status
+        // Track offline status
         this.isOnline = navigator.onLine;
         
-        // FIX: Connection state tracking
+        // Connection state tracking
         this.connectionState = 'connected';
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 1000;
         
-        // ==================== FIXED: Message counter for XP rewards ====================
-        this.messageCounter = 0;
+        // XP tracking
+        this.userXPCache = new Map(); // userId -> { xpData, rank }
+        this.dailyXPTracking = new Map(); // userId -> { date, count }
+        this.dailyXPLimit = 20; // Maximum XP per day from chat
         
         this.setupNetworkListener();
         this.setupAuthListener();
@@ -968,7 +1137,7 @@ class GroupChat {
         this.checkRestrictedUsers();
         this.loadBlockedUsers();
         
-        // FIX: Setup page visibility listener
+        // Setup page visibility listener
         this.setupPageVisibilityListener();
         
         // Initialize Service Worker
@@ -979,9 +1148,6 @@ class GroupChat {
         
         // Setup voice recording styles
         this.setupVoiceRecordingStyles();
-        
-        // Initialize XP System
-        this.xpSystem = xpSystem;
     }
 
     // NEW: Setup voice recording styles
@@ -1300,6 +1466,55 @@ class GroupChat {
                     margin: 5px 0;
                 }
                 
+                /* XP Icon Styles */
+                .xp-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    border-radius: 20px;
+                    padding: 2px 8px;
+                    margin-left: 6px;
+                    color: white;
+                    font-size: 11px;
+                    font-weight: bold;
+                    gap: 4px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                }
+                
+                .xp-badge span {
+                    line-height: 1;
+                }
+                
+                .xp-icon {
+                    font-size: 12px;
+                }
+                
+                .xp-level {
+                    background: rgba(255,255,255,0.2);
+                    border-radius: 12px;
+                    padding: 1px 4px;
+                    margin-left: 2px;
+                }
+                
+                /* Reward system messages */
+                .system-message.reward-upgrade {
+                    background: linear-gradient(45deg, rgba(255, 215, 0, 0.1), rgba(255, 149, 0, 0.1));
+                    border-left: 3px solid #ff9500;
+                    padding: 10px;
+                    margin: 10px 0;
+                    border-radius: 8px;
+                    text-align: center;
+                    font-weight: bold;
+                    animation: reward-message 3s ease-in-out;
+                }
+                
+                @keyframes reward-message {
+                    0% { opacity: 0; transform: translateY(-10px); }
+                    20% { opacity: 1; transform: translateY(0); }
+                    80% { opacity: 1; transform: translateY(0); }
+                    100% { opacity: 0; transform: translateY(-10px); }
+                }
+                
                 /* Font Awesome icons */
                 .fas {
                     display: inline-block;
@@ -1318,79 +1533,6 @@ class GroupChat {
                     background: none !important;
                     transform: none !important;
                     box-shadow: none !important;
-                }
-                
-                /* XP Profile Icon Styles */
-                .xp-profile-icon {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    border-radius: 30px;
-                    padding: 4px 10px;
-                    margin-left: 8px;
-                    color: white;
-                    font-weight: bold;
-                    font-size: 12px;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                    cursor: pointer;
-                    transition: transform 0.2s, box-shadow 0.2s;
-                    border: 1px solid rgba(255,255,255,0.2);
-                }
-                
-                .xp-profile-icon:hover {
-                    transform: scale(1.05);
-                    box-shadow: 0 4px 10px rgba(102, 126, 234, 0.4);
-                }
-                
-                /* XP Quick Stats Tooltip */
-                .xp-quick-stats {
-                    position: absolute;
-                    background: white;
-                    border-radius: 15px;
-                    padding: 20px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                    z-index: 10000;
-                    min-width: 280px;
-                    animation: fadeIn 0.2s ease-out;
-                    border: 1px solid #e0e0e0;
-                }
-                
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(-10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                
-                /* XP Gain Animation */
-                .xp-gain-animation {
-                    position: fixed;
-                    bottom: 100px;
-                    right: 20px;
-                    background: rgba(0, 255, 157, 0.9);
-                    color: #000;
-                    padding: 10px 20px;
-                    border-radius: 25px;
-                    font-weight: bold;
-                    font-size: 16px;
-                    z-index: 9999;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-                    animation: floatUp 2s ease-in-out forwards;
-                }
-                
-                @keyframes floatUp {
-                    0% { transform: translateY(0); opacity: 1; }
-                    100% { transform: translateY(-100px); opacity: 0; }
-                }
-                
-                /* XP System Message */
-                .system-message.xp-message {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    border-left: 4px solid #ffd700;
-                    font-weight: 500;
                 }
             `;
             document.head.appendChild(style);
@@ -1499,8 +1641,8 @@ class GroupChat {
                 timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
             
-            // Check max duration
-            if (this.recordingDuration >= MAX_VOICE_NOTE_DURATION) {
+            // Check max duration (2 minutes)
+            if (this.recordingDuration >= 120000) {
                 this.stopVoiceRecording();
                 showNotification('Maximum recording time reached (2 minutes)', 'warning');
                 return;
@@ -1529,14 +1671,11 @@ class GroupChat {
         return false;
     }
     
-    // ==================== FIXED: Cancel voice recording button ====================
     cancelVoiceRecording() {
         if (this.mediaRecorder && this.isRecording) {
-            // Stop the recorder
             this.mediaRecorder.stop();
             this.isRecording = false;
             
-            // Clear the timer
             if (this.recordingTimer) {
                 clearTimeout(this.recordingTimer);
                 this.recordingTimer = null;
@@ -1547,7 +1686,7 @@ class GroupChat {
                 this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
             }
             
-            // Clear voice note data
+            // Clear voice note
             this.currentVoiceNote = null;
             this.audioChunks = [];
             
@@ -1590,6 +1729,9 @@ class GroupChat {
                 this.currentVoiceNote.duration
             );
             
+            // Award XP for sending voice note
+            await this.awardChatXP(this.firebaseUser.uid, 'voice_sent');
+            
             // Clear current voice note
             this.currentVoiceNote = null;
             
@@ -1607,7 +1749,7 @@ class GroupChat {
     }
     
     async uploadVoiceToCloudinary(audioBlob, uploadId) {
-        // FIX: Check if offline before starting upload
+        // Check if offline before starting upload
         if (!this.isOnline) {
             throw new Error('You are offline. Please check your network connection.');
         }
@@ -1656,6 +1798,7 @@ class GroupChat {
             throw new Error('Audio file must be less than 10MB');
         }
         
+        const AUDIO_FORMATS = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/mpeg'];
         if (!AUDIO_FORMATS.includes(file.type)) {
             throw new Error('Please upload a valid audio file (MP3, WAV, OGG, WebM)');
         }
@@ -2169,7 +2312,8 @@ class GroupChat {
             groupInvites: new Map(),
             adminGroups: new Map(),
             allGroups: new Map(),
-            messages: new Map()
+            messages: new Map(),
+            userXP: new Map()
         };
         this.lastDisplayedMessages.clear();
         this.messageRenderQueue = [];
@@ -2184,15 +2328,16 @@ class GroupChat {
             this.pageProcessedMessageIdsByGroup.clear();
         }
         
-        // NEW: Clear typing and reward data
+        // Clear XP cache
+        xpDataCache.clear();
+        this.userXPCache.clear();
+        this.dailyXPTracking.clear();
+        
+        // Clear typing data
         this.typingUsers.clear();
         this.lastMessageTimes.clear();
-        this.userMessageStreaks.clear();
-        this.userStreakTimers.clear();
-        this.userRewards.clear();
-        this.userActiveDurations.clear();
         
-        // NEW: Clear voice recording
+        // Clear voice recording
         if (this.isRecording) {
             this.cancelVoiceRecording();
         }
@@ -2215,6 +2360,7 @@ class GroupChat {
                     await indexedDBCache.clear('user_profiles');
                     await indexedDBCache.clear('offline_messages');
                     await indexedDBCache.clear('voice_notes');
+                    await indexedDBCache.clear('xp_data');
                     console.log('Cleared all IndexedDB cache');
                 } catch (error) {
                     console.error('Error clearing IndexedDB cache:', error);
@@ -2384,7 +2530,7 @@ class GroupChat {
     }
 
     async uploadMediaToCloudinary(file, uploadId, onProgress = null, onCancel = null) {
-        // FIX: Check if offline before starting upload
+        // Check if offline before starting upload
         if (!this.isOnline) {
             throw new Error('You are offline. Please check your network connection.');
         }
@@ -2502,10 +2648,6 @@ class GroupChat {
             
             if (userSnap.exists()) {
                 const userData = userSnap.data();
-                
-                // Get XP info for this user
-                const xpInfo = await getUserXPInfo(userId);
-                
                 const profile = {
                     id: userId,
                     name: userData.displayName || 'User',
@@ -2518,15 +2660,7 @@ class GroupChat {
                     createdAt: userData.createdAt ? 
                         (userData.createdAt.toDate ? userData.createdAt.toDate() : userData.createdAt) : 
                         new Date(),
-                    profileComplete: userData.displayName && userData.avatar ? true : false,
-                    // NEW: Add reward tracking
-                    rewardTag: userData.rewardTag || '',
-                    glowEffect: userData.glowEffect || false,
-                    fireRing: userData.fireRing || false,
-                    // XP info
-                    xpLevel: xpInfo.level,
-                    xpRank: xpInfo.rank,
-                    xpTotal: xpInfo.totalXP
+                    profileComplete: userData.displayName && userData.avatar ? true : false
                 };
                 
                 // Update memory cache
@@ -2551,6 +2685,144 @@ class GroupChat {
         } catch (error) {
             console.error('Error getting user profile:', error);
             return null;
+        }
+    }
+
+    // NEW: Get user XP data with rank
+    async getUserXPWithRank(userId, forceRefresh = false) {
+        try {
+            // Check cache first
+            if (!forceRefresh) {
+                const cached = this.userXPCache.get(userId);
+                if (cached && cached.expiry > Date.now()) {
+                    return cached;
+                }
+            }
+            
+            // Get XP data
+            const xpData = await getUserXPData(userId);
+            
+            // Get rank
+            const rank = getUserRankFromXP(xpData);
+            
+            const result = {
+                xpData: xpData,
+                rank: rank,
+                level: rank.level,
+                icon: rank.icon,
+                title: rank.title,
+                color: rank.color
+            };
+            
+            // Cache for 5 minutes
+            this.userXPCache.set(userId, {
+                ...result,
+                expiry: Date.now() + 5 * 60 * 1000
+            });
+            
+            return result;
+        } catch (error) {
+            console.error('Error getting user XP with rank:', error);
+            return {
+                xpData: { totalXP: 0, coins: 0 },
+                rank: XP_RANKS[0],
+                level: 1,
+                icon: XP_RANKS[0].icon,
+                title: XP_RANKS[0].title,
+                color: XP_RANKS[0].color
+            };
+        }
+    }
+
+    // NEW: Check daily XP limit
+    async checkDailyXPLimit(userId) {
+        const today = new Date().toDateString();
+        const userDaily = this.dailyXPTracking.get(userId);
+        
+        if (!userDaily || userDaily.date !== today) {
+            // Reset for new day
+            this.dailyXPTracking.set(userId, {
+                date: today,
+                count: 0
+            });
+            return true;
+        }
+        
+        if (userDaily.count >= this.dailyXPLimit) {
+            console.log(`Daily XP limit reached for user ${userId}`);
+            return false;
+        }
+        
+        return true;
+    }
+
+    // NEW: Award XP for chat activity
+    async awardChatXP(userId, activityType) {
+        try {
+            // Check daily limit
+            const canAward = await this.checkDailyXPLimit(userId);
+            if (!canAward) return false;
+            
+            let xpAmount = 0;
+            let reason = '';
+            
+            switch(activityType) {
+                case 'message_sent':
+                    xpAmount = XP_REWARDS.MESSAGE_SENT;
+                    reason = 'Sent a message';
+                    break;
+                case 'image_sent':
+                    xpAmount = XP_REWARDS.IMAGE_SENT;
+                    reason = 'Shared an image';
+                    break;
+                case 'video_sent':
+                    xpAmount = XP_REWARDS.VIDEO_SENT;
+                    reason = 'Shared a video';
+                    break;
+                case 'voice_sent':
+                    xpAmount = XP_REWARDS.VOICE_SENT;
+                    reason = 'Sent a voice note';
+                    break;
+                case 'reaction_added':
+                    xpAmount = XP_REWARDS.REACTION_ADDED;
+                    reason = 'Added a reaction';
+                    break;
+                default:
+                    return false;
+            }
+            
+            // Award XP
+            const success = await awardXP(userId, xpAmount, reason);
+            
+            if (success) {
+                // Update daily count
+                const userDaily = this.dailyXPTracking.get(userId);
+                if (userDaily) {
+                    userDaily.count += 1;
+                }
+                
+                // Clear cache
+                this.userXPCache.delete(userId);
+                
+                // Get updated XP data to check for milestones
+                const xpData = await getUserXPData(userId);
+                
+                // Check for XP milestones (every 100 XP)
+                if (xpData.totalXP % 100 === 0 && xpData.totalXP > 0) {
+                    await sendRewardSystemMessage(
+                        this.currentGroupId,
+                        userId,
+                        this.currentUser?.name || 'User',
+                        `${xpData.totalXP} total XP`,
+                        'milestone'
+                    );
+                }
+            }
+            
+            return success;
+        } catch (error) {
+            console.error('Error awarding chat XP:', error);
+            return false;
         }
     }
 
@@ -2606,165 +2878,17 @@ class GroupChat {
         return `private_${ids[0]}_${ids[1]}`;
     }
 
-    // NEW: Update user reward in database
-    async updateUserReward(userId, rewardData) {
-        try {
-            const userRef = doc(db, 'group_users', userId);
-            await updateDoc(userRef, {
-                rewardTag: rewardData.tag,
-                glowEffect: rewardData.glowEffect,
-                fireRing: rewardData.fireRing,
-                updatedAt: serverTimestamp()
-            });
-            
-            // Update cache
-            const cacheKey = `user_${userId}`;
-            const cached = this.cache.userProfiles.get(cacheKey);
-            if (cached) {
-                cached.rewardTag = rewardData.tag;
-                cached.glowEffect = rewardData.glowEffect;
-                cached.fireRing = rewardData.fireRing;
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('Error updating user reward:', error);
-            return false;
-        }
-    }
-
-    // NEW: Send system message for XP upgrade
-    async sendXPSystemMessage(groupId, userId, userName, xpAmount, reason) {
-        try {
-            const messagesRef = collection(db, 'groups', groupId, 'messages');
-            
-            await addDoc(messagesRef, {
-                type: 'system',
-                text: `🎮 ${userName} gained +${xpAmount} XP (${reason})!`,
-                timestamp: serverTimestamp(),
-                senderId: 'system',
-                senderName: 'System',
-                senderAvatar: '',
-                xpUpgrade: true,
-                xpUserId: userId,
-                xpUserName: userName,
-                xpAmount: xpAmount
-            });
-            
-            return true;
-        } catch (error) {
-            console.error('Error sending XP system message:', error);
-            return false;
-        }
-    }
-
-    // NEW: Check and award user for activity
-    async checkAndAwardUser(groupId, userId, userName) {
-        try {
-            const now = Date.now();
-            const lastMessageTime = this.lastMessageTimes.get(userId) || 0;
-            const timeSinceLastMessage = now - lastMessageTime;
-            
-            // Update active duration
-            if (!this.userActiveDurations.has(userId)) {
-                this.userActiveDurations.set(userId, 0);
-            }
-            
-            // Add time since last message to active duration
-            if (lastMessageTime > 0) {
-                const currentDuration = this.userActiveDurations.get(userId);
-                this.userActiveDurations.set(userId, currentDuration + timeSinceLastMessage);
-            }
-            
-            // Check reward thresholds
-            const activeDuration = this.userActiveDurations.get(userId);
-            let rewardTag = '';
-            
-            if (activeDuration >= REWARD_TIME_THRESHOLDS.TWENTY_MINUTES && 
-                (!this.userRewards.has(userId) || this.userRewards.get(userId) !== REWARD_TAGS.TWENTY_MINUTES)) {
-                rewardTag = REWARD_TAGS.TWENTY_MINUTES;
-            } else if (activeDuration >= REWARD_TIME_THRESHOLDS.TEN_MINUTES && 
-                      activeDuration < REWARD_TIME_THRESHOLDS.TWENTY_MINUTES &&
-                      (!this.userRewards.has(userId) || this.userRewards.get(userId) !== REWARD_TAGS.TEN_MINUTES)) {
-                rewardTag = REWARD_TAGS.TEN_MINUTES;
-            } else if (activeDuration >= REWARD_TIME_THRESHOLDS.THREE_MINUTES && 
-                      activeDuration < REWARD_TIME_THRESHOLDS.TEN_MINUTES &&
-                      (!this.userRewards.has(userId) || this.userRewards.get(userId) !== REWARD_TAGS.THREE_MINUTES)) {
-                rewardTag = REWARD_TAGS.THREE_MINUTES;
-            }
-            
-            // Award the reward if earned
-            if (rewardTag) {
-                this.userRewards.set(userId, rewardTag);
-                
-                // Update user profile in database
-                const rewardData = {
-                    tag: rewardTag,
-                    glowEffect: activeDuration >= REWARD_TIME_THRESHOLDS.TEN_MINUTES,
-                    fireRing: activeDuration >= REWARD_TIME_THRESHOLDS.TWENTY_MINUTES
-                };
-                
-                await this.updateUserReward(userId, rewardData);
-                
-                // Send system message about the reward
-                await this.sendXPSystemMessage(groupId, userId, userName, 50, `Earned ${rewardTag}`);
-                
-                console.log(`User ${userName} awarded: ${rewardTag}`);
-                
-                // Reset active duration for next tier
-                if (rewardTag === REWARD_TAGS.TWENTY_MINUTES) {
-                    this.userActiveDurations.set(userId, 0);
-                }
-            }
-            
-            // Update last message time
-            this.lastMessageTimes.set(userId, now);
-            
-        } catch (error) {
-            console.error('Error checking and awarding user:', error);
-        }
-    }
-
-    // NEW: Update user message streak
-    updateMessageStreak(userId) {
-        const now = Date.now();
-        const lastStreakTime = this.lastMessageTimes.get(userId) || 0;
-        const timeSinceLastMessage = now - lastStreakTime;
+    // NEW: Create XP badge HTML
+    createXPBadge(xpRank) {
+        if (!xpRank) return '';
         
-        // Reset streak if more than 30 seconds between messages
-        if (timeSinceLastMessage > 30000) {
-            this.userMessageStreaks.set(userId, 1);
-        } else {
-            const currentStreak = this.userMessageStreaks.get(userId) || 0;
-            this.userMessageStreaks.set(userId, currentStreak + 1);
-        }
-        
-        // Clear previous streak timer
-        if (this.userStreakTimers.has(userId)) {
-            clearTimeout(this.userStreakTimers.get(userId));
-        }
-        
-        // Set timer to reset streak after 30 seconds of inactivity
-        const streakTimer = setTimeout(() => {
-            this.userMessageStreaks.delete(userId);
-        }, 30000);
-        
-        this.userStreakTimers.set(userId, streakTimer);
-        this.lastMessageTimes.set(userId, now);
-        
-        return this.userMessageStreaks.get(userId) || 0;
-    }
-
-    // NEW: Check if user should have glowing messages
-    shouldGlowMessage(userId) {
-        const streak = this.userMessageStreaks.get(userId) || 0;
-        return streak >= CONSECUTIVE_MESSAGES_THRESHOLD;
-    }
-
-    // NEW: Check if user should have fire ring avatar
-    shouldHaveFireRing(userId) {
-        const streak = this.userMessageStreaks.get(userId) || 0;
-        return streak >= CONSECUTIVE_MESSAGES_THRESHOLD * 2; // After 10 consecutive messages
+        return `
+            <span class="xp-badge" style="background: linear-gradient(135deg, ${xpRank.color}, #764ba2);">
+                <span class="xp-icon">${xpRank.icon}</span>
+                <span>Lvl ${xpRank.level}</span>
+                <span class="xp-level">${xpRank.title.split(' ')[0]}</span>
+            </span>
+        `;
     }
 
     async sendPrivateMessage(toUserId, text = null, imageUrl = null, videoUrl = null, replyTo = null, voiceUrl = null, duration = null) {
@@ -3343,8 +3467,8 @@ class GroupChat {
                 const userSnap = await getDoc(userRef);
                 const userData = userSnap.exists() ? userSnap.data() : {};
                 
-                // Get XP info for this user
-                const xpInfo = await getUserXPInfo(docSnap.id);
+                // Get XP data for member
+                const xpRank = await this.getUserXPWithRank(docSnap.id);
                 
                 const member = {
                     id: docSnap.id,
@@ -3355,10 +3479,13 @@ class GroupChat {
                     joinedAt: data.joinedAt ? (data.joinedAt.toDate ? data.joinedAt.toDate() : data.joinedAt) : new Date(),
                     lastActive: data.lastActive ? (data.lastActive.toDate ? data.lastActive.toDate() : data.lastActive) : new Date(),
                     isAdmin: docSnap.id === adminId,
-                    // XP info
-                    xpLevel: xpInfo.level,
-                    xpRank: xpInfo.rank,
-                    xpTotal: xpInfo.totalXP
+                    xp: {
+                        level: xpRank.level,
+                        icon: xpRank.icon,
+                        title: xpRank.title,
+                        color: xpRank.color,
+                        totalXP: xpRank.xpData.totalXP
+                    }
                 };
                 
                 members.push(member);
@@ -3549,11 +3676,6 @@ class GroupChat {
                 this.firebaseUser = user;
                 console.log('User authenticated:', user.uid);
                 
-                // Initialize XP System for this user
-                if (this.xpSystem) {
-                    await this.xpSystem.initialize();
-                }
-                
                 await this.loadUserProfile(user.uid);
                 
                 document.dispatchEvent(new CustomEvent('groupAuthReady'));
@@ -3588,14 +3710,14 @@ class GroupChat {
                     avatar: AVATAR_OPTIONS[0],
                     bio: '',
                     email: this.firebaseUser.email,
-                    profileComplete: false,
-                    xpLevel: 1,
-                    xpRank: XP_RANKS[0],
-                    xpTotal: 0
+                    profileComplete: false
                 };
                 
                 console.log('New user profile created:', this.currentUser);
             }
+            
+            // Load current user's XP data
+            await this.getUserXPWithRank(userId);
             
         } catch (error) {
             console.error('Error loading user profile:', error);
@@ -3618,18 +3740,12 @@ class GroupChat {
                 lastSeen: serverTimestamp()
             }, { merge: true });
             
-            // Get XP info
-            const xpInfo = await getUserXPInfo(this.firebaseUser.uid);
-            
             this.currentUser = {
                 ...this.currentUser,
                 name: userData.name,
                 avatar: userData.avatar,
                 bio: userData.bio,
-                profileComplete: true,
-                xpLevel: xpInfo.level,
-                xpRank: xpInfo.rank,
-                xpTotal: xpInfo.totalXP
+                profileComplete: true
             };
             
             this.cache.userProfile = this.currentUser;
@@ -4167,10 +4283,9 @@ class GroupChat {
         }
     }
 
-    // ==================== FIXED: sendMessage with 1 XP per 5 messages instead of 5 XP per message ====================
     async sendMessage(groupId, text = null, imageUrl = null, videoUrl = null, replyTo = null, voiceUrl = null, duration = null) {
         try {
-            // FIX: Check if offline before sending
+            // Check if offline before sending
             if (!this.isOnline) {
                 // Queue message for offline sending
                 const offlineMessage = {
@@ -4217,11 +4332,6 @@ class GroupChat {
                 }
             }
             
-            // NEW: Update message streak
-            const streak = this.updateMessageStreak(this.firebaseUser.uid);
-            const shouldGlow = this.shouldGlowMessage(this.firebaseUser.uid);
-            const shouldHaveFireRing = this.shouldHaveFireRing(this.firebaseUser.uid);
-            
             const messageId = `${groupId}_${this.firebaseUser.uid}_${Date.now()}`;
             
             if (this.sentMessageIds.has(messageId) || this.pendingMessages.has(messageId)) {
@@ -4239,15 +4349,6 @@ class GroupChat {
                 senderAvatar: this.currentUser.avatar,
                 timestamp: serverTimestamp()
             };
-            
-            // NEW: Add glow effect and fire ring data
-            if (shouldGlow) {
-                messageData.glowEffect = true;
-            }
-            
-            if (shouldHaveFireRing) {
-                messageData.fireRing = true;
-            }
             
             if (replyTo) {
                 messageData.replyTo = replyTo;
@@ -4287,26 +4388,18 @@ class GroupChat {
                 }
             });
             
-            // ==================== FIXED: Award XP for messages (1 XP per 5 messages) ====================
-            this.messageCounter++;
-            
-            // Only award XP every 5 messages
-            if (this.messageCounter % 5 === 0) {
-                const xpAwarded = await this.xpSystem.addXP(1, "Sent 5 messages in group chat");
-                
-                if (xpAwarded) {
-                    // Send system message about XP gain
-                    await this.sendXPSystemMessage(groupId, this.firebaseUser.uid, this.currentUser.name, 1, "Sent 5 messages");
-                    
-                    // Show XP gain animation
-                    this.showXPGainAnimation(1, "5 messages sent");
-                }
+            // Award XP based on message type
+            if (voiceUrl) {
+                await this.awardChatXP(this.firebaseUser.uid, 'voice_sent');
+            } else if (videoUrl) {
+                await this.awardChatXP(this.firebaseUser.uid, 'video_sent');
+            } else if (imageUrl) {
+                await this.awardChatXP(this.firebaseUser.uid, 'image_sent');
+            } else if (text) {
+                await this.awardChatXP(this.firebaseUser.uid, 'message_sent');
             }
             
-            // NEW: Check and award user for activity (reward tags)
-            await this.checkAndAwardUser(groupId, this.firebaseUser.uid, this.currentUser.name);
-            
-            // NEW: Stop typing indicator
+            // Stop typing indicator
             await this.stopTyping(groupId);
             
             await this.updateLastActive(groupId);
@@ -4335,25 +4428,6 @@ class GroupChat {
             this.pendingMessages.delete(messageId);
             throw error;
         }
-    }
-
-    // Helper method to show XP gain animation
-    showXPGainAnimation(amount, reason) {
-        const xpElement = document.createElement('div');
-        xpElement.className = 'xp-gain-animation';
-        xpElement.innerHTML = `
-            <span style="font-size: 20px;">🎮</span>
-            <span>+${amount} XP</span>
-            <span style="font-size: 12px; opacity: 0.8;">${reason}</span>
-        `;
-        
-        document.body.appendChild(xpElement);
-        
-        setTimeout(() => {
-            if (xpElement.parentElement) {
-                xpElement.remove();
-            }
-        }, 2000);
     }
 
     async sendMediaMessage(groupId, file, replyTo = null, onProgress = null, onCancel = null) {
@@ -4476,7 +4550,6 @@ class GroupChat {
             
             // Track if this is the first snapshot
             let isFirstSnapshot = true;
-            let initialMessagesProcessed = false;
             
             // Load cached messages from IndexedDB first
             if (indexedDBCache && pageProcessedIds.size === 0) {
@@ -4502,7 +4575,7 @@ class GroupChat {
             
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 try {
-                    // FIX: Check if we're offline or page is hidden
+                    // Check if we're offline or page is hidden
                     if (!this.isOnline || this.connectionState === 'inactive') {
                         console.log('Skipping message processing - offline or inactive');
                         return;
@@ -4533,7 +4606,6 @@ class GroupChat {
                         if (isFirstSnapshot) {
                             console.log('Initial load:', messages.length, 'messages');
                             isFirstSnapshot = false;
-                            initialMessagesProcessed = true;
                         } else {
                             console.log('New messages received:', messages.length);
                         }
@@ -4913,7 +4985,7 @@ class GroupChat {
                 min-width: 0;
             }
             
-            /* UPDATED: Typing indicator styles - Moved to top */
+            /* Typing indicator styles */
             .typing-indicator {
                 position: fixed;
                 top: 0;
@@ -4961,104 +5033,34 @@ class GroupChat {
                 50% { opacity: 1; transform: scale(1.2); }
             }
             
-            /* UPDATED: Soft glass glowing message styles */
-            .glowing-message {
-                animation: soft-glow 3s ease-in-out infinite alternate;
-                position: relative;
-                backdrop-filter: blur(5px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
-                padding: 8px 12px;
-                margin: 2px 0;
-            }
-            
-            @keyframes soft-glow {
-                0% {
-                    box-shadow: 0 0 5px rgba(255, 255, 255, 0.3),
-                                0 0 10px rgba(77, 171, 247, 0.2),
-                                0 0 15px rgba(77, 171, 247, 0.1);
-                    background: rgba(255, 255, 255, 0.05);
-                }
-                100% {
-                    box-shadow: 0 0 10px rgba(255, 255, 255, 0.4),
-                                0 0 20px rgba(77, 171, 247, 0.3),
-                                0 0 30px rgba(77, 171, 247, 0.2);
-                    background: rgba(255, 255, 255, 0.08);
-                }
-            }
-            
-            /* Fire ring avatar styles */
-            .avatar-with-fire-ring {
-                position: relative;
-            }
-            
-            .fire-ring {
-                position: absolute;
-                top: -5px;
-                left: -5px;
-                right: -5px;
-                bottom: -5px;
-                border-radius: 50%;
-                background: linear-gradient(45deg, #ff6b00, #ff9500, #ffcc00);
-                animation: fire-ring 1.5s ease-in-out infinite alternate;
-                z-index: -1;
-            }
-            
-            @keyframes fire-ring {
-                from {
-                    box-shadow: 0 0 10px #ff6b00, 0 0 20px #ff9500, 0 0 30px #ffcc00;
-                    transform: scale(1);
-                }
-                to {
-                    box-shadow: 0 0 15px #ff6b00, 0 0 25px #ff9500, 0 0 35px #ffcc00;
-                    transform: scale(1.05);
-                }
-            }
-            
-            /* Reward tag styles */
-            .reward-tag {
-                display: inline-block;
-                background: linear-gradient(45deg, #ffd700, #ff9500);
-                color: white;
+            /* XP Badge Styles */
+            .xp-badge {
+                display: inline-flex;
+                align-items: center;
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                border-radius: 20px;
                 padding: 2px 8px;
-                border-radius: 12px;
-                font-size: 10px;
-                font-weight: bold;
                 margin-left: 6px;
-                animation: reward-tag-pulse 2s infinite;
-                text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
-            }
-            
-            @keyframes reward-tag-pulse {
-                0% { transform: scale(1); }
-                50% { transform: scale(1.05); }
-                100% { transform: scale(1); }
-            }
-            
-            .system-message.reward-upgrade {
-                background: linear-gradient(45deg, rgba(255, 215, 0, 0.1), rgba(255, 149, 0, 0.1));
-                border-left: 3px solid #ff9500;
-                padding: 10px;
-                margin: 10px 0;
-                border-radius: 8px;
-                text-align: center;
-                font-weight: bold;
-                animation: reward-message 3s ease-in-out;
-            }
-            
-            @keyframes reward-message {
-                0% { opacity: 0; transform: translateY(-10px); }
-                20% { opacity: 1; transform: translateY(0); }
-                80% { opacity: 1; transform: translateY(0); }
-                100% { opacity: 0; transform: translateY(-10px); }
-            }
-            
-            /* XP Message Styles */
-            .system-message.xp-message {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
-                border-left: 4px solid #ffd700;
-                font-weight: 500;
+                font-size: 11px;
+                font-weight: bold;
+                gap: 4px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            }
+            
+            .xp-badge span {
+                line-height: 1;
+            }
+            
+            .xp-icon {
+                font-size: 12px;
+            }
+            
+            .xp-level {
+                background: rgba(255,255,255,0.2);
+                border-radius: 12px;
+                padding: 1px 4px;
+                margin-left: 2px;
             }
             
             /* Upload modal styles */
@@ -5372,6 +5374,9 @@ class GroupChat {
                         users: arrayUnion(userId),
                         lastUpdated: serverTimestamp()
                     });
+                    
+                    // Award XP for adding reaction
+                    await this.awardChatXP(userId, 'reaction_added');
                 }
             } else {
                 await setDoc(reactionRef, {
@@ -5380,6 +5385,9 @@ class GroupChat {
                     users: [userId],
                     lastUpdated: serverTimestamp()
                 });
+                
+                // Award XP for adding reaction
+                await this.awardChatXP(userId, 'reaction_added');
             }
         } else {
             const groupId = this.currentGroupId;
@@ -5406,6 +5414,9 @@ class GroupChat {
                         users: arrayUnion(userId),
                         lastUpdated: serverTimestamp()
                     });
+                    
+                    // Award XP for adding reaction
+                    await this.awardChatXP(userId, 'reaction_added');
                 }
             } else {
                 await setDoc(reactionRef, {
@@ -5414,6 +5425,9 @@ class GroupChat {
                     users: [userId],
                     lastUpdated: serverTimestamp()
                 });
+                
+                // Award XP for adding reaction
+                await this.awardChatXP(userId, 'reaction_added');
             }
         }
             
@@ -5879,7 +5893,7 @@ class GroupChat {
             this.pageProcessedMessageIdsByGroup.clear();
         }
         
-        // NEW: Clear typing timeouts
+        // Clear typing timeouts
         this.typingUsers.forEach((userTyping, groupId) => {
             userTyping.forEach((timeout, userId) => {
                 clearTimeout(timeout);
@@ -5888,13 +5902,12 @@ class GroupChat {
         });
         this.typingUsers.clear();
         
-        // Clear streak timers
-        this.userStreakTimers.forEach(timer => {
-            clearTimeout(timer);
-        });
-        this.userStreakTimers.clear();
+        // Clear XP cache
+        xpDataCache.clear();
+        this.userXPCache.clear();
+        this.dailyXPTracking.clear();
         
-        // NEW: Clear voice recording
+        // Clear voice recording
         if (this.isRecording) {
             this.cancelVoiceRecording();
         }
@@ -5935,7 +5948,7 @@ class GroupChat {
 
 const groupChat = new GroupChat();
 
-// UPDATED: Create typing indicator element at top
+// Create typing indicator element at top
 function createTypingIndicator() {
     const typingIndicator = document.createElement('div');
     typingIndicator.id = 'typingIndicator';
@@ -5953,7 +5966,7 @@ function createTypingIndicator() {
     return typingIndicator;
 }
 
-// UPDATED: Update typing indicator
+// Update typing indicator
 function updateTypingIndicator(typingUsers) {
     const typingIndicator = document.getElementById('typingIndicator');
     const typingText = document.getElementById('typingText');
@@ -5986,7 +5999,7 @@ function updateTypingIndicator(typingUsers) {
     typingIndicator.classList.add('show');
 }
 
-// NEW: Create upload modal
+// Create upload modal
 function createUploadModal(uploadId, fileName, fileType, onCancel) {
     const existingModal = document.getElementById(`upload-modal-${uploadId}`);
     if (existingModal) {
@@ -6049,7 +6062,7 @@ function createUploadModal(uploadId, fileName, fileType, onCancel) {
     return modal;
 }
 
-// NEW: Update upload progress
+// Update upload progress
 function updateUploadProgress(uploadId, progress) {
     const progressFill = document.getElementById(`progress-fill-${uploadId}`);
     const progressPercent = document.getElementById(`progress-percent-${uploadId}`);
@@ -6063,125 +6076,12 @@ function updateUploadProgress(uploadId, progress) {
     }
 }
 
-// NEW: Remove upload modal
+// Remove upload modal
 function removeUploadModal(uploadId) {
     const modal = document.getElementById(`upload-modal-${uploadId}`);
     if (modal) {
         modal.remove();
     }
-}
-
-// ==================== XP INTEGRATION HELPER FUNCTIONS ====================
-
-// Function to create XP profile icon for a user in the chat
-function createXPProfileIcon(userId, userName, xpLevel, xpRank) {
-    const icon = document.createElement('span');
-    icon.className = 'xp-profile-icon';
-    icon.setAttribute('data-user-id', userId);
-    icon.innerHTML = `
-        <span style="margin-right: 4px;">${xpRank.icon}</span>
-        <span>Lvl ${xpLevel}</span>
-    `;
-    
-    // Add click handler to show XP details
-    icon.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        
-        // Get full XP data
-        const xpData = await getUserXPInfo(userId);
-        
-        // Show quick stats tooltip
-        showXPQuickStats(userId, userName, xpData, xpLevel, xpRank, e.target);
-    });
-    
-    return icon;
-}
-
-// Function to show XP quick stats tooltip
-function showXPQuickStats(userId, userName, xpInfo, level, rank, targetElement) {
-    // Remove any existing tooltips
-    const existingTooltip = document.querySelector('.xp-quick-stats');
-    if (existingTooltip) existingTooltip.remove();
-    
-    const nextRank = XP_RANKS[level] || null;
-    
-    // Calculate progress
-    let progress = 0;
-    let xpToNext = 0;
-    
-    if (nextRank && xpInfo) {
-        xpToNext = nextRank.xpNeeded - (xpInfo.totalXP || 0);
-        const xpInCurrent = (xpInfo.totalXP || 0) - rank.xpNeeded;
-        const xpNeeded = nextRank.xpNeeded - rank.xpNeeded;
-        progress = (xpInCurrent / xpNeeded) * 100;
-    }
-    
-    // Create tooltip
-    const tooltip = document.createElement('div');
-    tooltip.className = 'xp-quick-stats';
-    tooltip.style.cssText = `
-        position: absolute;
-        background: white;
-        border-radius: 15px;
-        padding: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        z-index: 10000;
-        min-width: 280px;
-        animation: fadeIn 0.2s ease-out;
-        border: 1px solid #e0e0e0;
-    `;
-    
-    tooltip.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-            <div style="font-size: 40px; background: ${rank.color}20; padding: 10px; border-radius: 50%;">${rank.icon}</div>
-            <div>
-                <div style="font-weight: bold; font-size: 18px; color: #333;">${rank.title}</div>
-                <div style="color: #666; font-size: 14px;">${userName} • Level ${level}</div>
-            </div>
-        </div>
-        <div style="margin-bottom: 15px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
-                <span style="color: #666;">Total XP:</span>
-                <span style="font-weight: bold; color: #667eea;">${xpInfo?.totalXP?.toLocaleString() || 0}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
-                <span style="color: #666;">Coins:</span>
-                <span style="font-weight: bold; color: #f1c40f;">🪙 ${xpInfo?.coins?.toLocaleString() || 0}</span>
-            </div>
-            ${nextRank ? `
-                <div style="margin-top: 15px;">
-                    <div style="font-size: 13px; color: #666; margin-bottom: 5px; display: flex; justify-content: space-between;">
-                        <span>Next: ${nextRank.title}</span>
-                        <span style="font-weight: bold;">${xpToNext.toLocaleString()} XP needed</span>
-                    </div>
-                    <div style="width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
-                        <div style="width: ${progress}%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);"></div>
-                    </div>
-                </div>
-            ` : '<div style="color: #f1c40f; text-align: center; margin-top: 10px; font-weight: bold;">🏆 MAX LEVEL ACHIEVED!</div>'}
-        </div>
-        <div style="font-size: 11px; color: #999; text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
-            Click anywhere to close
-        </div>
-    `;
-    
-    // Position near the clicked element
-    const rect = targetElement.getBoundingClientRect();
-    tooltip.style.top = `${rect.bottom + window.scrollY + 10}px`;
-    tooltip.style.left = `${rect.left + window.scrollX}px`;
-    
-    document.body.appendChild(tooltip);
-    
-    // Remove on click outside
-    setTimeout(() => {
-        const clickHandler = (e) => {
-            if (!tooltip.contains(e.target) && e.target !== targetElement) {
-                tooltip.remove();
-                document.removeEventListener('click', clickHandler);
-            }
-        };
-        document.addEventListener('click', clickHandler);
-    }, 100);
 }
 
 // Initialize group chat page
@@ -6245,7 +6145,7 @@ function initGroupPage() {
     let isRendering = false;
     let renderQueue = [];
     
-    // UPDATED: Typing indicator variables
+    // Typing indicator variables
     let typingIndicator = null;
     let typingUnsubscribe = null;
     let typingTimeout = null;
@@ -6253,13 +6153,13 @@ function initGroupPage() {
     let lastMessageIds = '';
     let renderedMessageIds = new Set(); // Track which messages have been rendered
     
-    // FIXED: Voice message handlers map
+    // Voice message handlers map
     let voiceMessageHandlers = new Map();
     
-    // Track user XP icons to prevent duplicates
-    let userXPIcons = new Map();
+    // XP badge cache for messages
+    let messageXPCache = new Map(); // messageId -> { xpRank }
     
-    // ADDED: Missing queueRender function
+    // Queue render function
     function queueRender() {
         if (!isRendering) {
             isRendering = true;
@@ -6297,7 +6197,7 @@ function initGroupPage() {
         console.log('Cleared page processed messages for group:', groupId);
     }
     
-    // UPDATED: Create typing indicator at top
+    // Create typing indicator at top
     typingIndicator = createTypingIndicator();
     
     (async () => {
@@ -6336,7 +6236,7 @@ function initGroupPage() {
             });
             reactionUnsubscribers.clear();
             
-            // UPDATED: Clean up typing indicator
+            // Clean up typing indicator
             if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
                 typingUnsubscribe();
             }
@@ -6404,7 +6304,7 @@ function initGroupPage() {
         }
     }
     
-    // UPDATED: Typing indicator for message input
+    // Typing indicator for message input
     if (messageInput) {
         messageInput.addEventListener('input', () => {
             if (sendBtn) {
@@ -6414,7 +6314,7 @@ function initGroupPage() {
             messageInput.style.height = 'auto';
             messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
             
-            // UPDATED: Start typing indicator when user types
+            // Start typing indicator when user types
             const now = Date.now();
             if (now - lastTypingInputTime > 1000) { // Throttle to 1 second
                 groupChat.startTyping(groupId);
@@ -6432,7 +6332,7 @@ function initGroupPage() {
             }, 3000);
         });
         
-        // UPDATED: Stop typing when input loses focus
+        // Stop typing when input loses focus
         messageInput.addEventListener('blur', () => {
             groupChat.stopTyping(groupId);
             if (typingTimeout) {
@@ -6441,7 +6341,7 @@ function initGroupPage() {
         });
     }
     
-    // FIXED: Send button always shows airplane icon, no loader - prevent form submission
+    // Send button always shows airplane icon, no loader - prevent form submission
     if (sendBtn) {
         sendBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -6544,7 +6444,7 @@ function initGroupPage() {
         }
     }
     
-    // NEW: Add voice note button to sidebar
+    // Add voice note button to sidebar
     function addVoiceNoteButton() {
         // Create voice note button
         const voiceNoteBtn = document.createElement('button');
@@ -6659,7 +6559,7 @@ function initGroupPage() {
             if (groupNameSidebar) groupNameSidebar.textContent = groupData.name;
             if (groupMembersCount) groupMembersCount.textContent = `${groupData.memberCount || 0} members`;
             
-            // FIXED: Truncate group name to 6 words in chat header
+            // Truncate group name to 6 words in chat header
             const truncatedGroupName = groupChat.truncateName(groupData.name);
             if (chatTitle) chatTitle.textContent = truncatedGroupName;
             if (chatSubtitle) chatSubtitle.textContent = groupData.description;
@@ -6674,10 +6574,10 @@ function initGroupPage() {
                 });
             }
             
-            // UPDATED: Create copy invite link button for everyone (not just admin)
+            // Create copy invite link button for everyone (not just admin)
             addInviteLinkButton();
             
-            // ADDED: Add voice note button
+            // Add voice note button
             addVoiceNoteButton();
             
             members = await groupChat.getGroupMembers(groupId);
@@ -6696,7 +6596,7 @@ function initGroupPage() {
         }
     }
     
-    // UPDATED: Function to add copy invite link button for everyone (both admin and non-admin)
+    // Function to add copy invite link button for everyone (both admin and non-admin)
     function addInviteLinkButton() {
         // Don't check for admin status - show button for everyone
         let inviteContainer = document.getElementById('inviteLinkContainer');
@@ -6851,7 +6751,7 @@ function initGroupPage() {
             reactionUnsubscribers.clear();
         }
         
-        // UPDATED: Clear typing listener
+        // Clear typing listener
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             typingUnsubscribe();
             typingUnsubscribe = null;
@@ -6897,7 +6797,7 @@ function initGroupPage() {
         
         groupChat.activeListeners.set('members', membersUnsubscribe);
         
-        // UPDATED: Set up typing indicator listener
+        // Set up typing indicator listener
         typingUnsubscribe = groupChat.listenToTyping(groupId, (typingUsers) => {
             updateTypingIndicator(typingUsers);
         });
@@ -6930,7 +6830,7 @@ function initGroupPage() {
             });
             reactionUnsubscribers.clear();
             
-            // UPDATED: Clean up typing
+            // Clean up typing
             if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
                 typingUnsubscribe();
             }
@@ -6965,48 +6865,27 @@ function initGroupPage() {
             const div = document.createElement('div');
             div.className = 'member-item';
             
-            // Get user profile for reward tag and XP
-            const userProfile = groupChat.cache.userProfiles ? 
-                groupChat.cache.userProfiles.get(`user_${member.id}`)?.data : null;
-            
-            const rewardTag = userProfile?.rewardTag || '';
+            // Create XP badge HTML if member has XP data
+            const xpBadge = member.xp ? groupChat.createXPBadge(member.xp) : '';
             
             div.innerHTML = `
-                <div class="member-avatar-container" style="position: relative; display: flex; align-items: center;">
-                    ${userProfile?.fireRing ? '<div class="fire-ring"></div>' : ''}
-                    <img src="${member.avatar}" alt="${member.name}" class="member-avatar ${userProfile?.fireRing ? 'avatar-with-fire-ring' : ''}" data-user-id="${member.id}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
-                    <div class="member-info" style="flex: 1;">
-                        <div class="member-name" style="display: flex; align-items: center; flex-wrap: wrap;">
-                            <span style="font-weight: 600; margin-right: 5px;">${member.name}</span>
-                            ${isAdmin ? '<span style="background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 5px;">Admin</span>' : ''}
-                            ${isCurrentUser ? '<span style="background: #666; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 5px;">You</span>' : ''}
-                            ${rewardTag ? `<span class="reward-tag" style="margin-right: 5px;">${rewardTag}</span>` : ''}
-                            <!-- XP Icon -->
-                            <span class="xp-profile-icon" data-user-id="${member.id}" style="margin-left: 5px;">
-                                <span>${member.xpRank?.icon || '🌱'}</span>
-                                <span>Lvl ${member.xpLevel || 1}</span>
-                            </span>
-                        </div>
-                        ${member.bio ? `<div class="member-bio" style="font-size: 12px; color: #666;">${member.bio}</div>` : ''}
-                    </div>
-                    <div class="member-status ${isOnline ? 'online' : ''}" style="width: 10px; height: 10px; border-radius: 50%; background: ${isOnline ? '#4CAF50' : '#999'}; margin-left: 10px;"></div>
+                <div class="member-avatar-container" style="position: relative;">
+                    <img src="${member.avatar}" alt="${member.name}" class="member-avatar" data-user-id="${member.id}">
                 </div>
+                <div class="member-info">
+                    <div class="member-name">
+                        ${member.name}
+                        ${isAdmin ? '<span style="margin-left: 6px; background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">Admin</span>' : ''}
+                        ${isCurrentUser ? '<span style="margin-left: 6px; background: #666; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">You</span>' : ''}
+                        ${xpBadge}
+                    </div>
+                    ${member.bio ? `<div class="member-bio">${member.bio}</div>` : ''}
+                    ${member.xp ? `<div class="member-xp" style="font-size: 10px; color: #666; margin-top: 2px;">Total XP: ${member.xp.totalXP}</div>` : ''}
+                </div>
+                <div class="member-status ${isOnline ? 'online' : ''}"></div>
             `;
             
             membersList.appendChild(div);
-        });
-        
-        // Add click handlers for XP icons
-        document.querySelectorAll('.xp-profile-icon').forEach(icon => {
-            icon.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const userId = icon.dataset.userId;
-                const member = members.find(m => m.id === userId);
-                if (member) {
-                    const xpInfo = await getUserXPInfo(userId);
-                    showXPQuickStats(userId, member.name, xpInfo, member.xpLevel || 1, member.xpRank || XP_RANKS[0], e.target);
-                }
-            });
         });
         
         document.querySelectorAll('.member-avatar').forEach(avatar => {
@@ -7089,11 +6968,12 @@ function initGroupPage() {
             
             const firstMessage = group[0];
             const isSystemMessage = firstMessage.type === 'system';
+            const isRewardUpgrade = firstMessage.rewardUpgrade || false;
             
             // For system messages, don't group - render individually
             if (isSystemMessage) {
                 group.forEach(message => {
-                    renderSingleMessage(fragment, message, true);
+                    renderSingleMessage(fragment, message, true, isRewardUpgrade);
                 });
                 return;
             }
@@ -7101,102 +6981,123 @@ function initGroupPage() {
             // For regular messages, render as a group
             const messageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
             
-            // Get user profile for reward tag
-            const userProfile = groupChat.cache.userProfiles ? 
-                groupChat.cache.userProfiles.get(`user_${firstMessage.senderId}`)?.data : null;
-            
-            const rewardTag = userProfile?.rewardTag || '';
-            const hasFireRing = userProfile?.fireRing || false;
-            
-            // Get XP info for this user
-            const member = members.find(m => m.id === firstMessage.senderId);
-            const xpLevel = member?.xpLevel || 1;
-            const xpRank = member?.xpRank || XP_RANKS[0];
-            
-            // Create group container
-            const groupContainer = document.createElement('div');
-            groupContainer.className = 'message-group';
-            groupContainer.style.cssText = 'margin-bottom: 16px;';
-            
-            // Create header with avatar and sender info
-            const headerDiv = document.createElement('div');
-            headerDiv.style.cssText = 'display: flex; align-items: flex-start; gap: 10px; margin-bottom: 4px;';
-            
-            headerDiv.innerHTML = `
-                <!-- Avatar on the left -->
-                <div class="message-avatar-container" style="position: relative; flex-shrink: 0;">
-                    ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
-                    <img src="${firstMessage.senderAvatar}" 
-                         alt="${firstMessage.senderName}" 
-                         class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
-                         data-user-id="${firstMessage.senderId}"
-                         style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; cursor: pointer;">
-                </div>
-                
-                <!-- Sender info on the right -->
-                <div style="flex: 1; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px; flex-wrap: wrap;">
-                        <span style="font-weight: 600; color: #333; font-size: 14px;">${firstMessage.senderName}</span>
-                        ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
-                        <!-- XP Icon -->
-                        <span class="xp-profile-icon" data-user-id="${firstMessage.senderId}" style="margin-left: 5px;">
-                            <span>${xpRank.icon}</span>
-                            <span>Lvl ${xpLevel}</span>
-                        </span>
-                        <span style="color: #999; font-size: 12px; margin-left: auto;">${formatTime(messageTime)}</span>
-                    </div>
-                </div>
-            `;
-            
-            groupContainer.appendChild(headerDiv);
-            
-            // Create messages container
-            const messagesDiv = document.createElement('div');
-            messagesDiv.style.cssText = 'display: flex; flex-direction: column; gap: 2px; margin-left: 46px;';
-            
-            // Add each message in the group
-            group.forEach((message, index) => {
-                const messageDiv = createSingleMessageElement(message, index);
-                messagesDiv.appendChild(messageDiv);
-            });
-            
-            groupContainer.appendChild(messagesDiv);
-            fragment.appendChild(groupContainer);
+            // Get sender XP data (cached or fetch)
+            (async () => {
+                try {
+                    const senderXP = await groupChat.getUserXPWithRank(firstMessage.senderId);
+                    
+                    // Create group container
+                    const groupContainer = document.createElement('div');
+                    groupContainer.className = 'message-group';
+                    groupContainer.style.cssText = 'margin-bottom: 16px;';
+                    
+                    // Create header with avatar and sender info
+                    const headerDiv = document.createElement('div');
+                    headerDiv.style.cssText = 'display: flex; align-items: flex-start; gap: 10px; margin-bottom: 4px;';
+                    
+                    // Create XP badge
+                    const xpBadge = groupChat.createXPBadge(senderXP);
+                    
+                    headerDiv.innerHTML = `
+                        <!-- Avatar on the left -->
+                        <div class="message-avatar-container" style="position: relative; flex-shrink: 0;">
+                            <img src="${firstMessage.senderAvatar}" 
+                                 alt="${firstMessage.senderName}" 
+                                 class="message-avatar"
+                                 data-user-id="${firstMessage.senderId}"
+                                 style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; cursor: pointer;">
+                        </div>
+                        
+                        <!-- Sender info on the right -->
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px; flex-wrap: wrap;">
+                                <span style="font-weight: 600; color: #333; font-size: 14px;">${firstMessage.senderName}</span>
+                                ${xpBadge}
+                                <span style="color: #999; font-size: 12px; margin-left: auto;">${formatTime(messageTime)}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    groupContainer.appendChild(headerDiv);
+                    
+                    // Create messages container
+                    const messagesDiv = document.createElement('div');
+                    messagesDiv.style.cssText = 'display: flex; flex-direction: column; gap: 2px; margin-left: 46px;';
+                    
+                    // Add each message in the group
+                    group.forEach((message, index) => {
+                        const messageDiv = createSingleMessageElement(message, index, senderXP);
+                        messagesDiv.appendChild(messageDiv);
+                    });
+                    
+                    groupContainer.appendChild(messagesDiv);
+                    fragment.appendChild(groupContainer);
+                    
+                    // Append fragment after async operations
+                    messagesContainer.appendChild(fragment);
+                    
+                } catch (error) {
+                    console.error('Error getting sender XP:', error);
+                    // Fallback without XP badge
+                    const groupContainer = document.createElement('div');
+                    groupContainer.className = 'message-group';
+                    groupContainer.style.cssText = 'margin-bottom: 16px;';
+                    
+                    const headerDiv = document.createElement('div');
+                    headerDiv.style.cssText = 'display: flex; align-items: flex-start; gap: 10px; margin-bottom: 4px;';
+                    
+                    headerDiv.innerHTML = `
+                        <div class="message-avatar-container" style="position: relative; flex-shrink: 0;">
+                            <img src="${firstMessage.senderAvatar}" 
+                                 alt="${firstMessage.senderName}" 
+                                 class="message-avatar"
+                                 data-user-id="${firstMessage.senderId}"
+                                 style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; cursor: pointer;">
+                        </div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                                <span style="font-weight: 600; color: #333; font-size: 14px;">${firstMessage.senderName}</span>
+                                <span style="color: #999; font-size: 12px; margin-left: auto;">${formatTime(messageTime)}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    groupContainer.appendChild(headerDiv);
+                    
+                    const messagesDiv = document.createElement('div');
+                    messagesDiv.style.cssText = 'display: flex; flex-direction: column; gap: 2px; margin-left: 46px;';
+                    
+                    group.forEach((message, index) => {
+                        const messageDiv = createSingleMessageElement(message, index);
+                        messagesDiv.appendChild(messageDiv);
+                    });
+                    
+                    groupContainer.appendChild(messagesDiv);
+                    fragment.appendChild(groupContainer);
+                    messagesContainer.appendChild(fragment);
+                }
+            })();
         });
         
-        messagesContainer.appendChild(fragment);
-        
-        // Add click handlers for XP icons
-        document.querySelectorAll('.xp-profile-icon').forEach(icon => {
-            icon.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const userId = icon.dataset.userId;
-                const member = members.find(m => m.id === userId);
-                if (member) {
-                    const xpInfo = await getUserXPInfo(userId);
-                    const rank = XP_RANKS[member.xpLevel - 1] || XP_RANKS[0];
-                    showXPQuickStats(userId, member.name, xpInfo, member.xpLevel || 1, rank, e.target);
+        // Now create and attach voice message elements for new voice messages
+        setTimeout(() => {
+            messages.forEach(msg => {
+                if (msg.voiceUrl) {
+                    const voiceElementId = `voice-${msg.id}`;
+                    const placeholder = document.getElementById(voiceElementId);
+                    if (placeholder) {
+                        // Create actual voice element
+                        const voiceElement = groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id);
+                        
+                        // Replace placeholder with actual voice element
+                        placeholder.parentNode.replaceChild(voiceElement, placeholder);
+                        
+                        // Store reference to voice element handler
+                        voiceMessageHandlers.set(msg.id, voiceElement);
+                    }
                 }
             });
-        });
-        
-        // FIXED: Now create and attach voice message elements for new voice messages
-        messages.forEach(msg => {
-            if (msg.voiceUrl) {
-                const voiceElementId = `voice-${msg.id}`;
-                const placeholder = document.getElementById(voiceElementId);
-                if (placeholder) {
-                    // Create actual voice element
-                    const voiceElement = groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id);
-                    
-                    // Replace placeholder with actual voice element
-                    placeholder.parentNode.replaceChild(voiceElement, placeholder);
-                    
-                    // Store reference to voice element handler
-                    voiceMessageHandlers.set(msg.id, voiceElement);
-                }
-            }
-        });
+        }, 100);
         
         // Add event listeners
         document.querySelectorAll('.message-avatar').forEach(avatar => {
@@ -7263,26 +7164,9 @@ function initGroupPage() {
         }, 50);
     }
     
-    function renderSingleMessage(fragment, message, isSystem = false) {
+    function renderSingleMessage(fragment, message, isSystem = false, isRewardUpgrade = false) {
         const messageTime = message.timestamp ? new Date(message.timestamp) : new Date();
-        
-        // Get user profile for reward tag
-        const userProfile = groupChat.cache.userProfiles ? 
-            groupChat.cache.userProfiles.get(`user_${message.senderId}`)?.data : null;
-        
-        const rewardTag = userProfile?.rewardTag || '';
-        const hasFireRing = userProfile?.fireRing || false;
-        const hasGlowEffect = message.glowEffect || false;
-        const isXPMessage = message.xpUpgrade || false;
-        const xpMessageClass = isXPMessage ? ' xp-message' : '';
-        const isRewardUpgrade = message.rewardUpgrade || false;
         const rewardUpgradeClass = isRewardUpgrade ? ' reward-upgrade' : '';
-        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
-        
-        // Get XP info for this user
-        const member = members.find(m => m.id === message.senderId);
-        const xpLevel = member?.xpLevel || 1;
-        const xpRank = member?.xpRank || XP_RANKS[0];
         
         const messageDivClass = isSystem ? 'system-message' : 'message-text';
         
@@ -7355,7 +7239,7 @@ function initGroupPage() {
         if (isSystem) {
             messageContainer.innerHTML = `
                 <div style="margin: 8px 0;">
-                    <div class="${messageDivClass}${extraClasses}${xpMessageClass}${rewardUpgradeClass}" 
+                    <div class="${messageDivClass}${rewardUpgradeClass}" 
                          data-message-id="${message.id}"
                          style="background: transparent; padding: 8px 12px; border-radius: 12px; max-width: 100%; word-wrap: break-word; margin: 0 auto;">
                         ${replyHtml}
@@ -7370,30 +7254,17 @@ function initGroupPage() {
                 <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;">
                     <!-- Avatar on the left -->
                     <div class="message-avatar-container" style="position: relative; flex-shrink: 0;">
-                        ${hasFireRing ? '<div class="fire-ring"></div>' : ''}
                         <img src="${message.senderAvatar}" 
                              alt="${message.senderName}" 
-                             class="message-avatar ${hasFireRing ? 'avatar-with-fire-ring' : ''}"
+                             class="message-avatar"
                              data-user-id="${message.senderId}"
                              style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; cursor: pointer;">
                     </div>
                     
                     <!-- Message content on the right -->
                     <div style="flex: 1; min-width: 0;">
-                        <!-- Sender info -->
-                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;">
-                            <span style="font-weight: 600; color: #333; font-size: 14px;">${message.senderName}</span>
-                            ${rewardTag ? `<span class="reward-tag">${rewardTag}</span>` : ''}
-                            <!-- XP Icon -->
-                            <span class="xp-profile-icon" data-user-id="${message.senderId}" style="margin-left: 5px;">
-                                <span>${xpRank.icon}</span>
-                                <span>Lvl ${xpLevel}</span>
-                            </span>
-                            <span style="color: #999; font-size: 12px; margin-left: auto;">${formatTime(messageTime)}</span>
-                        </div>
-                        
-                        <!-- Message content -->
-                        <div class="${messageDivClass}${extraClasses}${xpMessageClass}${rewardUpgradeClass}" 
+                        <!-- Sender info will be added by the group header -->
+                        <div class="${messageDivClass}" 
                              data-message-id="${message.id}"
                              style="background: ${message.senderId === groupChat.firebaseUser?.uid ? '#dcf8c6' : '#ffffff'}; 
                                     padding: 8px 12px; 
@@ -7428,10 +7299,7 @@ function initGroupPage() {
         fragment.appendChild(messageContainer);
     }
     
-    function createSingleMessageElement(message, index) {
-        const hasGlowEffect = message.glowEffect || false;
-        const extraClasses = hasGlowEffect ? ' glowing-message' : '';
-        
+    function createSingleMessageElement(message, index, senderXP = null) {
         let replyHtml = '';
         if (message.replyTo) {
             const repliedMessage = messages.find(m => m.id === message.replyTo);
@@ -7488,7 +7356,7 @@ function initGroupPage() {
         const cachedReactions = reactionsCache.get(message.id) || [];
         
         const messageDiv = document.createElement('div');
-        messageDiv.className = `message-text${extraClasses}`;
+        messageDiv.className = 'message-text';
         messageDiv.dataset.messageId = message.id;
         messageDiv.style.cssText = `
             background: ${message.senderId === groupChat.firebaseUser?.uid ? '#dcf8c6' : '#f0f0f0'}; 
@@ -7579,7 +7447,7 @@ function initGroupPage() {
         
         if (!text && !groupChat.currentVoiceNote) return;
         
-        // UPDATED: Clear typing timeout before sending
+        // Clear typing timeout before sending
         if (typingTimeout) {
             clearTimeout(typingTimeout);
         }
@@ -7587,7 +7455,7 @@ function initGroupPage() {
         // Stop typing indicator
         await groupChat.stopTyping(groupId);
         
-        // FIXED: Send button always shows airplane icon, no loader
+        // Send button always shows airplane icon, no loader
         // We only disable it temporarily to prevent double sends
         if (sendBtn) {
             const originalHTML = sendBtn.innerHTML;
@@ -7616,7 +7484,7 @@ function initGroupPage() {
                 console.error('Error sending message:', error);
                 alert(error.message || 'Failed to send message. Please try again.');
             } finally {
-                // FIXED: Always restore airplane icon immediately
+                // Always restore airplane icon immediately
                 sendBtn.disabled = originalDisabled;
                 sendBtn.innerHTML = originalHTML;
             }
@@ -7679,7 +7547,7 @@ function initGroupPage() {
         });
         reactionUnsubscribers.clear();
         
-        // UPDATED: Clean up typing
+        // Clean up typing
         if (typingUnsubscribe && typeof typingUnsubscribe === 'function') {
             typingUnsubscribe();
         }
