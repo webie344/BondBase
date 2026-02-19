@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Share Bond Base - Anonymous Gaming & Anime Chat App</title>
+    
+    <!-- Open Graph Meta Tags for Social Sharing -->
+    <meta property="og:title" content="Bond Base - Anonymous Gaming & Anime Chat App">
+    <meta property="og:description" content="Anonymous gaming and anime fans chat app dedicated to bringing anime lovers and gamers together in a friendly arena. Connect with like-minded fans anonymously!">
+    <meta property="og:image" content="/Bondbase.png">
+    <meta property="og:url" content="https://bond-base.vercel.app">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Bond Base">
+    <meta property="og:image:alt" content="Bond Base - Gaming & Anime Community">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Bond Base - Anonymous Gaming & Anime Chat App">
+    <meta name="twitter:description" content="Anonymous gaming and anime fans chat app dedicated to bringing anime lovers and gamers together in a friendly arena.">
+    <meta name="twitter:image" content="/Bondbase.png">
+    <meta name="twitter:image:alt" content="Bond Base Logo">
+    
+    <!-- WhatsApp Preview Meta Tags (uses Open Graph) -->
+    <!-- Telegram Preview Meta Tags (uses Open Graph) -->
+    
+    <!-- Other Meta Tags -->
+    <meta name="description" content="Anonymous gaming and anime fans chat app dedicated to bringing anime lovers and gamers together in a friendly arena. Join now!">
+    <meta name="keywords" content="anime, gaming, chat, anonymous chat, anime lovers, gamers, community, bond base">
+    <meta name="theme-color" content="#4a8cff">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .share-container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            overflow: hidden;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .share-header {
+            background: linear-gradient(135deg, #4a8cff 0%, #6c5ce7 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .share-header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .share-header p {
+            font-size: 16px;
+            opacity: 0.95;
+            line-height: 1.5;
+        }
+
+        .share-content {
+            padding: 30px;
+        }
+
+        /* Preview Card */
+        .preview-section {
+            margin-bottom: 30px;
+        }
+
+        .preview-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .link-preview-card {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            border: 1px solid #eaeaea;
+        }
+
+        .link-preview-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .link-preview-image {
+            width: 200px;
+            min-width: 200px;
+            height: 200px;
+            overflow: hidden;
+            background: #e0e0e0;
+        }
+
+        .link-preview-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .link-preview-card:hover .link-preview-image img {
+            transform: scale(1.05);
+        }
+
+        .link-preview-content {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .link-preview-site {
+            font-size: 14px;
+            color: #4a8cff;
+            margin-bottom: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .link-preview-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+
+        .link-preview-description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.5;
+            flex: 1;
+        }
+
+        .link-preview-url {
+            font-size: 12px;
+            color: #4a8cff;
+            word-break: break-all;
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 6px 10px;
+            border-radius: 6px;
+            display: inline-block;
+            align-self: flex-start;
+        }
+
+        /* Link Copy Section */
+        .link-section {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid #eaeaea;
+        }
+
+        .link-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .link-section h3 i {
+            color: #4a8cff;
+        }
+
+        .link-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .link-input-group input {
+            flex: 1;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+            transition: all 0.3s;
+            background: white;
+            font-family: monospace;
+        }
+
+        .link-input-group input:focus {
+            outline: none;
+            border-color: #4a8cff;
+            box-shadow: 0 0 0 3px rgba(74, 140, 255, 0.1);
+        }
+
+        .link-input-group input:read-only {
+            background: #f5f5f5;
+            cursor: text;
+        }
+
+        .copy-btn {
+            padding: 14px 30px;
+            background: #4a8cff;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: #3a7cef;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 140, 255, 0.3);
+        }
+
+        .copy-btn i {
+            font-size: 16px;
+        }
+
+        .copy-feedback {
+            text-align: center;
+            color: #28a745;
+            font-size: 14px;
+            min-height: 20px;
+            font-weight: 500;
+        }
+
+        /* Share Buttons Section */
+        .share-section {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 25px;
+            border: 1px solid #eaeaea;
+        }
+
+        .share-section h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .share-section h3 i {
+            color: #4a8cff;
+        }
+
+        .share-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .share-btn {
+            padding: 14px 10px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s;
+            color: white;
+            border: 1px solid transparent;
+        }
+
+        .share-btn i {
+            font-size: 18px;
+        }
+
+        .share-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(110%);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .share-btn:active {
+            transform: translateY(0);
+        }
+
+        .share-btn.whatsapp {
+            background: #25D366;
+        }
+
+        .share-btn.telegram {
+            background: #0088cc;
+        }
+
+        .share-btn.twitter {
+            background: #1DA1F2;
+        }
+
+        .share-btn.facebook {
+            background: #4267B2;
+        }
+
+        .share-btn.linkedin {
+            background: #0077b5;
+        }
+
+        .share-btn.reddit {
+            background: #FF4500;
+        }
+
+        .share-btn.email {
+            background: #6c757d;
+        }
+
+        .share-btn.pinterest {
+            background: #E60023;
+        }
+
+        /* Additional Info */
+        .info-text {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eaeaea;
+            color: #888;
+            font-size: 13px;
+        }
+
+        .info-text i {
+            color: #4a8cff;
+            margin: 0 4px;
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            animation: slideInRight 0.3s ease;
+            border-left: 4px solid #4a8cff;
+            max-width: 350px;
+        }
+
+        .notification.success {
+            border-left-color: #28a745;
+        }
+
+        .notification.error {
+            border-left-color: #dc3545;
+        }
+
+        .notification i {
+            font-size: 20px;
+        }
+
+        .notification.success i {
+            color: #28a745;
+        }
+
+        .notification.error i {
+            color: #dc3545;
+        }
+
+        .notification .message {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .notification .close-btn {
+            cursor: pointer;
+            color: #999;
+            transition: color 0.2s;
+        }
+
+        .notification .close-btn:hover {
+            color: #333;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4a8cff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            color: #333;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .share-header h1 {
+                font-size: 24px;
+            }
+
+            .share-header p {
+                font-size: 14px;
+            }
+
+            .share-content {
+                padding: 20px;
+            }
+
+            .link-preview-card {
+                flex-direction: column;
+            }
+
+            .link-preview-image {
+                width: 100%;
+                height: 250px;
+            }
+
+            .link-input-group {
+                flex-direction: column;
+            }
+
+            .copy-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .share-buttons {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .share-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .notification {
+                left: 20px;
+                right: 20px;
+                max-width: none;
+            }
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .share-container {
+                box-shadow: none;
+            }
+            
+            .share-btn {
+                display: none;
+            }
+        }
+
+        /* Accessibility */
+        .share-btn:focus-visible,
+        .copy-btn:focus-visible,
+        .link-input-group input:focus-visible {
+            outline: 3px solid #4a8cff;
+            outline-offset: 2px;
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            }
+            
+            .share-container {
+                background: #1e1e2f;
+                color: #fff;
+            }
+            
+            .share-header {
+                background: linear-gradient(135deg, #2d3e6b 0%, #3a2c4a 100%);
+            }
+            
+            .preview-section h3,
+            .link-section h3,
+            .share-section h3 {
+                color: #fff;
+            }
+            
+            .link-preview-card {
+                background: #2a2a3a;
+                border-color: #3a3a4a;
+            }
+            
+            .link-preview-site {
+                color: #6c8cff;
+            }
+            
+            .link-preview-title {
+                color: #fff;
+            }
+            
+            .link-preview-description {
+                color: #bbb;
+            }
+            
+            .link-preview-url {
+                background: #3a3a4a;
+                color: #6c8cff;
+            }
+            
+            .link-section,
+            .share-section {
+                background: #2a2a3a;
+                border-color: #3a3a4a;
+            }
+            
+            .link-input-group input {
+                background: #1e1e2f;
+                border-color: #3a3a4a;
+                color: #fff;
+            }
+            
+            .link-input-group input:read-only {
+                background: #252535;
+            }
+            
+            .info-text {
+                color: #888;
+                border-top-color: #3a3a4a;
+            }
+            
+            .loading-overlay {
+                background: rgba(30, 30, 47, 0.95);
+            }
+            
+            .loading-text {
+                color: #fff;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Preparing share link...</div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="share-container">
+        <div class="share-header">
+            <h1>✨ Share Bond Base</h1>
+            <p>Share the anonymous gaming and anime chat app with your friends! 🎮 Anime lovers and gamers unite! 🌟</p>
+        </div>
+
+        <div class="share-content">
+            <!-- Preview Section -->
+            <div class="preview-section">
+                <h3><i class="fas fa-eye" style="color: #4a8cff; margin-right: 8px;"></i> Link Preview</h3>
+                <div class="link-preview-card" id="previewCard" title="Click to copy link">
+                    <div class="link-preview-image">
+                        <img src="/Bondbase.png" alt="Bond Base Preview" id="previewImage" onerror="this.src='https://via.placeholder.com/200?text=Bond+Base'">
+                    </div>
+                    <div class="link-preview-content">
+                        <div class="link-preview-site" id="previewSite">Bond Base</div>
+                        <div class="link-preview-title" id="previewTitle">Bond Base - Anonymous Gaming & Anime Chat App</div>
+                        <div class="link-preview-description" id="previewDescription">Anonymous gaming and anime fans chat app dedicated to bringing anime lovers and gamers together in a friendly arena. Connect with like-minded fans anonymously!</div>
+                        <div class="link-preview-url" id="previewUrl">https://bond-base.vercel.app</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Link Copy Section -->
+            <div class="link-section">
+                <h3><i class="fas fa-link"></i> Copy Link</h3>
+                <div class="link-input-group">
+                    <input type="text" id="bondlyLink" value="https://bond-base.vercel.app" readonly class="allow-copy" aria-label="Bond Base link">
+                    <button class="copy-btn" id="copyBtn" aria-label="Copy link to clipboard">
+                        <i class="fas fa-copy"></i> Copy Link
+                    </button>
+                </div>
+                <div id="copyFeedback" class="copy-feedback"></div>
+            </div>
+
+            <!-- Share Buttons -->
+            <div class="share-section">
+                <h3><i class="fas fa-share-alt"></i> Share on Social Media</h3>
+                <div class="share-buttons">
+                    <button class="share-btn whatsapp" id="shareWhatsApp" title="Share on WhatsApp">
+                        <i class="fab fa-whatsapp"></i> WhatsApp
+                    </button>
+                    <button class="share-btn telegram" id="shareTelegram" title="Share on Telegram">
+                        <i class="fab fa-telegram"></i> Telegram
+                    </button>
+                    <button class="share-btn twitter" id="shareTwitter" title="Share on Twitter/X">
+                        <i class="fab fa-twitter"></i> Twitter
+                    </button>
+                    <button class="share-btn facebook" id="shareFacebook" title="Share on Facebook">
+                        <i class="fab fa-facebook"></i> Facebook
+                    </button>
+                    <button class="share-btn linkedin" id="shareLinkedIn" title="Share on LinkedIn">
+                        <i class="fab fa-linkedin"></i> LinkedIn
+                    </button>
+                    <button class="share-btn reddit" id="shareReddit" title="Share on Reddit">
+                        <i class="fab fa-reddit"></i> Reddit
+                    </button>
+                    <button class="share-btn pinterest" id="sharePinterest" title="Share on Pinterest">
+                        <i class="fab fa-pinterest"></i> Pinterest
+                    </button>
+                    <button class="share-btn email" id="shareEmail" title="Share via Email">
+                        <i class="fas fa-envelope"></i> Email
+                    </button>
+                </div>
+                
+                <div class="info-text">
+                    <i class="fas fa-shield-alt"></i> Share anonymously • <i class="fas fa-users"></i> Join the community • <i class="fas fa-gamepad"></i> Gaming & Anime
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container (will be populated by JavaScript) -->
+    <div id="notificationContainer"></div>
+
+    <!-- Script -->
+    <script src="link.js"></script>
+    <script>
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const previewImage = document.getElementById('previewImage');
+            const previewSite = document.getElementById('previewSite');
+            const previewTitle = document.getElementById('previewTitle');
+            const previewDescription = document.getElementById('previewDescription');
+            const previewUrl = document.getElementById('previewUrl');
+            const bondlyLink = document.getElementById('bondlyLink');
+            const copyBtn = document.getElementById('copyBtn');
+            const copyFeedback = document.getElementById('copyFeedback');
+            const previewCard = document.getElementById('previewCard');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            
+            // Share buttons
+            const shareWhatsApp = document.getElementById('shareWhatsApp');
+            const shareTelegram = document.getElementById('shareTelegram');
+            const shareTwitter = document.getElementById('shareTwitter');
+            const shareFacebook = document.getElementById('shareFacebook');
+            const shareLinkedIn = document.getElementById('shareLinkedIn');
+            const shareReddit = document.getElementById('shareReddit');
+            const shareEmail = document.getElementById('shareEmail');
+            const sharePinterest = document.getElementById('sharePinterest');
+
+            // Get site info from the global object
+            const siteInfo = window.BondBaseShare?.SITE_INFO || {
+                name: 'Bond Base',
+                domain: 'bond-base.vercel.app',
+                title: 'Bond Base - Anonymous Gaming & Anime Chat App',
+                description: 'Anonymous gaming and anime fans chat app dedicated to bringing anime lovers and gamers together in a friendly arena.',
+                image: '/Bondbase.png'
+            };
+
+            // Update preview with site info
+            function updatePreview() {
+                previewSite.textContent = siteInfo.name;
+                previewTitle.textContent = siteInfo.title;
+                previewDescription.textContent = siteInfo.description;
+                previewUrl.textContent = `https://${siteInfo.domain}`;
+                bondlyLink.value = `https://${siteInfo.domain}`;
+                
+                // Set image with fallback
+                previewImage.src = siteInfo.image;
+                previewImage.onerror = function() {
+                    this.src = 'https://via.placeholder.com/200?text=Bond+Base';
+                };
+            }
+
+            // Show notification
+            function showNotification(message, type = 'success') {
+                const container = document.getElementById('notificationContainer');
+                
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.innerHTML = `
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                    <span class="message">${message}</span>
+                    <i class="fas fa-times close-btn" onclick="this.parentElement.remove()"></i>
+                `;
+                
+                container.appendChild(notification);
+                
+                // Auto remove after 3 seconds
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 3000);
+            }
+
+            // Show loading
+            function showLoading(show) {
+                if (show) {
+                    loadingOverlay.classList.add('active');
+                } else {
+                    loadingOverlay.classList.remove('active');
+                }
+            }
+
+            // Copy link functionality
+            copyBtn.addEventListener('click', async function() {
+                showLoading(true);
+                
+                const link = bondlyLink.value;
+                const result = await window.BondBaseShare.copyLinkToClipboard(link);
+                
+                showLoading(false);
+                
+                if (result.success) {
+                    // Visual feedback
+                    copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                    copyFeedback.textContent = '✅ Link copied to clipboard!';
+                    
+                    showNotification('Link copied successfully!', 'success');
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy Link';
+                        copyFeedback.textContent = '';
+                    }, 2000);
+                } else {
+                    copyFeedback.textContent = '❌ Failed to copy link';
+                    showNotification('Failed to copy link. Please try again.', 'error');
+                    
+                    setTimeout(() => {
+                        copyFeedback.textContent = '';
+                    }, 3000);
+                }
+            });
+
+            // Share button handlers
+            shareWhatsApp.addEventListener('click', function() {
+                window.BondBaseShare.shareOnWhatsApp(bondlyLink.value);
+                showNotification('Opening WhatsApp...', 'success');
+            });
+
+            shareTelegram.addEventListener('click', function() {
+                window.BondBaseShare.shareOnTelegram(bondlyLink.value);
+                showNotification('Opening Telegram...', 'success');
+            });
+
+            shareTwitter.addEventListener('click', function() {
+                window.BondBaseShare.shareOnTwitter(bondlyLink.value);
+                showNotification('Opening Twitter...', 'success');
+            });
+
+            shareFacebook.addEventListener('click', function() {
+                window.BondBaseShare.shareOnFacebook(bondlyLink.value);
+                showNotification('Opening Facebook...', 'success');
+            });
+
+            shareLinkedIn.addEventListener('click', function() {
+                window.BondBaseShare.shareOnLinkedIn(bondlyLink.value);
+                showNotification('Opening LinkedIn...', 'success');
+            });
+
+            shareReddit.addEventListener('click', function() {
+                window.BondBaseShare.shareOnReddit(bondlyLink.value);
+                showNotification('Opening Reddit...', 'success');
+            });
+
+            shareEmail.addEventListener('click', function() {
+                window.BondBaseShare.shareViaEmail(bondlyLink.value);
+                showNotification('Opening email client...', 'success');
+            });
+
+            sharePinterest.addEventListener('click', function() {
+                if (window.BondBaseShare.shareOnPinterest) {
+                    window.BondBaseShare.shareOnPinterest(bondlyLink.value);
+                    showNotification('Opening Pinterest...', 'success');
+                }
+            });
+
+            // Click on preview to copy
+            previewCard.addEventListener('click', function() {
+                copyBtn.click();
+            });
+
+            // Initialize
+            updatePreview();
+
+            // Add keyboard shortcut (Ctrl+C) when input is focused
+            bondlyLink.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'c') {
+                    e.preventDefault();
+                    copyBtn.click();
+                }
+            });
+
+            // Double click on input to select all
+            bondlyLink.addEventListener('dblclick', function() {
+                this.select();
+            });
+
+            // Log that link.js is loaded
+            console.log('Bond Base Share initialized!');
+            console.log('Share URL:', bondlyLink.value);
+        });
+    </script>
+</body>
+</html>
