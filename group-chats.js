@@ -201,7 +201,7 @@ async function getUserXPInfo(userId) {
 class GroupIndexedDBCache {
     constructor() {
         this.dbName = 'GroupChatDB';
-        this.dbVersion = 4;
+        this.dbVersion = 5;
         this.db = null;
     }
 
