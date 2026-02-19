@@ -1503,3 +1503,5 @@ window.refreshProfileXP = function() {
 };
 
 console.log('XP System: Module loaded successfully');
+// At the very end of XP.js, after all your code
+export { XPSystem, xpSystem };
