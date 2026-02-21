@@ -1,6 +1,6 @@
 // groupchat.js - Enhanced with IndexedDB Caching, Service Worker Support & Voice Notes
 // COMPLETE VERSION WITH XP SYSTEM INTEGRATED - LOADS ACTUAL USER XP DATA
-// FIXED: Message ordering and cancel voice recording button
+// FIXED: Message ordering on initial load and cancel voice recording button
 
 import { 
     getFirestore, 
@@ -1117,6 +1117,8 @@ class GroupChat {
         // Track processed messages
         this.processedMessageIdsByGroup = new Map();
         this.pageProcessedMessageIdsByGroup = new Map();
+        this.initialLoadComplete = new Map(); // Track if initial load is complete for a group
+        this.pendingMessageUpdates = new Map(); // Queue messages during initial load
         
         // Track offline status
         this.isOnline = navigator.onLine;
@@ -1676,7 +1678,11 @@ class GroupChat {
     cancelVoiceRecording() {
         if (this.mediaRecorder && this.isRecording) {
             // Stop the recorder
-            this.mediaRecorder.stop();
+            try {
+                this.mediaRecorder.stop();
+            } catch (e) {
+                console.log('Error stopping recorder:', e);
+            }
             this.isRecording = false;
             
             // Clear timer
@@ -1688,7 +1694,11 @@ class GroupChat {
             // Stop all tracks
             if (this.mediaRecorder.stream) {
                 this.mediaRecorder.stream.getTracks().forEach(track => {
-                    track.stop();
+                    try {
+                        track.stop();
+                    } catch (e) {
+                        console.log('Error stopping track:', e);
+                    }
                 });
             }
             
@@ -2293,6 +2303,16 @@ class GroupChat {
             this.pageProcessedMessageIdsByGroup.delete(`page_processed_${groupId}`);
         }
         
+        // Clear initial load flag
+        if (this.initialLoadComplete) {
+            this.initialLoadComplete.delete(groupId);
+        }
+        
+        // Clear pending updates
+        if (this.pendingMessageUpdates) {
+            this.pendingMessageUpdates.delete(groupId);
+        }
+        
         // Clear IndexedDB cache for this group
         if (indexedDBCache) {
             // We'll handle IndexedDB clearing asynchronously
@@ -2340,6 +2360,16 @@ class GroupChat {
         // Clear page processed messages for all groups
         if (this.pageProcessedMessageIdsByGroup) {
             this.pageProcessedMessageIdsByGroup.clear();
+        }
+        
+        // Clear initial load flags
+        if (this.initialLoadComplete) {
+            this.initialLoadComplete.clear();
+        }
+        
+        // Clear pending updates
+        if (this.pendingMessageUpdates) {
+            this.pendingMessageUpdates.clear();
         }
         
         // Clear XP cache
@@ -4536,7 +4566,7 @@ class GroupChat {
         }
     }
 
-    // FIXED: listenToMessages method - properly track processed messages and maintain order
+    // FIXED: listenToMessages method - properly track processed messages and maintain order on initial load
     listenToMessages(groupId, callback) {
         try {
             // First, unsubscribe from any existing listener
@@ -4562,14 +4592,22 @@ class GroupChat {
             
             const pageProcessedIds = this.pageProcessedMessageIdsByGroup.get(pageProcessedKey);
             
-            // Track if this is the first snapshot
-            let isFirstSnapshot = true;
+            // Track if initial load is complete
+            if (!this.initialLoadComplete.has(groupId)) {
+                this.initialLoadComplete.set(groupId, false);
+            }
+            
+            // Initialize pending updates queue
+            if (!this.pendingMessageUpdates.has(groupId)) {
+                this.pendingMessageUpdates.set(groupId, []);
+            }
             
             // Store all messages for sorting
             let allMessages = [];
+            let isFirstSnapshot = true;
             
             // Load cached messages from IndexedDB first
-            if (indexedDBCache && pageProcessedIds.size === 0) {
+            if (indexedDBCache) {
                 setTimeout(async () => {
                     try {
                         const cachedMessages = await indexedDBCache.getGroupMessages(groupId, 50);
@@ -4583,7 +4621,8 @@ class GroupChat {
                                 return timeA - timeB;
                             });
                             
-                            callback(sortedCached);
+                            // Store messages
+                            allMessages = sortedCached;
                             
                             // Mark these messages as processed
                             sortedCached.forEach(msg => {
@@ -4592,7 +4631,8 @@ class GroupChat {
                                 }
                             });
                             
-                            allMessages = sortedCached;
+                            // Send cached messages immediately
+                            callback([...allMessages]);
                         }
                     } catch (error) {
                         console.log('Error loading cached messages:', error);
@@ -4615,7 +4655,7 @@ class GroupChat {
                         const data = doc.data();
                         const messageId = doc.id;
                         
-                        // Check if we've already processed this message ID in THIS PAGE
+                        // Check if we've already processed this message ID
                         if (!pageProcessedIds.has(messageId)) {
                             newMessages.push({ 
                                 id: messageId, 
@@ -4627,10 +4667,10 @@ class GroupChat {
                     });
                     
                     if (newMessages.length > 0) {
-                        // Mark these messages as processed FOR THIS PAGE
+                        // Mark these messages as processed
                         newMessageIds.forEach(id => pageProcessedIds.add(id));
                         
-                        // Sort all messages by timestamp to maintain correct order
+                        // Add to all messages
                         allMessages = [...allMessages, ...newMessages].sort((a, b) => {
                             const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
                             const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
@@ -4638,14 +4678,28 @@ class GroupChat {
                         });
                         
                         if (isFirstSnapshot) {
-                            console.log('Initial load:', allMessages.length, 'messages');
+                            console.log('Firebase initial load:', allMessages.length, 'messages');
                             isFirstSnapshot = false;
+                            
+                            // Mark initial load as complete
+                            this.initialLoadComplete.set(groupId, true);
+                            
+                            // Process any pending updates
+                            const pendingUpdates = this.pendingMessageUpdates.get(groupId) || [];
+                            if (pendingUpdates.length > 0) {
+                                allMessages = [...allMessages, ...pendingUpdates].sort((a, b) => {
+                                    const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
+                                    const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
+                                    return timeA - timeB;
+                                });
+                                this.pendingMessageUpdates.set(groupId, []);
+                            }
                         } else {
                             console.log('New messages received:', newMessages.length);
                         }
                         
-                        // Always send all messages in correct chronological order
-                        callback(allMessages);
+                        // Always send messages in correct chronological order
+                        callback([...allMessages]);
                         
                         // Cache new messages in IndexedDB
                         if (indexedDBCache) {
@@ -4670,9 +4724,6 @@ class GroupChat {
                 if (error.code === 'unavailable' || error.code === 'failed-precondition') {
                     this.connectionState = 'disconnected';
                     console.log('Firebase connection lost, attempting to reconnect...');
-                    
-                    // Don't clear processed IDs on connection error
-                    // The listener will reconnect automatically
                 }
             });
             
@@ -5928,6 +5979,16 @@ class GroupChat {
             this.pageProcessedMessageIdsByGroup.clear();
         }
         
+        // Clear initial load flags
+        if (this.initialLoadComplete) {
+            this.initialLoadComplete.clear();
+        }
+        
+        // Clear pending updates
+        if (this.pendingMessageUpdates) {
+            this.pendingMessageUpdates.clear();
+        }
+        
         // Clear typing timeouts
         this.typingUsers.forEach((userTyping, groupId) => {
             userTyping.forEach((timeout, userId) => {
@@ -6230,6 +6291,11 @@ function initGroupPage() {
     if (groupChat.pageProcessedMessageIdsByGroup && groupChat.pageProcessedMessageIdsByGroup.has(pageProcessedKey)) {
         groupChat.pageProcessedMessageIdsByGroup.get(pageProcessedKey).clear();
         console.log('Cleared page processed messages for group:', groupId);
+    }
+    
+    // Reset initial load flag for this group
+    if (groupChat.initialLoadComplete) {
+        groupChat.initialLoadComplete.set(groupId, false);
     }
     
     // Create typing indicator at top
