@@ -1,5 +1,6 @@
 // groupchat.js - Enhanced with IndexedDB Caching, Service Worker Support & Voice Notes
 // COMPLETE VERSION WITH XP SYSTEM INTEGRATED - LOADS ACTUAL USER XP DATA
+// FIXED: Message ordering and cancel voice recording button
 
 import { 
     getFirestore, 
@@ -1671,11 +1672,14 @@ class GroupChat {
         return false;
     }
     
+    // FIXED: Cancel voice recording - properly clean up all resources
     cancelVoiceRecording() {
         if (this.mediaRecorder && this.isRecording) {
+            // Stop the recorder
             this.mediaRecorder.stop();
             this.isRecording = false;
             
+            // Clear timer
             if (this.recordingTimer) {
                 clearTimeout(this.recordingTimer);
                 this.recordingTimer = null;
@@ -1683,18 +1687,28 @@ class GroupChat {
             
             // Stop all tracks
             if (this.mediaRecorder.stream) {
-                this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                this.mediaRecorder.stream.getTracks().forEach(track => {
+                    track.stop();
+                });
             }
             
-            // Clear voice note
+            // Clear voice note data
             this.currentVoiceNote = null;
             this.audioChunks = [];
+            this.recordingDuration = 0;
+            this.recordingStartTime = null;
             
             // Hide recording UI
             this.hideRecordingUI();
             
             // Remove preview if exists
             this.removeVoiceNotePreview();
+            
+            // Update button state if exists
+            const voiceNoteBtn = document.getElementById('voiceNoteBtn');
+            if (voiceNoteBtn) {
+                voiceNoteBtn.classList.remove('recording');
+            }
             
             showNotification('Recording cancelled', 'info');
             
@@ -1995,9 +2009,9 @@ class GroupChat {
         const waveform = document.getElementById('voiceNoteWaveform');
         if (waveform) {
             waveform.addEventListener('click', (e) => {
-                const rect = e.target.getBoundingClientRect();
+                const rect = waveform.getBoundingClientRect();
                 const clickX = e.clientX - rect.left;
-                const percentage = clickX / rect.width;
+                const percentage = Math.max(0, Math.min(1, clickX / rect.width));
                 audio.currentTime = audio.duration * percentage;
             });
         }
@@ -2156,9 +2170,9 @@ class GroupChat {
             if (waveform) {
                 waveform.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const rect = e.target.getBoundingClientRect();
+                    const rect = waveform.getBoundingClientRect();
                     const clickX = e.clientX - rect.left;
-                    const percentage = clickX / rect.width;
+                    const percentage = Math.max(0, Math.min(1, clickX / rect.width));
                     audio.currentTime = audio.duration * percentage;
                 });
             }
@@ -4522,7 +4536,7 @@ class GroupChat {
         }
     }
 
-    // FIXED: listenToMessages method - properly track processed messages
+    // FIXED: listenToMessages method - properly track processed messages and maintain order
     listenToMessages(groupId, callback) {
         try {
             // First, unsubscribe from any existing listener
@@ -4551,6 +4565,9 @@ class GroupChat {
             // Track if this is the first snapshot
             let isFirstSnapshot = true;
             
+            // Store all messages for sorting
+            let allMessages = [];
+            
             // Load cached messages from IndexedDB first
             if (indexedDBCache && pageProcessedIds.size === 0) {
                 setTimeout(async () => {
@@ -4558,14 +4575,24 @@ class GroupChat {
                         const cachedMessages = await indexedDBCache.getGroupMessages(groupId, 50);
                         if (cachedMessages && cachedMessages.length > 0) {
                             console.log('Loaded', cachedMessages.length, 'cached messages from IndexedDB');
-                            callback(cachedMessages);
+                            
+                            // Sort cached messages by timestamp
+                            const sortedCached = cachedMessages.sort((a, b) => {
+                                const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
+                                const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
+                                return timeA - timeB;
+                            });
+                            
+                            callback(sortedCached);
                             
                             // Mark these messages as processed
-                            cachedMessages.forEach(msg => {
+                            sortedCached.forEach(msg => {
                                 if (msg.id) {
                                     pageProcessedIds.add(msg.id);
                                 }
                             });
+                            
+                            allMessages = sortedCached;
                         }
                     } catch (error) {
                         console.log('Error loading cached messages:', error);
@@ -4581,7 +4608,7 @@ class GroupChat {
                         return;
                     }
                     
-                    const messages = [];
+                    const newMessages = [];
                     const newMessageIds = [];
                     
                     snapshot.forEach(doc => {
@@ -4590,7 +4617,7 @@ class GroupChat {
                         
                         // Check if we've already processed this message ID in THIS PAGE
                         if (!pageProcessedIds.has(messageId)) {
-                            messages.push({ 
+                            newMessages.push({ 
                                 id: messageId, 
                                 ...data,
                                 timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
@@ -4599,24 +4626,32 @@ class GroupChat {
                         }
                     });
                     
-                    if (messages.length > 0) {
+                    if (newMessages.length > 0) {
                         // Mark these messages as processed FOR THIS PAGE
                         newMessageIds.forEach(id => pageProcessedIds.add(id));
                         
+                        // Sort all messages by timestamp to maintain correct order
+                        allMessages = [...allMessages, ...newMessages].sort((a, b) => {
+                            const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
+                            const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
+                            return timeA - timeB;
+                        });
+                        
                         if (isFirstSnapshot) {
-                            console.log('Initial load:', messages.length, 'messages');
+                            console.log('Initial load:', allMessages.length, 'messages');
                             isFirstSnapshot = false;
                         } else {
-                            console.log('New messages received:', messages.length);
+                            console.log('New messages received:', newMessages.length);
                         }
                         
-                        callback(messages);
+                        // Always send all messages in correct chronological order
+                        callback(allMessages);
                         
                         // Cache new messages in IndexedDB
                         if (indexedDBCache) {
                             setTimeout(async () => {
                                 try {
-                                    for (const message of messages) {
+                                    for (const message of newMessages) {
                                         await indexedDBCache.addGroupMessage(groupId, message);
                                     }
                                 } catch (error) {
@@ -6761,23 +6796,10 @@ function initGroupPage() {
         const messagesUnsubscribe = groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Listener callback received:', newMessages.length, 'messages');
             
-            // Clear messages array on first load
-            if (messages.length === 0) {
-                messages = newMessages;
-                setupReactionListeners();
-                queueRender();
-            } else {
-                // For subsequent updates, only add new messages
-                const existingIds = new Set(messages.map(m => m.id));
-                const newUniqueMessages = newMessages.filter(msg => !existingIds.has(msg.id));
-                
-                if (newUniqueMessages.length > 0) {
-                    console.log('Adding new messages:', newUniqueMessages.length);
-                    messages = [...messages, ...newUniqueMessages];
-                    setupReactionListeners();
-                    queueRender();
-                }
-            }
+            // Replace messages array with sorted messages
+            messages = newMessages;
+            setupReactionListeners();
+            queueRender();
         });
         
         groupChat.activeListeners.set('messages', messagesUnsubscribe);
@@ -6898,6 +6920,7 @@ function initGroupPage() {
         });
     }
     
+    // FIXED: displayMessages function to ensure correct message order
     function displayMessages() {
         if (!messagesContainer) return;
         
@@ -6913,12 +6936,19 @@ function initGroupPage() {
         
         window.currentMessages = messages;
         
+        // Ensure messages are sorted by timestamp
+        const sortedMessages = [...messages].sort((a, b) => {
+            const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
+            const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
+            return timeA - timeB;
+        });
+        
         // Group messages from same sender within 2 minutes
         const groupedMessages = [];
         const GROUP_TIME_THRESHOLD = 2 * 60 * 1000; // 2 minutes in milliseconds
         
-        for (let i = 0; i < messages.length; i++) {
-            const currentMessage = messages[i];
+        for (let i = 0; i < sortedMessages.length; i++) {
+            const currentMessage = sortedMessages[i];
             
             // Check if we should start a new group
             if (i === 0) {
@@ -6926,7 +6956,7 @@ function initGroupPage() {
                 continue;
             }
             
-            const previousMessage = messages[i - 1];
+            const previousMessage = sortedMessages[i - 1];
             const timeDifference = currentMessage.timestamp - previousMessage.timestamp;
             const isSameSender = currentMessage.senderId === previousMessage.senderId;
             
@@ -6945,16 +6975,8 @@ function initGroupPage() {
             }
         }
         
-        // Only update if there are new messages that haven't been rendered
-        const allMessageIds = new Set(messages.map(m => m.id));
-        const newMessagesExist = [...allMessageIds].some(id => !renderedMessageIds.has(id));
-        
-        if (!newMessagesExist) {
-            return; // No new messages to render
-        }
-        
         // Track which messages we've rendered
-        messages.forEach(msg => renderedMessageIds.add(msg.id));
+        sortedMessages.forEach(msg => renderedMessageIds.add(msg.id));
         
         // Clear the container first
         messagesContainer.innerHTML = '';
@@ -6962,7 +6984,7 @@ function initGroupPage() {
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
         
-        // Render each group
+        // Render each group in chronological order
         groupedMessages.forEach(group => {
             if (group.length === 0) return;
             
@@ -7081,7 +7103,7 @@ function initGroupPage() {
         
         // Now create and attach voice message elements for new voice messages
         setTimeout(() => {
-            messages.forEach(msg => {
+            sortedMessages.forEach(msg => {
                 if (msg.voiceUrl) {
                     const voiceElementId = `voice-${msg.id}`;
                     const placeholder = document.getElementById(voiceElementId);
@@ -7117,7 +7139,7 @@ function initGroupPage() {
                 const messageElement = e.target.closest('.message-text, .system-message');
                 if (messageElement) {
                     const messageId = messageElement.dataset.messageId;
-                    const message = messages.find(m => m.id === messageId);
+                    const message = sortedMessages.find(m => m.id === messageId);
                     if (message) {
                         const emoji = e.currentTarget.dataset.emoji;
                         groupChat.currentMessageForReaction = message;
@@ -7130,7 +7152,7 @@ function initGroupPage() {
         document.querySelectorAll('.message-text, .system-message').forEach(messageElement => {
             let longPressTimer;
             const messageId = messageElement.dataset.messageId;
-            const message = messages.find(m => m.id === messageId);
+            const message = sortedMessages.find(m => m.id === messageId);
             
             if (message) {
                 messageElement.addEventListener('touchstart', (e) => {
