@@ -1045,165 +1045,508 @@ class SocialManager {
                     gap: 4px;
                 }
 
-                /* ========== PEOPLE YOU MAY KNOW ========== */
+                /* ========== PEOPLE YOU MAY KNOW STYLES (ORIGINAL) ========== */
                 .pymk-section {
-                    background: transparent;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                    padding: 16px;
-                    margin: 0;
+                    background: #2c2f33;
+                    border-radius: 15px;
+                    padding: 20px;
+                    margin: 25px 0;
+                    border: 1px solid #40444b;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
                 }
-
+                
                 .pymk-header {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 16px;
+                    margin-bottom: 20px;
                 }
-
+                
                 .pymk-header h3 {
                     margin: 0;
-                    font-size: 16px;
+                    font-size: 18px;
                     color: #fff;
                     display: flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: 10px;
                 }
-
+                
                 .pymk-header h3 i {
                     color: #ff4b6e;
                 }
-
+                
                 .pymk-see-all {
                     background: transparent;
-                    border: none;
+                    border: 1px solid #ff4b6e;
                     color: #ff4b6e;
-                    font-size: 13px;
+                    padding: 6px 15px;
+                    border-radius: 20px;
+                    font-size: 14px;
                     cursor: pointer;
+                    transition: all 0.3s;
                 }
-
+                
                 .pymk-see-all:hover {
-                    text-decoration: underline;
+                    background: #ff4b6e;
+                    color: white;
                 }
-
+                
                 .pymk-content {
                     display: flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: 10px;
                     position: relative;
                 }
-
+                
                 .pymk-nav-btn {
-                    background: rgba(0, 0, 0, 0.5);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    background: #36393f;
+                    border: 1px solid #40444b;
                     color: #fff;
-                    width: 32px;
-                    height: 32px;
+                    width: 40px;
+                    height: 40px;
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     cursor: pointer;
-                    transition: all 0.2s;
+                    transition: all 0.3s;
                     flex-shrink: 0;
                     z-index: 2;
                 }
-
+                
                 .pymk-nav-btn:hover {
-                    background: #ff4b6e;
+                    background: #40444b;
                     border-color: #ff4b6e;
+                    color: #ff4b6e;
                 }
-
+                
+                .pymk-nav-btn.left {
+                    position: absolute;
+                    left: -20px;
+                }
+                
+                .pymk-nav-btn.right {
+                    position: absolute;
+                    right: -20px;
+                }
+                
                 .pymk-profiles-container {
                     display: flex;
-                    gap: 12px;
+                    gap: 15px;
                     overflow-x: auto;
                     scroll-behavior: smooth;
-                    padding: 4px 0;
+                    padding: 10px 0;
                     scrollbar-width: none;
                     -ms-overflow-style: none;
                     flex: 1;
                 }
-
+                
                 .pymk-profiles-container::-webkit-scrollbar {
                     display: none;
                 }
-
+                
                 .pymk-profile-card {
-                    background: rgba(255, 255, 255, 0.03);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    border-radius: 9999px;
-                    padding: 6px 12px 6px 6px;
-                    min-width: auto;
-                    max-width: none;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
+                    background: #36393f;
+                    border: 1px solid #40444b;
+                    border-radius: 12px;
+                    padding: 15px;
+                    min-width: 180px;
+                    max-width: 180px;
+                    text-align: center;
+                    transition: all 0.3s;
                     flex-shrink: 0;
                 }
-
+                
+                .pymk-profile-card:hover {
+                    transform: translateY(-5px);
+                    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+                    border-color: #ff4b6e;
+                }
+                
                 .pymk-profile-avatar {
-                    width: 32px;
-                    height: 32px;
+                    width: 70px;
+                    height: 70px;
                     border-radius: 50%;
                     object-fit: cover;
+                    margin: 0 auto 12px;
+                    border: 3px solid #ff4b6e;
                 }
-
+                
                 .pymk-profile-name {
-                    font-weight: 500;
-                    font-size: 13px;
-                    margin: 0;
+                    font-weight: 600;
+                    font-size: 16px;
+                    margin: 0 0 5px;
                     color: #fff;
                     white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
-
-                .pymk-follow-btn {
-                    background: transparent;
-                    border: 1px solid #ff4b6e;
-                    color: #ff4b6e;
-                    padding: 4px 8px;
-                    border-radius: 9999px;
-                    font-size: 11px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.2s;
+                
+                .pymk-profile-info {
+                    font-size: 12px;
+                    color: #b9bbbe;
+                    margin: 0 0 10px;
                     white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
-
-                .pymk-follow-btn:hover {
+                
+                .pymk-profile-mutual {
+                    font-size: 11px;
+                    color: #b9bbbe;
+                    margin: 0 0 15px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 5px;
+                }
+                
+                .pymk-profile-mutual i {
+                    color: #10b981;
+                }
+                
+                .pymk-follow-btn {
+                    width: 100%;
+                    padding: 8px;
+                    border-radius: 20px;
+                    border: none;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 5px;
+                }
+                
+                .pymk-follow-btn:not(.following) {
                     background: #ff4b6e;
                     color: white;
                 }
-
+                
                 .pymk-follow-btn.following {
-                    background: transparent;
-                    border-color: #6b6f76;
-                    color: #6b6f76;
+                    background: #10b981;
+                    color: white;
                 }
-
-                /* ========== LOAD MORE BUTTON ========== */
-                #loadMorePosts {
-                    display: block;
-                    width: 100%;
-                    max-width: 600px;
-                    margin: 20px auto;
-                    padding: 12px;
+                
+                .pymk-follow-btn:hover {
+                    opacity: 0.9;
+                    transform: scale(1.05);
+                }
+                
+                .pymk-footer {
+                    margin-top: 20px;
+                    text-align: center;
+                }
+                
+                .pymk-load-more {
                     background: transparent;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border: 1px solid #40444b;
                     color: #fff;
-                    border-radius: 9999px;
+                    padding: 10px 20px;
+                    border-radius: 20px;
                     font-size: 14px;
                     cursor: pointer;
-                    transition: all 0.2s;
+                    transition: all 0.3s;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
                 }
-
-                #loadMorePosts:hover {
-                    background: rgba(255, 75, 110, 0.1);
+                
+                .pymk-load-more:hover {
+                    background: #40444b;
                     border-color: #ff4b6e;
                     color: #ff4b6e;
                 }
+                
+                .pymk-loading {
+                    text-align: center;
+                    padding: 40px;
+                    color: #b9bbbe;
+                    font-style: italic;
+                }
+                
+                .pymk-expanded {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.8);
+                    z-index: 10000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }
+                
+                .pymk-expanded-content {
+                    background: #36393f;
+                    border-radius: 15px;
+                    padding: 30px;
+                    max-width: 90%;
+                    max-height: 90%;
+                    overflow-y: auto;
+                    position: relative;
+                }
+                
+                .pymk-close-expanded {
+                    position: absolute;
+                    top: 15px;
+                    right: 15px;
+                    background: transparent;
+                    border: none;
+                    color: #b9bbbe;
+                    font-size: 24px;
+                    cursor: pointer;
+                    width: 30px;
+                    height: 30px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 50%;
+                    transition: all 0.3s;
+                }
+                
+                .pymk-close-expanded:hover {
+                    background: #40444b;
+                    color: #fff;
+                }
+                
+                .pymk-expanded-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                    gap: 20px;
+                    margin-top: 20px;
+                }
 
-                #loadMorePosts:disabled {
-                    opacity: 0.5;
+                /* ========== NOTIFICATION STYLES (ORIGINAL) ========== */
+                .custom-notification {
+                    position: fixed;
+                    top: 80px;
+                    right: 20px;
+                    color: white;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 10000;
+                    animation: slideIn 0.3s ease;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    max-width: 400px;
+                    backdrop-filter: blur(10px);
+                    font-family: 'Inter', sans-serif;
+                }
+
+                .custom-notification.success {
+                    background: #16a34a;
+                }
+
+                .custom-notification.error {
+                    background: #dc2626;
+                }
+
+                .custom-notification.warning {
+                    background: #f59e0b;
+                }
+
+                .custom-notification.info {
+                    background: #3b82f6;
+                }
+
+                @keyframes slideIn {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+
+                @keyframes slideOut {
+                    from {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                }
+
+                /* ========== DELETE MODAL STYLES ========== */
+                #deletePostModal {
+                    display: none;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.7);
+                    z-index: 10000;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                    backdrop-filter: blur(5px);
+                }
+
+                #deletePostModal .modal-content {
+                    background: #2c2f33;
+                    border-radius: 16px;
+                    max-width: 500px;
+                    width: 100%;
+                    max-height: 90vh;
+                    display: flex;
+                    flex-direction: column;
+                    animation: modalSlideIn 0.3s ease;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                }
+
+                @keyframes modalSlideIn {
+                    from {
+                        transform: translateY(-30px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateY(0);
+                        opacity: 1;
+                    }
+                }
+
+                #deletePostModal .modal-header {
+                    padding: 20px;
+                    border-bottom: 1px solid #40444b;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    flex-shrink: 0;
+                }
+
+                #deletePostModal .modal-header h3 {
+                    margin: 0;
+                    color: #ffffff;
+                    font-size: 1.25rem;
+                }
+
+                #deletePostModal .close-modal {
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #99aab5;
+                    transition: color 0.2s;
+                }
+
+                #deletePostModal .close-modal:hover {
+                    color: #ffffff;
+                }
+
+                #deletePostModal .modal-body {
+                    padding: 20px;
+                    overflow-y: auto;
+                    flex: 1;
+                    color: #ffffff;
+                }
+
+                #deletePostModal .modal-body p {
+                    margin-top: 0;
+                    margin-bottom: 20px;
+                    color: #dcddde;
+                }
+
+                #deletePostModal .post-preview {
+                    background: #36393f;
+                    border-radius: 12px;
+                    padding: 15px;
+                    border: 1px solid #40444b;
+                }
+
+                #deletePostModal .preview-image {
+                    position: relative;
+                    margin-bottom: 15px;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    background: #000;
+                }
+
+                #deletePostModal .preview-image img,
+                #deletePostModal .preview-image video {
+                    width: 100%;
+                    max-height: 300px;
+                    object-fit: contain;
+                    display: block;
+                }
+
+                #deletePostModal .media-badge {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    background: rgba(0, 0, 0, 0.7);
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                }
+
+                #deletePostModal .preview-caption {
+                    font-size: 14px;
+                    color: #ffffff;
+                    word-wrap: break-word;
+                    max-height: 100px;
+                    overflow-y: auto;
+                    padding: 10px;
+                    background: rgba(0, 0, 0, 0.2);
+                    border-radius: 8px;
+                }
+
+                #deletePostModal .modal-actions {
+                    padding: 20px;
+                    border-top: 1px solid #40444b;
+                    display: flex;
+                    gap: 15px;
+                    justify-content: flex-end;
+                    flex-shrink: 0;
+                }
+
+                #deletePostModal .btn-secondary,
+                #deletePostModal .btn-danger {
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    border: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+
+                #deletePostModal .btn-secondary {
+                    background: #40444b;
+                    color: #ffffff;
+                }
+
+                #deletePostModal .btn-secondary:hover {
+                    background: #50555c;
+                }
+
+                #deletePostModal .btn-danger {
+                    background: #ed4245;
+                    color: white;
+                }
+
+                #deletePostModal .btn-danger:hover {
+                    background: #c03538;
+                }
+
+                #deletePostModal .btn-danger:disabled {
+                    opacity: 0.6;
                     cursor: not-allowed;
                 }
 
@@ -1213,12 +1556,13 @@ class SocialManager {
                     bottom: 0;
                     left: 0;
                     right: 0;
-                    background: #1a1a1a;
-                    border-top: 1px solid rgba(255, 255, 255, 0.1);
+                    background: #36393f;
+                    border-top: 2px solid #40444b;
                     padding: 16px;
                     z-index: 10000;
                     display: none;
-                    animation: slideUp 0.2s ease;
+                    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+                    animation: slideUp 0.3s ease;
                 }
 
                 @keyframes slideUp {
@@ -1242,7 +1586,7 @@ class SocialManager {
                     gap: 12px;
                     margin-bottom: 16px;
                     padding-bottom: 12px;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                    border-bottom: 1px solid #40444b;
                 }
 
                 .reply-to-avatar {
@@ -1260,7 +1604,7 @@ class SocialManager {
 
                 .reply-to-text {
                     font-size: 13px;
-                    color: #6b6f76;
+                    color: #b9bbbe;
                     margin-top: 2px;
                 }
 
@@ -1272,11 +1616,11 @@ class SocialManager {
 
                 .reply-modal-input {
                     flex: 1;
-                    padding: 12px 16px;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    border-radius: 9999px;
-                    font-size: 14px;
-                    background: transparent;
+                    padding: 14px 18px;
+                    border: 2px solid #40444b;
+                    border-radius: 30px;
+                    font-size: 15px;
+                    background: #2c2f33;
                     color: #fff;
                 }
 
@@ -1286,16 +1630,16 @@ class SocialManager {
                 }
 
                 .reply-modal-send {
-                    width: 42px;
-                    height: 42px;
-                    border-radius: 50%;
-                    border: none;
                     background: #ff4b6e;
+                    border: none;
                     color: white;
-                    cursor: pointer;
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    cursor: pointer;
                     transition: all 0.2s;
                 }
 
@@ -1309,7 +1653,7 @@ class SocialManager {
                     right: 0;
                     background: transparent;
                     border: none;
-                    color: #6b6f76;
+                    color: #b9bbbe;
                     font-size: 24px;
                     cursor: pointer;
                     width: 32px;
@@ -1321,267 +1665,258 @@ class SocialManager {
                 }
 
                 .reply-modal-close:hover {
-                    background: rgba(255, 255, 255, 0.1);
+                    background: rgba(255,255,255,0.1);
                 }
 
-                /* ========== DELETE MODAL ========== */
-                #deletePostModal {
-                    display: none;
-                    position: fixed;
+                /* ========== CUSTOM VIDEO PLAYER STYLES ========== */
+                .custom-video-container {
+                    position: relative;
+                    width: 100%;
+                    height: 0;
+                    padding-bottom: 56.25%;
+                    background: #000;
+                    border-radius: 12px;
+                    overflow: hidden;
+                }
+
+                .custom-video-player {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                    background: #000;
+                }
+
+                .custom-video-player::-webkit-media-controls {
+                    display: none !important;
+                }
+
+                .video-controls-overlay {
+                    position: absolute;
                     top: 0;
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background: rgba(0, 0, 0, 0.8);
-                    z-index: 10000;
+                    background: rgba(0,0,0,0.3);
+                    display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 20px;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
                 }
 
-                #deletePostModal .modal-content {
-                    background: #1a1a1a;
-                    border-radius: 16px;
-                    max-width: 500px;
-                    width: 100%;
-                    max-height: 90vh;
+                .custom-video-container:hover .video-controls-overlay {
+                    opacity: 1;
+                }
+
+                .video-center-play-btn {
+                    width: 80px;
+                    height: 80px;
+                    background: rgba(255, 75, 110, 0.95);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 32px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    border: 3px solid rgba(255,255,255,0.5);
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+                }
+
+                .video-center-play-btn:hover {
+                    background: #ff4b6e;
+                    transform: scale(1.1);
+                    border-color: white;
+                }
+
+                .video-bottom-controls {
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+                    padding: 20px 15px 15px;
                     display: flex;
                     flex-direction: column;
-                    animation: modalSlideIn 0.2s ease;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    gap: 8px;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                    pointer-events: none;
                 }
 
-                @keyframes modalSlideIn {
-                    from {
-                        transform: translateY(-30px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0);
-                        opacity: 1;
-                    }
+                .custom-video-container:hover .video-bottom-controls {
+                    opacity: 1;
+                    pointer-events: auto;
                 }
 
-                #deletePostModal .modal-header {
-                    padding: 20px;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                .control-bar {
                     display: flex;
-                    justify-content: space-between;
                     align-items: center;
-                }
-
-                #deletePostModal .modal-header h3 {
-                    margin: 0;
-                    color: #fff;
-                    font-size: 18px;
-                }
-
-                #deletePostModal .close-modal {
-                    font-size: 24px;
-                    cursor: pointer;
-                    color: #6b6f76;
-                }
-
-                #deletePostModal .close-modal:hover {
-                    color: #fff;
-                }
-
-                #deletePostModal .modal-body {
-                    padding: 20px;
-                    overflow-y: auto;
-                    flex: 1;
-                }
-
-                #deletePostModal .modal-body p {
-                    margin-top: 0;
-                    margin-bottom: 20px;
-                    color: #e7e9ea;
-                }
-
-                #deletePostModal .post-preview {
-                    background: rgba(255, 255, 255, 0.03);
-                    border-radius: 12px;
-                    padding: 15px;
-                }
-
-                #deletePostModal .preview-image {
-                    position: relative;
-                    margin-bottom: 15px;
-                    border-radius: 8px;
-                    overflow: hidden;
-                }
-
-                #deletePostModal .preview-image img,
-                #deletePostModal .preview-image video {
-                    width: 100%;
-                    max-height: 300px;
-                    object-fit: contain;
-                    display: block;
-                }
-
-                #deletePostModal .media-badge {
-                    position: absolute;
-                    top: 10px;
-                    right: 10px;
-                    background: rgba(0, 0, 0, 0.7);
+                    gap: 15px;
                     color: white;
-                    padding: 4px 8px;
-                    border-radius: 12px;
-                    font-size: 11px;
                 }
 
-                #deletePostModal .preview-caption {
-                    font-size: 14px;
-                    color: #fff;
-                    word-wrap: break-word;
-                    padding: 10px;
-                    background: rgba(0, 0, 0, 0.2);
-                    border-radius: 8px;
-                }
-
-                #deletePostModal .modal-actions {
-                    padding: 20px;
-                    border-top: 1px solid rgba(255, 255, 255, 0.1);
-                    display: flex;
-                    gap: 12px;
-                    justify-content: flex-end;
-                }
-
-                #deletePostModal .btn-secondary {
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    border: none;
+                .control-btn {
                     background: transparent;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    color: #fff;
-                }
-
-                #deletePostModal .btn-secondary:hover {
-                    background: rgba(255, 255, 255, 0.1);
-                }
-
-                #deletePostModal .btn-danger {
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: 500;
-                    cursor: pointer;
                     border: none;
-                    background: #dc2626;
                     color: white;
+                    cursor: pointer;
+                    padding: 8px;
+                    border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s;
                 }
 
-                #deletePostModal .btn-danger:hover {
-                    background: #b91c1c;
+                .control-btn:hover {
+                    background: rgba(255,255,255,0.2);
                 }
 
-                #deletePostModal .btn-danger:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
+                .progress-bar-container {
+                    flex: 1;
+                    height: 6px;
+                    background: rgba(255,255,255,0.3);
+                    border-radius: 3px;
+                    cursor: pointer;
+                    position: relative;
                 }
 
-                /* ========== NOTIFICATION ========== */
-                .custom-notification {
-                    position: fixed;
-                    bottom: 20px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: #1a1a1a;
+                .progress-bar-fill {
+                    height: 100%;
+                    background: #ff4b6e;
+                    border-radius: 3px;
+                    width: 0%;
+                    position: relative;
+                    transition: width 0.1s linear;
+                }
+
+                .time-display {
+                    font-size: 14px;
                     color: white;
-                    padding: 12px 24px;
-                    border-radius: 9999px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-                    z-index: 10001;
-                    animation: notificationSlide 0.2s ease;
+                    font-family: monospace;
+                    min-width: 90px;
+                }
+
+                .volume-control {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    border: 1px solid rgba(255, 75, 110, 0.3);
                 }
 
-                @keyframes notificationSlide {
-                    from {
-                        transform: translate(-50%, 100%);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translate(-50%, 0);
-                        opacity: 1;
-                    }
+                .volume-slider {
+                    width: 80px;
+                    height: 4px;
+                    background: rgba(255,255,255,0.3);
+                    border-radius: 2px;
+                    cursor: pointer;
+                    position: relative;
                 }
 
-                .custom-notification.success {
-                    border-color: #10b981;
-                }
-
-                .custom-notification.error {
-                    border-color: #dc2626;
-                }
-
-                .custom-notification.warning {
-                    border-color: #f59e0b;
-                }
-
-                /* ========== LOADING STATES ========== */
-                .loading, .no-posts, .error, .no-comments {
-                    text-align: center;
-                    padding: 40px;
-                    color: #6b6f76;
-                    font-style: italic;
+                .volume-fill {
+                    height: 100%;
+                    background: white;
+                    border-radius: 2px;
+                    width: 100%;
                 }
 
                 /* ========== MEDIA QUERIES ========== */
                 @media (max-width: 768px) {
-                    .post-content {
-                        margin-left: 0;
+                    .pymk-nav-btn.left {
+                        left: -10px;
                     }
                     
-                    .post-actions {
-                        margin-left: 0;
-                    }
-                    
-                    .comments-section {
-                        margin-left: 0;
-                    }
-                    
-                    .post-author-avatar {
-                        width: 40px;
-                        height: 40px;
+                    .pymk-nav-btn.right {
+                        right: -10px;
                     }
                     
                     .pymk-profile-card {
-                        padding: 4px 8px 4px 4px;
+                        min-width: 160px;
+                        max-width: 160px;
                     }
                     
-                    .pymk-profile-name {
-                        font-size: 12px;
+                    .video-play-button-center {
+                        width: 60px;
+                        height: 60px;
+                        font-size: 24px;
+                    }
+                    
+                    .video-center-play-btn {
+                        width: 60px;
+                        height: 60px;
+                        font-size: 24px;
+                    }
+                    
+                    .custom-notification {
+                        top: 70px;
+                        right: 15px;
+                        left: 15px;
+                        max-width: none;
                     }
                 }
 
                 @media (max-width: 480px) {
-                    .post-item {
+                    .pymk-section {
+                        padding: 15px;
+                    }
+                    
+                    .pymk-profile-card {
+                        min-width: 150px;
+                        max-width: 150px;
                         padding: 12px;
                     }
                     
-                    .post-actions {
-                        flex-wrap: wrap;
-                        gap: 8px;
-                    }
-                    
-                    .vote-btn {
-                        padding: 4px 8px;
-                    }
-                    
-                    .post-action {
-                        padding: 4px 10px;
+                    .pymk-profile-avatar {
+                        width: 60px;
+                        height: 60px;
                     }
                     
                     .pymk-nav-btn {
-                        width: 28px;
-                        height: 28px;
+                        width: 32px;
+                        height: 32px;
+                    }
+                    
+                    .pymk-nav-btn.left {
+                        left: -5px;
+                    }
+                    
+                    .pymk-nav-btn.right {
+                        right: -5px;
+                    }
+                    
+                    .video-play-button-center {
+                        width: 50px;
+                        height: 50px;
+                        font-size: 20px;
+                    }
+                    
+                    .video-center-play-btn {
+                        width: 50px;
+                        height: 50px;
+                        font-size: 20px;
+                    }
+                    
+                    .poll-option-content {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 8px;
+                    }
+                    
+                    .poll-option-right {
+                        width: 100%;
+                        justify-content: space-between;
+                    }
+                    
+                    .custom-notification {
+                        top: 60px;
+                        right: 10px;
+                        left: 10px;
+                        padding: 10px 15px;
+                        font-size: 13px;
                     }
                 }
             `;
@@ -3313,11 +3648,46 @@ class SocialManager {
         
         const notification = document.createElement('div');
         notification.className = `custom-notification ${type}`;
-        notification.innerHTML = message;
+        
+        const bgColor = type === 'error' ? '#dc2626' : 
+                       type === 'success' ? '#16a34a' : 
+                       type === 'warning' ? '#f59e0b' : '#3b82f6';
+        
+        notification.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: ${bgColor};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 400px;
+            backdrop-filter: blur(10px);
+            font-family: 'Inter', sans-serif;
+        `;
+        
+        const icon = type === 'error' ? 'alert-circle' : 
+                    type === 'success' ? 'check-circle' : 
+                    type === 'warning' ? 'alert-triangle' : 'info';
+        
+        notification.innerHTML = `
+            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+                ${this.getNotificationIcon(icon)}
+            </svg>
+            <span>${message}</span>
+        `;
+        
         document.body.appendChild(notification);
         
         setTimeout(() => {
-            notification.remove();
+            notification.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
         }, 3000);
     }
 
@@ -4144,9 +4514,18 @@ class SocialManager {
         card.innerHTML = `
             <img src="${user.profileImage || 'images/default-profile.jpg'}" 
                  alt="${user.name}" class="pymk-profile-avatar">
-            <span class="pymk-profile-name" title="${user.name || 'Unknown User'}">
+            <h4 class="pymk-profile-name" title="${user.name || 'Unknown User'}">
                 ${user.name || 'Unknown User'}
-            </span>
+            </h4>
+            <div class="pymk-profile-info" title="${profileInfo}">
+                ${profileInfo}
+            </div>
+            ${mutualConnections > 0 ? `
+                <div class="pymk-profile-mutual">
+                    <i class="fas fa-user-friends"></i>
+                    ${mutualConnections} mutual connection${mutualConnections !== 1 ? 's' : ''}
+                </div>
+            ` : ''}
             <button class="pymk-follow-btn ${isFollowing ? 'following' : ''}" 
                     data-user-id="${user.id}" 
                     data-following="${isFollowing}">
