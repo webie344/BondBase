@@ -1,7 +1,7 @@
 // groupchat.js - Enhanced with Service Worker Support & Voice Notes
 // COMPLETE VERSION WITH XP SYSTEM INTEGRATED - LOADS ACTUAL USER XP DATA
-// FIXED: Removed IndexedDB caching from chat page to ensure chronological message order
-// FIXED: Message ordering on initial load and cancel voice recording button
+// FIXED: Message ordering and scroll behavior
+// FIXED: Cancel voice recording button functionality
 
 import { 
     getFirestore, 
@@ -704,6 +704,10 @@ class GroupChat {
             // hasLoadedFirebase: boolean
         // }
         
+        // Track scroll position
+        this.shouldScrollToBottom = true;
+        this.userHasScrolled = false;
+        
         // Track offline status
         this.isOnline = navigator.onLine;
         
@@ -1250,6 +1254,8 @@ class GroupChat {
     
     // FIXED: Cancel voice recording - properly clean up all resources
     cancelVoiceRecording() {
+        console.log('Cancel voice recording called');
+        
         if (this.mediaRecorder && this.isRecording) {
             // Stop the recorder
             try {
@@ -1447,18 +1453,23 @@ class GroupChat {
         
         document.body.appendChild(recordingUI);
         
-        // Add event listeners
+        // Add event listeners with correct binding
         const cancelBtn = document.getElementById('cancelRecording');
         const stopBtn = document.getElementById('stopRecording');
         
         if (cancelBtn) {
-            cancelBtn.addEventListener('click', () => {
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Use a bound function to ensure 'this' is correct
                 this.cancelVoiceRecording();
             });
         }
         
         if (stopBtn) {
-            stopBtn.addEventListener('click', () => {
+            stopBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 this.stopVoiceRecording();
             });
         }
@@ -1475,6 +1486,14 @@ class GroupChat {
             background: rgba(0, 0, 0, 0.5);
             z-index: 1000;
         `;
+        
+        // Close overlay when clicked
+        overlay.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.cancelVoiceRecording();
+        });
+        
         document.body.appendChild(overlay);
     }
     
@@ -3871,7 +3890,7 @@ class GroupChat {
         }
     }
 
-    // FIXED: listenToMessages method - Single source of truth approach
+    // FIXED: listenToMessages method - Single source of truth approach with proper chronological order
     listenToMessages(groupId, callback) {
         try {
             // First, unsubscribe from any existing listener
@@ -3930,12 +3949,12 @@ class GroupChat {
                             if (msg.id) tracker.processedIds.add(msg.id);
                         });
                         
-                        // Add to all messages
+                        // Add to all messages and sort by timestamp
                         tracker.allMessages = [...tracker.allMessages, ...newMessages]
                             .sort((a, b) => {
                                 const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
                                 const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
-                                return timeA - timeB;
+                                return timeA - timeB; // Ascending order (oldest first)
                             });
                         
                         // Mark that Firebase has loaded
@@ -3946,7 +3965,7 @@ class GroupChat {
                             console.log('New messages received:', newMessages.length);
                         }
                         
-                        // ALWAYS send the complete sorted array
+                        // ALWAYS send the complete sorted array (chronological order)
                         callback([...tracker.allMessages]);
                         
                     } else if (!tracker.hasLoadedFirebase && tracker.allMessages.length > 0) {
@@ -5601,7 +5620,7 @@ function initGroupPage() {
     if (messageInput) {
         messageInput.addEventListener('input', () => {
             if (sendBtn) {
-                sendBtn.disabled = !messageInput.value.trim();
+                sendBtn.disabled = !messageInput.value.trim() && !groupChat.currentVoiceNote;
             }
             
             messageInput.style.height = 'auto';
@@ -6054,10 +6073,23 @@ function initGroupPage() {
         const messagesUnsubscribe = groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Listener callback received:', newMessages.length, 'messages');
             
-            // Replace messages array with sorted messages
+            // Replace messages array with sorted messages (already in chronological order)
             messages = newMessages;
+            
+            // Check if we should scroll to bottom
+            const shouldScroll = !groupChat.userHasScrolled || 
+                               (messages.length > 0 && 
+                                messages[messages.length - 1].senderId === groupChat.firebaseUser?.uid);
+            
             setupReactionListeners();
-            queueRender();
+            displayMessages();
+            
+            // Scroll to bottom if needed
+            if (shouldScroll && messagesContainer) {
+                setTimeout(() => {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }, 100);
+            }
         });
         
         groupChat.activeListeners.set('messages', messagesUnsubscribe);
@@ -6194,11 +6226,11 @@ function initGroupPage() {
         
         window.currentMessages = messages;
         
-        // Ensure messages are sorted by timestamp
+        // Ensure messages are sorted by timestamp (ascending - oldest first)
         const sortedMessages = [...messages].sort((a, b) => {
             const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
             const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
-            return timeA - timeB;
+            return timeA - timeB; // Ascending order (oldest first)
         });
         
         // Group messages from same sender within 2 minutes
@@ -6242,28 +6274,28 @@ function initGroupPage() {
         // Use DocumentFragment for efficient DOM updates
         const fragment = document.createDocumentFragment();
         
-        // Render each group in chronological order
-        groupedMessages.forEach(group => {
-            if (group.length === 0) return;
-            
-            const firstMessage = group[0];
-            const isSystemMessage = firstMessage.type === 'system';
-            const isRewardUpgrade = firstMessage.rewardUpgrade || false;
-            
-            // For system messages, don't group - render individually
-            if (isSystemMessage) {
-                group.forEach(message => {
-                    renderSingleMessage(fragment, message, true, isRewardUpgrade);
-                });
-                return;
-            }
-            
-            // For regular messages, render as a group
-            const messageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
-            
-            // Get sender XP data (cached or fetch)
-            (async () => {
+        // Process groups sequentially to avoid async issues
+        const processGroups = async () => {
+            for (const group of groupedMessages) {
+                if (group.length === 0) continue;
+                
+                const firstMessage = group[0];
+                const isSystemMessage = firstMessage.type === 'system';
+                const isRewardUpgrade = firstMessage.rewardUpgrade || false;
+                
+                // For system messages, don't group - render individually
+                if (isSystemMessage) {
+                    for (const message of group) {
+                        renderSingleMessage(fragment, message, true, isRewardUpgrade);
+                    }
+                    continue;
+                }
+                
+                // For regular messages, render as a group
+                const messageTime = firstMessage.timestamp ? new Date(firstMessage.timestamp) : new Date();
+                
                 try {
+                    // Get sender XP data
                     const senderXP = await groupChat.getUserXPWithRank(firstMessage.senderId);
                     
                     // Create group container
@@ -6305,16 +6337,14 @@ function initGroupPage() {
                     messagesDiv.style.cssText = 'display: flex; flex-direction: column; gap: 2px; margin-left: 46px;';
                     
                     // Add each message in the group
-                    group.forEach((message, index) => {
-                        const messageDiv = createSingleMessageElement(message, index, senderXP);
+                    for (let i = 0; i < group.length; i++) {
+                        const message = group[i];
+                        const messageDiv = createSingleMessageElement(message, i, senderXP);
                         messagesDiv.appendChild(messageDiv);
-                    });
+                    }
                     
                     groupContainer.appendChild(messagesDiv);
                     fragment.appendChild(groupContainer);
-                    
-                    // Append fragment after async operations
-                    messagesContainer.appendChild(fragment);
                     
                 } catch (error) {
                     console.error('Error getting sender XP:', error);
@@ -6347,101 +6377,102 @@ function initGroupPage() {
                     const messagesDiv = document.createElement('div');
                     messagesDiv.style.cssText = 'display: flex; flex-direction: column; gap: 2px; margin-left: 46px;';
                     
-                    group.forEach((message, index) => {
-                        const messageDiv = createSingleMessageElement(message, index);
+                    for (let i = 0; i < group.length; i++) {
+                        const message = group[i];
+                        const messageDiv = createSingleMessageElement(message, i);
                         messagesDiv.appendChild(messageDiv);
-                    });
+                    }
                     
                     groupContainer.appendChild(messagesDiv);
                     fragment.appendChild(groupContainer);
-                    messagesContainer.appendChild(fragment);
                 }
-            })();
-        });
-        
-        // Now create and attach voice message elements for new voice messages
-        setTimeout(() => {
-            sortedMessages.forEach(msg => {
-                if (msg.voiceUrl) {
-                    const voiceElementId = `voice-${msg.id}`;
-                    const placeholder = document.getElementById(voiceElementId);
-                    if (placeholder) {
-                        // Create actual voice element
-                        const voiceElement = groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id);
-                        
-                        // Replace placeholder with actual voice element
-                        placeholder.parentNode.replaceChild(voiceElement, placeholder);
-                        
-                        // Store reference to voice element handler
-                        voiceMessageHandlers.set(msg.id, voiceElement);
-                    }
-                }
-            });
-        }, 100);
-        
-        // Add event listeners
-        document.querySelectorAll('.message-avatar').forEach(avatar => {
-            avatar.addEventListener('click', (e) => {
-                const userId = e.target.dataset.userId;
-                if (userId && userId !== groupChat.firebaseUser?.uid) {
-                    window.open(`user.html?id=${userId}`, '_blank');
-                }
-            });
-        });
-        
-        document.querySelectorAll('.reaction-bubble').forEach(bubble => {
-            bubble.addEventListener('click', (e) => {
-                if (e.currentTarget.classList.contains('add-reaction')) {
-                    return;
-                }
-                const messageElement = e.target.closest('.message-text, .system-message');
-                if (messageElement) {
-                    const messageId = messageElement.dataset.messageId;
-                    const message = sortedMessages.find(m => m.id === messageId);
-                    if (message) {
-                        const emoji = e.currentTarget.dataset.emoji;
-                        groupChat.currentMessageForReaction = message;
-                        groupChat.addReactionToMessage(emoji);
-                    }
-                }
-            });
-        });
-        
-        document.querySelectorAll('.message-text, .system-message').forEach(messageElement => {
-            let longPressTimer;
-            const messageId = messageElement.dataset.messageId;
-            const message = sortedMessages.find(m => m.id === messageId);
-            
-            if (message) {
-                messageElement.addEventListener('touchstart', (e) => {
-                    longPressTimer = setTimeout(() => {
-                        groupChat.showReactionModal(message);
-                    }, 500);
-                });
-                
-                messageElement.addEventListener('touchend', () => {
-                    clearTimeout(longPressTimer);
-                });
-                
-                messageElement.addEventListener('touchmove', () => {
-                    clearTimeout(longPressTimer);
-                });
-                
-                messageElement.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    groupChat.showReactionModal(message);
-                });
             }
-        });
+            
+            // Append the fragment to the container
+            messagesContainer.appendChild(fragment);
+            
+            // Now create and attach voice message elements for new voice messages
+            setTimeout(() => {
+                sortedMessages.forEach(msg => {
+                    if (msg.voiceUrl) {
+                        const voiceElementId = `voice-${msg.id}`;
+                        const placeholder = document.getElementById(voiceElementId);
+                        if (placeholder) {
+                            // Create actual voice element
+                            const voiceElement = groupChat.createVoiceMessageElement(msg.voiceUrl, msg.duration || 0, msg.id);
+                            
+                            // Replace placeholder with actual voice element
+                            placeholder.parentNode.replaceChild(voiceElement, placeholder);
+                            
+                            // Store reference to voice element handler
+                            voiceMessageHandlers.set(msg.id, voiceElement);
+                        }
+                    }
+                });
+            }, 100);
+            
+            // Add event listeners
+            document.querySelectorAll('.message-avatar').forEach(avatar => {
+                avatar.addEventListener('click', (e) => {
+                    const userId = e.target.dataset.userId;
+                    if (userId && userId !== groupChat.firebaseUser?.uid) {
+                        window.open(`user.html?id=${userId}`, '_blank');
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.reaction-bubble').forEach(bubble => {
+                bubble.addEventListener('click', (e) => {
+                    if (e.currentTarget.classList.contains('add-reaction')) {
+                        return;
+                    }
+                    const messageElement = e.target.closest('.message-text, .system-message');
+                    if (messageElement) {
+                        const messageId = messageElement.dataset.messageId;
+                        const message = sortedMessages.find(m => m.id === messageId);
+                        if (message) {
+                            const emoji = e.currentTarget.dataset.emoji;
+                            groupChat.currentMessageForReaction = message;
+                            groupChat.addReactionToMessage(emoji);
+                        }
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.message-text, .system-message').forEach(messageElement => {
+                let longPressTimer;
+                const messageId = messageElement.dataset.messageId;
+                const message = sortedMessages.find(m => m.id === messageId);
+                
+                if (message) {
+                    messageElement.addEventListener('touchstart', (e) => {
+                        longPressTimer = setTimeout(() => {
+                            groupChat.showReactionModal(message);
+                        }, 500);
+                    });
+                    
+                    messageElement.addEventListener('touchend', () => {
+                        clearTimeout(longPressTimer);
+                    });
+                    
+                    messageElement.addEventListener('touchmove', () => {
+                        clearTimeout(longPressTimer);
+                    });
+                    
+                    messageElement.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        groupChat.showReactionModal(message);
+                    });
+                }
+            });
+            
+            groupChat.setupSwipeToReply(messagesContainer);
+            
+            setupReactionListeners();
+        };
         
-        groupChat.setupSwipeToReply(messagesContainer);
-        
-        setupReactionListeners();
-        
-        // Scroll to bottom after rendering
-        setTimeout(() => {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 50);
+        // Start processing groups
+        processGroups();
     }
     
     function renderSingleMessage(fragment, message, isSystem = false, isRewardUpgrade = false) {
@@ -6760,6 +6791,13 @@ function initGroupPage() {
                 // Clear the reply indicator after sending
                 groupChat.clearReply();
                 
+                // Scroll to bottom after sending
+                setTimeout(() => {
+                    if (messagesContainer) {
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                }, 100);
+                
             } catch (error) {
                 console.error('Error sending message:', error);
                 alert(error.message || 'Failed to send message. Please try again.');
@@ -6779,6 +6817,13 @@ function initGroupPage() {
                 
                 // Clear the reply indicator after sending
                 groupChat.clearReply();
+                
+                // Scroll to bottom after sending
+                setTimeout(() => {
+                    if (messagesContainer) {
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                }, 100);
                 
             } catch (error) {
                 console.error('Error sending message:', error);
