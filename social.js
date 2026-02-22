@@ -144,6 +144,7 @@ class SocialManager {
                 this.loadVotedPosts();
                 this.loadViewedPYMKProfiles();
                 this.setupPollEventListeners();
+                this.setupPostModal();
             } else {
                 if (!window.location.pathname.includes('login.html') && 
                     !window.location.pathname.includes('signup.html') &&
@@ -152,6 +153,486 @@ class SocialManager {
                 }
             }
         });
+    }
+
+    // ==================== POST MODAL FOR FULL PAGE VIEW ====================
+    
+    setupPostModal() {
+        // Create modal if it doesn't exist
+        if (!document.getElementById('postModal')) {
+            const modal = document.createElement('div');
+            modal.id = 'postModal';
+            modal.className = 'post-modal';
+            modal.innerHTML = `
+                <div class="post-modal-content">
+                    <div class="post-modal-header">
+                        <button class="post-modal-close">&times;</button>
+                    </div>
+                    <div class="post-modal-body" id="postModalBody">
+                        <div class="loading">Loading post...</div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Add modal styles
+            this.addModalStyles();
+            
+            // Close modal events
+            const closeBtn = modal.querySelector('.post-modal-close');
+            closeBtn.addEventListener('click', () => this.closePostModal());
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closePostModal();
+                }
+            });
+            
+            // ESC key to close
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.style.display === 'flex') {
+                    this.closePostModal();
+                }
+            });
+        }
+    }
+    
+    addModalStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            .post-modal {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.95);
+                z-index: 100000;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                backdrop-filter: blur(10px);
+            }
+            
+            .post-modal-content {
+                background: #1a1d21;
+                border-radius: 24px;
+                max-width: 800px;
+                width: 100%;
+                max-height: 90vh;
+                display: flex;
+                flex-direction: column;
+                animation: modalFadeIn 0.3s ease;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            @keyframes modalFadeIn {
+                from {
+                    opacity: 0;
+                    transform: scale(0.95);
+                }
+                to {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+            }
+            
+            .post-modal-header {
+                padding: 16px 20px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                display: flex;
+                justify-content: flex-end;
+                flex-shrink: 0;
+            }
+            
+            .post-modal-close {
+                background: transparent;
+                border: none;
+                color: #fff;
+                font-size: 28px;
+                cursor: pointer;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: all 0.2s;
+            }
+            
+            .post-modal-close:hover {
+                background: rgba(255, 75, 110, 0.2);
+                color: #ff4b6e;
+            }
+            
+            .post-modal-body {
+                padding: 20px;
+                overflow-y: auto;
+                flex: 1;
+            }
+            
+            .post-modal-body .post-item {
+                border: none;
+                padding: 0;
+                background: transparent;
+            }
+            
+            .post-modal-body .post-item:hover {
+                background: transparent;
+            }
+            
+            .post-modal-body .post-content {
+                margin-left: 60px;
+                margin-bottom: 20px;
+            }
+            
+            .post-modal-body .post-image-container img {
+                max-height: 70vh;
+                width: 100%;
+                object-fit: contain;
+            }
+            
+            .post-modal-body .video-thumbnail-container {
+                margin-top: 0;
+                cursor: default;
+            }
+            
+            .post-modal-body .comments-section {
+                margin-left: 60px;
+                margin-top: 20px;
+                display: block !important;
+            }
+            
+            .post-modal-body .post-actions {
+                margin-left: 60px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    async openPostModal(postId) {
+        const modal = document.getElementById('postModal');
+        const modalBody = document.getElementById('postModalBody');
+        
+        if (!modal || !modalBody) return;
+        
+        modal.style.display = 'flex';
+        modalBody.innerHTML = '<div class="loading">Loading post...</div>';
+        
+        try {
+            // Fetch post data
+            const postRef = doc(db, 'posts', postId);
+            const postSnap = await getDoc(postRef);
+            
+            if (!postSnap.exists()) {
+                modalBody.innerHTML = '<div class="error">Post not found</div>';
+                return;
+            }
+            
+            const post = { id: postSnap.id, ...postSnap.data() };
+            
+            // Fetch user data
+            const userRef = doc(db, 'users', post.userId);
+            const userSnap = await getDoc(userRef);
+            const user = userSnap.exists() ? userSnap.data() : {};
+            
+            // Create enhanced post element for modal
+            const postElement = await this.createModalPostElement(post, user, postId);
+            modalBody.innerHTML = '';
+            modalBody.appendChild(postElement);
+            
+            // Load comments
+            await this.loadModalComments(postId);
+            
+        } catch (error) {
+            console.error('Error loading post for modal:', error);
+            modalBody.innerHTML = '<div class="error">Error loading post</div>';
+        }
+    }
+    
+    closePostModal() {
+        const modal = document.getElementById('postModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    async createModalPostElement(post, user, postId) {
+        const postDiv = document.createElement('div');
+        postDiv.className = 'post-item';
+        postDiv.setAttribute('data-post-id', postId);
+        
+        const userName = user.name || 'Unknown User';
+        const userProfileImage = user.profileImage || 'images/default-profile.jpg';
+        
+        let postContentHTML = '';
+        
+        // Handle different media types
+        if (post.mediaType === 'poll' && post.poll) {
+            const pollContainer = this.createPollElement(post, postId);
+            postContentHTML = pollContainer.outerHTML;
+        } else if (post.videoUrl || post.mediaType === 'video') {
+            const videoUrl = post.videoUrl;
+            if (videoUrl) {
+                postContentHTML = `<div id="modal-video-container-${postId}"></div>`;
+                
+                setTimeout(() => {
+                    const container = document.getElementById(`modal-video-container-${postId}`);
+                    if (container) {
+                        const videoPlayer = this.createCustomVideoPlayer(
+                            videoUrl, 
+                            this.getVideoThumbnail(post), 
+                            post.videoDuration || 0
+                        );
+                        container.appendChild(videoPlayer.container);
+                    }
+                }, 50);
+            }
+        } else if (post.imageUrl) {
+            const imageUrl = String(post.imageUrl).trim();
+            if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
+                postContentHTML += `
+                    <div class="post-image-container">
+                        <img src="${imageUrl}" alt="Post image" class="post-image" style="width: 100%; max-height: 70vh; object-fit: contain; border-radius: 16px;">
+                    </div>
+                `;
+            }
+        }
+        
+        if (post.caption) {
+            postContentHTML += `<p class="post-caption">${this.escapeHTML(post.caption)}</p>`;
+        }
+        
+        const isLiked = this.likedPosts.has(postId);
+        const userVote = this.getUserVoteForPost(postId);
+        const upvotes = post.upvotes || 0;
+        const downvotes = post.downvotes || 0;
+        
+        postDiv.innerHTML = `
+            <div class="post-header">
+                <img src="${userProfileImage}" 
+                     alt="${userName}" class="post-author-avatar" style="cursor: pointer;">
+                <div class="post-author-info">
+                    <h4 style="color: #ff4b6e; cursor: pointer;">${userName}</h4>
+                    <span class="post-time">${this.formatTime(post.createdAt)}</span>
+                </div>
+            </div>
+            
+            <div class="post-content">
+                ${postContentHTML}
+            </div>
+            
+            <div class="post-actions">
+                <div class="action-group">
+                    <button class="vote-btn up ${userVote === 'up' ? 'active' : ''}" data-post-id="${postId}" data-vote="up">
+                        <i class="fas fa-arrow-up"></i>
+                        <span class="vote-count upvote-count">${this.formatCount(upvotes)}</span>
+                    </button>
+                    <button class="vote-btn down ${userVote === 'down' ? 'active' : ''}" data-post-id="${postId}" data-vote="down">
+                        <i class="fas fa-arrow-down"></i>
+                        <span class="vote-count downvote-count">${this.formatCount(downvotes)}</span>
+                    </button>
+                </div>
+                
+                <div class="action-group">
+                    <button class="post-action like-btn ${isLiked ? 'liked' : ''}" data-post-id="${postId}">
+                        <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> 
+                        <span class="like-count">${this.formatCount(post.likes || 0)}</span>
+                    </button>
+                    <button class="post-action comment-btn active" data-post-id="${postId}">
+                        <i class="far fa-comment"></i> 
+                        <span class="comment-count">${this.formatCount(post.commentsCount || 0)}</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="comments-section expanded" id="modal-comments-${postId}">
+                <div class="add-comment">
+                    <input type="text" class="comment-input" placeholder="Write a comment..." data-post-id="${postId}">
+                    <button class="send-comment-btn" data-post-id="${postId}">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="comments-list" id="modal-comments-list-${postId}"></div>
+            </div>
+        `;
+
+        // Add event listeners
+        const likeBtn = postDiv.querySelector('.like-btn');
+        const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
+        const commentInput = postDiv.querySelector('.comment-input');
+        const upvoteBtn = postDiv.querySelector('.vote-btn.up');
+        const downvoteBtn = postDiv.querySelector('.vote-btn.down');
+        const profileLink = postDiv.querySelector('.post-author-avatar');
+        const profileName = postDiv.querySelector('.post-author-info h4');
+
+        if (likeBtn) {
+            likeBtn.addEventListener('click', () => this.handleLike(postId, likeBtn));
+        }
+
+        if (sendCommentBtn) {
+            sendCommentBtn.addEventListener('click', () => this.handleModalComment(postId));
+        }
+
+        if (commentInput) {
+            commentInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleModalComment(postId);
+                }
+            });
+        }
+
+        if (upvoteBtn) {
+            upvoteBtn.addEventListener('click', () => this.handleVote(postId, 'up', upvoteBtn));
+        }
+
+        if (downvoteBtn) {
+            downvoteBtn.addEventListener('click', () => this.handleVote(postId, 'down', downvoteBtn));
+        }
+
+        // Navigate to profile
+        const navigateToProfile = () => {
+            window.location.href = `profile.html?id=${post.userId}`;
+        };
+
+        if (profileLink) {
+            profileLink.addEventListener('click', navigateToProfile);
+        }
+        
+        if (profileName) {
+            profileName.addEventListener('click', navigateToProfile);
+        }
+
+        return postDiv;
+    }
+    
+    async loadModalComments(postId) {
+        const commentsList = document.getElementById(`modal-comments-list-${postId}`);
+        if (!commentsList) return;
+
+        try {
+            const commentsQuery = query(
+                collection(db, 'posts', postId, 'comments'), 
+                orderBy('createdAt', 'asc')
+            );
+            const commentsSnap = await getDocs(commentsQuery);
+            
+            commentsList.innerHTML = '';
+            
+            if (commentsSnap.empty) {
+                commentsList.innerHTML = '<div class="no-comments">No comments yet. Be the first to comment!</div>';
+                return;
+            }
+
+            const userIds = new Set();
+            commentsSnap.forEach(doc => {
+                const comment = doc.data();
+                userIds.add(comment.userId);
+            });
+
+            const usersData = await this.getUsersData([...userIds]);
+
+            commentsSnap.forEach(doc => {
+                const comment = { id: doc.id, ...doc.data() };
+                const user = usersData[comment.userId] || {};
+                const commentElement = this.createModalCommentElement(comment, user, postId);
+                commentsList.appendChild(commentElement);
+            });
+        } catch (error) {
+            console.error('Error loading comments:', error);
+            commentsList.innerHTML = '<div class="error">Error loading comments</div>';
+        }
+    }
+    
+    createModalCommentElement(comment, user, postId) {
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'comment-item';
+        commentDiv.setAttribute('data-comment-id', comment.id);
+        
+        commentDiv.innerHTML = `
+            <div class="comment-header">
+                <img src="${user.profileImage || 'images/default-profile.jpg'}" 
+                     alt="${user.name}" class="comment-avatar" style="cursor: pointer;">
+                <div class="comment-info">
+                    <strong style="color: #ff4b6e; cursor: pointer;">${user.name || 'Unknown User'}</strong>
+                    <span class="comment-time">${this.formatTime(comment.createdAt)}</span>
+                </div>
+            </div>
+            <div class="comment-text">${this.escapeHTML(comment.text)}</div>
+        `;
+
+        // Add profile navigation to avatar and name
+        const avatar = commentDiv.querySelector('.comment-avatar');
+        const name = commentDiv.querySelector('.comment-info strong');
+        
+        const navigateToProfile = () => {
+            window.location.href = `profile.html?id=${comment.userId}`;
+        };
+        
+        if (avatar) {
+            avatar.addEventListener('click', navigateToProfile);
+        }
+        
+        if (name) {
+            name.addEventListener('click', navigateToProfile);
+        }
+
+        return commentDiv;
+    }
+    
+    async handleModalComment(postId) {
+        if (!this.currentUser) {
+            alert('Please login to comment');
+            return;
+        }
+
+        const commentInput = document.querySelector(`#modal-comments-${postId} .comment-input`);
+        if (!commentInput) return;
+
+        const commentText = commentInput.value.trim();
+        if (!commentText) {
+            alert('Please enter a comment');
+            return;
+        }
+
+        try {
+            const commentData = {
+                userId: this.currentUser.uid,
+                userName: this.currentUser.displayName || 'User',
+                userAvatar: this.currentUser.photoURL || 'images/default-profile.jpg',
+                text: commentText,
+                createdAt: serverTimestamp(),
+                repliesCount: 0
+            };
+
+            await addDoc(collection(db, 'posts', postId, 'comments'), commentData);
+
+            const postRef = doc(db, 'posts', postId);
+            await updateDoc(postRef, {
+                commentsCount: increment(1),
+                updatedAt: serverTimestamp()
+            });
+
+            commentInput.value = '';
+            
+            // Reload comments
+            await this.loadModalComments(postId);
+            
+            // Update comment count in modal
+            const commentCount = document.querySelector(`.comment-btn[data-post-id="${postId}"] .comment-count`);
+            if (commentCount) {
+                const currentCount = parseInt(commentCount.textContent) || 0;
+                commentCount.textContent = this.formatCount(currentCount + 1);
+            }
+
+            this.showNotification('Comment added!', 'success');
+
+        } catch (error) {
+            console.error('Error adding comment:', error);
+            alert('Error adding comment: ' + error.message);
+        }
     }
 
     // ==================== VOTE FUNCTIONS (UP/DOWN ARROWS) ====================
@@ -256,11 +737,6 @@ class SocialManager {
             
             // Update UI
             this.updateVoteUI(postId, upvotes, downvotes, this.votedPosts.get(postId) || null);
-            
-            this.showNotification(
-                newVoteType ? `Voted ${newVoteType}!` : 'Vote removed',
-                'success'
-            );
             
         } catch (error) {
             console.error('Error voting:', error);
@@ -414,6 +890,7 @@ class SocialManager {
                     margin: 0;
                     transition: background-color 0.2s ease;
                     position: relative;
+                    cursor: pointer;
                 }
 
                 .post-item:hover {
@@ -434,6 +911,7 @@ class SocialManager {
                     border-radius: 50%;
                     object-fit: cover;
                     flex-shrink: 0;
+                    cursor: pointer;
                 }
 
                 .post-author-info {
@@ -446,13 +924,13 @@ class SocialManager {
                     margin: 0;
                     font-size: 15px;
                     font-weight: 700;
-                    color: #fff;
+                    color: #ff4b6e;
                     line-height: 1.2;
+                    cursor: pointer;
                 }
 
                 .post-author-info h4:hover {
                     text-decoration: underline;
-                    cursor: pointer;
                 }
 
                 .post-time {
@@ -766,6 +1244,7 @@ class SocialManager {
                     height: 32px;
                     border-radius: 50%;
                     object-fit: cover;
+                    cursor: pointer;
                 }
 
                 .comment-info {
@@ -774,7 +1253,12 @@ class SocialManager {
 
                 .comment-info strong {
                     font-size: 14px;
-                    color: #fff;
+                    color: #ff4b6e;
+                    cursor: pointer;
+                }
+
+                .comment-info strong:hover {
+                    text-decoration: underline;
                 }
 
                 .comment-time {
@@ -859,11 +1343,17 @@ class SocialManager {
                     height: 24px;
                     border-radius: 50%;
                     object-fit: cover;
+                    cursor: pointer;
                 }
 
                 .reply-info strong {
                     font-size: 13px;
-                    color: #fff;
+                    color: #ff4b6e;
+                    cursor: pointer;
+                }
+
+                .reply-info strong:hover {
+                    text-decoration: underline;
                 }
 
                 .reply-time {
@@ -1045,7 +1535,7 @@ class SocialManager {
                     gap: 4px;
                 }
 
-                /* ========== PEOPLE YOU MAY KNOW STYLES (ORIGINAL) ========== */
+                /* ========== PEOPLE YOU MAY KNOW STYLES ========== */
                 .pymk-section {
                     background: #2c2f33;
                     border-radius: 15px;
@@ -1170,16 +1660,22 @@ class SocialManager {
                     object-fit: cover;
                     margin: 0 auto 12px;
                     border: 3px solid #ff4b6e;
+                    cursor: pointer;
                 }
                 
                 .pymk-profile-name {
                     font-weight: 600;
                     font-size: 16px;
                     margin: 0 0 5px;
-                    color: #fff;
+                    color: #ff4b6e;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
+                    cursor: pointer;
+                }
+                
+                .pymk-profile-name:hover {
+                    text-decoration: underline;
                 }
                 
                 .pymk-profile-info {
@@ -1321,7 +1817,7 @@ class SocialManager {
                     margin-top: 20px;
                 }
 
-                /* ========== NOTIFICATION STYLES (ORIGINAL) ========== */
+                /* ========== NOTIFICATION STYLES ========== */
                 .custom-notification {
                     position: fixed;
                     top: 80px;
@@ -1594,12 +2090,18 @@ class SocialManager {
                     height: 40px;
                     border-radius: 50%;
                     object-fit: cover;
+                    cursor: pointer;
                 }
 
                 .reply-to-name {
                     font-weight: 600;
-                    color: #fff;
+                    color: #ff4b6e;
                     font-size: 14px;
+                    cursor: pointer;
+                }
+
+                .reply-to-name:hover {
+                    text-decoration: underline;
                 }
 
                 .reply-to-text {
@@ -2266,14 +2768,13 @@ class SocialManager {
         return videoIndicators.some(indicator => indicator);
     }
 
-    // ==================== VIDEO UPLOAD & PROCESSING - FIXED ====================
+    // ==================== VIDEO UPLOAD & PROCESSING ====================
     
     async uploadMediaToCloudinary(file) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', cloudinaryConfig.uploadPreset);
         
-        // CRITICAL FIX: Properly detect video files
         const isVideo = file.type.startsWith('video/') || 
                        file.name.match(/\.(mp4|mov|avi|mkv|wmv|flv|webm|3gp|m4v|mpg|mpeg)$/i) !== null;
         
@@ -2304,32 +2805,28 @@ class SocialManager {
                 throw new Error('No secure_url in Cloudinary response');
             }
             
-            // CRITICAL FIX: Always set the correct media type
             if (isVideo) {
                 const videoUrl = data.secure_url;
                 const thumbnailUrl = this.generateCloudinaryThumbnail(videoUrl);
                 
-                console.log('Video uploaded successfully:', videoUrl);
-                
                 return {
                     url: videoUrl,
-                    type: 'video', // Explicitly set as video
-                    mediaType: 'video', // Add explicit mediaType
+                    type: 'video',
+                    mediaType: 'video',
                     duration: data.duration || 0,
                     width: data.width,
                     height: data.height,
                     format: data.format,
                     publicId: data.public_id,
                     thumbnail: thumbnailUrl,
-                    videoThumbnail: thumbnailUrl // Add for consistency
+                    videoThumbnail: thumbnailUrl
                 };
             }
             
-            // Return for images
             return {
                 url: data.secure_url,
                 type: 'image',
-                mediaType: 'image', // Add explicit mediaType
+                mediaType: 'image',
                 width: data.width,
                 height: data.height,
                 format: data.format,
@@ -2833,6 +3330,27 @@ class SocialManager {
                     this.closeReplyModal();
                 }
             });
+            
+            // Add profile navigation to reply modal
+            const replyToName = document.getElementById('replyToName');
+            if (replyToName) {
+                replyToName.addEventListener('click', () => {
+                    const userId = modal.dataset.replyToUserId;
+                    if (userId) {
+                        window.location.href = `profile.html?id=${userId}`;
+                    }
+                });
+            }
+            
+            const replyToAvatar = document.getElementById('replyToAvatar');
+            if (replyToAvatar) {
+                replyToAvatar.addEventListener('click', () => {
+                    const userId = modal.dataset.replyToUserId;
+                    if (userId) {
+                        window.location.href = `profile.html?id=${userId}`;
+                    }
+                });
+            }
         }
     }
     
@@ -2972,6 +3490,22 @@ class SocialManager {
             <div id="replies-${comment.id}" class="replies-container" style="display: none;"></div>
         `;
         
+        // Add profile navigation to avatar and name
+        const avatar = commentDiv.querySelector('.comment-avatar');
+        const name = commentDiv.querySelector('.comment-info strong');
+        
+        const navigateToProfile = () => {
+            window.location.href = `profile.html?id=${comment.userId}`;
+        };
+        
+        if (avatar) {
+            avatar.addEventListener('click', navigateToProfile);
+        }
+        
+        if (name) {
+            name.addEventListener('click', navigateToProfile);
+        }
+        
         const replyBtn = commentDiv.querySelector('.reply-btn');
         if (replyBtn) {
             replyBtn.addEventListener('click', (e) => {
@@ -3086,6 +3620,22 @@ class SocialManager {
             </div>
         `;
         
+        // Add profile navigation
+        const avatar = replyDiv.querySelector('.reply-avatar');
+        const name = replyDiv.querySelector('.reply-info strong');
+        
+        const navigateToProfile = () => {
+            window.location.href = `profile.html?id=${reply.userId}`;
+        };
+        
+        if (avatar) {
+            avatar.addEventListener('click', navigateToProfile);
+        }
+        
+        if (name) {
+            name.addEventListener('click', navigateToProfile);
+        }
+        
         const replyToReplyBtn = replyDiv.querySelector('.reply-to-reply-btn');
         if (replyToReplyBtn) {
             replyToReplyBtn.addEventListener('click', (e) => {
@@ -3112,7 +3662,7 @@ class SocialManager {
         return div.innerHTML;
     }
 
-    // ==================== CREATE POST WITH VIDEO/POLL - FIXED ====================
+    // ==================== CREATE POST WITH VIDEO/POLL ====================
     
     setupCreatePost() {
         const form = document.getElementById('createPostForm');
@@ -3165,6 +3715,7 @@ class SocialManager {
         
         this.setupPollBuilder();
         this.setupReplyModal();
+        this.setupPostModal();
     }
 
     async previewMedia(file) {
@@ -3305,7 +3856,6 @@ class SocialManager {
                 submitBtn.disabled = false;
             }
 
-            // CRITICAL FIX: Properly set post data based on media type
             const postData = {
                 userId: this.currentUser.uid,
                 caption: caption,
@@ -3318,17 +3868,16 @@ class SocialManager {
             };
 
             if (mediaData) {
-                // Use the mediaType from the upload response
                 if (mediaData.type === 'video' || mediaData.mediaType === 'video') {
                     postData.videoUrl = mediaData.url;
                     postData.mediaType = 'video';
                     postData.videoThumbnail = mediaData.thumbnail || mediaData.videoThumbnail;
                     postData.videoDuration = mediaData.duration || 0;
-                    postData.imageUrl = null; // Explicitly set to null
+                    postData.imageUrl = null;
                 } else {
                     postData.imageUrl = mediaData.url;
                     postData.mediaType = 'image';
-                    postData.videoUrl = null; // Explicitly set to null
+                    postData.videoUrl = null;
                 }
             }
 
@@ -3643,6 +4192,11 @@ class SocialManager {
     }
 
     showNotification(message, type = 'info') {
+        // Remove vote notifications
+        if (message.includes('Voted') || message.includes('Vote')) {
+            return;
+        }
+        
         const existingNotifications = document.querySelectorAll('.custom-notification');
         existingNotifications.forEach(notification => notification.remove());
         
@@ -3700,7 +4254,7 @@ class SocialManager {
             case 'alert-triangle':
                 return '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>';
             default:
-                return '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>';
+                return '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
         }
     }
 
@@ -3821,9 +4375,9 @@ class SocialManager {
             <div class="post-item" data-post-id="${post.id}">
                 <div class="post-header">
                     <img src="${user.profileImage || 'images/default-profile.jpg'}" 
-                         alt="${user.name}" class="post-author-avatar">
+                         alt="${user.name}" class="post-author-avatar" style="cursor: pointer;">
                     <div class="post-author-info">
-                        <h4>${user.name || 'Unknown User'}</h4>
+                        <h4 style="color: #ff4b6e; cursor: pointer;">${user.name || 'Unknown User'}</h4>
                         <span class="post-time">${this.formatTime(post.createdAt)}</span>
                     </div>
                 </div>
@@ -3870,6 +4424,22 @@ class SocialManager {
                 </div>
             </div>
         `;
+
+        // Add profile navigation
+        const avatar = container.querySelector('.post-author-avatar');
+        const name = container.querySelector('.post-author-info h4');
+        
+        const navigateToProfile = () => {
+            window.location.href = `profile.html?id=${post.userId}`;
+        };
+        
+        if (avatar) {
+            avatar.addEventListener('click', navigateToProfile);
+        }
+        
+        if (name) {
+            name.addEventListener('click', navigateToProfile);
+        }
 
         const likeBtn = container.querySelector('.like-btn');
         const sendCommentBtn = container.querySelector('#sendCommentBtn');
@@ -3993,7 +4563,6 @@ class SocialManager {
         
         let postContentHTML = '';
         
-        // CRITICAL FIX: Check media type correctly
         if (post.mediaType === 'poll' && post.poll) {
             const pollContainer = this.createPollElement(post, postId);
             postContentHTML = pollContainer.outerHTML;
@@ -4105,6 +4674,44 @@ class SocialManager {
             </div>
         `;
 
+        // Add profile navigation
+        const avatar = postDiv.querySelector('.post-author-avatar');
+        const name = postDiv.querySelector('.post-author-info h4');
+        
+        const navigateToProfile = () => {
+            window.location.href = `profile.html?id=${userId}`;
+        };
+        
+        if (avatar) {
+            avatar.addEventListener('click', navigateToProfile);
+        }
+        
+        if (name) {
+            name.addEventListener('click', navigateToProfile);
+        }
+
+        // Add click to open modal (except on interactive elements)
+        postDiv.addEventListener('click', (e) => {
+            // Don't open modal if clicking on buttons, inputs, or links
+            const target = e.target;
+            const isInteractive = 
+                target.closest('.vote-btn') ||
+                target.closest('.post-action') ||
+                target.closest('.follow-btn-post') ||
+                target.closest('.comment-input') ||
+                target.closest('.send-comment-btn') ||
+                target.closest('.reply-btn') ||
+                target.closest('.view-replies-btn') ||
+                target.closest('.poll-option-content') ||
+                target.closest('.video-thumbnail-container') ||
+                target.closest('.post-author-avatar') ||
+                target.closest('.post-author-info h4');
+            
+            if (!isInteractive) {
+                this.openPostModal(postId);
+            }
+        });
+
         const likeBtn = postDiv.querySelector('.like-btn');
         const commentBtn = postDiv.querySelector('.comment-btn');
         const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
@@ -4114,19 +4721,29 @@ class SocialManager {
         const downvoteBtn = postDiv.querySelector('.vote-btn.down');
 
         if (likeBtn) {
-            likeBtn.addEventListener('click', () => this.handleLike(postId, likeBtn));
+            likeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleLike(postId, likeBtn);
+            });
         }
 
         if (commentBtn) {
-            commentBtn.addEventListener('click', () => this.toggleComments(postId));
+            commentBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleComments(postId);
+            });
         }
 
         if (sendCommentBtn) {
-            sendCommentBtn.addEventListener('click', () => this.handleAddComment(postId, false));
+            sendCommentBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleAddComment(postId, false);
+            });
         }
 
         if (commentInput) {
             commentInput.addEventListener('keypress', (e) => {
+                e.stopPropagation();
                 if (e.key === 'Enter') {
                     this.handleAddComment(postId, false);
                 }
@@ -4134,11 +4751,17 @@ class SocialManager {
         }
 
         if (upvoteBtn) {
-            upvoteBtn.addEventListener('click', () => this.handleVote(postId, 'up', upvoteBtn));
+            upvoteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleVote(postId, 'up', upvoteBtn);
+            });
         }
 
         if (downvoteBtn) {
-            downvoteBtn.addEventListener('click', () => this.handleVote(postId, 'down', downvoteBtn));
+            downvoteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleVote(postId, 'down', downvoteBtn);
+            });
         }
 
         if (followBtn) {
@@ -4533,6 +5156,22 @@ class SocialManager {
                 ${isFollowing ? 'Following' : 'Follow'}
             </button>
         `;
+
+        // Add profile navigation
+        const avatar = card.querySelector('.pymk-profile-avatar');
+        const name = card.querySelector('.pymk-profile-name');
+        
+        const navigateToProfile = () => {
+            window.location.href = `profile.html?id=${user.id}`;
+        };
+        
+        if (avatar) {
+            avatar.addEventListener('click', navigateToProfile);
+        }
+        
+        if (name) {
+            name.addEventListener('click', navigateToProfile);
+        }
         
         return card;
     }
@@ -4924,7 +5563,37 @@ class SocialManager {
             this.loadProfileSocialLinks(profileId);
             this.loadAllProfilePosts(profileId);
             this.setupProfileButtons(profileId);
+            
+            // Fix for profile page reactions
+            this.setupProfileReactions();
         }
+    }
+    
+    setupProfileReactions() {
+        // Add event delegation for reactions on profile page
+        document.addEventListener('click', (e) => {
+            const likeBtn = e.target.closest('.like-btn');
+            const voteBtn = e.target.closest('.vote-btn');
+            
+            if (likeBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const postId = likeBtn.dataset.postId;
+                if (postId) {
+                    this.handleLike(postId, likeBtn);
+                }
+            }
+            
+            if (voteBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const postId = voteBtn.dataset.postId;
+                const voteType = voteBtn.dataset.vote;
+                if (postId && voteType) {
+                    this.handleVote(postId, voteType, voteBtn);
+                }
+            }
+        });
     }
 
     async loadProfileSocialLinks(profileId) {
@@ -5093,9 +5762,9 @@ class SocialManager {
         postDiv.innerHTML = `
             <div class="post-header">
                 <img src="${userData.profileImage || 'images/default-profile.jpg'}" 
-                     alt="${userData.name}" class="post-author-avatar">
+                     alt="${userData.name}" class="post-author-avatar" style="cursor: pointer;">
                 <div class="post-author-info">
-                    <h4>${userData.name || 'Unknown User'}</h4>
+                    <h4 style="color: #ff4b6e; cursor: pointer;">${userData.name || 'Unknown User'}</h4>
                     <span class="post-time">${this.formatTime(post.createdAt)}</span>
                 </div>
             </div>
@@ -5137,6 +5806,16 @@ class SocialManager {
             </div>
         `;
 
+        // Add profile navigation
+        const avatar = postDiv.querySelector('.post-author-avatar');
+        const name = postDiv.querySelector('.post-author-info h4');
+        
+        // Don't navigate if already on profile page
+        if (window.location.pathname.includes('profile.html')) {
+            if (avatar) avatar.style.cursor = 'default';
+            if (name) name.style.cursor = 'default';
+        }
+
         const likeBtn = postDiv.querySelector('.like-btn');
         const commentBtn = postDiv.querySelector('.comment-btn');
         const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
@@ -5145,19 +5824,29 @@ class SocialManager {
         const downvoteBtn = postDiv.querySelector('.vote-btn.down');
 
         if (likeBtn) {
-            likeBtn.addEventListener('click', () => this.handleLike(postId, likeBtn));
+            likeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleLike(postId, likeBtn);
+            });
         }
 
         if (commentBtn) {
-            commentBtn.addEventListener('click', () => this.toggleComments(postId));
+            commentBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleComments(postId);
+            });
         }
 
         if (sendCommentBtn) {
-            sendCommentBtn.addEventListener('click', () => this.handleAddComment(postId, false));
+            sendCommentBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleAddComment(postId, false);
+            });
         }
 
         if (commentInput) {
             commentInput.addEventListener('keypress', (e) => {
+                e.stopPropagation();
                 if (e.key === 'Enter') {
                     this.handleAddComment(postId, false);
                 }
@@ -5165,11 +5854,17 @@ class SocialManager {
         }
 
         if (upvoteBtn) {
-            upvoteBtn.addEventListener('click', () => this.handleVote(postId, 'up', upvoteBtn));
+            upvoteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleVote(postId, 'up', upvoteBtn);
+            });
         }
 
         if (downvoteBtn) {
-            downvoteBtn.addEventListener('click', () => this.handleVote(postId, 'down', downvoteBtn));
+            downvoteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleVote(postId, 'down', downvoteBtn);
+            });
         }
 
         this.loadComments(postId);
