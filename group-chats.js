@@ -1,5 +1,6 @@
-// groupchat.js - Enhanced with IndexedDB Caching, Service Worker Support & Voice Notes
+// groupchat.js - Enhanced with Service Worker Support & Voice Notes
 // COMPLETE VERSION WITH XP SYSTEM INTEGRATED - LOADS ACTUAL USER XP DATA
+// FIXED: Removed IndexedDB caching from chat page to ensure chronological message order
 // FIXED: Message ordering on initial load and cancel voice recording button
 
 import { 
@@ -143,8 +144,7 @@ const firebaseConfig = {
     storageBucket: "crypto-6517d.firebasestorage.app",
     messagingSenderId: "60263975159",
     appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-  };
-
+};
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -169,370 +169,6 @@ const AVATAR_OPTIONS = [
 
 // ==================== XP DATA CACHE ====================
 const xpDataCache = new Map(); // userId -> { xpData, expiry }
-
-// ==================== INDEXEDDB CACHE SYSTEM ====================
-class GroupIndexedDBCache {
-    constructor() {
-        this.dbName = 'GroupChatDB';
-        this.dbVersion = 4;
-        this.db = null;
-    }
-
-    async init() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.dbName, this.dbVersion);
-            
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => {
-                this.db = request.result;
-                resolve(this.db);
-            };
-            
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-                
-                // Create object stores
-                if (!db.objectStoreNames.contains('groups')) {
-                    const groupsStore = db.createObjectStore('groups', { keyPath: 'id' });
-                    groupsStore.createIndex('lastActivity', 'lastActivity', { unique: false });
-                    groupsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('group_messages')) {
-                    const messagesStore = db.createObjectStore('group_messages', { 
-                        keyPath: 'id',
-                        autoIncrement: true 
-                    });
-                    messagesStore.createIndex('groupId_timestamp', ['groupId', 'timestamp'], { unique: false });
-                    messagesStore.createIndex('groupId', 'groupId', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('group_members')) {
-                    const membersStore = db.createObjectStore('group_members', { keyPath: ['groupId', 'userId'] });
-                    membersStore.createIndex('groupId', 'groupId', { unique: false });
-                    membersStore.createIndex('userId', 'userId', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('user_profiles')) {
-                    db.createObjectStore('user_profiles', { keyPath: 'userId' });
-                }
-                if (!db.objectStoreNames.contains('private_messages')) {
-                    const privateStore = db.createObjectStore('private_messages', { 
-                        keyPath: 'id',
-                        autoIncrement: true 
-                    });
-                    privateStore.createIndex('chatId_timestamp', ['chatId', 'timestamp'], { unique: false });
-                }
-                if (!db.objectStoreNames.contains('private_chats')) {
-                    db.createObjectStore('private_chats', { keyPath: 'chatId' });
-                }
-                if (!db.objectStoreNames.contains('message_reactions')) {
-                    const reactionsStore = db.createObjectStore('message_reactions', { 
-                        keyPath: ['groupId', 'messageId', 'emoji'] 
-                    });
-                    reactionsStore.createIndex('messageId', 'messageId', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('offline_messages')) {
-                    db.createObjectStore('offline_messages', { 
-                        keyPath: 'localId',
-                        autoIncrement: true 
-                    });
-                }
-                if (!db.objectStoreNames.contains('typing_status')) {
-                    db.createObjectStore('typing_status', { keyPath: ['groupId', 'userId'] });
-                }
-                if (!db.objectStoreNames.contains('voice_notes')) {
-                    db.createObjectStore('voice_notes', { keyPath: 'localId' });
-                }
-                // Add XP data store
-                if (!db.objectStoreNames.contains('xp_data')) {
-                    db.createObjectStore('xp_data', { keyPath: 'userId' });
-                }
-            };
-        });
-    }
-
-    async set(storeName, data) {
-        if (!this.db) await this.init();
-        
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.put(data);
-            
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve(request.result);
-        });
-    }
-
-    async get(storeName, key) {
-        if (!this.db) await this.init();
-        
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore(storeName);
-            const request = store.get(key);
-            
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve(request.result);
-        });
-    }
-
-    async getAll(storeName, indexName = null, queryValue = null) {
-        if (!this.db) await this.init();
-        
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore(storeName);
-            let request;
-            
-            if (indexName && queryValue) {
-                const index = store.index(indexName);
-                const range = IDBKeyRange.only(queryValue);
-                request = index.getAll(range);
-            } else if (indexName && Array.isArray(queryValue)) {
-                const index = store.index(indexName);
-                const range = IDBKeyRange.bound(queryValue[0], queryValue[1]);
-                request = index.getAll(range);
-            } else {
-                request = store.getAll();
-            }
-            
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve(request.result || []);
-        });
-    }
-
-    async delete(storeName, key) {
-        if (!this.db) await this.init();
-        
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.delete(key);
-            
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve();
-        });
-    }
-
-    async clear(storeName) {
-        if (!this.db) await this.init();
-        
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.clear();
-            
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve();
-        });
-    }
-
-    // Group-specific methods
-    async setGroup(group) {
-        await this.init();
-        return await this.set('groups', {
-            ...group,
-            cachedAt: Date.now()
-        });
-    }
-
-    async getGroup(groupId) {
-        await this.init();
-        return await this.get('groups', groupId);
-    }
-
-    async setGroups(groups) {
-        await this.init();
-        for (const group of groups) {
-            await this.setGroup(group);
-        }
-    }
-
-    async getGroups() {
-        await this.init();
-        return await this.getAll('groups');
-    }
-
-    // Message-specific methods
-    async setGroupMessages(groupId, messages) {
-        await this.init();
-        const transaction = this.db.transaction(['group_messages'], 'readwrite');
-        const store = transaction.objectStore('group_messages');
-        
-        // Clear existing messages for this group
-        const index = store.index('groupId');
-        const range = IDBKeyRange.only(groupId);
-        const clearRequest = index.getAll(range);
-        
-        clearRequest.onsuccess = async () => {
-            const existingMessages = clearRequest.result;
-            for (const msg of existingMessages) {
-                store.delete(msg.id);
-            }
-            
-            // Add new messages
-            for (const message of messages) {
-                await store.put({
-                    ...message,
-                    groupId: groupId,
-                    cachedAt: Date.now()
-                });
-            }
-        };
-    }
-
-    async getGroupMessages(groupId, limit = 50) {
-        await this.init();
-        const messages = await this.getAll('group_messages', 'groupId_timestamp', [groupId, IDBKeyRange.upperBound(Date.now())]);
-        return messages
-            .sort((a, b) => (a.timestamp?.getTime?.() || a.timestamp) - (b.timestamp?.getTime?.() || b.timestamp))
-            .slice(-limit);
-    }
-
-    async addGroupMessage(groupId, message) {
-        await this.init();
-        return await this.set('group_messages', {
-            ...message,
-            groupId: groupId,
-            cachedAt: Date.now(),
-            id: message.id || `${groupId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        });
-    }
-
-    // Member-specific methods
-    async setGroupMembers(groupId, members) {
-        await this.init();
-        const transaction = this.db.transaction(['group_members'], 'readwrite');
-        const store = transaction.objectStore('group_members');
-        
-        // Clear existing members for this group
-        const index = store.index('groupId');
-        const range = IDBKeyRange.only(groupId);
-        const clearRequest = index.getAll(range);
-        
-        clearRequest.onsuccess = async () => {
-            const existingMembers = clearRequest.result;
-            for (const member of existingMembers) {
-                store.delete([groupId, member.userId || member.id]);
-            }
-            
-            // Add new members
-            for (const member of members) {
-                await store.put({
-                    ...member,
-                    groupId: groupId,
-                    userId: member.userId || member.id,
-                    cachedAt: Date.now()
-                });
-            }
-        };
-    }
-
-    async getGroupMembers(groupId) {
-        await this.init();
-        return await this.getAll('group_members', 'groupId', groupId);
-    }
-
-    // Offline message queuing
-    async queueOfflineMessage(message) {
-        await this.init();
-        const localId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        return await this.set('offline_messages', {
-            ...message,
-            localId: localId,
-            status: 'pending',
-            createdAt: Date.now(),
-            attempts: 0
-        });
-    }
-
-    async getOfflineMessages() {
-        await this.init();
-        return await this.getAll('offline_messages');
-    }
-
-    async updateOfflineMessageStatus(localId, status, error = null) {
-        await this.init();
-        const message = await this.get('offline_messages', localId);
-        if (message) {
-            message.status = status;
-            message.error = error;
-            message.attempts = (message.attempts || 0) + 1;
-            message.lastAttempt = Date.now();
-            await this.set('offline_messages', message);
-        }
-    }
-
-    async removeOfflineMessage(localId) {
-        await this.init();
-        return await this.delete('offline_messages', localId);
-    }
-
-    // Typing status
-    async setTypingStatus(groupId, userId, status) {
-        await this.init();
-        return await this.set('typing_status', {
-            groupId: groupId,
-            userId: userId,
-            isTyping: status,
-            timestamp: Date.now()
-        });
-    }
-
-    async getTypingStatus(groupId) {
-        await this.init();
-        const allStatus = await this.getAll('typing_status');
-        return allStatus.filter(s => s.groupId === groupId && s.isTyping);
-    }
-
-    async clearOldTypingStatus() {
-        await this.init();
-        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-        const allStatus = await this.getAll('typing_status');
-        
-        for (const status of allStatus) {
-            if (status.timestamp < fiveMinutesAgo) {
-                await this.delete('typing_status', [status.groupId, status.userId]);
-            }
-        }
-    }
-
-    // Voice notes
-    async saveVoiceNote(voiceNote) {
-        await this.init();
-        return await this.set('voice_notes', {
-            ...voiceNote,
-            cachedAt: Date.now()
-        });
-    }
-
-    async getVoiceNotes(groupId) {
-        await this.init();
-        const allNotes = await this.getAll('voice_notes');
-        return allNotes.filter(note => note.groupId === groupId);
-    }
-
-    async deleteVoiceNote(localId) {
-        await this.init();
-        return await this.delete('voice_notes', localId);
-    }
-
-    // XP data methods
-    async setXPData(userId, xpData) {
-        await this.init();
-        return await this.set('xp_data', {
-            userId: userId,
-            ...xpData,
-            cachedAt: Date.now()
-        });
-    }
-
-    async getXPData(userId) {
-        await this.init();
-        return await this.get('xp_data', userId);
-    }
-}
-
-const indexedDBCache = new GroupIndexedDBCache();
 
 // ==================== SERVICE WORKER REGISTRATION ====================
 async function registerServiceWorker() {
@@ -667,9 +303,6 @@ async function handleNetworkOnline() {
     
     showNotification('Connection restored', 'success', 2000);
     
-    // Sync offline messages
-    await syncOfflineMessages();
-    
     // Refresh data when coming online
     if (window.groupChat && window.groupChat.currentGroupId) {
         window.groupChat.clearGroupCache(window.groupChat.currentGroupId);
@@ -686,40 +319,6 @@ function handleNetworkOffline() {
     }
     
     showNotification('No internet connection - working offline', 'offline', 5000);
-}
-
-async function syncOfflineMessages() {
-    try {
-        const offlineMessages = await indexedDBCache.getOfflineMessages();
-        const pendingMessages = offlineMessages.filter(m => m.status === 'pending');
-        
-        if (pendingMessages.length > 0) {
-            showNotification(`Sending ${pendingMessages.length} offline messages...`, 'info');
-            
-            for (const message of pendingMessages) {
-                try {
-                    // Re-send the message
-                    // You'll need to implement the actual resend logic based on your message structure
-                    console.log('Resending offline message:', message);
-                    
-                    // Update status to sent
-                    await indexedDBCache.updateOfflineMessageStatus(message.localId, 'sent');
-                    
-                } catch (error) {
-                    console.error('Error resending offline message:', error);
-                    await indexedDBCache.updateOfflineMessageStatus(message.localId, 'failed', error.message);
-                }
-            }
-            
-            // Clean up sent messages
-            const sentMessages = offlineMessages.filter(m => m.status === 'sent');
-            for (const message of sentMessages) {
-                await indexedDBCache.removeOfflineMessage(message.localId);
-            }
-        }
-    } catch (error) {
-        console.error('Error syncing offline messages:', error);
-    }
 }
 
 // ==================== NOTIFICATION SYSTEM ====================
@@ -800,19 +399,6 @@ async function getUserXPData(userId) {
             return cached.data;
         }
         
-        // Check IndexedDB
-        if (indexedDBCache) {
-            const indexedDBCached = await indexedDBCache.getXPData(userId);
-            if (indexedDBCached && indexedDBCached.cachedAt > Date.now() - 5 * 60 * 1000) {
-                // Cache for 5 minutes
-                xpDataCache.set(userId, {
-                    data: indexedDBCached,
-                    expiry: Date.now() + 5 * 60 * 1000
-                });
-                return indexedDBCached;
-            }
-        }
-        
         // Fetch from Firebase
         const xpRef = doc(db, 'xpData', userId);
         const xpSnap = await getDoc(xpRef);
@@ -835,11 +421,6 @@ async function getUserXPData(userId) {
             data: xpData,
             expiry: Date.now() + 5 * 60 * 1000
         });
-        
-        // Update IndexedDB
-        if (indexedDBCache) {
-            await indexedDBCache.setXPData(userId, xpData);
-        }
         
         return xpData;
     } catch (error) {
@@ -1114,11 +695,14 @@ class GroupChat {
         this.recordingDuration = 0;
         this.currentVoiceNote = null;
         
-        // Track processed messages
-        this.processedMessageIdsByGroup = new Map();
-        this.pageProcessedMessageIdsByGroup = new Map();
-        this.initialLoadComplete = new Map(); // Track if initial load is complete for a group
-        this.pendingMessageUpdates = new Map(); // Queue messages during initial load
+        // Track processed messages - FIXED: Better tracking system
+        this.messageTracker = new Map(); // groupId -> { 
+            // processedIds: Set of message IDs that have been processed
+            // allMessages: Array of all messages sorted by timestamp
+            // initialLoadComplete: boolean
+            // pendingUpdates: Array of pending messages
+            // hasLoadedFirebase: boolean
+        // }
         
         // Track offline status
         this.isOnline = navigator.onLine;
@@ -1593,16 +1177,6 @@ class GroupChat {
                 
                 // Stop all tracks
                 stream.getTracks().forEach(track => track.stop());
-                
-                // Save to IndexedDB
-                if (indexedDBCache) {
-                    indexedDBCache.saveVoiceNote({
-                        ...this.currentVoiceNote,
-                        groupId: this.currentGroupId,
-                        localId: `voice_${Date.now()}`,
-                        status: 'recorded'
-                    });
-                }
                 
                 // Show preview
                 this.showVoiceNotePreview();
@@ -2230,13 +1804,6 @@ class GroupChat {
                 console.log('Page visible - resetting connection state');
                 this.connectionState = 'reconnecting';
                 this.isOnline = navigator.onLine;
-                
-                // Clear page processed messages for current group when page becomes visible
-                if (this.currentGroupId) {
-                    const pageProcessedKey = `page_processed_${this.currentGroupId}`;
-                    this.pageProcessedMessageIdsByGroup.delete(pageProcessedKey);
-                    console.log('Cleared page processed messages for group:', this.currentGroupId);
-                }
             }
         });
     }
@@ -2250,12 +1817,6 @@ class GroupChat {
             // When coming back online, clear sent message IDs to allow resending
             this.sentMessageIds.clear();
             this.pendingMessages.clear();
-            
-            // Clear page processed messages for current group
-            if (this.currentGroupId) {
-                const pageProcessedKey = `page_processed_${this.currentGroupId}`;
-                this.pageProcessedMessageIdsByGroup.delete(pageProcessedKey);
-            }
         });
         
         window.addEventListener('offline', () => {
@@ -2293,38 +1854,9 @@ class GroupChat {
         this.cache.joinedGroups.delete(groupId);
         this.cache.messageReactions.delete(groupId);
         
-        // Also clear processed messages for this group
-        if (this.processedMessageIdsByGroup) {
-            this.processedMessageIdsByGroup.delete(`processed_${groupId}`);
-        }
-        
-        // Clear page processed messages for this group
-        if (this.pageProcessedMessageIdsByGroup) {
-            this.pageProcessedMessageIdsByGroup.delete(`page_processed_${groupId}`);
-        }
-        
-        // Clear initial load flag
-        if (this.initialLoadComplete) {
-            this.initialLoadComplete.delete(groupId);
-        }
-        
-        // Clear pending updates
-        if (this.pendingMessageUpdates) {
-            this.pendingMessageUpdates.delete(groupId);
-        }
-        
-        // Clear IndexedDB cache for this group
-        if (indexedDBCache) {
-            // We'll handle IndexedDB clearing asynchronously
-            setTimeout(async () => {
-                try {
-                    await indexedDBCache.clear('group_messages');
-                    await indexedDBCache.clear('group_members');
-                    console.log('Cleared IndexedDB cache for group:', groupId);
-                } catch (error) {
-                    console.error('Error clearing IndexedDB cache:', error);
-                }
-            }, 0);
+        // Clear message tracker for this group
+        if (this.messageTracker) {
+            this.messageTracker.delete(groupId);
         }
     }
 
@@ -2352,24 +1884,9 @@ class GroupChat {
         this.lastDisplayedMessages.clear();
         this.messageRenderQueue = [];
         
-        // Clear processed messages for all groups
-        if (this.processedMessageIdsByGroup) {
-            this.processedMessageIdsByGroup.clear();
-        }
-        
-        // Clear page processed messages for all groups
-        if (this.pageProcessedMessageIdsByGroup) {
-            this.pageProcessedMessageIdsByGroup.clear();
-        }
-        
-        // Clear initial load flags
-        if (this.initialLoadComplete) {
-            this.initialLoadComplete.clear();
-        }
-        
-        // Clear pending updates
-        if (this.pendingMessageUpdates) {
-            this.pendingMessageUpdates.clear();
+        // Clear message tracker
+        if (this.messageTracker) {
+            this.messageTracker.clear();
         }
         
         // Clear XP cache
@@ -2393,24 +1910,6 @@ class GroupChat {
         
         // Clear local storage cache
         cache.clear();
-        
-        // Clear IndexedDB cache
-        if (indexedDBCache) {
-            setTimeout(async () => {
-                try {
-                    await indexedDBCache.clear('groups');
-                    await indexedDBCache.clear('group_messages');
-                    await indexedDBCache.clear('group_members');
-                    await indexedDBCache.clear('user_profiles');
-                    await indexedDBCache.clear('offline_messages');
-                    await indexedDBCache.clear('voice_notes');
-                    await indexedDBCache.clear('xp_data');
-                    console.log('Cleared all IndexedDB cache');
-                } catch (error) {
-                    console.error('Error clearing IndexedDB cache:', error);
-                }
-            }, 0);
-        }
     }
 
     async loadBlockedUsers() {
@@ -2672,20 +2171,6 @@ class GroupChat {
                     return cached;
                 }
             }
-            
-            // Then check IndexedDB cache
-            if (!forceRefresh && indexedDBCache) {
-                try {
-                    const indexedDBCached = await indexedDBCache.get('user_profiles', userId);
-                    if (indexedDBCached) {
-                        // Update memory cache
-                        this.setCachedItem(cacheKey, indexedDBCached, this.cache.userProfiles, CACHE_DURATION.USER_PROFILE);
-                        return indexedDBCached;
-                    }
-                } catch (error) {
-                    console.log('Error getting user profile from IndexedDB:', error);
-                }
-            }
 
             const userRef = doc(db, 'group_users', userId);
             const userSnap = await getDoc(userRef);
@@ -2709,19 +2194,6 @@ class GroupChat {
                 
                 // Update memory cache
                 this.setCachedItem(cacheKey, profile, this.cache.userProfiles, CACHE_DURATION.USER_PROFILE);
-                
-                // Update IndexedDB cache
-                if (indexedDBCache) {
-                    try {
-                        await indexedDBCache.set('user_profiles', {
-                            userId: userId,
-                            ...profile,
-                            cachedAt: Date.now()
-                        });
-                    } catch (error) {
-                        console.log('Error caching user profile in IndexedDB:', error);
-                    }
-                }
                 
                 return profile;
             }
@@ -3478,19 +2950,6 @@ class GroupChat {
                 if (cachedMembers) {
                     return cachedMembers;
                 }
-                
-                // Try IndexedDB cache
-                if (indexedDBCache) {
-                    try {
-                        const indexedDBCached = await indexedDBCache.getGroupMembers(groupId);
-                        if (indexedDBCached && indexedDBCached.length > 0) {
-                            this.setCachedItem(groupId, indexedDBCached, this.cache.groupMembers, CACHE_DURATION.MEMBERS_LIST);
-                            return indexedDBCached;
-                        }
-                    } catch (error) {
-                        console.log('Error getting group members from IndexedDB:', error);
-                    }
-                }
             }
 
             const membersRef = collection(db, 'groups', groupId, 'members');
@@ -3536,15 +2995,6 @@ class GroupChat {
             }
             
             this.setCachedItem(groupId, members, this.cache.groupMembers, CACHE_DURATION.MEMBERS_LIST);
-            
-            // Update IndexedDB cache
-            if (indexedDBCache) {
-                try {
-                    await indexedDBCache.setGroupMembers(groupId, members);
-                } catch (error) {
-                    console.log('Error caching group members in IndexedDB:', error);
-                }
-            }
             
             return members;
         } catch (error) {
@@ -3895,15 +3345,6 @@ class GroupChat {
             
             this.setCachedItem(groupRef.id, group, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
             
-            // Update IndexedDB cache
-            if (indexedDBCache) {
-                try {
-                    await indexedDBCache.setGroup(group);
-                } catch (error) {
-                    console.log('Error caching group in IndexedDB:', error);
-                }
-            }
-            
             return { groupId: groupRef.id, inviteLink: inviteLink };
         } catch (error) {
             console.error('Error creating group:', error);
@@ -3964,19 +3405,6 @@ class GroupChat {
             if (!forceRefresh) {
                 const cached = this.getCachedItem(cacheKey, this.cache.allGroups);
                 if (cached) return cached;
-                
-                // Try IndexedDB cache
-                if (indexedDBCache) {
-                    try {
-                        const indexedDBCached = await indexedDBCache.getGroups();
-                        if (indexedDBCached && indexedDBCached.length > 0) {
-                            this.setCachedItem(cacheKey, indexedDBCached, this.cache.allGroups, CACHE_DURATION.GROUP_DATA);
-                            return indexedDBCached;
-                        }
-                    } catch (error) {
-                        console.log('Error getting groups from IndexedDB:', error);
-                    }
-                }
             }
 
             const groupsRef = collection(db, 'groups');
@@ -4000,15 +3428,6 @@ class GroupChat {
             
             this.setCachedItem(cacheKey, groups, this.cache.allGroups, CACHE_DURATION.GROUP_DATA);
             
-            // Update IndexedDB cache
-            if (indexedDBCache) {
-                try {
-                    await indexedDBCache.setGroups(groups);
-                } catch (error) {
-                    console.log('Error caching groups in IndexedDB:', error);
-                }
-            }
-            
             return groups;
         } catch (error) {
             console.error('Error getting groups:', error);
@@ -4022,19 +3441,6 @@ class GroupChat {
                 const cachedGroup = this.getCachedItem(groupId, this.cache.groupData);
                 if (cachedGroup) {
                     return cachedGroup;
-                }
-                
-                // Try IndexedDB cache
-                if (indexedDBCache) {
-                    try {
-                        const indexedDBCached = await indexedDBCache.getGroup(groupId);
-                        if (indexedDBCached) {
-                            this.setCachedItem(groupId, indexedDBCached, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
-                            return indexedDBCached;
-                        }
-                    } catch (error) {
-                        console.log('Error getting group from IndexedDB:', error);
-                    }
                 }
             }
             
@@ -4051,15 +3457,6 @@ class GroupChat {
                 };
                 
                 this.setCachedItem(groupId, group, this.cache.groupData, CACHE_DURATION.GROUP_DATA);
-                
-                // Update IndexedDB cache
-                if (indexedDBCache) {
-                    try {
-                        await indexedDBCache.setGroup(group);
-                    } catch (error) {
-                        console.log('Error caching group in IndexedDB:', error);
-                    }
-                }
                 
                 return group;
             }
@@ -4185,15 +3582,6 @@ class GroupChat {
         try {
             if (!this.firebaseUser || !this.currentUser || !groupId) return;
             
-            // Update local cache first
-            if (indexedDBCache) {
-                try {
-                    await indexedDBCache.setTypingStatus(groupId, this.firebaseUser.uid, true);
-                } catch (error) {
-                    console.log('Error caching typing status:', error);
-                }
-            }
-            
             const typingRef = doc(db, 'groups', groupId, 'typing', this.firebaseUser.uid);
             
             await setDoc(typingRef, {
@@ -4229,15 +3617,6 @@ class GroupChat {
         try {
             if (!this.firebaseUser || !groupId) return;
             
-            // Update local cache
-            if (indexedDBCache) {
-                try {
-                    await indexedDBCache.setTypingStatus(groupId, this.firebaseUser.uid, false);
-                } catch (error) {
-                    console.log('Error caching typing status:', error);
-                }
-            }
-            
             const typingRef = doc(db, 'groups', groupId, 'typing', this.firebaseUser.uid);
             
             await setDoc(typingRef, {
@@ -4272,24 +3651,6 @@ class GroupChat {
                     console.log('Error unsubscribing from typing:', err);
                 }
                 this.unsubscribeTyping = null;
-            }
-            
-            // First check IndexedDB cache for offline typing status
-            if (indexedDBCache) {
-                setTimeout(async () => {
-                    try {
-                        const cachedTyping = await indexedDBCache.getTypingStatus(groupId);
-                        if (cachedTyping && cachedTyping.length > 0) {
-                            callback(cachedTyping.map(status => ({
-                                userId: status.userId,
-                                userName: status.userName || 'User',
-                                timestamp: status.timestamp
-                            })));
-                        }
-                    } catch (error) {
-                        console.log('Error getting cached typing status:', error);
-                    }
-                }, 100);
             }
             
             const typingRef = collection(db, 'groups', groupId, 'typing');
@@ -4331,28 +3692,7 @@ class GroupChat {
         try {
             // Check if offline before sending
             if (!this.isOnline) {
-                // Queue message for offline sending
-                const offlineMessage = {
-                    groupId: groupId,
-                    text: text,
-                    imageUrl: imageUrl,
-                    videoUrl: videoUrl,
-                    voiceUrl: voiceUrl,
-                    duration: duration,
-                    replyTo: replyTo,
-                    senderId: this.firebaseUser.uid,
-                    senderName: this.currentUser.name,
-                    senderAvatar: this.currentUser.avatar,
-                    type: text ? 'text' : (imageUrl ? 'image' : videoUrl ? 'video' : voiceUrl ? 'voice' : 'text'),
-                    timestamp: new Date()
-                };
-                
-                if (indexedDBCache) {
-                    await indexedDBCache.queueOfflineMessage(offlineMessage);
-                    showNotification('Message queued for sending when you reconnect', 'offline');
-                }
-                
-                throw new Error('You are offline. Message will be sent when you reconnect.');
+                throw new Error('You are offline. Please check your network connection.');
             }
             
             if (!this.firebaseUser || !this.currentUser) {
@@ -4448,19 +3788,6 @@ class GroupChat {
             
             await this.updateLastActive(groupId);
             
-            // Cache the message in IndexedDB
-            if (indexedDBCache) {
-                try {
-                    await indexedDBCache.addGroupMessage(groupId, {
-                        id: finalMessageId,
-                        ...messageData,
-                        timestamp: new Date()
-                    });
-                } catch (error) {
-                    console.log('Error caching message in IndexedDB:', error);
-                }
-            }
-            
             this.clearReply();
             
             this.pendingMessages.delete(messageId);
@@ -4518,19 +3845,6 @@ class GroupChat {
             // First check memory cache
             const cached = this.getCachedItem(cacheKey, this.cache.messages);
             if (cached) return cached;
-            
-            // Then check IndexedDB cache
-            if (indexedDBCache) {
-                try {
-                    const indexedDBCached = await indexedDBCache.getGroupMessages(groupId, limitCount);
-                    if (indexedDBCached && indexedDBCached.length > 0) {
-                        this.setCachedItem(cacheKey, indexedDBCached, this.cache.messages, 30000);
-                        return indexedDBCached;
-                    }
-                } catch (error) {
-                    console.log('Error getting messages from IndexedDB:', error);
-                }
-            }
 
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(limitCount));
@@ -4550,15 +3864,6 @@ class GroupChat {
             
             this.setCachedItem(cacheKey, result, this.cache.messages, 30000);
             
-            // Update IndexedDB cache
-            if (indexedDBCache) {
-                try {
-                    await indexedDBCache.setGroupMessages(groupId, result);
-                } catch (error) {
-                    console.log('Error caching messages in IndexedDB:', error);
-                }
-            }
-            
             return result;
         } catch (error) {
             console.error('Error getting messages:', error);
@@ -4566,7 +3871,7 @@ class GroupChat {
         }
     }
 
-    // FIXED: listenToMessages method - properly track processed messages and maintain order on initial load
+    // FIXED: listenToMessages method - Single source of truth approach
     listenToMessages(groupId, callback) {
         try {
             // First, unsubscribe from any existing listener
@@ -4582,137 +3887,72 @@ class GroupChat {
             const messagesRef = collection(db, 'groups', groupId, 'messages');
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
             
-            // Create a unique key for this group's page processed messages
-            const pageProcessedKey = `page_processed_${groupId}`;
-            
-            // Initialize processed message IDs for this page if not exists
-            if (!this.pageProcessedMessageIdsByGroup.has(pageProcessedKey)) {
-                this.pageProcessedMessageIdsByGroup.set(pageProcessedKey, new Set());
+            // Initialize message tracker for this group if not exists
+            if (!this.messageTracker.has(groupId)) {
+                this.messageTracker.set(groupId, {
+                    processedIds: new Set(),
+                    allMessages: [],
+                    hasLoadedFirebase: false,
+                    initialLoadComplete: false,
+                    pendingUpdates: []
+                });
             }
             
-            const pageProcessedIds = this.pageProcessedMessageIdsByGroup.get(pageProcessedKey);
-            
-            // Track if initial load is complete
-            if (!this.initialLoadComplete.has(groupId)) {
-                this.initialLoadComplete.set(groupId, false);
-            }
-            
-            // Initialize pending updates queue
-            if (!this.pendingMessageUpdates.has(groupId)) {
-                this.pendingMessageUpdates.set(groupId, []);
-            }
-            
-            // Store all messages for sorting
-            let allMessages = [];
-            let isFirstSnapshot = true;
-            
-            // Load cached messages from IndexedDB first
-            if (indexedDBCache) {
-                setTimeout(async () => {
-                    try {
-                        const cachedMessages = await indexedDBCache.getGroupMessages(groupId, 50);
-                        if (cachedMessages && cachedMessages.length > 0) {
-                            console.log('Loaded', cachedMessages.length, 'cached messages from IndexedDB');
-                            
-                            // Sort cached messages by timestamp
-                            const sortedCached = cachedMessages.sort((a, b) => {
-                                const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
-                                const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
-                                return timeA - timeB;
-                            });
-                            
-                            // Store messages
-                            allMessages = sortedCached;
-                            
-                            // Mark these messages as processed
-                            sortedCached.forEach(msg => {
-                                if (msg.id) {
-                                    pageProcessedIds.add(msg.id);
-                                }
-                            });
-                            
-                            // Send cached messages immediately
-                            callback([...allMessages]);
-                        }
-                    } catch (error) {
-                        console.log('Error loading cached messages:', error);
-                    }
-                }, 100);
-            }
+            const tracker = this.messageTracker.get(groupId);
             
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 try {
-                    // Check if we're offline or page is hidden
+                    // Check if we're offline
                     if (!this.isOnline || this.connectionState === 'inactive') {
                         console.log('Skipping message processing - offline or inactive');
                         return;
                     }
                     
                     const newMessages = [];
-                    const newMessageIds = [];
                     
                     snapshot.forEach(doc => {
                         const data = doc.data();
                         const messageId = doc.id;
                         
                         // Check if we've already processed this message ID
-                        if (!pageProcessedIds.has(messageId)) {
+                        if (!tracker.processedIds.has(messageId)) {
                             newMessages.push({ 
                                 id: messageId, 
                                 ...data,
                                 timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : data.timestamp) : new Date()
                             });
-                            newMessageIds.push(messageId);
                         }
                     });
                     
                     if (newMessages.length > 0) {
                         // Mark these messages as processed
-                        newMessageIds.forEach(id => pageProcessedIds.add(id));
-                        
-                        // Add to all messages
-                        allMessages = [...allMessages, ...newMessages].sort((a, b) => {
-                            const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
-                            const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
-                            return timeA - timeB;
+                        newMessages.forEach(msg => {
+                            if (msg.id) tracker.processedIds.add(msg.id);
                         });
                         
-                        if (isFirstSnapshot) {
-                            console.log('Firebase initial load:', allMessages.length, 'messages');
-                            isFirstSnapshot = false;
-                            
-                            // Mark initial load as complete
-                            this.initialLoadComplete.set(groupId, true);
-                            
-                            // Process any pending updates
-                            const pendingUpdates = this.pendingMessageUpdates.get(groupId) || [];
-                            if (pendingUpdates.length > 0) {
-                                allMessages = [...allMessages, ...pendingUpdates].sort((a, b) => {
-                                    const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
-                                    const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
-                                    return timeA - timeB;
-                                });
-                                this.pendingMessageUpdates.set(groupId, []);
-                            }
+                        // Add to all messages
+                        tracker.allMessages = [...tracker.allMessages, ...newMessages]
+                            .sort((a, b) => {
+                                const timeA = a.timestamp?.getTime?.() || a.timestamp || 0;
+                                const timeB = b.timestamp?.getTime?.() || b.timestamp || 0;
+                                return timeA - timeB;
+                            });
+                        
+                        // Mark that Firebase has loaded
+                        if (!tracker.hasLoadedFirebase) {
+                            tracker.hasLoadedFirebase = true;
+                            console.log('Firebase initial load complete:', tracker.allMessages.length, 'messages');
                         } else {
                             console.log('New messages received:', newMessages.length);
                         }
                         
-                        // Always send messages in correct chronological order
-                        callback([...allMessages]);
+                        // ALWAYS send the complete sorted array
+                        callback([...tracker.allMessages]);
                         
-                        // Cache new messages in IndexedDB
-                        if (indexedDBCache) {
-                            setTimeout(async () => {
-                                try {
-                                    for (const message of newMessages) {
-                                        await indexedDBCache.addGroupMessage(groupId, message);
-                                    }
-                                } catch (error) {
-                                    console.log('Error caching new messages in IndexedDB:', error);
-                                }
-                            }, 0);
-                        }
+                    } else if (!tracker.hasLoadedFirebase && tracker.allMessages.length > 0) {
+                        // If Firebase loaded but no new messages, still send the cached ones
+                        tracker.hasLoadedFirebase = true;
+                        callback([...tracker.allMessages]);
                     }
                 } catch (error) {
                     console.error('Error processing messages:', error);
@@ -4750,21 +3990,6 @@ class GroupChat {
                 this.unsubscribeMembers = null;
             }
             
-            // Load cached members from IndexedDB first
-            if (indexedDBCache) {
-                setTimeout(async () => {
-                    try {
-                        const cachedMembers = await indexedDBCache.getGroupMembers(groupId);
-                        if (cachedMembers && cachedMembers.length > 0) {
-                            console.log('Loaded', cachedMembers.length, 'cached members from IndexedDB');
-                            callback(cachedMembers);
-                        }
-                    } catch (error) {
-                        console.log('Error loading cached members:', error);
-                    }
-                }, 100);
-            }
-            
             const membersRef = collection(db, 'groups', groupId, 'members');
             const q = query(membersRef, orderBy('joinedAt', 'asc'));
             
@@ -4782,17 +4007,6 @@ class GroupChat {
                 callback(members);
                 
                 this.setCachedItem(groupId, members, this.cache.groupMembers, CACHE_DURATION.MEMBERS_LIST);
-                
-                // Update IndexedDB cache
-                if (indexedDBCache) {
-                    setTimeout(async () => {
-                        try {
-                            await indexedDBCache.setGroupMembers(groupId, members);
-                        } catch (error) {
-                            console.log('Error caching members in IndexedDB:', error);
-                        }
-                    }, 0);
-                }
             }, (error) => {
                 console.error('Error in members listener:', error);
             });
@@ -5969,24 +5183,9 @@ class GroupChat {
         this.sentMessageIds.clear();
         this.pendingMessages.clear();
         
-        // Clear processed messages for all groups
-        if (this.processedMessageIdsByGroup) {
-            this.processedMessageIdsByGroup.clear();
-        }
-        
-        // Clear page processed messages for all groups
-        if (this.pageProcessedMessageIdsByGroup) {
-            this.pageProcessedMessageIdsByGroup.clear();
-        }
-        
-        // Clear initial load flags
-        if (this.initialLoadComplete) {
-            this.initialLoadComplete.clear();
-        }
-        
-        // Clear pending updates
-        if (this.pendingMessageUpdates) {
-            this.pendingMessageUpdates.clear();
+        // Clear message tracker for all groups
+        if (this.messageTracker) {
+            this.messageTracker.clear();
         }
         
         // Clear typing timeouts
@@ -6286,16 +5485,9 @@ function initGroupPage() {
     window.currentGroupId = groupId;
     groupChat.currentGroupId = groupId;
     
-    // Clear the page processed messages for this group when page loads
-    const pageProcessedKey = `page_processed_${groupId}`;
-    if (groupChat.pageProcessedMessageIdsByGroup && groupChat.pageProcessedMessageIdsByGroup.has(pageProcessedKey)) {
-        groupChat.pageProcessedMessageIdsByGroup.get(pageProcessedKey).clear();
-        console.log('Cleared page processed messages for group:', groupId);
-    }
-    
-    // Reset initial load flag for this group
-    if (groupChat.initialLoadComplete) {
-        groupChat.initialLoadComplete.set(groupId, false);
+    // Reset message tracker for this group
+    if (groupChat.messageTracker) {
+        groupChat.messageTracker.delete(groupId);
     }
     
     // Create typing indicator at top
