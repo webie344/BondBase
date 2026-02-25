@@ -89,7 +89,7 @@ function createGunSound(ctx) {
 
 class Game {
     constructor() {
-        console.log('🎮 MULTIPLAYER BATTLE ROYALE - INITIALIZING');
+        console.log('🎮 MULTIPLAYER BATTLE ROYALE - FREE FIRE STYLE');
         
         // Firebase references
         this.currentUser = null;
@@ -104,6 +104,10 @@ class Game {
         
         // Player meshes dictionary
         this.otherPlayers = new Map();
+        
+        // Interpolation for smooth movement
+        this.playerPositions = new Map(); // Store target positions for interpolation
+        this.lastUpdateTime = Date.now();
         
         // Initialize ALL arrays
         this.buildings = [];
@@ -133,9 +137,10 @@ class Game {
             document.body.appendChild(this.renderer.domElement);
         }
         
-        // Game state
+        // Game state - 3-shot kill system (33 damage per shot)
         this.health = 100;
         this.maxHealth = 100;
+        this.damagePerShot = 33; // 3 shots to kill
         this.score = 0;
         this.kills = 0;
         this.ammo = 30;
@@ -337,7 +342,7 @@ class Game {
                         console.error('Heartbeat error:', error);
                     });
                 }
-            }, 100);
+            }, 50); // Increased to 20 updates per second for smoother movement
             
             onSnapshot(collection(db, 'game_hits'), (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
@@ -387,99 +392,236 @@ class Game {
         });
     }
     
+    createRealisticPlayer(color = 0x3366ff, playerName = 'Player') {
+        const group = new THREE.Group();
+        
+        // Body (more realistic proportions)
+        const bodyGeo = new THREE.CylinderGeometry(0.4, 0.45, 1.6, 8);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: color, emissive: 0x111111 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = 0.8;
+        body.castShadow = true;
+        body.receiveShadow = true;
+        group.add(body);
+        
+        // Chest armor/vest detail
+        const chestGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.6, 8);
+        const chestMat = new THREE.MeshStandardMaterial({ color: 0x444444, emissive: 0x111111 });
+        const chest = new THREE.Mesh(chestGeo, chestMat);
+        chest.position.y = 1.1;
+        chest.castShadow = true;
+        chest.receiveShadow = true;
+        group.add(chest);
+        
+        // Head (more detailed)
+        const headGeo = new THREE.SphereGeometry(0.28, 16, 16);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa, emissive: 0x221100 });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.position.y = 1.8;
+        head.castShadow = true;
+        head.receiveShadow = true;
+        group.add(head);
+        
+        // Helmet/hat
+        const hatGeo = new THREE.ConeGeometry(0.25, 0.15, 8);
+        const hatMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const hat = new THREE.Mesh(hatGeo, hatMat);
+        hat.position.y = 2.0;
+        hat.castShadow = true;
+        group.add(hat);
+        
+        // Eyes
+        const eyeGeo = new THREE.SphereGeometry(0.05, 8);
+        const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const pupilMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+        
+        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+        leftEye.position.set(-0.1, 1.88, 0.25);
+        group.add(leftEye);
+        
+        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+        rightEye.position.set(0.1, 1.88, 0.25);
+        group.add(rightEye);
+        
+        const leftPupil = new THREE.Mesh(new THREE.SphereGeometry(0.025, 4), pupilMat);
+        leftPupil.position.set(-0.1, 1.88, 0.3);
+        group.add(leftPupil);
+        
+        const rightPupil = new THREE.Mesh(new THREE.SphereGeometry(0.025, 4), pupilMat);
+        rightPupil.position.set(0.1, 1.88, 0.3);
+        group.add(rightPupil);
+        
+        // Arms with better shape
+        const armGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.0, 6);
+        const armMat = new THREE.MeshStandardMaterial({ color: color });
+        
+        // Left arm
+        const leftArm = new THREE.Mesh(armGeo, armMat);
+        leftArm.position.set(-0.5, 1.3, 0);
+        leftArm.rotation.z = 0.2;
+        leftArm.rotation.x = 0.2;
+        leftArm.castShadow = true;
+        group.add(leftArm);
+        
+        // Right arm
+        const rightArm = new THREE.Mesh(armGeo, armMat);
+        rightArm.position.set(0.5, 1.3, 0);
+        rightArm.rotation.z = -0.2;
+        rightArm.rotation.x = -0.1;
+        rightArm.castShadow = true;
+        group.add(rightArm);
+        
+        // Hands
+        const handGeo = new THREE.SphereGeometry(0.1, 4);
+        const handMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
+        
+        const leftHand = new THREE.Mesh(handGeo, handMat);
+        leftHand.position.set(-0.7, 0.85, 0.1);
+        leftHand.castShadow = true;
+        group.add(leftHand);
+        
+        const rightHand = new THREE.Mesh(handGeo, handMat);
+        rightHand.position.set(0.7, 0.85, -0.1);
+        rightHand.castShadow = true;
+        group.add(rightHand);
+        
+        // Legs
+        const legGeo = new THREE.CylinderGeometry(0.15, 0.15, 1.0, 6);
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+        
+        // Left leg
+        const leftLeg = new THREE.Mesh(legGeo, legMat);
+        leftLeg.position.set(-0.2, 0.4, 0);
+        leftLeg.castShadow = true;
+        group.add(leftLeg);
+        
+        // Right leg
+        const rightLeg = new THREE.Mesh(legGeo, legMat);
+        rightLeg.position.set(0.2, 0.4, 0);
+        rightLeg.castShadow = true;
+        group.add(rightLeg);
+        
+        // Shoes
+        const shoeGeo = new THREE.BoxGeometry(0.2, 0.1, 0.4);
+        const shoeMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+        
+        const leftShoe = new THREE.Mesh(shoeGeo, shoeMat);
+        leftShoe.position.set(-0.2, 0.0, 0.1);
+        leftShoe.castShadow = true;
+        group.add(leftShoe);
+        
+        const rightShoe = new THREE.Mesh(shoeGeo, shoeMat);
+        rightShoe.position.set(0.2, 0.0, 0.1);
+        rightShoe.castShadow = true;
+        group.add(rightShoe);
+        
+        // Backpack
+        const backpackGeo = new THREE.BoxGeometry(0.4, 0.5, 0.2);
+        const backpackMat = new THREE.MeshStandardMaterial({ color: 0x884422 });
+        const backpack = new THREE.Mesh(backpackGeo, backpackMat);
+        backpack.position.set(0, 1.0, -0.3);
+        backpack.castShadow = true;
+        group.add(backpack);
+        
+        // Weapon (pistol) on hip
+        const pistolGeo = new THREE.BoxGeometry(0.1, 0.1, 0.3);
+        const pistolMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const pistol = new THREE.Mesh(pistolGeo, pistolMat);
+        pistol.position.set(0.3, 0.7, 0.2);
+        pistol.rotation.y = 0.5;
+        pistol.castShadow = true;
+        group.add(pistol);
+        
+        // Name tag (HTML element)
+        const nameTagDiv = document.createElement('div');
+        nameTagDiv.className = 'player-name-tag';
+        nameTagDiv.textContent = playerName;
+        nameTagDiv.style.cssText = `
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-family: 'Arial', sans-serif;
+            font-weight: bold;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            border: 2px solid ${this.rgbToHex(color)};
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            z-index: 1000;
+            text-shadow: 1px 1px 2px black;
+        `;
+        document.body.appendChild(nameTagDiv);
+        
+        // Health bar
+        const healthBarDiv = document.createElement('div');
+        healthBarDiv.className = 'player-health-bar';
+        healthBarDiv.style.cssText = `
+            position: absolute;
+            width: 50px;
+            height: 8px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 4px;
+            transform: translate(-50%, -50%);
+            overflow: hidden;
+            border: 1px solid white;
+            z-index: 1000;
+        `;
+        const healthFill = document.createElement('div');
+        healthFill.className = 'health-fill';
+        healthFill.style.cssText = `
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #00ff00, #33ff33);
+            transition: width 0.2s;
+        `;
+        healthBarDiv.appendChild(healthFill);
+        document.body.appendChild(healthBarDiv);
+        
+        return {
+            mesh: group,
+            nameTag: nameTagDiv,
+            healthBar: healthBarDiv,
+            healthFill: healthFill
+        };
+    }
+    
+    rgbToHex(color) {
+        return '#' + color.toString(16).padStart(6, '0');
+    }
+    
     updateOrAddPlayer(playerData) {
         let playerObj = this.otherPlayers.get(playerData.id);
         
         if (!playerObj) {
-            const group = new THREE.Group();
-            
-            const bodyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.8);
-            const bodyMat = new THREE.MeshStandardMaterial({ color: this.getPlayerColor(playerData.id) });
-            const body = new THREE.Mesh(bodyGeo, bodyMat);
-            body.position.y = 0.9;
-            body.castShadow = true;
-            body.receiveShadow = true;
-            group.add(body);
-            
-            const headGeo = new THREE.SphereGeometry(0.3);
-            const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
-            const head = new THREE.Mesh(headGeo, headMat);
-            head.position.y = 1.8 + 0.3;
-            head.castShadow = true;
-            head.receiveShadow = true;
-            group.add(head);
-            
-            const armGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8);
-            const armMat = new THREE.MeshStandardMaterial({ color: this.getPlayerColor(playerData.id) });
-            
-            const leftArm = new THREE.Mesh(armGeo, armMat);
-            leftArm.position.set(-0.5, 1.4, 0);
-            leftArm.rotation.z = 0.2;
-            leftArm.castShadow = true;
-            group.add(leftArm);
-            
-            const rightArm = new THREE.Mesh(armGeo, armMat);
-            rightArm.position.set(0.5, 1.4, 0);
-            rightArm.rotation.z = -0.2;
-            rightArm.castShadow = true;
-            group.add(rightArm);
-            
-            const nameTagDiv = document.createElement('div');
-            nameTagDiv.className = 'player-name-tag';
-            nameTagDiv.textContent = playerData.name || 'Player';
-            nameTagDiv.style.cssText = `
-                position: absolute;
-                background: rgba(0,0,0,0.7);
-                color: white;
-                padding: 2px 8px;
-                border-radius: 10px;
-                font-size: 12px;
-                font-family: Arial, sans-serif;
-                pointer-events: none;
-                transform: translate(-50%, -50%);
-                white-space: nowrap;
-                border: 1px solid ${this.getPlayerColor(playerData.id)};
-                z-index: 1000;
-            `;
-            document.body.appendChild(nameTagDiv);
-            
-            const healthBarDiv = document.createElement('div');
-            healthBarDiv.className = 'player-health-bar';
-            healthBarDiv.style.cssText = `
-                position: absolute;
-                width: 40px;
-                height: 5px;
-                background: rgba(0,0,0,0.5);
-                border-radius: 2px;
-                transform: translate(-50%, -50%);
-                overflow: hidden;
-                z-index: 1000;
-            `;
-            const healthFill = document.createElement('div');
-            healthFill.className = 'health-fill';
-            healthFill.style.cssText = `
-                height: 100%;
-                width: 100%;
-                background: #00ff00;
-                transition: width 0.2s;
-            `;
-            healthBarDiv.appendChild(healthFill);
-            document.body.appendChild(healthBarDiv);
+            const newPlayer = this.createRealisticPlayer(
+                this.getPlayerColor(playerData.id),
+                playerData.name || 'Player'
+            );
             
             playerObj = {
-                mesh: group,
-                nameTag: nameTagDiv,
-                healthBar: healthBarDiv,
-                healthFill: healthFill,
-                data: playerData
+                mesh: newPlayer.mesh,
+                nameTag: newPlayer.nameTag,
+                healthBar: newPlayer.healthBar,
+                healthFill: newPlayer.healthFill,
+                data: playerData,
+                targetPosition: playerData.position ? new THREE.Vector3(
+                    playerData.position.x,
+                    playerData.position.y,
+                    playerData.position.z
+                ) : new THREE.Vector3(0, 1.8, 0),
+                targetRotation: playerData.rotation ? playerData.rotation.y : 0
             };
             
-            this.scene.add(group);
+            this.scene.add(playerObj.mesh);
             this.otherPlayers.set(playerData.id, playerObj);
         }
         
+        // Store target positions for smooth interpolation
         if (playerData.position) {
-            playerObj.mesh.position.set(
+            playerObj.targetPosition = new THREE.Vector3(
                 playerData.position.x,
                 playerData.position.y,
                 playerData.position.z
@@ -487,19 +629,20 @@ class Game {
         }
         
         if (playerData.rotation) {
-            playerObj.mesh.rotation.y = playerData.rotation.y;
+            playerObj.targetRotation = playerData.rotation.y;
         }
         
+        // Update health bar immediately
         if (playerData.health !== undefined) {
             const healthPercent = Math.max(0, playerData.health) / 100;
             playerObj.healthFill.style.width = `${healthPercent * 100}%`;
             
             if (healthPercent > 0.6) {
-                playerObj.healthFill.style.background = '#00ff00';
+                playerObj.healthFill.style.background = 'linear-gradient(90deg, #00ff00, #33ff33)';
             } else if (healthPercent > 0.3) {
-                playerObj.healthFill.style.background = '#ffff00';
+                playerObj.healthFill.style.background = 'linear-gradient(90deg, #ffff00, #ffaa00)';
             } else {
-                playerObj.healthFill.style.background = '#ff0000';
+                playerObj.healthFill.style.background = 'linear-gradient(90deg, #ff0000, #ff3333)';
             }
         }
         
@@ -526,7 +669,8 @@ class Game {
             hash = ((hash << 5) - hash) + playerId.charCodeAt(i);
             hash |= 0;
         }
-        const colors = [0xff3333, 0x33ff33, 0x3333ff, 0xffff33, 0xff33ff, 0x33ffff, 0xff9933, 0x9933ff];
+        // Brighter, more game-like colors
+        const colors = [0xff4444, 0x44ff44, 0x4444ff, 0xffff44, 0xff44ff, 0x44ffff, 0xff8844, 0x8844ff];
         return colors[Math.abs(hash) % colors.length];
     }
     
@@ -561,16 +705,19 @@ class Game {
         this.killMessages.forEach(msg => {
             const item = document.createElement('div');
             item.style.cssText = `
-                background: rgba(0,0,0,0.7);
+                background: rgba(0,0,0,0.8);
                 color: white;
-                padding: 4px 8px;
-                margin-bottom: 4px;
-                border-radius: 4px;
-                font-size: 12px;
-                border-left: 3px solid #ff3333;
+                padding: 6px 12px;
+                margin-bottom: 5px;
+                border-radius: 20px;
+                font-size: 13px;
+                font-weight: bold;
+                border-left: 4px solid #ff4444;
                 animation: slideIn 0.3s ease;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+                text-align: center;
             `;
-            item.innerHTML = `<span style="color: #ffaa00;">${msg.killer}</span> 🔫 <span style="color: #ff3333;">${msg.victim}</span>`;
+            item.innerHTML = `<span style="color: #ffaa00;">${msg.killer}</span> 🔫 <span style="color: #ff4444;">${msg.victim}</span>`;
             this.killFeedElement.appendChild(item);
         });
     }
@@ -582,15 +729,17 @@ class Game {
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: ${type === 'error' ? '#ff3333' : type === 'success' ? '#33ff33' : '#3333ff'};
+            background: ${type === 'error' ? '#ff4444' : type === 'success' ? '#44ff44' : '#4444ff'};
             color: white;
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 30px;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
+            font-family: 'Arial', sans-serif;
+            font-size: 16px;
+            font-weight: bold;
             z-index: 10000;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             animation: fadeInOut 3s ease;
+            text-shadow: 1px 1px 2px black;
         `;
         notification.textContent = message;
         document.body.appendChild(notification);
@@ -614,24 +763,50 @@ class Game {
         const fill = new THREE.DirectionalLight(0x88aacc, 0.6);
         fill.position.set(-30, 20, -40);
         this.scene.add(fill);
+        
+        // Add point lights for better ambiance
+        const pointLight1 = new THREE.PointLight(0xffaa00, 0.5, 50);
+        pointLight1.position.set(10, 10, 10);
+        this.scene.add(pointLight1);
+        
+        const pointLight2 = new THREE.PointLight(0x44aaff, 0.5, 50);
+        pointLight2.position.set(-10, 5, -10);
+        this.scene.add(pointLight2);
     }
     
     setupGround() {
+        // Grass ground with texture-like appearance
         const groundGeo = new THREE.CircleGeometry(100, 64);
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x3a7e3a, roughness: 0.7 });
+        const groundMat = new THREE.MeshStandardMaterial({ 
+            color: 0x3a7e3a, 
+            roughness: 0.8,
+            emissive: 0x112211
+        });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = 0;
         ground.receiveShadow = true;
         this.scene.add(ground);
         
+        // Add some random grass patches
+        for (let i = 0; i < 50; i++) {
+            const patchGeo = new THREE.CircleGeometry(0.5 + Math.random(), 3);
+            const patchMat = new THREE.MeshStandardMaterial({ color: 0x4a8e4a });
+            const patch = new THREE.Mesh(patchGeo, patchMat);
+            patch.rotation.x = -Math.PI / 2;
+            patch.position.set((Math.random()-0.5)*80, 0.01, (Math.random()-0.5)*80);
+            patch.receiveShadow = true;
+            this.scene.add(patch);
+        }
+        
+        // Paths
         for (let i = 0; i < 10; i++) {
             const path = new THREE.Mesh(
                 new THREE.PlaneGeometry(4, 4),
-                new THREE.MeshStandardMaterial({ color: 0x555555 })
+                new THREE.MeshStandardMaterial({ color: 0x6b4c3b })
             );
             path.rotation.x = -Math.PI/2;
-            path.position.set((Math.random()-0.5)*60, 0.01, (Math.random()-0.5)*60);
+            path.position.set((Math.random()-0.5)*60, 0.02, (Math.random()-0.5)*60);
             path.receiveShadow = true;
             this.scene.add(path);
         }
@@ -648,7 +823,7 @@ class Game {
         positions.forEach((pos, index) => {
             const width = 8;
             const depth = 8;
-            const height = 6;
+            const height = 6 + Math.random() * 2;
             const color = colors[index % colors.length];
             
             this.createDetailedBuilding(pos.x, pos.z, width, depth, height, color);
@@ -659,72 +834,85 @@ class Game {
         const group = new THREE.Group();
         const wallThick = 0.5;
         
+        // Main building structure with texture
+        const mainMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.7 });
+        const trimMat = new THREE.MeshStandardMaterial({ color: 0x884422, roughness: 0.5 });
+        
+        // Back wall
         const backWall = new THREE.Mesh(
             new THREE.BoxGeometry(w, h, wallThick),
-            new THREE.MeshStandardMaterial({ color })
+            mainMat
         );
         backWall.position.set(0, h/2, -d/2 + wallThick/2);
         backWall.castShadow = true; 
         backWall.receiveShadow = true;
         group.add(backWall);
         
+        // Left wall
         const leftWall = new THREE.Mesh(
             new THREE.BoxGeometry(wallThick, h, d),
-            new THREE.MeshStandardMaterial({ color })
+            mainMat
         );
         leftWall.position.set(-w/2 + wallThick/2, h/2, 0);
         leftWall.castShadow = true; 
         leftWall.receiveShadow = true;
         group.add(leftWall);
         
+        // Right wall
         const rightWall = new THREE.Mesh(
             new THREE.BoxGeometry(wallThick, h, d),
-            new THREE.MeshStandardMaterial({ color })
+            mainMat
         );
         rightWall.position.set(w/2 - wallThick/2, h/2, 0);
         rightWall.castShadow = true; 
         rightWall.receiveShadow = true;
         group.add(rightWall);
         
+        // Front wall with door
         const doorWidth = 2.0;
         const doorHeight = 2.5;
         
+        // Left part
         const frontLeft = new THREE.Mesh(
             new THREE.BoxGeometry((w - doorWidth)/2, h, wallThick),
-            new THREE.MeshStandardMaterial({ color })
+            mainMat
         );
         frontLeft.position.set(-(w + doorWidth)/4, h/2, d/2 - wallThick/2);
         frontLeft.castShadow = true; 
         frontLeft.receiveShadow = true;
         group.add(frontLeft);
         
+        // Right part
         const frontRight = new THREE.Mesh(
             new THREE.BoxGeometry((w - doorWidth)/2, h, wallThick),
-            new THREE.MeshStandardMaterial({ color })
+            mainMat
         );
         frontRight.position.set((w + doorWidth)/4, h/2, d/2 - wallThick/2);
         frontRight.castShadow = true; 
         frontRight.receiveShadow = true;
         group.add(frontRight);
         
+        // Top part above door
         const topDoor = new THREE.Mesh(
             new THREE.BoxGeometry(doorWidth, h - doorHeight, wallThick),
-            new THREE.MeshStandardMaterial({ color })
+            mainMat
         );
         topDoor.position.set(0, h - (h - doorHeight)/2, d/2 - wallThick/2);
         topDoor.castShadow = true; 
         topDoor.receiveShadow = true;
         group.add(topDoor);
         
+        // Door frame
         const doorFrame = new THREE.Mesh(
             new THREE.BoxGeometry(doorWidth + 0.2, doorHeight + 0.2, 0.3),
-            new THREE.MeshStandardMaterial({ color: 0x4a2c1a })
+            trimMat
         );
         doorFrame.position.set(0, doorHeight/2, d/2 - 0.1);
         doorFrame.castShadow = true; 
         doorFrame.receiveShadow = true;
         group.add(doorFrame);
         
+        // Door
         const door = new THREE.Mesh(
             new THREE.BoxGeometry(doorWidth - 0.2, doorHeight - 0.2, 0.2),
             new THREE.MeshStandardMaterial({ color: 0x8B5A2B })
@@ -734,6 +922,27 @@ class Game {
         door.receiveShadow = true;
         group.add(door);
         
+        // Windows
+        for (let i = 0; i < 3; i++) {
+            const windowMat = new THREE.MeshStandardMaterial({ color: 0x87CEEB, emissive: 0x112233 });
+            const windowFrame = new THREE.Mesh(
+                new THREE.BoxGeometry(1.0, 1.0, 0.2),
+                trimMat
+            );
+            windowFrame.position.set(-2 + i*2, 3, d/2 - 0.2);
+            windowFrame.castShadow = true;
+            group.add(windowFrame);
+            
+            const windowGlass = new THREE.Mesh(
+                new THREE.BoxGeometry(0.8, 0.8, 0.1),
+                windowMat
+            );
+            windowGlass.position.set(-2 + i*2, 3, d/2 - 0.1);
+            windowGlass.castShadow = true;
+            group.add(windowGlass);
+        }
+        
+        // Roof
         const roof = new THREE.Mesh(
             new THREE.ConeGeometry(Math.max(w, d) * 0.7, 2, 4),
             new THREE.MeshStandardMaterial({ color: 0x884422 })
@@ -744,13 +953,23 @@ class Game {
         roof.receiveShadow = true;
         group.add(roof);
         
+        // Chimney
+        const chimney = new THREE.Mesh(
+            new THREE.BoxGeometry(0.8, 2.5, 0.8),
+            new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+        );
+        chimney.position.set(2, h + 1.5, 1);
+        chimney.castShadow = true;
+        group.add(chimney);
+        
+        // Steps
         const stepGroup = new THREE.Group();
-        for (let s = 0; s < 4; s++) {
+        for (let s = 0; s < 3; s++) {
             const step = new THREE.Mesh(
-                new THREE.BoxGeometry(2.0, 0.3, 1.0),
+                new THREE.BoxGeometry(2.2 - s*0.2, 0.2, 1.0),
                 new THREE.MeshStandardMaterial({ color: 0xcccccc })
             );
-            step.position.set(0, 0.15 + s * 0.5, -1.5 + s * 0.8);
+            step.position.set(0, 0.1 + s * 0.3, 3.5 - s * 0.2);
             step.castShadow = true; 
             step.receiveShadow = true;
             stepGroup.add(step);
@@ -758,6 +977,7 @@ class Game {
         stepGroup.position.set(0, 0, 0);
         group.add(stepGroup);
         
+        // Interior floor
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(w - 1.5, d - 1.5),
             new THREE.MeshStandardMaterial({ color: 0x5a3a1a, side: THREE.DoubleSide })
@@ -785,30 +1005,77 @@ class Game {
     }
     
     createSimpleEnvironment() {
-        for (let i = 0; i < 20; i++) {
+        // Trees
+        for (let i = 0; i < 30; i++) {
             const treeGroup = new THREE.Group();
             
-            const trunk = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.5, 0.7, 2),
-                new THREE.MeshStandardMaterial({ color: 0x8B5A2B })
-            );
-            trunk.position.y = 1;
+            // Trunk
+            const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 3);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B5A2B });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 1.5;
             trunk.castShadow = true;
             trunk.receiveShadow = true;
             treeGroup.add(trunk);
             
-            const leaves = new THREE.Mesh(
-                new THREE.ConeGeometry(1.5, 2, 8),
-                new THREE.MeshStandardMaterial({ color: 0x2a8a2a })
-            );
-            leaves.position.y = 2.5;
-            leaves.castShadow = true;
-            leaves.receiveShadow = true;
-            treeGroup.add(leaves);
+            // Leaves (multiple layers)
+            const leafMat = new THREE.MeshStandardMaterial({ color: 0x2a8a2a });
             
-            treeGroup.position.set((Math.random()-0.5)*60, 0, (Math.random()-0.5)*60);
-            this.scene.add(treeGroup);
-            this.trees.push(treeGroup);
+            const leaves1 = new THREE.Mesh(new THREE.ConeGeometry(1.2, 1.5, 6), leafMat);
+            leaves1.position.y = 3.0;
+            leaves1.castShadow = true;
+            leaves1.receiveShadow = true;
+            treeGroup.add(leaves1);
+            
+            const leaves2 = new THREE.Mesh(new THREE.ConeGeometry(1.0, 1.2, 6), leafMat);
+            leaves2.position.y = 4.0;
+            leaves2.castShadow = true;
+            leaves2.receiveShadow = true;
+            treeGroup.add(leaves2);
+            
+            const leaves3 = new THREE.Mesh(new THREE.ConeGeometry(0.8, 1.0, 6), leafMat);
+            leaves3.position.y = 4.8;
+            leaves3.castShadow = true;
+            leaves3.receiveShadow = true;
+            treeGroup.add(leaves3);
+            
+            treeGroup.position.set((Math.random()-0.5)*70, 0, (Math.random()-0.5)*70);
+            
+            // Avoid placing trees too close to buildings
+            let tooClose = false;
+            for (let b of this.buildings) {
+                if (treeGroup.position.distanceTo(b.mesh.position) < 8) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            
+            if (!tooClose) {
+                this.scene.add(treeGroup);
+                this.trees.push(treeGroup);
+            }
+        }
+        
+        // Bushes
+        for (let i = 0; i < 40; i++) {
+            const bushGeo = new THREE.SphereGeometry(0.5 + Math.random()*0.5, 5);
+            const bushMat = new THREE.MeshStandardMaterial({ color: 0x3a8a3a });
+            const bush = new THREE.Mesh(bushGeo, bushMat);
+            bush.position.set((Math.random()-0.5)*70, 0.3, (Math.random()-0.5)*70);
+            bush.castShadow = true;
+            bush.receiveShadow = true;
+            
+            let tooClose = false;
+            for (let b of this.buildings) {
+                if (bush.position.distanceTo(b.mesh.position) < 6) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            
+            if (!tooClose) {
+                this.scene.add(bush);
+            }
         }
     }
     
@@ -838,6 +1105,7 @@ class Game {
         box.castShadow = true;
         box.receiveShadow = true;
         
+        // Add ammo label
         const canvas = document.createElement('canvas');
         canvas.width = 64;
         canvas.height = 64;
@@ -855,6 +1123,25 @@ class Game {
         label.position.set(0, 0.6, 0);
         box.add(label);
         
+        // Add ammo count text
+        const countCanvas = document.createElement('canvas');
+        countCanvas.width = 32;
+        countCanvas.height = 32;
+        const countCtx = countCanvas.getContext('2d');
+        countCtx.fillStyle = '#ffffff';
+        countCtx.font = 'bold 16px Arial';
+        countCtx.textAlign = 'center';
+        countCtx.textBaseline = 'middle';
+        countCtx.fillText('+' + ammoAmount, 16, 16);
+        
+        const countTexture = new THREE.CanvasTexture(countCanvas);
+        const countMat = new THREE.SpriteMaterial({ map: countTexture });
+        const countLabel = new THREE.Sprite(countMat);
+        countLabel.scale.set(0.4, 0.4, 0.4);
+        countLabel.position.set(0, -0.6, 0);
+        box.add(countLabel);
+        
+        // Add wireframe
         const edges = new THREE.EdgesGeometry(box.geometry);
         const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffff00 }));
         box.add(line);
@@ -1109,51 +1396,86 @@ class Game {
         const ctx = this.minimapCtx;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        ctx.fillStyle = '#0a0a1a';
+        // Background with grid
+        ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
+        // Draw grid
+        ctx.strokeStyle = '#334466';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= canvas.width; i += 20) {
+            ctx.beginPath();
+            ctx.moveTo(i, 0);
+            ctx.lineTo(i, canvas.height);
+            ctx.stroke();
+        }
+        for (let i = 0; i <= canvas.height; i += 20) {
+            ctx.beginPath();
+            ctx.moveTo(0, i);
+            ctx.lineTo(canvas.width, i);
+            ctx.stroke();
+        }
+        
+        // Draw buildings
         ctx.fillStyle = '#8B4513';
         this.buildings.forEach(b => {
             const x = (b.mesh.position.x + 50) * 2;
             const z = (b.mesh.position.z + 50) * 2;
             if (x > 0 && x < canvas.width && z > 0 && z < canvas.height) {
-                ctx.fillRect(x-3, z-3, 6, 6);
+                ctx.fillRect(x-4, z-4, 8, 8);
             }
         });
         
-        ctx.fillStyle = '#ff3333';
+        // Draw other players with direction
         this.otherPlayers.forEach((player) => {
             const x = (player.mesh.position.x + 50) * 2;
             const z = (player.mesh.position.z + 50) * 2;
             if (x > 0 && x < canvas.width && z > 0 && z < canvas.height) {
+                // Player dot
+                ctx.fillStyle = '#ff4444';
                 ctx.beginPath();
-                ctx.arc(x, z, 4, 0, 2*Math.PI);
+                ctx.arc(x, z, 5, 0, 2*Math.PI);
                 ctx.fill();
                 
+                // Direction indicator
                 ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.moveTo(x, z);
                 ctx.lineTo(
-                    x + Math.sin(player.mesh.rotation.y) * 8,
-                    z + Math.cos(player.mesh.rotation.y) * 8
+                    x + Math.sin(player.mesh.rotation.y) * 12,
+                    z + Math.cos(player.mesh.rotation.y) * 12
                 );
                 ctx.stroke();
             }
         });
         
+        // Draw ammo boxes
         ctx.fillStyle = '#ffaa00';
         this.ammoBoxes.forEach(box => {
             const x = (box.position.x + 50) * 2;
             const z = (box.position.z + 50) * 2;
             ctx.beginPath();
-            ctx.arc(x, z, 2, 0, 2*Math.PI);
+            ctx.arc(x, z, 3, 0, 2*Math.PI);
             ctx.fill();
         });
         
-        ctx.fillStyle = '#33ff33';
+        // Player (center)
+        ctx.fillStyle = '#44ff44';
         ctx.beginPath();
-        ctx.arc(canvas.width/2, canvas.height/2, 5, 0, 2*Math.PI);
+        ctx.arc(canvas.width/2, canvas.height/2, 6, 0, 2*Math.PI);
         ctx.fill();
+        
+        // Player direction
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(canvas.width/2, canvas.height/2);
+        ctx.lineTo(
+            canvas.width/2 + Math.sin(this.lookYaw) * 15,
+            canvas.height/2 + Math.cos(this.lookYaw) * 15
+        );
+        ctx.stroke();
     }
     
     startGame() {
@@ -1197,6 +1519,7 @@ class Game {
         const startPos = this.camera.position.clone();
         const rayLength = 30;
         
+        // Check for ammo box hits
         for (let i = this.ammoBoxes.length - 1; i >= 0; i--) {
             const box = this.ammoBoxes[i];
             const toBox = box.position.clone().sub(startPos);
@@ -1221,22 +1544,49 @@ class Game {
             }
         }
         
+        // Check for player hits
         for (let [playerId, playerObj] of this.otherPlayers) {
             if (!playerObj.mesh || !playerObj.data.alive) continue;
             
             const toPlayer = playerObj.mesh.position.clone().sub(startPos);
             
             if (direction.angleTo(toPlayer) < 0.2 && toPlayer.length() < rayLength) {
-                const distance = toPlayer.length();
-                const damage = Math.max(10, Math.floor(30 * (1 - distance / rayLength)));
+                // 3-shot kill system (33 damage per shot)
+                const damage = this.damagePerShot;
                 
                 this.registerHit(playerId, damage);
                 
-                this.showNotification(`Hit ${playerObj.data.name} for ${damage} damage!`, 'info');
+                // Show hit marker
+                this.showHitMarker();
+                
+                this.showNotification(`Hit ${playerObj.data.name} (${damage} DMG)`, 'info');
                 
                 break;
             }
         }
+    }
+    
+    showHitMarker() {
+        // Create hit marker effect
+        const marker = document.createElement('div');
+        marker.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 3px solid white;
+            border-radius: 50%;
+            animation: hitMarker 0.2s ease-out;
+            pointer-events: none;
+            z-index: 9999;
+        `;
+        document.body.appendChild(marker);
+        
+        setTimeout(() => {
+            marker.remove();
+        }, 200);
     }
     
     async registerHit(targetId, damage) {
@@ -1266,9 +1616,12 @@ class Game {
         
         this.updateUI();
         
+        // Screen damage effect
         document.body.style.backgroundColor = '#ff0000';
+        document.body.style.transition = 'background-color 0.1s';
         setTimeout(() => {
             document.body.style.backgroundColor = '';
+            document.body.style.transition = '';
         }, 100);
         
         if (this.firebaseReady && this.playerRef) {
@@ -1278,7 +1631,7 @@ class Game {
         if (this.health <= 0) {
             this.die();
         } else {
-            this.showNotification(`-${amount} HP`, 'error');
+            this.showNotification(`-${amount} HP from ${attackerName}`, 'error');
         }
     }
     
@@ -1303,13 +1656,14 @@ class Game {
                     kills: increment(1)
                 });
                 
-                await this.recordWin(this.lastDamagedBy.id, this.lastDamagedBy.name, 'kill');
+                await this.recordWin(this.lastDamagedBy.id, this.lastDamagedBy.name);
                 
             } catch (error) {
                 console.error('Error recording kill:', error);
             }
             
-            this.spawnAmmoBoxOnDeath(this.camera.position, 15);
+            // Spawn ammo box at death location
+            this.spawnAmmoBoxOnDeath(this.camera.position, 20);
             
             this.showNotification(`You were killed by ${this.lastDamagedBy.name}`, 'error');
         } else {
@@ -1334,7 +1688,7 @@ class Game {
         await this.recordDeath(this.playerId, this.playerName);
     }
     
-    async recordWin(playerId, playerName, type = 'kill') {
+    async recordWin(playerId, playerName) {
         if (!this.firebaseReady || !db) return;
         
         try {
@@ -1468,7 +1822,7 @@ class Game {
             clearInterval(this.heartbeatInterval);
         }
         
-        this.otherPlayers.forEach((playerObj, playerId) => {
+        this.otherPlayers.forEach((playerObj) => {
             this.scene.remove(playerObj.mesh);
             if (playerObj.nameTag && playerObj.nameTag.parentNode) {
                 playerObj.nameTag.remove();
@@ -1483,10 +1837,16 @@ class Game {
     animate() {
         requestAnimationFrame(() => this.animate());
         
+        const now = Date.now();
+        const deltaTime = Math.min(100, now - this.lastUpdateTime) / 1000; // Cap at 100ms
+        this.lastUpdateTime = now;
+        
         if (this.gameActive) {
+            // Smooth camera rotation
             this.camera.rotation.y = this.lookYaw;
             this.camera.rotation.x = this.lookPitch;
             
+            // Movement
             const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
             forward.y = 0; 
             forward.normalize();
@@ -1499,6 +1859,7 @@ class Game {
             if (Math.abs(this.moveY) > 0.05) moveDelta.addScaledVector(forward, this.moveY * this.moveSpeed);
             if (Math.abs(this.moveX) > 0.05) moveDelta.addScaledVector(right, this.moveX * this.moveSpeed);
             
+            // Head bob
             if (moveDelta.length() > 0.01) {
                 this.footstepTime += 0.15;
                 this.bobAmount = Math.sin(this.footstepTime) * 0.02;
@@ -1509,16 +1870,31 @@ class Game {
             this.camera.position.add(moveDelta);
             this.camera.position.y = 1.8 + Math.abs(this.bobAmount);
             
+            // Bounds
             this.camera.position.x = Math.max(-40, Math.min(40, this.camera.position.x));
             this.camera.position.z = Math.max(-40, Math.min(40, this.camera.position.z));
             
+            // Building collision
             if (this.insideBuilding && this.currentBuilding) {
                 const inter = this.currentBuilding.interior;
                 this.camera.position.x = Math.max(inter.minX + 0.5, Math.min(inter.maxX - 0.5, this.camera.position.x));
                 this.camera.position.z = Math.max(inter.minZ + 0.5, Math.min(inter.maxZ - 0.5, this.camera.position.z));
             }
             
+            // Smoothly interpolate other players' positions
             this.otherPlayers.forEach((playerObj) => {
+                if (playerObj.targetPosition) {
+                    // Smooth interpolation
+                    playerObj.mesh.position.lerp(playerObj.targetPosition, 0.3);
+                }
+                
+                if (playerObj.targetRotation !== undefined) {
+                    // Smooth rotation interpolation
+                    const rotDiff = playerObj.targetRotation - playerObj.mesh.rotation.y;
+                    playerObj.mesh.rotation.y += rotDiff * 0.3;
+                }
+                
+                // Update name tags and health bars
                 if (playerObj.nameTag && playerObj.mesh) {
                     const vector = playerObj.mesh.position.clone();
                     vector.y += 2.5;
@@ -1535,7 +1911,7 @@ class Game {
                         if (playerObj.healthBar) {
                             playerObj.healthBar.style.display = 'block';
                             playerObj.healthBar.style.left = x + 'px';
-                            playerObj.healthBar.style.top = (y + 15) + 'px';
+                            playerObj.healthBar.style.top = (y + 20) + 'px';
                         }
                     } else {
                         playerObj.nameTag.style.display = 'none';
@@ -1544,9 +1920,10 @@ class Game {
                 }
             });
             
+            // Animate ammo boxes
             this.ammoBoxes.forEach(box => {
-                box.rotation.y += 0.01;
-                box.position.y = 0.5 + Math.sin(Date.now() * 0.003) * 0.1;
+                box.rotation.y += 0.02;
+                box.position.y = 0.5 + Math.sin(Date.now() * 0.005) * 0.15;
             });
             
             this.updateMinimap();
@@ -1562,9 +1939,15 @@ window.onload = () => {
         window.game = game;
     } catch (error) {
         console.error('Failed to start game:', error);
+        document.body.innerHTML = `<div style="color: white; padding: 20px; text-align: center;">
+            <h1>Error Starting Game</h1>
+            <p>${error.message}</p>
+            <button onclick="location.reload()">Reload</button>
+        </div>`;
     }
 };
 
+// Add animation styles
 if (!document.getElementById('game-animation-styles')) {
     const style = document.createElement('style');
     style.id = 'game-animation-styles';
@@ -1578,6 +1961,10 @@ if (!document.getElementById('game-animation-styles')) {
             10% { opacity: 1; transform: translateX(-50%) translateY(0); }
             90% { opacity: 1; transform: translateX(-50%) translateY(0); }
             100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
+        @keyframes hitMarker {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
         }
     `;
     document.head.appendChild(style);
