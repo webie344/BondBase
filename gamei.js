@@ -1,23 +1,34 @@
 import * as THREE from 'three';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-    getDatabase,
-    ref,
-    set,
-    push,
-    onValue,
-    update,
-    remove,
-    onDisconnect,
+    getAuth, 
+    onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+    getFirestore,
+    collection,
+    doc,
+    setDoc,
+    updateDoc,
+    deleteDoc,
+    onSnapshot,
+    query,
+    orderBy,
+    limit,
+    getDocs,
+    where,
+    Timestamp,
+    increment,
+    arrayUnion,
+    arrayRemove,
     serverTimestamp,
-    get
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    addDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
     authDomain: "crypto-6517d.firebaseapp.com",
-    databaseURL: "https://crypto-6517d-default-rtdb.firebaseio.com",
     projectId: "crypto-6517d",
     storageBucket: "crypto-6517d.firebasestorage.app",
     messagingSenderId: "60263975159",
@@ -25,8 +36,15 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+let app, auth, db;
+try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    console.log('Firebase initialized for multiplayer');
+} catch (error) {
+    console.error('Firebase initialization error:', error);
+}
 
 // Gun sound
 function playGunSound() {
@@ -37,106 +55,64 @@ function playGunSound() {
         } else {
             createGunSound(audioCtx);
         }
-    } catch (e) {}
+    } catch (e) {
+        console.log('Audio not supported');
+    }
 }
 
 function createGunSound(ctx) {
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.value = 120;
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.2);
-    
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'triangle';
-    osc2.frequency.value = 240;
-    gain2.gain.setValueAtTime(0.15, now);
-    gain2.gain.exponentialRampToValueAtTime(0.005, now + 0.15);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now);
-    osc2.stop(now + 0.15);
-}
-
-// Killed sound
-function playKilledSound() {
     try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume().then(() => createKilledSound(audioCtx));
-        } else {
-            createKilledSound(audioCtx);
-        }
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.value = 120;
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+        
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.value = 240;
+        gain2.gain.setValueAtTime(0.15, now);
+        gain2.gain.exponentialRampToValueAtTime(0.005, now + 0.15);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now);
+        osc2.stop(now + 0.15);
     } catch (e) {}
-}
-
-function createKilledSound(ctx) {
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(200, now);
-    osc.frequency.exponentialRampToValueAtTime(50, now + 0.5);
-    gain.gain.setValueAtTime(0.5, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.5);
-}
-
-// Collect sound
-function playCollectSound() {
-    try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume().then(() => createCollectSound(audioCtx));
-        } else {
-            createCollectSound(audioCtx);
-        }
-    } catch (e) {}
-}
-
-function createCollectSound(ctx) {
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(400, now);
-    osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.2);
 }
 
 class Game {
     constructor() {
-        console.log('🎮 MULTIPLAYER GAME STARTING...');
+        console.log('🎮 MULTIPLAYER BATTLE ROYALE - INITIALIZING');
         
-        // Player ID
-        this.playerId = this.generatePlayerId();
-        this.playerName = this.generatePlayerName();
-        console.log('Player ID:', this.playerId);
+        // Firebase references
+        this.currentUser = null;
+        this.playerId = null;
+        this.playerName = 'Player_' + Math.floor(Math.random() * 10000);
+        this.playerRef = null;
+        this.playersCollection = null;
+        this.killsCollection = null;
+        this.unsubscribePlayers = null;
+        this.heartbeatInterval = null;
+        this.firebaseReady = false;
+        
+        // Player meshes dictionary
+        this.otherPlayers = new Map();
         
         // Initialize ALL arrays
         this.buildings = [];
         this.doors = [];
-        this.rewardBoxes = [];
+        this.ammoBoxes = [];
         this.bullets = [];
         this.trees = [];
-        this.otherPlayers = {}; // Store other player meshes
-        this.ammoBoxes = []; // Special ammo boxes from kills
         
+        // Scene setup
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x87CEEB);
         this.scene.fog = new THREE.Fog(0x87CEEB, 60, 200);
@@ -149,19 +125,31 @@ class Game {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        document.getElementById('gameContainer').appendChild(this.renderer.domElement);
+        
+        const gameContainer = document.getElementById('gameContainer');
+        if (gameContainer) {
+            gameContainer.appendChild(this.renderer.domElement);
+        } else {
+            document.body.appendChild(this.renderer.domElement);
+        }
         
         // Game state
         this.health = 100;
+        this.maxHealth = 100;
         this.score = 0;
+        this.kills = 0;
         this.ammo = 30;
         this.maxAmmo = 30;
         this.boxesCollected = 0;
-        this.kills = 0;
-        this.deaths = 0;
         this.gameActive = false;
-        this.lastShot = 0;
-        this.shootCooldown = 300; // ms
+        
+        // Kill feed
+        this.killMessages = [];
+        this.setupKillFeed();
+        
+        // Last damage info
+        this.lastDamagedBy = null;
+        this.lastDamageTime = 0;
         
         // Realistic movement
         this.moveX = 0; 
@@ -194,28 +182,24 @@ class Game {
         this.lastSwipeX = 0; 
         this.lastSwipeY = 0;
         
-        // Kill notifications
-        this.killMessages = [];
-        this.createKillFeed();
+        // Setup UI elements
+        this.setupUIElements();
         
         // Setup everything
         this.setupLighting();
         this.setupGround();
         this.createRealisticBuildings();
         this.createSimpleEnvironment();
-        this.spawnRewardBoxes(30);
+        this.spawnInitialAmmoBoxes(20);
         
         this.setupControls();
         this.setupMinimap();
         
-        // Setup multiplayer
-        this.setupMultiplayer();
-        
         // Door check interval
         setInterval(() => this.checkNearbyDoors(), 200);
         
-        // Update player position in Firebase
-        setInterval(() => this.updatePlayerPosition(), 100);
+        // Set up auth state listener
+        this.setupAuthListener();
         
         this.animate();
         
@@ -224,353 +208,396 @@ class Game {
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
         });
-    }
-    
-    generatePlayerId() {
-        return 'player_' + Math.random().toString(36).substr(2, 9);
-    }
-    
-    generatePlayerName() {
-        const names = ['Viper', 'Shadow', 'Ghost', 'Phoenix', 'Raptor', 'Falcon', 'Tiger', 'Wolf', 'Eagle', 'Cobra'];
-        return names[Math.floor(Math.random() * names.length)] + '_' + Math.floor(Math.random() * 1000);
-    }
-    
-    createKillFeed() {
-        const feed = document.createElement('div');
-        feed.id = 'killFeed';
-        feed.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            width: 300px;
-            z-index: 100;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            align-items: flex-end;
-        `;
-        document.body.appendChild(feed);
-        this.killFeedElement = feed;
-    }
-    
-    addKillMessage(killer, victim) {
-        const message = document.createElement('div');
-        message.style.cssText = `
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-weight: bold;
-            border-left: 4px solid #ff3333;
-            animation: slideIn 0.3s ease;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            backdrop-filter: blur(5px);
-            font-size: 14px;
-        `;
-        message.innerHTML = `<span style="color: #ffaa00;">${killer}</span> killed <span style="color: #ff3333;">${victim}</span> 🔫`;
         
-        this.killFeedElement.appendChild(message);
-        
-        setTimeout(() => {
-            message.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => message.remove(), 300);
-        }, 5000);
-    }
-    
-    setupMultiplayer() {
-        // Reference to players in Firebase
-        this.playersRef = ref(db, 'game/players');
-        this.killsRef = ref(db, 'game/kills');
-        this.ammoBoxesRef = ref(db, 'game/ammoBoxes');
-        
-        // Listen for other players
-        onValue(this.playersRef, (snapshot) => {
-            const players = snapshot.val() || {};
-            
-            // Update player count
-            const playerCount = Object.keys(players).length;
-            document.getElementById('playerCount').innerHTML = `👥 ${playerCount} ${playerCount === 1 ? 'Player' : 'Players'}`;
-            
-            // Remove disconnected players
-            Object.keys(this.otherPlayers).forEach(id => {
-                if (!players[id] && id !== this.playerId) {
-                    this.scene.remove(this.otherPlayers[id]);
-                    delete this.otherPlayers[id];
-                }
-            });
-            
-            // Update or add players
-            Object.keys(players).forEach(id => {
-                if (id !== this.playerId) {
-                    const playerData = players[id];
-                    
-                    if (this.otherPlayers[id]) {
-                        // Update existing player
-                        this.otherPlayers[id].position.set(
-                            playerData.x || 0,
-                            playerData.y || 1.8,
-                            playerData.z || 0
-                        );
-                        this.otherPlayers[id].rotation.y = playerData.rotation || 0;
-                    } else {
-                        // Create new player
-                        this.createOtherPlayer(id, playerData);
-                    }
-                }
-            });
-        });
-        
-        // Listen for kills
-        onValue(this.killsRef, (snapshot) => {
-            const kills = snapshot.val() || {};
-            
-            // Show kill notifications
-            Object.keys(kills).forEach(key => {
-                const kill = kills[key];
-                if (!kill.seen) {
-                    this.addKillMessage(kill.killer, kill.victim);
-                    
-                    // Mark as seen
-                    update(ref(db, `game/kills/${key}`), { seen: true });
-                }
-            });
-        });
-        
-        // Listen for ammo boxes
-        onValue(this.ammoBoxesRef, (snapshot) => {
-            const boxes = snapshot.val() || {};
-            
-            // Remove old boxes
-            this.ammoBoxes.forEach(box => this.scene.remove(box));
-            this.ammoBoxes = [];
-            
-            // Create new boxes
-            Object.keys(boxes).forEach(key => {
-                const box = boxes[key];
-                this.createAmmoBox(key, box.x, box.y, box.z);
-            });
-        });
-        
-        // Set up disconnect
-        onDisconnect(ref(db, `game/players/${this.playerId}`)).remove();
-    }
-    
-    createOtherPlayer(id, data) {
-        const group = new THREE.Group();
-        
-        // Body
-        const body = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.5, 0.5, 1.8),
-            new THREE.MeshStandardMaterial({ color: 0x3366ff })
-        );
-        body.position.y = 0.9;
-        body.castShadow = true;
-        body.receiveShadow = true;
-        group.add(body);
-        
-        // Head
-        const head = new THREE.Mesh(
-            new THREE.SphereGeometry(0.3),
-            new THREE.MeshStandardMaterial({ color: 0xffcc99 })
-        );
-        head.position.y = 1.8;
-        head.castShadow = true;
-        head.receiveShadow = true;
-        group.add(head);
-        
-        // Name tag
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = '#ffaa00';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(1, 1, canvas.width-2, canvas.height-2);
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 24px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(data.name || 'Player', canvas.width/2, canvas.height/2);
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        const material = new THREE.SpriteMaterial({ map: texture });
-        const sprite = new THREE.Sprite(material);
-        sprite.scale.set(2, 0.5, 1);
-        sprite.position.y = 2.3;
-        group.add(sprite);
-        
-        group.position.set(data.x || 0, data.y || 1.8, data.z || 0);
-        group.rotation.y = data.rotation || 0;
-        
-        this.scene.add(group);
-        this.otherPlayers[id] = group;
-    }
-    
-    createAmmoBox(id, x, y, z) {
-        const box = new THREE.Mesh(
-            new THREE.BoxGeometry(0.8, 0.8, 0.8),
-            new THREE.MeshStandardMaterial({ color: 0xff3333, emissive: 0x331100 })
-        );
-        box.position.set(x, y, z);
-        box.castShadow = true;
-        box.receiveShadow = true;
-        
-        // Add pulsing effect
-        const edges = new THREE.EdgesGeometry(box.geometry);
-        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffaa00 }));
-        box.add(line);
-        
-        // Add floating animation
-        box.userData = { floatY: y, floatSpeed: 0.02 + Math.random() * 0.02 };
-        
-        this.scene.add(box);
-        this.ammoBoxes.push(box);
-    }
-    
-    updatePlayerPosition() {
-        if (!this.gameActive) return;
-        
-        const playerRef = ref(db, `game/players/${this.playerId}`);
-        set(playerRef, {
-            x: this.camera.position.x,
-            y: this.camera.position.y,
-            z: this.camera.position.z,
-            rotation: this.lookYaw,
-            name: this.playerName,
-            health: this.health,
-            kills: this.kills,
-            deaths: this.deaths,
-            lastUpdate: Date.now()
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            this.cleanup();
         });
     }
     
-    reportKill(victimId, victimName) {
-        this.kills++;
+    setupAuthListener() {
+        console.log('Setting up auth listener...');
         
-        const killRef = push(ref(db, 'game/kills'));
-        set(killRef, {
-            killer: this.playerName,
-            victim: victimName,
-            killerId: this.playerId,
-            victimId: victimId,
-            timestamp: Date.now(),
-            seen: false
-        });
-        
-        // Spawn ammo box at victim's position
-        this.spawnAmmoBoxFromKill(victimId);
-        
-        // Update score
-        this.score += 100;
-        this.updateUI();
-    }
-    
-    spawnAmmoBoxFromKill(victimId) {
-        const victim = this.otherPlayers[victimId];
-        if (!victim) return;
-        
-        const boxId = push(ref(db, 'game/ammoBoxes')).key;
-        const boxRef = ref(db, `game/ammoBoxes/${boxId}`);
-        
-        set(boxRef, {
-            x: victim.position.x,
-            y: victim.position.y + 1,
-            z: victim.position.z,
-            spawnedAt: Date.now()
-        });
-        
-        // Remove after 30 seconds
-        setTimeout(() => {
-            remove(boxRef);
-        }, 30000);
-    }
-    
-    checkPlayerHit() {
-        const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-        
-        // Check other players
-        Object.keys(this.otherPlayers).forEach(id => {
-            const player = this.otherPlayers[id];
-            if (!player) return;
+        onAuthStateChanged(auth, (user) => {
+            console.log('🔐 Auth state changed:', user ? 'User logged in' : 'No user');
+            this.currentUser = user;
             
-            const toPlayer = player.position.clone().sub(this.camera.position);
-            const distance = toPlayer.length();
-            
-            if (distance < 20 && direction.angleTo(toPlayer) < 0.2) {
-                // Hit detected
-                this.health -= 20;
-                this.updateUI();
+            if (user) {
+                this.playerId = user.uid;
                 
-                if (this.health <= 0) {
-                    this.die(id);
+                try {
+                    const userProfile = localStorage.getItem('currentUserProfile');
+                    if (userProfile) {
+                        const profile = JSON.parse(userProfile);
+                        this.playerName = profile.name || this.playerName;
+                    }
+                } catch (e) {}
+                
+                console.log('✅ Player authenticated:', this.playerId, 'Name:', this.playerName);
+                this.firebaseReady = true;
+                
+                this.setupFirebase();
+                
+                this.showNotification(`Welcome ${this.playerName}!`, 'success');
+            } else {
+                console.log('Playing in offline mode - no user logged in');
+                this.firebaseReady = false;
+                this.showNotification('Playing offline - login to play multiplayer', 'info');
+            }
+        }, (error) => {
+            console.error('Auth error:', error);
+            this.firebaseReady = false;
+            this.showNotification('Auth failed - playing offline', 'error');
+        });
+    }
+    
+    setupFirebase() {
+        if (!this.firebaseReady || !db) return;
+        
+        try {
+            this.playersCollection = collection(db, 'game_players');
+            this.killsCollection = collection(db, 'game_kills');
+            this.playerRef = doc(this.playersCollection, this.playerId);
+            
+            const playerData = {
+                id: this.playerId,
+                name: this.playerName,
+                position: {
+                    x: this.camera.position.x,
+                    y: this.camera.position.y,
+                    z: this.camera.position.z
+                },
+                rotation: {
+                    y: this.lookYaw,
+                    x: this.lookPitch
+                },
+                health: this.health,
+                ammo: this.ammo,
+                kills: 0,
+                alive: true,
+                lastUpdate: serverTimestamp(),
+                joinedAt: serverTimestamp()
+            };
+            
+            setDoc(this.playerRef, playerData).catch(error => {
+                console.error('Error adding player:', error);
+                this.firebaseReady = false;
+            });
+            
+            this.unsubscribePlayers = onSnapshot(this.playersCollection, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const playerData = change.doc.data();
+                    
+                    if (playerData.id === this.playerId) return;
+                    
+                    if (change.type === 'added' || change.type === 'modified') {
+                        if (playerData.alive) {
+                            this.updateOrAddPlayer(playerData);
+                        } else {
+                            this.removePlayer(playerData.id);
+                        }
+                    } else if (change.type === 'removed') {
+                        this.removePlayer(playerData.id);
+                    }
+                });
+            }, (error) => {
+                console.error('Player listener error:', error);
+            });
+            
+            if (this.killsCollection) {
+                const killsQuery = query(this.killsCollection, orderBy('timestamp', 'desc'), limit(20));
+                onSnapshot(killsQuery, (snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'added') {
+                            const killData = change.doc.data();
+                            this.addKillToFeed(killData);
+                        }
+                    });
+                }, (error) => {
+                    console.error('Kill listener error:', error);
+                });
+            }
+            
+            this.heartbeatInterval = setInterval(() => {
+                if (this.gameActive && this.playerId && this.playerRef && this.firebaseReady) {
+                    updateDoc(this.playerRef, {
+                        position: {
+                            x: this.camera.position.x,
+                            y: this.camera.position.y,
+                            z: this.camera.position.z
+                        },
+                        rotation: {
+                            y: this.lookYaw,
+                            x: this.lookPitch
+                        },
+                        health: this.health,
+                        ammo: this.ammo,
+                        lastUpdate: serverTimestamp()
+                    }).catch(error => {
+                        console.error('Heartbeat error:', error);
+                    });
                 }
+            }, 100);
+            
+            onSnapshot(collection(db, 'game_hits'), (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const hitData = change.doc.data();
+                        if (hitData.targetId === this.playerId && this.gameActive) {
+                            this.takeDamage(hitData.damage, hitData.shooterId, hitData.shooterName);
+                        }
+                    }
+                });
+            }, (error) => {
+                console.log('Hit listener error:', error);
+            });
+            
+        } catch (error) {
+            console.error('Error setting up Firebase:', error);
+            this.firebaseReady = false;
+        }
+    }
+    
+    setupKillFeed() {
+        if (!document.getElementById('killFeed')) {
+            const killFeed = document.createElement('div');
+            killFeed.id = 'killFeed';
+            killFeed.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 10px;
+                width: 250px;
+                z-index: 1000;
+                pointer-events: none;
+            `;
+            document.body.appendChild(killFeed);
+        }
+        this.killFeedElement = document.getElementById('killFeed');
+    }
+    
+    setupUIElements() {
+        const requiredElements = ['healthValue', 'scoreValue', 'ammoValue', 'boxesValue', 'killsValue'];
+        requiredElements.forEach(id => {
+            if (!document.getElementById(id)) {
+                const el = document.createElement('span');
+                el.id = id;
+                el.style.display = 'none';
+                document.body.appendChild(el);
             }
         });
     }
     
-    die(killerId) {
-        this.deaths++;
-        this.gameActive = false;
+    updateOrAddPlayer(playerData) {
+        let playerObj = this.otherPlayers.get(playerData.id);
         
-        // Get killer name
-        let killerName = 'Unknown';
-        const killer = this.otherPlayers[killerId];
-        if (killer && killer.userData) {
-            killerName = killer.userData.name || 'Player';
+        if (!playerObj) {
+            const group = new THREE.Group();
+            
+            const bodyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.8);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: this.getPlayerColor(playerData.id) });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.9;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            group.add(body);
+            
+            const headGeo = new THREE.SphereGeometry(0.3);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 1.8 + 0.3;
+            head.castShadow = true;
+            head.receiveShadow = true;
+            group.add(head);
+            
+            const armGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8);
+            const armMat = new THREE.MeshStandardMaterial({ color: this.getPlayerColor(playerData.id) });
+            
+            const leftArm = new THREE.Mesh(armGeo, armMat);
+            leftArm.position.set(-0.5, 1.4, 0);
+            leftArm.rotation.z = 0.2;
+            leftArm.castShadow = true;
+            group.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeo, armMat);
+            rightArm.position.set(0.5, 1.4, 0);
+            rightArm.rotation.z = -0.2;
+            rightArm.castShadow = true;
+            group.add(rightArm);
+            
+            const nameTagDiv = document.createElement('div');
+            nameTagDiv.className = 'player-name-tag';
+            nameTagDiv.textContent = playerData.name || 'Player';
+            nameTagDiv.style.cssText = `
+                position: absolute;
+                background: rgba(0,0,0,0.7);
+                color: white;
+                padding: 2px 8px;
+                border-radius: 10px;
+                font-size: 12px;
+                font-family: Arial, sans-serif;
+                pointer-events: none;
+                transform: translate(-50%, -50%);
+                white-space: nowrap;
+                border: 1px solid ${this.getPlayerColor(playerData.id)};
+                z-index: 1000;
+            `;
+            document.body.appendChild(nameTagDiv);
+            
+            const healthBarDiv = document.createElement('div');
+            healthBarDiv.className = 'player-health-bar';
+            healthBarDiv.style.cssText = `
+                position: absolute;
+                width: 40px;
+                height: 5px;
+                background: rgba(0,0,0,0.5);
+                border-radius: 2px;
+                transform: translate(-50%, -50%);
+                overflow: hidden;
+                z-index: 1000;
+            `;
+            const healthFill = document.createElement('div');
+            healthFill.className = 'health-fill';
+            healthFill.style.cssText = `
+                height: 100%;
+                width: 100%;
+                background: #00ff00;
+                transition: width 0.2s;
+            `;
+            healthBarDiv.appendChild(healthFill);
+            document.body.appendChild(healthBarDiv);
+            
+            playerObj = {
+                mesh: group,
+                nameTag: nameTagDiv,
+                healthBar: healthBarDiv,
+                healthFill: healthFill,
+                data: playerData
+            };
+            
+            this.scene.add(group);
+            this.otherPlayers.set(playerData.id, playerObj);
         }
         
-        // Report death
-        const killRef = push(ref(db, 'game/kills'));
-        set(killRef, {
-            killer: killerName,
-            victim: this.playerName,
-            killerId: killerId,
-            victimId: this.playerId,
-            timestamp: Date.now(),
-            seen: false
-        });
+        if (playerData.position) {
+            playerObj.mesh.position.set(
+                playerData.position.x,
+                playerData.position.y,
+                playerData.position.z
+            );
+        }
         
-        // Spawn ammo box at death location
-        this.spawnAmmoBoxFromDeath();
+        if (playerData.rotation) {
+            playerObj.mesh.rotation.y = playerData.rotation.y;
+        }
         
-        // Play sound
-        playKilledSound();
+        if (playerData.health !== undefined) {
+            const healthPercent = Math.max(0, playerData.health) / 100;
+            playerObj.healthFill.style.width = `${healthPercent * 100}%`;
+            
+            if (healthPercent > 0.6) {
+                playerObj.healthFill.style.background = '#00ff00';
+            } else if (healthPercent > 0.3) {
+                playerObj.healthFill.style.background = '#ffff00';
+            } else {
+                playerObj.healthFill.style.background = '#ff0000';
+            }
+        }
         
-        // Show death screen
-        document.getElementById('finalScore').innerHTML = `Kills: ${this.kills} | Deaths: ${this.deaths}<br>Score: ${this.score}`;
-        document.getElementById('gameOverlay').style.display = 'flex';
+        playerObj.data = playerData;
     }
     
-    spawnAmmoBoxFromDeath() {
-        const boxId = push(ref(db, 'game/ammoBoxes')).key;
-        const boxRef = ref(db, `game/ammoBoxes/${boxId}`);
+    removePlayer(playerId) {
+        const playerObj = this.otherPlayers.get(playerId);
+        if (playerObj) {
+            this.scene.remove(playerObj.mesh);
+            if (playerObj.nameTag && playerObj.nameTag.parentNode) {
+                playerObj.nameTag.remove();
+            }
+            if (playerObj.healthBar && playerObj.healthBar.parentNode) {
+                playerObj.healthBar.remove();
+            }
+            this.otherPlayers.delete(playerId);
+        }
+    }
+    
+    getPlayerColor(playerId) {
+        let hash = 0;
+        for (let i = 0; i < playerId.length; i++) {
+            hash = ((hash << 5) - hash) + playerId.charCodeAt(i);
+            hash |= 0;
+        }
+        const colors = [0xff3333, 0x33ff33, 0x3333ff, 0xffff33, 0xff33ff, 0x33ffff, 0xff9933, 0x9933ff];
+        return colors[Math.abs(hash) % colors.length];
+    }
+    
+    addKillToFeed(killData) {
+        const killMessage = {
+            killer: killData.killerName || 'Unknown',
+            victim: killData.victimName || 'Unknown',
+            time: Date.now()
+        };
         
-        set(boxRef, {
-            x: this.camera.position.x,
-            y: this.camera.position.y,
-            z: this.camera.position.z,
-            spawnedAt: Date.now()
+        this.killMessages.unshift(killMessage);
+        if (this.killMessages.length > 5) {
+            this.killMessages.pop();
+        }
+        
+        this.updateKillFeed();
+        
+        if (killData.victimId === this.playerId) {
+            this.showNotification(`You were killed by ${killData.killerName}`, 'error');
+        } else if (killData.killerId === this.playerId) {
+            this.showNotification(`You killed ${killData.victimName}! +100 XP`, 'success');
+            this.kills++;
+            this.score += 100;
+            this.updateUI();
+        }
+    }
+    
+    updateKillFeed() {
+        if (!this.killFeedElement) return;
+        
+        this.killFeedElement.innerHTML = '';
+        this.killMessages.forEach(msg => {
+            const item = document.createElement('div');
+            item.style.cssText = `
+                background: rgba(0,0,0,0.7);
+                color: white;
+                padding: 4px 8px;
+                margin-bottom: 4px;
+                border-radius: 4px;
+                font-size: 12px;
+                border-left: 3px solid #ff3333;
+                animation: slideIn 0.3s ease;
+            `;
+            item.innerHTML = `<span style="color: #ffaa00;">${msg.killer}</span> 🔫 <span style="color: #ff3333;">${msg.victim}</span>`;
+            this.killFeedElement.appendChild(item);
         });
     }
     
-    collectAmmoBox(box) {
-        playCollectSound();
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: ${type === 'error' ? '#ff3333' : type === 'success' ? '#33ff33' : '#3333ff'};
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            z-index: 10000;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            animation: fadeInOut 3s ease;
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
         
-        // Add ammo
-        this.ammo = Math.min(this.maxAmmo, this.ammo + 15);
-        this.score += 25;
-        this.boxesCollected++;
-        this.updateUI();
-        
-        // Remove from scene
-        this.scene.remove(box);
-        
-        // Remove from Firebase
-        // Find which box this is
-        this.ammoBoxes = this.ammoBoxes.filter(b => b !== box);
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
     }
     
     setupLighting() {
@@ -598,7 +625,6 @@ class Game {
         ground.receiveShadow = true;
         this.scene.add(ground);
         
-        // Add some paths
         for (let i = 0; i < 10; i++) {
             const path = new THREE.Mesh(
                 new THREE.PlaneGeometry(4, 4),
@@ -614,7 +640,6 @@ class Game {
     createRealisticBuildings() {
         const colors = [0x8B4513, 0x5D3A1A, 0xA0522D];
         
-        // Create 8 detailed buildings
         const positions = [
             {x: -15, z: -15}, {x: 15, z: -15}, {x: -15, z: 15}, {x: 15, z: 15},
             {x: -25, z: 0}, {x: 25, z: 0}, {x: 0, z: -25}, {x: 0, z: 25}
@@ -634,7 +659,6 @@ class Game {
         const group = new THREE.Group();
         const wallThick = 0.5;
         
-        // Back wall
         const backWall = new THREE.Mesh(
             new THREE.BoxGeometry(w, h, wallThick),
             new THREE.MeshStandardMaterial({ color })
@@ -644,7 +668,6 @@ class Game {
         backWall.receiveShadow = true;
         group.add(backWall);
         
-        // Left wall
         const leftWall = new THREE.Mesh(
             new THREE.BoxGeometry(wallThick, h, d),
             new THREE.MeshStandardMaterial({ color })
@@ -654,7 +677,6 @@ class Game {
         leftWall.receiveShadow = true;
         group.add(leftWall);
         
-        // Right wall
         const rightWall = new THREE.Mesh(
             new THREE.BoxGeometry(wallThick, h, d),
             new THREE.MeshStandardMaterial({ color })
@@ -664,11 +686,9 @@ class Game {
         rightWall.receiveShadow = true;
         group.add(rightWall);
         
-        // Front wall with door
         const doorWidth = 2.0;
         const doorHeight = 2.5;
         
-        // Left part of front wall
         const frontLeft = new THREE.Mesh(
             new THREE.BoxGeometry((w - doorWidth)/2, h, wallThick),
             new THREE.MeshStandardMaterial({ color })
@@ -678,7 +698,6 @@ class Game {
         frontLeft.receiveShadow = true;
         group.add(frontLeft);
         
-        // Right part
         const frontRight = new THREE.Mesh(
             new THREE.BoxGeometry((w - doorWidth)/2, h, wallThick),
             new THREE.MeshStandardMaterial({ color })
@@ -688,7 +707,6 @@ class Game {
         frontRight.receiveShadow = true;
         group.add(frontRight);
         
-        // Top part above door
         const topDoor = new THREE.Mesh(
             new THREE.BoxGeometry(doorWidth, h - doorHeight, wallThick),
             new THREE.MeshStandardMaterial({ color })
@@ -698,7 +716,6 @@ class Game {
         topDoor.receiveShadow = true;
         group.add(topDoor);
         
-        // Door frame
         const doorFrame = new THREE.Mesh(
             new THREE.BoxGeometry(doorWidth + 0.2, doorHeight + 0.2, 0.3),
             new THREE.MeshStandardMaterial({ color: 0x4a2c1a })
@@ -708,7 +725,6 @@ class Game {
         doorFrame.receiveShadow = true;
         group.add(doorFrame);
         
-        // Door
         const door = new THREE.Mesh(
             new THREE.BoxGeometry(doorWidth - 0.2, doorHeight - 0.2, 0.2),
             new THREE.MeshStandardMaterial({ color: 0x8B5A2B })
@@ -718,7 +734,6 @@ class Game {
         door.receiveShadow = true;
         group.add(door);
         
-        // Roof
         const roof = new THREE.Mesh(
             new THREE.ConeGeometry(Math.max(w, d) * 0.7, 2, 4),
             new THREE.MeshStandardMaterial({ color: 0x884422 })
@@ -729,7 +744,6 @@ class Game {
         roof.receiveShadow = true;
         group.add(roof);
         
-        // INTERIOR STEPS
         const stepGroup = new THREE.Group();
         for (let s = 0; s < 4; s++) {
             const step = new THREE.Mesh(
@@ -744,7 +758,6 @@ class Game {
         stepGroup.position.set(0, 0, 0);
         group.add(stepGroup);
         
-        // Interior floor
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(w - 1.5, d - 1.5),
             new THREE.MeshStandardMaterial({ color: 0x5a3a1a, side: THREE.DoubleSide })
@@ -757,7 +770,6 @@ class Game {
         group.position.set(x, 0, z);
         this.scene.add(group);
         
-        // Store building data
         this.buildings.push({
             mesh: group,
             doorPos: new THREE.Vector3(x, 1.2, z + d/2),
@@ -773,7 +785,6 @@ class Game {
     }
     
     createSimpleEnvironment() {
-        // Add some trees
         for (let i = 0; i < 20; i++) {
             const treeGroup = new THREE.Group();
             
@@ -801,33 +812,66 @@ class Game {
         }
     }
     
-    spawnRewardBoxes(count) {
-        // Remove old boxes
-        this.rewardBoxes.forEach(box => this.scene.remove(box));
-        this.rewardBoxes = [];
-        
+    spawnInitialAmmoBoxes(count) {
         for (let i = 0; i < count; i++) {
-            const box = new THREE.Mesh(
-                new THREE.BoxGeometry(1, 1, 1),
-                new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0x442200 })
-            );
-            box.position.set(
+            this.spawnAmmoBox(
                 (Math.random()-0.5)*50,
-                2 + Math.random() * 5,
-                (Math.random()-0.5)*50
+                0.5,
+                (Math.random()-0.5)*50,
+                5 + Math.floor(Math.random() * 10)
             );
-            box.castShadow = true;
-            box.receiveShadow = true;
-            
-            // Add wireframe
-            const edges = new THREE.EdgesGeometry(box.geometry);
-            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffff00 }));
-            box.add(line);
-            
-            this.scene.add(box);
-            this.rewardBoxes.push(box);
         }
-        console.log(`Spawned ${this.rewardBoxes.length} boxes`);
+        console.log(`Spawned ${this.ammoBoxes.length} initial ammo boxes`);
+    }
+    
+    spawnAmmoBox(x, y, z, ammoAmount = 10) {
+        const box = new THREE.Mesh(
+            new THREE.BoxGeometry(0.8, 0.8, 0.8),
+            new THREE.MeshStandardMaterial({ 
+                color: 0xffaa00,
+                emissive: 0x442200,
+                transparent: true,
+                opacity: 0.9
+            })
+        );
+        box.position.set(x, y, z);
+        box.castShadow = true;
+        box.receiveShadow = true;
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffff00';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🔫', 32, 32);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const labelMat = new THREE.SpriteMaterial({ map: texture });
+        const label = new THREE.Sprite(labelMat);
+        label.scale.set(0.5, 0.5, 0.5);
+        label.position.set(0, 0.6, 0);
+        box.add(label);
+        
+        const edges = new THREE.EdgesGeometry(box.geometry);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffff00 }));
+        box.add(line);
+        
+        box.userData = {
+            ammo: ammoAmount,
+            type: 'ammo'
+        };
+        
+        this.scene.add(box);
+        this.ammoBoxes.push(box);
+        
+        return box;
+    }
+    
+    spawnAmmoBoxOnDeath(position, ammoAmount = 15) {
+        this.spawnAmmoBox(position.x, 0.5, position.z, ammoAmount);
     }
     
     checkNearbyDoors() {
@@ -848,7 +892,10 @@ class Game {
         
         if (found !== this.nearbyDoor) {
             this.nearbyDoor = found;
-            document.getElementById('doorIndicator').style.display = found ? 'block' : 'none';
+            const doorIndicator = document.getElementById('doorIndicator');
+            if (doorIndicator) {
+                doorIndicator.style.display = found ? 'block' : 'none';
+            }
         }
     }
     
@@ -858,14 +905,16 @@ class Game {
         this.insideBuilding = true;
         this.currentBuilding = building;
         
-        // Position inside
         this.camera.position.set(
             building.doorPos.x,
             1.8,
             building.doorPos.z - 3
         );
         
-        document.getElementById('doorIndicator').textContent = '🏢 INSIDE - TAP SHOOT TO EXIT';
+        const doorIndicator = document.getElementById('doorIndicator');
+        if (doorIndicator) {
+            doorIndicator.textContent = '🏢 INSIDE - TAP SHOOT TO EXIT';
+        }
     }
     
     exitBuilding() {
@@ -881,14 +930,22 @@ class Game {
             );
         }
         
-        document.getElementById('doorIndicator').textContent = '🚪 NEAR DOOR - TAP SHOOT TO ENTER';
-        document.getElementById('doorIndicator').style.display = 'none';
+        const doorIndicator = document.getElementById('doorIndicator');
+        if (doorIndicator) {
+            doorIndicator.textContent = '🚪 NEAR DOOR - TAP SHOOT TO ENTER';
+            doorIndicator.style.display = 'none';
+        }
         this.currentBuilding = null;
     }
     
     setupControls() {
         const swipeZone = document.getElementById('viewSwipeZone');
         const joystickEl = document.getElementById('joystickContainer');
+        
+        if (!joystickEl || !swipeZone) {
+            console.warn('Control elements not found');
+            return;
+        }
         
         joystickEl.addEventListener('touchstart', (e) => {
             e.preventDefault();
@@ -918,8 +975,15 @@ class Game {
             this.moveX = 0; 
             this.moveY = 0;
             this.bobSpeed = 0;
-            document.getElementById('movementSpeed').textContent = '0';
-            this.joystickThumb.style.transform = `translate(0px, 0px)`;
+            
+            const speedElement = document.getElementById('movementSpeed');
+            if (speedElement) {
+                speedElement.textContent = '0';
+            }
+            
+            if (this.joystickThumb) {
+                this.joystickThumb.style.transform = `translate(0px, 0px)`;
+            }
         });
         
         swipeZone.addEventListener('touchstart', (e) => {
@@ -957,47 +1021,52 @@ class Game {
             this.swipeTouchId = null; 
         });
         
-        // Shoot/Interact button
-        document.getElementById('shootBtn').addEventListener('touchstart', (e) => { 
-            e.preventDefault(); 
-            
-            if (!this.gameActive) return;
-            
-            const now = Date.now();
-            if (now - this.lastShot < this.shootCooldown) return;
-            this.lastShot = now;
-            
-            if (this.insideBuilding) {
-                this.exitBuilding();
-            } else if (this.nearbyDoor) {
-                this.enterBuilding(this.nearbyDoor);
-            } else if (this.ammo > 0) {
-                this.shoot();
-                playGunSound();
-            }
-        });
+        const shootBtn = document.getElementById('shootBtn');
+        if (shootBtn) {
+            shootBtn.addEventListener('touchstart', (e) => { 
+                e.preventDefault(); 
+                
+                if (!this.gameActive) return;
+                
+                if (this.insideBuilding) {
+                    this.exitBuilding();
+                } else if (this.nearbyDoor) {
+                    this.enterBuilding(this.nearbyDoor);
+                } else {
+                    this.shoot();
+                    playGunSound();
+                }
+            });
+        }
         
-        document.getElementById('reloadBtn').addEventListener('touchstart', (e) => { 
-            e.preventDefault(); 
-            this.reload(); 
-        });
+        const reloadBtn = document.getElementById('reloadBtn');
+        if (reloadBtn) {
+            reloadBtn.addEventListener('touchstart', (e) => { 
+                e.preventDefault(); 
+                this.reload(); 
+            });
+        }
         
-        document.getElementById('startBtn').addEventListener('click', () => {
-            document.getElementById('instructions').style.display = 'none';
-            this.startGame();
-        });
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                const instructions = document.getElementById('instructions');
+                if (instructions) {
+                    instructions.style.display = 'none';
+                }
+                this.startGame();
+            });
+        }
         
-        document.getElementById('restartBtn').addEventListener('click', () => this.restart());
-        
-        // Add player count display
-        const hud = document.getElementById('hud');
-        const playerCountDiv = document.createElement('div');
-        playerCountDiv.id = 'playerCount';
-        playerCountDiv.innerHTML = '👥 0 Players';
-        hud.appendChild(playerCountDiv);
+        const restartBtn = document.getElementById('restartBtn');
+        if (restartBtn) {
+            restartBtn.addEventListener('click', () => this.restart());
+        }
     }
     
     updateJoystick(touch) {
+        if (!this.joystickContainer || !this.joystickThumb) return;
+        
         const rect = this.joystickContainer.getBoundingClientRect();
         const centerX = rect.left + rect.width/2;
         const centerY = rect.top + rect.height/2;
@@ -1017,24 +1086,32 @@ class Game {
         this.moveY = -deltaY / this.joystickMaxMove;
         
         const speed = Math.sqrt(this.moveX*this.moveX + this.moveY*this.moveY);
-        document.getElementById('movementSpeed').textContent = speed.toFixed(1);
+        const speedElement = document.getElementById('movementSpeed');
+        if (speedElement) {
+            speedElement.textContent = speed.toFixed(1);
+        }
         this.bobSpeed = speed;
     }
     
     setupMinimap() { 
-        this.minimapCtx = document.getElementById('minimapCanvas').getContext('2d'); 
+        const canvas = document.getElementById('minimapCanvas');
+        if (canvas) {
+            this.minimapCtx = canvas.getContext('2d'); 
+        }
     }
     
     updateMinimap() {
-        const ctx = this.minimapCtx;
+        if (!this.minimapCtx) return;
+        
         const canvas = document.getElementById('minimapCanvas');
+        if (!canvas) return;
+        
+        const ctx = this.minimapCtx;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Background
         ctx.fillStyle = '#0a0a1a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Draw buildings
         ctx.fillStyle = '#8B4513';
         this.buildings.forEach(b => {
             const x = (b.mesh.position.x + 50) * 2;
@@ -1044,77 +1121,67 @@ class Game {
             }
         });
         
-        // Draw regular boxes
-        ctx.fillStyle = '#ffaa00';
-        this.rewardBoxes.forEach(box => {
-            const x = (box.position.x + 50) * 2;
-            const z = (box.position.z + 50) * 2;
-            ctx.beginPath();
-            ctx.arc(x, z, 3, 0, 2*Math.PI);
-            ctx.fill();
+        ctx.fillStyle = '#ff3333';
+        this.otherPlayers.forEach((player) => {
+            const x = (player.mesh.position.x + 50) * 2;
+            const z = (player.mesh.position.z + 50) * 2;
+            if (x > 0 && x < canvas.width && z > 0 && z < canvas.height) {
+                ctx.beginPath();
+                ctx.arc(x, z, 4, 0, 2*Math.PI);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(x, z);
+                ctx.lineTo(
+                    x + Math.sin(player.mesh.rotation.y) * 8,
+                    z + Math.cos(player.mesh.rotation.y) * 8
+                );
+                ctx.stroke();
+            }
         });
         
-        // Draw ammo boxes (red)
-        ctx.fillStyle = '#ff3333';
+        ctx.fillStyle = '#ffaa00';
         this.ammoBoxes.forEach(box => {
             const x = (box.position.x + 50) * 2;
             const z = (box.position.z + 50) * 2;
             ctx.beginPath();
-            ctx.arc(x, z, 4, 0, 2*Math.PI);
+            ctx.arc(x, z, 2, 0, 2*Math.PI);
             ctx.fill();
         });
         
-        // Draw other players
-        ctx.fillStyle = '#3366ff';
-        Object.values(this.otherPlayers).forEach(player => {
-            const x = (player.position.x + 50) * 2;
-            const z = (player.position.z + 50) * 2;
-            ctx.beginPath();
-            ctx.arc(x, z, 4, 0, 2*Math.PI);
-            ctx.fill();
-        });
-        
-        // Player
         ctx.fillStyle = '#33ff33';
         ctx.beginPath();
         ctx.arc(canvas.width/2, canvas.height/2, 5, 0, 2*Math.PI);
         ctx.fill();
-        
-        // Direction indicator
-        ctx.strokeStyle = '#33ff33';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(canvas.width/2, canvas.height/2);
-        const dirX = canvas.width/2 + Math.sin(this.lookYaw) * 15;
-        const dirY = canvas.height/2 - Math.cos(this.lookYaw) * 15;
-        ctx.lineTo(dirX, dirY);
-        ctx.stroke();
     }
     
     startGame() {
         this.gameActive = true;
         this.health = 100; 
         this.score = 0; 
+        this.kills = 0;
         this.ammo = 30; 
         this.boxesCollected = 0;
-        this.kills = 0;
-        this.deaths = 0;
         this.camera.position.set(0, 1.8, 15);
+        
+        if (this.firebaseReady && this.playerRef) {
+            updateDoc(this.playerRef, {
+                health: this.health,
+                ammo: this.ammo,
+                kills: this.kills,
+                alive: true,
+                position: {
+                    x: this.camera.position.x,
+                    y: this.camera.position.y,
+                    z: this.camera.position.z
+                }
+            }).catch(console.error);
+        }
+        
         this.updateUI();
         
-        // Add player to Firebase
-        const playerRef = ref(db, `game/players/${this.playerId}`);
-        set(playerRef, {
-            x: this.camera.position.x,
-            y: this.camera.position.y,
-            z: this.camera.position.z,
-            rotation: this.lookYaw,
-            name: this.playerName,
-            health: this.health,
-            kills: this.kills,
-            deaths: this.deaths,
-            lastUpdate: Date.now()
-        });
+        this.showNotification(`Online players: ${this.otherPlayers.size + 1}`, 'info');
     }
     
     shoot() {
@@ -1122,102 +1189,237 @@ class Game {
         this.ammo--; 
         this.updateUI();
         
-        const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-        
-        // Check for box hits (regular reward boxes)
-        for (let i = this.rewardBoxes.length - 1; i >= 0; i--) {
-            const box = this.rewardBoxes[i];
-            const toBox = box.position.clone().sub(this.camera.position);
-            if (direction.angleTo(toBox) < 0.2 && toBox.length() < 20) {
-                this.scene.remove(box);
-                this.rewardBoxes.splice(i, 1);
-                this.score += 50;
-                this.boxesCollected++;
-                this.updateUI();
-                playCollectSound();
-                break;
-            }
+        if (this.firebaseReady && this.playerRef) {
+            updateDoc(this.playerRef, { ammo: this.ammo }).catch(console.error);
         }
         
-        // Check for ammo box hits (from kills)
+        const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        const startPos = this.camera.position.clone();
+        const rayLength = 30;
+        
         for (let i = this.ammoBoxes.length - 1; i >= 0; i--) {
             const box = this.ammoBoxes[i];
-            const toBox = box.position.clone().sub(this.camera.position);
-            if (direction.angleTo(toBox) < 0.2 && toBox.length() < 20) {
-                this.collectAmmoBox(box);
-                break;
+            const toBox = box.position.clone().sub(startPos);
+            
+            if (direction.angleTo(toBox) < 0.2 && toBox.length() < rayLength) {
+                const ammoGained = box.userData.ammo || 10;
+                this.ammo = Math.min(this.maxAmmo, this.ammo + ammoGained);
+                this.boxesCollected++;
+                
+                this.scene.remove(box);
+                this.ammoBoxes.splice(i, 1);
+                
+                this.updateUI();
+                
+                this.showNotification(`+${ammoGained} Ammo`, 'success');
+                
+                if (this.firebaseReady && this.playerRef) {
+                    updateDoc(this.playerRef, { ammo: this.ammo }).catch(console.error);
+                }
+                
+                return;
             }
         }
         
-        // Check for player hits
-        this.checkPlayerHit();
+        for (let [playerId, playerObj] of this.otherPlayers) {
+            if (!playerObj.mesh || !playerObj.data.alive) continue;
+            
+            const toPlayer = playerObj.mesh.position.clone().sub(startPos);
+            
+            if (direction.angleTo(toPlayer) < 0.2 && toPlayer.length() < rayLength) {
+                const distance = toPlayer.length();
+                const damage = Math.max(10, Math.floor(30 * (1 - distance / rayLength)));
+                
+                this.registerHit(playerId, damage);
+                
+                this.showNotification(`Hit ${playerObj.data.name} for ${damage} damage!`, 'info');
+                
+                break;
+            }
+        }
+    }
+    
+    async registerHit(targetId, damage) {
+        try {
+            if (!this.firebaseReady || !this.playerId || !targetId || !db) return;
+            
+            const hitRef = doc(collection(db, 'game_hits'));
+            await setDoc(hitRef, {
+                shooterId: this.playerId,
+                shooterName: this.playerName,
+                targetId: targetId,
+                damage: damage,
+                timestamp: serverTimestamp()
+            });
+            
+        } catch (error) {
+            console.error('Error registering hit:', error);
+        }
+    }
+    
+    takeDamage(amount, attackerId, attackerName) {
+        if (!this.gameActive || this.health <= 0) return;
+        
+        this.health = Math.max(0, this.health - amount);
+        this.lastDamagedBy = { id: attackerId, name: attackerName };
+        this.lastDamageTime = Date.now();
+        
+        this.updateUI();
+        
+        document.body.style.backgroundColor = '#ff0000';
+        setTimeout(() => {
+            document.body.style.backgroundColor = '';
+        }, 100);
+        
+        if (this.firebaseReady && this.playerRef) {
+            updateDoc(this.playerRef, { health: this.health }).catch(console.error);
+        }
+        
+        if (this.health <= 0) {
+            this.die();
+        } else {
+            this.showNotification(`-${amount} HP`, 'error');
+        }
+    }
+    
+    async die() {
+        this.gameActive = false;
+        
+        if (this.lastDamagedBy && this.firebaseReady && db) {
+            const killData = {
+                killerId: this.lastDamagedBy.id,
+                killerName: this.lastDamagedBy.name,
+                victimId: this.playerId,
+                victimName: this.playerName,
+                weapon: 'Pistol',
+                timestamp: serverTimestamp()
+            };
+            
+            try {
+                await addDoc(collection(db, 'game_kills'), killData);
+                
+                const killerRef = doc(this.playersCollection, this.lastDamagedBy.id);
+                await updateDoc(killerRef, {
+                    kills: increment(1)
+                });
+                
+                await this.recordWin(this.lastDamagedBy.id, this.lastDamagedBy.name, 'kill');
+                
+            } catch (error) {
+                console.error('Error recording kill:', error);
+            }
+            
+            this.spawnAmmoBoxOnDeath(this.camera.position, 15);
+            
+            this.showNotification(`You were killed by ${this.lastDamagedBy.name}`, 'error');
+        } else {
+            this.showNotification('You died!', 'error');
+        }
+        
+        if (this.firebaseReady && this.playerRef) {
+            await updateDoc(this.playerRef, {
+                alive: false,
+                health: 0
+            }).catch(console.error);
+        }
+        
+        const gameOverlay = document.getElementById('gameOverlay');
+        const finalScore = document.getElementById('finalScore');
+        
+        if (gameOverlay && finalScore) {
+            finalScore.textContent = `Kills: ${this.kills}  Score: ${this.score}  Boxes: ${this.boxesCollected}`;
+            gameOverlay.style.display = 'flex';
+        }
+        
+        await this.recordDeath(this.playerId, this.playerName);
+    }
+    
+    async recordWin(playerId, playerName, type = 'kill') {
+        if (!this.firebaseReady || !db) return;
+        
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            
+            const dailyWinRef = doc(db, 'game_daily_wins', today, 'players', playerId);
+            await setDoc(dailyWinRef, {
+                playerId: playerId,
+                playerName: playerName,
+                wins: increment(1),
+                lastWin: serverTimestamp()
+            }, { merge: true });
+            
+            const allTimeWinRef = doc(db, 'game_alltime_wins', playerId);
+            await setDoc(allTimeWinRef, {
+                playerId: playerId,
+                playerName: playerName,
+                wins: increment(1),
+                lastWin: serverTimestamp()
+            }, { merge: true });
+            
+        } catch (error) {
+            console.error('Error recording win:', error);
+        }
+    }
+    
+    async recordDeath(playerId, playerName) {
+        if (!this.firebaseReady || !db) return;
+        
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            
+            const dailyDeathRef = doc(db, 'game_daily_deaths', today, 'players', playerId);
+            await setDoc(dailyDeathRef, {
+                playerId: playerId,
+                playerName: playerName,
+                deaths: increment(1),
+                lastDeath: serverTimestamp()
+            }, { merge: true });
+            
+        } catch (error) {
+            console.error('Error recording death:', error);
+        }
     }
     
     reload() { 
         if (this.gameActive) { 
             this.ammo = this.maxAmmo; 
-            this.updateUI(); 
+            this.updateUI();
+            
+            if (this.firebaseReady && this.playerRef) {
+                updateDoc(this.playerRef, { ammo: this.ammo }).catch(console.error);
+            }
         } 
     }
     
     updateUI() {
-        document.getElementById('healthValue').textContent = this.health;
-        document.getElementById('scoreValue').textContent = this.score;
-        document.getElementById('ammoValue').textContent = this.ammo;
-        document.getElementById('boxesValue').textContent = this.boxesCollected;
-        
-        // Update health color
         const healthEl = document.getElementById('healthValue');
-        if (this.health > 70) healthEl.style.color = '#33ff33';
-        else if (this.health > 30) healthEl.style.color = '#ffaa00';
-        else healthEl.style.color = '#ff3333';
+        const scoreEl = document.getElementById('scoreValue');
+        const ammoEl = document.getElementById('ammoValue');
+        const boxesEl = document.getElementById('boxesValue');
+        const killsEl = document.getElementById('killsValue');
         
-        if (this.health <= 0) this.gameOver();
-    }
-    
-    gameOver() { 
-        this.gameActive = false; 
+        if (healthEl) healthEl.textContent = this.health;
+        if (scoreEl) scoreEl.textContent = this.score;
+        if (ammoEl) ammoEl.textContent = this.ammo;
+        if (boxesEl) boxesEl.textContent = this.boxesCollected;
+        if (killsEl) killsEl.textContent = this.kills;
         
-        // Remove player from Firebase
-        remove(ref(db, `game/players/${this.playerId}`));
-        
-        // Save result
-        this.saveResult();
-        
-        document.getElementById('finalScore').innerHTML = `Kills: ${this.kills} | Deaths: ${this.deaths}<br>Score: ${this.score} | Boxes: ${this.boxesCollected}`; 
-        document.getElementById('gameOverlay').style.display = 'flex'; 
-    }
-    
-    saveResult() {
-        const resultRef = push(ref(db, 'game/results'));
-        set(resultRef, {
-            playerId: this.playerId,
-            playerName: this.playerName,
-            kills: this.kills,
-            deaths: this.deaths,
-            score: this.score,
-            boxesCollected: this.boxesCollected,
-            timestamp: Date.now(),
-            date: new Date().toISOString().split('T')[0]
-        });
+        const healthBar = document.querySelector('.health-bar-fill');
+        if (healthBar) {
+            healthBar.style.width = `${(this.health / this.maxHealth) * 100}%`;
+        }
     }
     
     restart() {
-        // Clean up old boxes
-        this.rewardBoxes.forEach(b => this.scene.remove(b));
-        this.rewardBoxes = [];
-        this.spawnRewardBoxes(30);
-        
-        // Clear ammo boxes
         this.ammoBoxes.forEach(b => this.scene.remove(b));
         this.ammoBoxes = [];
+        this.spawnInitialAmmoBoxes(20);
         
         this.health = 100; 
         this.score = 0; 
+        this.kills = 0;
         this.ammo = 30; 
         this.boxesCollected = 0;
-        this.kills = 0;
-        this.deaths = 0;
         this.gameActive = true;
         this.camera.position.set(0, 1.8, 15);
         this.lookYaw = 0; 
@@ -1226,34 +1428,65 @@ class Game {
         this.currentBuilding = null;
         this.nearbyDoor = null;
         
-        // Add player back to Firebase
-        const playerRef = ref(db, `game/players/${this.playerId}`);
-        set(playerRef, {
-            x: this.camera.position.x,
-            y: this.camera.position.y,
-            z: this.camera.position.z,
-            rotation: this.lookYaw,
-            name: this.playerName,
-            health: this.health,
-            kills: this.kills,
-            deaths: this.deaths,
-            lastUpdate: Date.now()
-        });
+        if (this.firebaseReady && this.playerRef) {
+            updateDoc(this.playerRef, {
+                health: this.health,
+                ammo: this.ammo,
+                kills: this.kills,
+                alive: true,
+                position: {
+                    x: this.camera.position.x,
+                    y: this.camera.position.y,
+                    z: this.camera.position.z
+                }
+            }).catch(console.error);
+        }
         
-        document.getElementById('doorIndicator').style.display = 'none';
-        document.getElementById('gameOverlay').style.display = 'none';
+        const doorIndicator = document.getElementById('doorIndicator');
+        if (doorIndicator) {
+            doorIndicator.style.display = 'none';
+        }
+        
+        const gameOverlay = document.getElementById('gameOverlay');
+        if (gameOverlay) {
+            gameOverlay.style.display = 'none';
+        }
+        
         this.updateUI();
+    }
+    
+    cleanup() {
+        if (this.firebaseReady && this.playerRef) {
+            deleteDoc(this.playerRef).catch(console.error);
+        }
+        
+        if (this.unsubscribePlayers) {
+            this.unsubscribePlayers();
+        }
+        
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+        }
+        
+        this.otherPlayers.forEach((playerObj, playerId) => {
+            this.scene.remove(playerObj.mesh);
+            if (playerObj.nameTag && playerObj.nameTag.parentNode) {
+                playerObj.nameTag.remove();
+            }
+            if (playerObj.healthBar && playerObj.healthBar.parentNode) {
+                playerObj.healthBar.remove();
+            }
+        });
+        this.otherPlayers.clear();
     }
     
     animate() {
         requestAnimationFrame(() => this.animate());
         
         if (this.gameActive) {
-            // Apply look
             this.camera.rotation.y = this.lookYaw;
             this.camera.rotation.x = this.lookPitch;
             
-            // Movement
             const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
             forward.y = 0; 
             forward.normalize();
@@ -1266,7 +1499,6 @@ class Game {
             if (Math.abs(this.moveY) > 0.05) moveDelta.addScaledVector(forward, this.moveY * this.moveSpeed);
             if (Math.abs(this.moveX) > 0.05) moveDelta.addScaledVector(right, this.moveX * this.moveSpeed);
             
-            // Head bob
             if (moveDelta.length() > 0.01) {
                 this.footstepTime += 0.15;
                 this.bobAmount = Math.sin(this.footstepTime) * 0.02;
@@ -1277,26 +1509,44 @@ class Game {
             this.camera.position.add(moveDelta);
             this.camera.position.y = 1.8 + Math.abs(this.bobAmount);
             
-            // Simple bounds
             this.camera.position.x = Math.max(-40, Math.min(40, this.camera.position.x));
             this.camera.position.z = Math.max(-40, Math.min(40, this.camera.position.z));
             
-            // Inside building collision
             if (this.insideBuilding && this.currentBuilding) {
                 const inter = this.currentBuilding.interior;
                 this.camera.position.x = Math.max(inter.minX + 0.5, Math.min(inter.maxX - 0.5, this.camera.position.x));
                 this.camera.position.z = Math.max(inter.minZ + 0.5, Math.min(inter.maxZ - 0.5, this.camera.position.z));
             }
             
-            // Animate boxes
-            this.rewardBoxes.forEach(box => {
-                box.rotation.y += 0.01;
+            this.otherPlayers.forEach((playerObj) => {
+                if (playerObj.nameTag && playerObj.mesh) {
+                    const vector = playerObj.mesh.position.clone();
+                    vector.y += 2.5;
+                    vector.project(this.camera);
+                    
+                    const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                    const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+                    
+                    if (vector.z < 1) {
+                        playerObj.nameTag.style.display = 'block';
+                        playerObj.nameTag.style.left = x + 'px';
+                        playerObj.nameTag.style.top = y + 'px';
+                        
+                        if (playerObj.healthBar) {
+                            playerObj.healthBar.style.display = 'block';
+                            playerObj.healthBar.style.left = x + 'px';
+                            playerObj.healthBar.style.top = (y + 15) + 'px';
+                        }
+                    } else {
+                        playerObj.nameTag.style.display = 'none';
+                        if (playerObj.healthBar) playerObj.healthBar.style.display = 'none';
+                    }
+                }
             });
             
-            // Animate ammo boxes (floating)
             this.ammoBoxes.forEach(box => {
-                box.rotation.y += 0.02;
-                box.position.y = box.userData.floatY + Math.sin(Date.now() * box.userData.floatSpeed) * 0.2;
+                box.rotation.y += 0.01;
+                box.position.y = 0.5 + Math.sin(Date.now() * 0.003) * 0.1;
             });
             
             this.updateMinimap();
@@ -1306,21 +1556,29 @@ class Game {
     }
 }
 
-// Add animation styles for kill feed
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes slideOut {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-    }
-`;
-document.head.appendChild(style);
-
-// Start game
 window.onload = () => { 
-    const game = new Game(); 
+    try {
+        const game = new Game();
+        window.game = game;
+    } catch (error) {
+        console.error('Failed to start game:', error);
+    }
 };
+
+if (!document.getElementById('game-animation-styles')) {
+    const style = document.createElement('style');
+    style.id = 'game-animation-styles';
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
+    `;
+    document.head.appendChild(style);
+}
