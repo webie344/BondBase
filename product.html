@@ -36,79 +36,15 @@
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
+            padding-top: 20px; /* Add slight padding at top since navbar is gone */
         }
 
-        /* Navigation */
-        .navbar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            padding: 15px 30px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            backdrop-filter: blur(10px);
-        }
-
-        .nav-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .logo {
-            font-size: 24px;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-decoration: none;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 20px;
-        }
-
-        .nav-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 20px;
-            transition: all 0.3s ease;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            background: rgba(255, 42, 109, 0.1);
-            color: var(--primary);
-        }
-
-        .nav-link i {
-            margin-right: 8px;
-        }
-
-        .user-menu {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--bg-card);
-            border: 2px solid var(--primary);
-            cursor: pointer;
-            object-fit: cover;
-        }
+        /* NO NAVBAR - COMPLETELY REMOVED */
 
         /* Main Container */
         .container {
             max-width: 1200px;
-            margin: 30px auto;
+            margin: 0 auto;
             padding: 0 30px;
         }
 
@@ -694,10 +630,6 @@
 
         /* Responsive */
         @media (max-width: 768px) {
-            .nav-links {
-                display: none;
-            }
-            
             .product-container {
                 grid-template-columns: 1fr;
             }
@@ -709,29 +641,15 @@
             .contact-buttons {
                 flex-direction: column;
             }
+
+            .container {
+                padding: 0 15px;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <a href="index.html" class="logo">CryptoGamers</a>
-            
-            <div class="nav-links">
-                <a href="index.html" class="nav-link"><i class="fas fa-home"></i> Home</a>
-                <a href="gamers.html" class="nav-link"><i class="fas fa-users"></i> Gamers</a>
-                <a href="market.html" class="nav-link"><i class="fas fa-store"></i> Market</a>
-                <a href="xp.html" class="nav-link"><i class="fas fa-trophy"></i> XP</a>
-            </div>
-
-            <div class="user-menu">
-                <a href="profile.html" id="profileLink">
-                    <img src="images/default-avatar.jpg" alt="Profile" class="user-avatar" id="userAvatar">
-                </a>
-            </div>
-        </div>
-    </nav>
+    <!-- NO NAVIGATION - HEADER COMPLETELY REMOVED -->
 
     <!-- Main Container -->
     <div class="container">
@@ -775,7 +693,6 @@
 
         // DOM Elements
         const productContent = document.getElementById('productContent');
-        const userAvatar = document.getElementById('userAvatar');
         const backBtn = document.querySelector('.back-btn');
 
         // Modal Elements
@@ -799,20 +716,13 @@
             window.location.href = 'market.html';
         }
 
-        // Check authentication
+        // Check authentication (optional - don't require login to view products)
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                updateUserUI(user);
             }
             loadProduct();
         });
-
-        function updateUserUI(user) {
-            if (user.photoURL) {
-                userAvatar.src = user.photoURL;
-            }
-        }
 
         // Load product
         async function loadProduct() {
