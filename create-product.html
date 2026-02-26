@@ -412,7 +412,7 @@
         </div>
 
         <form id="createProductForm">
-            <!-- Store Selection -->
+            <!-- Store Selection - Now properly loads all stores -->
             <div class="form-group" id="storeSelectionGroup">
                 <label><i class="fas fa-store"></i> Select Store *</label>
                 <select class="form-control" id="storeSelect" required>
@@ -557,7 +557,6 @@
 
     <!-- Import products.js -->
     <script type="module">
-        // Import Firebase and product manager
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -634,36 +633,30 @@
             }
         });
 
-        // Load user's stores
+        // ========== FIXED: Load ALL user's stores ==========
         async function loadUserStores() {
             try {
-                // Check if user has a store
-                const storeRef = doc(db, 'stores', currentUser.uid);
-                const storeSnap = await getDoc(storeRef);
-
-                if (storeSnap.exists()) {
-                    // User has a store
-                    const storeData = storeSnap.data();
-                    storeSelect.innerHTML = `
-                        <option value="${currentUser.uid}" data-store='${JSON.stringify(storeData)}'>${storeData.storeName}</option>
-                    `;
-                } else {
-                    // Check if user has stores in the stores collection with different ID
-                    const storesQuery = query(collection(db, 'stores'), where('ownerId', '==', currentUser.uid));
-                    const storesSnap = await getDocs(storesQuery);
+                console.log('Loading stores for user:', currentUser.uid);
+                
+                // Query ALL stores where ownerId equals current user's UID
+                const storesQuery = query(collection(db, 'stores'), where('ownerId', '==', currentUser.uid));
+                const storesSnap = await getDocs(storesQuery);
+                
+                if (!storesSnap.empty) {
+                    console.log(`Found ${storesSnap.size} stores`);
+                    let options = '<option value="" disabled selected>Select a store</option>';
                     
-                    if (!storesSnap.empty) {
-                        let options = '';
-                        storesSnap.forEach(doc => {
-                            const storeData = doc.data();
-                            options += `<option value="${doc.id}" data-store='${JSON.stringify(storeData)}'>${storeData.storeName}</option>`;
-                        });
-                        storeSelect.innerHTML = options;
-                    } else {
-                        // No store found
-                        storeSelect.innerHTML = '<option value="" disabled>No store found. Create one first!</option>';
-                        showNoStoreMessage();
-                    }
+                    storesSnap.forEach(doc => {
+                        const storeData = doc.data();
+                        console.log('Store found:', doc.id, storeData.storeName);
+                        options += `<option value="${doc.id}" data-store='${JSON.stringify(storeData)}'>${storeData.storeName}</option>`;
+                    });
+                    
+                    storeSelect.innerHTML = options;
+                } else {
+                    console.log('No stores found for user');
+                    storeSelect.innerHTML = '<option value="" disabled>No stores found. Create one first!</option>';
+                    showNoStoreMessage();
                 }
             } catch (error) {
                 console.error('Error loading stores:', error);
@@ -795,7 +788,7 @@
             }
         }
 
-        // Form submission - NOW USING PRODUCT MANAGER WITH CLOUDINARY
+        // Form submission - USING PRODUCT MANAGER WITH CLOUDINARY
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -849,6 +842,7 @@
                 };
 
                 console.log('Creating product with Cloudinary images:', selectedFiles.length);
+                console.log('Selected store:', storeSelect.value, storeData.storeName);
 
                 // Use productManager to create product with Cloudinary upload
                 const result = await productManager.createProduct(productData, selectedFiles);
