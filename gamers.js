@@ -48,7 +48,8 @@ class InstantLoadingSystem {
             profiles: [],
             profileDetails: {},
             followStatus: {},
-            xpData: {}
+            xpData: {},
+            storeStatus: {} // Add store status cache
         };
         this.isInitialized = false;
         this.initPromise = null;
@@ -69,15 +70,17 @@ class InstantLoadingSystem {
                 await indexedDBCache.init();
                 
                 // Load all cached data in parallel
-                const [profiles, details, xpData] = await Promise.allSettled([
+                const [profiles, details, xpData, storeStatus] = await Promise.allSettled([
                     indexedDBCache.getProfiles(),
                     this.loadAllProfileDetails(),
-                    this.loadAllXPData()
+                    this.loadAllXPData(),
+                    this.loadAllStoreStatus() // Load store status
                 ]);
                 
                 this.appData.profiles = profiles.value || [];
                 this.appData.profileDetails = details.value || {};
                 this.appData.xpData = xpData.value || {};
+                this.appData.storeStatus = storeStatus.value || {};
                 
                 console.log(`⚡ Instant loaded ${this.appData.profiles.length} profiles from cache in ${Date.now() - preloadStartTime}ms`);
                 
@@ -124,6 +127,26 @@ class InstantLoadingSystem {
             console.log('Could not load XP data:', error);
         }
         return xpData;
+    }
+
+    // Add method to load store status
+    async loadAllStoreStatus() {
+        const storeStatus = {};
+        try {
+            const allStores = await indexedDBCache.getAll('stores');
+            allStores.forEach(store => {
+                if (store.ownerId) {
+                    storeStatus[store.ownerId] = {
+                        hasStore: true,
+                        storeId: store.storeId || store.ownerId,
+                        storeName: store.storeName
+                    };
+                }
+            });
+        } catch (error) {
+            console.log('Could not load store status:', error);
+        }
+        return storeStatus;
     }
 
     renderInstantly() {
@@ -203,6 +226,10 @@ class InstantLoadingSystem {
         return this.appData.xpData[userId];
     }
 
+    getStoreStatus(userId) {
+        return this.appData.storeStatus[userId];
+    }
+
     updateProfile(profile) {
         const index = this.appData.profiles.findIndex(p => p.id === profile.id);
         if (index !== -1) {
@@ -219,13 +246,17 @@ class InstantLoadingSystem {
     updateXPData(userId, xpData) {
         this.appData.xpData[userId] = xpData;
     }
+
+    updateStoreStatus(userId, storeData) {
+        this.appData.storeStatus[userId] = storeData;
+    }
 }
 
 // ==================== INDEXEDDB CACHE SYSTEM ====================
 class GamersIndexedDBCache {
     constructor() {
         this.dbName = 'GamersAppDB';
-        this.dbVersion = 8;
+        this.dbVersion = 9; // Increment version for stores store
         this.db = null;
     }
 
@@ -260,6 +291,12 @@ class GamersIndexedDBCache {
                 }
                 if (!db.objectStoreNames.contains('xpData')) {
                     db.createObjectStore('xpData', { keyPath: 'userId' });
+                }
+                // Add stores object store
+                if (!db.objectStoreNames.contains('stores')) {
+                    const storesStore = db.createObjectStore('stores', { keyPath: 'ownerId' });
+                    storesStore.createIndex('storeId', 'storeId', { unique: true });
+                    storesStore.createIndex('storeName', 'storeName', { unique: false });
                 }
             };
         });
@@ -396,6 +433,29 @@ class GamersIndexedDBCache {
     async getXPData(userId) {
         await this.init();
         return await this.get('xpData', userId);
+    }
+
+    // Add store methods
+    async setStore(storeData) {
+        await this.init();
+        return await this.set('stores', {
+            ownerId: storeData.ownerId,
+            storeId: storeData.storeId,
+            storeName: storeData.storeName,
+            logo: storeData.logo,
+            category: storeData.category,
+            lastUpdated: Date.now()
+        });
+    }
+
+    async getStore(ownerId) {
+        await this.init();
+        return await this.get('stores', ownerId);
+    }
+
+    async getAllStores() {
+        await this.init();
+        return await this.getAll('stores');
     }
 }
 
@@ -564,6 +624,8 @@ let allProfiles = [];
 let currentFilter = 'all';
 let xpSystem = null;
 let isLoading = false;
+// Cache for store status
+let storeStatusCache = {};
 
 // Check if we're on profile page or gamers directory
 const isProfilePage = window.location.pathname.includes('profile.html');
@@ -806,6 +868,20 @@ async function fetchFreshProfiles(silentRefresh = false) {
         const usersSnap = await getDocs(usersRef);
         console.log(`📊 Found ${usersSnap.size} users`);
         
+        // Load all stores first to check which users have stores
+        const storesRef = collection(db, 'stores');
+        const storesSnap = await getDocs(storesRef);
+        const storesMap = {};
+        storesSnap.forEach(doc => {
+            const storeData = doc.data();
+            storesMap[storeData.ownerId] = {
+                hasStore: true,
+                storeId: doc.id,
+                storeName: storeData.storeName,
+                storeLogo: storeData.logoThumbnail || storeData.logo
+            };
+        });
+        
         const newProfiles = [];
         const currentUserId = currentUser ? currentUser.uid : null;
         
@@ -822,7 +898,7 @@ async function fetchFreshProfiles(silentRefresh = false) {
                 return;
             }
             
-            profilePromises.push(processUserProfile(userId, userData));
+            profilePromises.push(processUserProfile(userId, userData, storesMap[userId]));
         });
         
         // Wait for all profiles to be processed
@@ -940,7 +1016,7 @@ function updateProfileItem(item, profile) {
     }
 }
 
-async function processUserProfile(userId, userData) {
+async function processUserProfile(userId, userData, storeInfo = null) {
     try {
         // Basic profile data
         const profile = {
@@ -961,7 +1037,12 @@ async function processUserProfile(userId, userData) {
             xpLevel: 1, // Default XP level
             xpRank: "Newbie Explorer", // Default XP rank
             xpIcon: "🌱", // Default XP icon
-            totalXP: 0 // Default total XP
+            totalXP: 0, // Default total XP
+            // Store info
+            hasStore: storeInfo ? true : false,
+            storeId: storeInfo ? storeInfo.storeId : null,
+            storeName: storeInfo ? storeInfo.storeName : null,
+            storeLogo: storeInfo ? storeInfo.storeLogo : null
         };
         
         // Get online status
@@ -1023,6 +1104,17 @@ async function processUserProfile(userId, userData) {
             }
         } catch (error) {
             console.log('No XP data for user:', userId);
+        }
+        
+        // Cache store info
+        if (storeInfo) {
+            await indexedDBCache.setStore({
+                ownerId: userId,
+                storeId: storeInfo.storeId,
+                storeName: storeInfo.storeName,
+                logo: storeInfo.storeLogo
+            });
+            instantLoader.updateStoreStatus(userId, storeInfo);
         }
         
         return profile;
@@ -1270,6 +1362,7 @@ function renderProfilesList() {
     console.log('Profiles rendered successfully');
 }
 
+// ==================== UPDATED PROFILE ITEM WITH STORE BUTTON ====================
 function createProfileItem(profile) {
     const div = document.createElement('div');
     div.className = 'gamer-item';
@@ -1292,6 +1385,14 @@ function createProfileItem(profile) {
                 <path d="M2 12h20"></path>
             </svg>
             Gamer
+        </span>
+    ` : '';
+    
+    // Store badge - NEW
+    const storeBadge = profile.hasStore ? `
+        <span class="attribute-tag" style="background: rgba(122, 79, 255, 0.2); border-color: #7a4fff; color: #7a4fff;">
+            <i class="fas fa-store" style="font-size: 10px; margin-right: 3px;"></i>
+            Store
         </span>
     ` : '';
     
@@ -1363,7 +1464,8 @@ function createProfileItem(profile) {
             </div>
             <div class="gamer-attributes">
                 ${gamerBadge}
-                ${attributes.slice(0, 3).map(attr => `
+                ${storeBadge}
+                ${attributes.slice(0, 2).map(attr => `
                     <span class="attribute-tag">${attr}</span>
                 `).join('')}
                 ${profile.interests && profile.interests.length > 0 ? `
@@ -1388,6 +1490,13 @@ function createProfileItem(profile) {
                     ${formatNumber(followersCount)}
                 </span>
             </div>
+            <!-- Store Button - NEW -->
+            ${profile.hasStore ? `
+                <button class="store-btn" data-profile-id="${profile.id}" data-store-id="${profile.storeId}" title="Visit Store">
+                    <i class="fas fa-store"></i>
+                    Store
+                </button>
+            ` : ''}
             <button class="${buttonClass}" data-profile-id="${profile.id}" data-following="${profile.isFollowing}">
                 ${profile.isFollowing ? `
                     <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -1416,10 +1525,20 @@ function createProfileItem(profile) {
     div.addEventListener('click', (e) => {
         if (!e.target.closest('.add-clan-btn') && 
             !e.target.closest('.clan-section') &&
-            !e.target.closest('.message-gamer-btn')) {
+            !e.target.closest('.message-gamer-btn') &&
+            !e.target.closest('.store-btn')) {
             window.location.href = `profile.html?id=${profile.id}`;
         }
     });
+    
+    // Store button event - NEW
+    const storeBtn = div.querySelector('.store-btn');
+    if (storeBtn) {
+        storeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.location.href = `store.html?id=${profile.storeId}`;
+        });
+    }
     
     // Follow/Unfollow button event
     const clanBtn = div.querySelector('.add-clan-btn');
@@ -1450,7 +1569,6 @@ function createProfileItem(profile) {
                         Follow
                     `;
                     clanBtn.classList.remove('added');
-                    clanBtn.textContent = 'Follow';
                     
                     // Update followers count with TikTok-style formatting
                     const clanCountSpan = div.querySelector('.clan-count');
@@ -1474,7 +1592,6 @@ function createProfileItem(profile) {
                         Following
                     `;
                     clanBtn.classList.add('added');
-                    clanBtn.textContent = 'Following';
                     
                     // Update followers count with TikTok-style formatting
                     const clanCountSpan = div.querySelector('.clan-count');
@@ -1524,6 +1641,42 @@ function createProfileItem(profile) {
     
     return div;
 }
+
+// Add CSS for store button (add to your existing styles)
+const style = document.createElement('style');
+style.textContent = `
+    .store-btn {
+        background: linear-gradient(135deg, #7a4fff, #ff2a6d);
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.3s ease;
+        margin-right: 5px;
+    }
+    
+    .store-btn i {
+        font-size: 12px;
+    }
+    
+    .store-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(122, 79, 255, 0.3);
+    }
+    
+    .gamer-actions {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+`;
+document.head.appendChild(style);
 
 // ==================== PROFILE PAGE FUNCTIONALITY ====================
 async function initProfilePage() {
@@ -2032,7 +2185,7 @@ async function updateFollowButton(profileId) {
         followBtn.dataset.following = 'true';
     } else {
         followBtn.innerHTML = '<svg class="feather" data-feather="user-plus"></svg> Follow';
-        followBtn.classList.remove('btn-follow');
+        followBtn.classList.remove('btn-message');
         followBtn.classList.add('btn-follow');
         followBtn.dataset.following = 'false';
     }

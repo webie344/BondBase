@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Product - Crypto Gamers</title>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #14141f;
+            --bg-card: #1a1a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0c0;
+            --primary: #ff2a6d;
+            --primary-dark: #d91a5c;
+            --secondary: #7a4fff;
+            --success: #00ff88;
+            --warning: #ffd166;
+            --danger: #ff6b6b;
+            --border: #2a2a3a;
+            --input-bg: #1e1e2e;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: var(--bg-card);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border);
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .store-badge {
+            background: linear-gradient(135deg, rgba(255, 42, 109, 0.2), rgba(122, 79, 255, 0.2));
+            border-radius: 50px;
+            padding: 5px 15px;
+            display: inline-block;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 42, 109, 0.3);
+            font-size: 14px;
+            color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        .form-group label i {
+            margin-right: 8px;
+            color: var(--primary);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 15px;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(255, 42, 109, 0.1);
+        }
+
+        .form-control::placeholder {
+            color: #4a4a60;
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .price-input {
+            display: flex;
+            align-items: center;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .price-input span {
+            background: rgba(255, 42, 109, 0.2);
+            padding: 12px 15px;
+            color: var(--primary);
+            font-weight: 600;
+            border-right: 1px solid var(--border);
+        }
+
+        .price-input input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 12px 15px;
+            color: var(--text-primary);
+        }
+
+        .price-input input:focus {
+            outline: none;
+        }
+
+        .image-upload {
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .image-upload:hover {
+            border-color: var(--primary);
+            background: rgba(255, 42, 109, 0.05);
+        }
+
+        .image-upload i {
+            font-size: 40px;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .image-upload p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .image-upload .cloudinary-badge {
+            display: inline-block;
+            background: #3448C5;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .image-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .preview-item {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid var(--border);
+        }
+
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .remove-image {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .remove-image:hover {
+            transform: scale(1.1);
+        }
+
+        .features-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .feature-tag {
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 5px 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .feature-tag i {
+            color: var(--primary);
+            font-size: 10px;
+        }
+
+        .feature-tag:hover {
+            background: rgba(255, 42, 109, 0.1);
+            border-color: var(--primary);
+        }
+
+        .feature-tag.selected {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .feature-tag.selected i {
+            color: white;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 42, 109, 0.3);
+        }
+
+        .btn i {
+            font-size: 18px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            color: var(--danger);
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .form-group.error .form-control {
+            border-color: var(--danger);
+        }
+
+        .form-group.error .error-message {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .loading i {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-message {
+            display: none;
+            text-align: center;
+            color: var(--success);
+            margin: 20px 0;
+        }
+
+        .upload-progress {
+            display: none;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .row {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="store-badge"><i class="fas fa-box"></i> Add New Product</span>
+            <h1>List Your Product</h1>
+            <p>Fill in the details of your product</p>
+        </div>
+
+        <form id="createProductForm">
+            <!-- Store Selection -->
+            <div class="form-group" id="storeSelectionGroup">
+                <label><i class="fas fa-store"></i> Select Store *</label>
+                <select class="form-control" id="storeSelect" required>
+                    <option value="" disabled selected>Loading your stores...</option>
+                </select>
+                <div class="error-message">Please select a store</div>
+            </div>
+
+            <!-- Product Name -->
+            <div class="form-group">
+                <label><i class="fas fa-tag"></i> Product Name *</label>
+                <input type="text" class="form-control" id="productName" placeholder="e.g., Gaming Mouse, Fortnite Account, etc." required>
+                <div class="error-message">Product name is required</div>
+            </div>
+
+            <!-- Product Description -->
+            <div class="form-group">
+                <label><i class="fas fa-align-left"></i> Product Description *</label>
+                <textarea class="form-control" id="productDescription" placeholder="Describe your product in detail..." required></textarea>
+                <div class="error-message">Description is required</div>
+            </div>
+
+            <!-- Product Category -->
+            <div class="form-group">
+                <label><i class="fas fa-list"></i> Category *</label>
+                <select class="form-control" id="productCategory" required>
+                    <option value="" disabled selected>Select category</option>
+                    <option value="gaming-gear">Gaming Gear</option>
+                    <option value="digital-goods">Digital Goods</option>
+                    <option value="game-accounts">Game Accounts</option>
+                    <option value="in-game-items">In-Game Items</option>
+                    <option value="services">Gaming Services</option>
+                    <option value="other">Other</option>
+                </select>
+                <div class="error-message">Please select a category</div>
+            </div>
+
+            <!-- Price Row -->
+            <div class="row">
+                <div class="form-group">
+                    <label><i class="fas fa-dollar-sign"></i> Price *</label>
+                    <div class="price-input">
+                        <span>$</span>
+                        <input type="number" id="price" step="0.01" min="0" placeholder="0.00" required>
+                    </div>
+                    <div class="error-message">Valid price is required</div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-boxes"></i> Stock Quantity</label>
+                    <input type="number" class="form-control" id="stockQuantity" min="0" value="1" placeholder="Quantity available">
+                    <small style="color: var(--text-secondary);">Leave 0 for unlimited/digital items</small>
+                </div>
+            </div>
+
+            <!-- Discount Row -->
+            <div class="row">
+                <div class="form-group">
+                    <label><i class="fas fa-percent"></i> Discount (%)</label>
+                    <input type="number" class="form-control" id="discount" min="0" max="100" value="0" placeholder="0">
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Sale Price</label>
+                    <div class="price-input">
+                        <span>$</span>
+                        <input type="number" id="salePrice" step="0.01" min="0" readonly placeholder="Auto-calculated">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Condition -->
+            <div class="form-group">
+                <label><i class="fas fa-clipboard-check"></i> Condition *</label>
+                <select class="form-control" id="condition" required>
+                    <option value="new">New</option>
+                    <option value="like-new">Like New</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="digital">Digital/Delivered</option>
+                </select>
+            </div>
+
+            <!-- Product Images - Cloudinary Upload -->
+            <div class="image-upload" id="imageUpload">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <p>Click to upload product images to Cloudinary</p>
+                <p style="font-size: 12px;">You can select multiple images (Max: 5)</p>
+                <div class="cloudinary-badge">
+                    <i class="fas fa-cloud"></i> Powered by Cloudinary
+                </div>
+                <input type="file" id="productImages" accept="image/*" multiple style="display: none;">
+            </div>
+
+            <!-- Image Preview Container -->
+            <div class="image-preview-container" id="imagePreviewContainer"></div>
+
+            <!-- Upload Progress -->
+            <div class="upload-progress" id="uploadProgress">
+                <p><i class="fas fa-cloud-upload-alt"></i> Uploading to Cloudinary...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+
+            <!-- Product Features/Tags -->
+            <div class="form-group">
+                <label><i class="fas fa-star"></i> Product Features</label>
+                <div class="features-container" id="featuresContainer">
+                    <span class="feature-tag" data-feature="brand-new"><i class="fas fa-tag"></i> Brand New</span>
+                    <span class="feature-tag" data-feature="warranty"><i class="fas fa-shield-alt"></i> Warranty</span>
+                    <span class="feature-tag" data-feature="instant-delivery"><i class="fas fa-bolt"></i> Instant Delivery</span>
+                    <span class="feature-tag" data-feature="rare"><i class="fas fa-gem"></i> Rare Item</span>
+                    <span class="feature-tag" data-feature="limited"><i class="fas fa-clock"></i> Limited Edition</span>
+                    <span class="feature-tag" data-feature="authentic"><i class="fas fa-check-circle"></i> Authentic</span>
+                </div>
+            </div>
+
+            <!-- Additional Details -->
+            <div class="form-group">
+                <label><i class="fas fa-info-circle"></i> Additional Details</label>
+                <textarea class="form-control" id="additionalDetails" placeholder="Any other important information..."></textarea>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div class="loading" id="loading">
+                <i class="fas fa-spinner"></i> Creating product...
+            </div>
+
+            <!-- Success Message -->
+            <div class="success-message" id="successMessage">
+                <i class="fas fa-check-circle"></i> Product created successfully! Redirecting...
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn" id="submitBtn">
+                <i class="fas fa-plus-circle"></i>
+                Add Product
+            </button>
+        </form>
+    </div>
+
+    <!-- Import products.js -->
+    <script type="module">
+        // Import Firebase and product manager
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        
+        // Import product manager
+        import { productManager } from './products.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
+            authDomain: "crypto-6517d.firebaseapp.com",
+            projectId: "crypto-6517d",
+            storageBucket: "crypto-6517d.firebasestorage.app",
+            messagingSenderId: "60263975159",
+            appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // DOM Elements
+        const form = document.getElementById('createProductForm');
+        const storeSelect = document.getElementById('storeSelect');
+        const storeSelectionGroup = document.getElementById('storeSelectionGroup');
+        const productName = document.getElementById('productName');
+        const productDescription = document.getElementById('productDescription');
+        const productCategory = document.getElementById('productCategory');
+        const price = document.getElementById('price');
+        const stockQuantity = document.getElementById('stockQuantity');
+        const discount = document.getElementById('discount');
+        const salePrice = document.getElementById('salePrice');
+        const condition = document.getElementById('condition');
+        const additionalDetails = document.getElementById('additionalDetails');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const successMessage = document.getElementById('successMessage');
+        const imageUpload = document.getElementById('imageUpload');
+        const productImages = document.getElementById('productImages');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressFill = document.getElementById('progressFill');
+        const featureTags = document.querySelectorAll('.feature-tag');
+
+        let currentUser = null;
+        let selectedFiles = [];
+        let selectedFeatures = [];
+
+        // Feature tag selection
+        featureTags.forEach(tag => {
+            tag.addEventListener('click', () => {
+                tag.classList.toggle('selected');
+                const feature = tag.dataset.feature;
+                if (tag.classList.contains('selected')) {
+                    if (!selectedFeatures.includes(feature)) {
+                        selectedFeatures.push(feature);
+                    }
+                } else {
+                    selectedFeatures = selectedFeatures.filter(f => f !== feature);
+                }
+                console.log('Selected features:', selectedFeatures);
+            });
+        });
+
+        // Check authentication and load stores
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                console.log('User logged in:', user.uid);
+                await loadUserStores();
+            } else {
+                window.location.href = 'login.html?redirect=create-product.html';
+            }
+        });
+
+        // Load user's stores
+        async function loadUserStores() {
+            try {
+                // Check if user has a store
+                const storeRef = doc(db, 'stores', currentUser.uid);
+                const storeSnap = await getDoc(storeRef);
+
+                if (storeSnap.exists()) {
+                    // User has a store
+                    const storeData = storeSnap.data();
+                    storeSelect.innerHTML = `
+                        <option value="${currentUser.uid}" data-store='${JSON.stringify(storeData)}'>${storeData.storeName}</option>
+                    `;
+                } else {
+                    // Check if user has stores in the stores collection with different ID
+                    const storesQuery = query(collection(db, 'stores'), where('ownerId', '==', currentUser.uid));
+                    const storesSnap = await getDocs(storesQuery);
+                    
+                    if (!storesSnap.empty) {
+                        let options = '';
+                        storesSnap.forEach(doc => {
+                            const storeData = doc.data();
+                            options += `<option value="${doc.id}" data-store='${JSON.stringify(storeData)}'>${storeData.storeName}</option>`;
+                        });
+                        storeSelect.innerHTML = options;
+                    } else {
+                        // No store found
+                        storeSelect.innerHTML = '<option value="" disabled>No store found. Create one first!</option>';
+                        showNoStoreMessage();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading stores:', error);
+                storeSelect.innerHTML = '<option value="" disabled>Error loading stores</option>';
+            }
+        }
+
+        function showNoStoreMessage() {
+            // Disable all form inputs
+            const inputs = form.querySelectorAll('input, select, textarea, button');
+            inputs.forEach(input => {
+                if (input.id !== 'storeSelect') {
+                    input.disabled = true;
+                }
+            });
+
+            // Show warning
+            const warningDiv = document.createElement('div');
+            warningDiv.style.cssText = `
+                background: rgba(255, 42, 109, 0.1);
+                border: 1px solid var(--primary);
+                border-radius: 12px;
+                padding: 20px;
+                text-align: center;
+                margin: 20px 0;
+            `;
+            warningDiv.innerHTML = `
+                <i class="fas fa-store" style="font-size: 40px; color: var(--primary); margin-bottom: 10px;"></i>
+                <h3 style="margin-bottom: 10px;">You don't have a store yet!</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">Create a store first to start adding products.</p>
+                <a href="create-store.html" style="
+                    background: linear-gradient(135deg, var(--primary), var(--secondary));
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 12px;
+                    text-decoration: none;
+                    display: inline-block;
+                    font-weight: 600;
+                ">Create Store Now</a>
+            `;
+
+            storeSelectionGroup.appendChild(warningDiv);
+        }
+
+        // Image upload handling
+        imageUpload.addEventListener('click', () => {
+            productImages.click();
+        });
+
+        // Drag and drop
+        imageUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            imageUpload.style.borderColor = 'var(--primary)';
+            imageUpload.style.background = 'rgba(255, 42, 109, 0.05)';
+        });
+
+        imageUpload.addEventListener('dragleave', () => {
+            imageUpload.style.borderColor = 'var(--border)';
+            imageUpload.style.background = 'transparent';
+        });
+
+        imageUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            imageUpload.style.borderColor = 'var(--border)';
+            imageUpload.style.background = 'transparent';
+            
+            const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+            handleImageSelection(files);
+        });
+
+        productImages.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleImageSelection(files);
+        });
+
+        function handleImageSelection(files) {
+            if (files.length + selectedFiles.length > 5) {
+                alert('Maximum 5 images allowed');
+                return;
+            }
+
+            files.forEach(file => {
+                selectedFiles.push(file);
+                
+                // Create preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const previewDiv = document.createElement('div');
+                    previewDiv.className = 'preview-item';
+                    previewDiv.dataset.filename = file.name;
+                    
+                    previewDiv.innerHTML = `
+                        <img src="${e.target.result}" alt="Preview">
+                        <button type="button" class="remove-image" data-filename="${file.name}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    
+                    previewDiv.querySelector('.remove-image').addEventListener('click', () => {
+                        const index = selectedFiles.findIndex(f => f.name === file.name);
+                        if (index > -1) {
+                            selectedFiles.splice(index, 1);
+                            previewDiv.remove();
+                        }
+                    });
+                    
+                    imagePreviewContainer.appendChild(previewDiv);
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // Clear input so same file can be selected again if removed
+            productImages.value = '';
+        }
+
+        // Calculate sale price when discount changes
+        price.addEventListener('input', calculateSalePrice);
+        discount.addEventListener('input', calculateSalePrice);
+
+        function calculateSalePrice() {
+            const originalPrice = parseFloat(price.value) || 0;
+            const discountPercent = parseFloat(discount.value) || 0;
+            
+            if (originalPrice > 0 && discountPercent > 0) {
+                const discounted = originalPrice * (1 - discountPercent / 100);
+                salePrice.value = discounted.toFixed(2);
+            } else {
+                salePrice.value = originalPrice.toFixed(2);
+            }
+        }
+
+        // Form submission - NOW USING PRODUCT MANAGER WITH CLOUDINARY
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Validate form
+            if (!validateForm()) {
+                return;
+            }
+
+            if (!currentUser) {
+                alert('Please login first');
+                window.location.href = 'login.html?redirect=create-product.html';
+                return;
+            }
+
+            // Show loading
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            submitBtn.style.opacity = '0.7';
+
+            try {
+                // Get selected store data
+                const selectedOption = storeSelect.options[storeSelect.selectedIndex];
+                let storeData = {};
+                try {
+                    storeData = JSON.parse(selectedOption.dataset.store || '{}');
+                } catch (e) {
+                    console.log('Error parsing store data:', e);
+                }
+
+                // Prepare product data
+                const productData = {
+                    storeId: storeSelect.value,
+                    storeName: storeData.storeName || 'Store',
+                    ownerId: currentUser.uid,
+                    ownerName: currentUser.displayName || 'Seller',
+                    ownerEmail: currentUser.email,
+                    ownerWhatsapp: storeData.whatsapp || '',
+                    ownerTelegram: storeData.telegram || '',
+                    name: productName.value.trim(),
+                    description: productDescription.value.trim(),
+                    category: productCategory.value,
+                    price: parseFloat(price.value) || 0,
+                    originalPrice: parseFloat(price.value) || 0,
+                    discount: parseFloat(discount.value) || 0,
+                    salePrice: parseFloat(salePrice.value) || parseFloat(price.value) || 0,
+                    stock: parseInt(stockQuantity.value) || 0,
+                    condition: condition.value,
+                    features: selectedFeatures,
+                    additionalDetails: additionalDetails.value.trim() || '',
+                    status: 'active'
+                };
+
+                console.log('Creating product with Cloudinary images:', selectedFiles.length);
+
+                // Use productManager to create product with Cloudinary upload
+                const result = await productManager.createProduct(productData, selectedFiles);
+                
+                console.log('Product created successfully:', result);
+
+                // Show success message
+                loading.style.display = 'none';
+                successMessage.style.display = 'block';
+
+                // Redirect after 2 seconds
+                setTimeout(() => {
+                    window.location.href = 'market.html';
+                }, 2000);
+
+            } catch (error) {
+                console.error('Error creating product:', error);
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                
+                // Show user-friendly error
+                let errorMessage = 'Error creating product';
+                if (error.message.includes('Cloudinary')) {
+                    errorMessage = 'Image upload failed. Please check your Cloudinary settings.';
+                } else if (error.message.includes('permission')) {
+                    errorMessage = 'You don\'t have permission to create products';
+                } else {
+                    errorMessage = error.message || 'Unknown error occurred';
+                }
+                
+                alert(errorMessage);
+            }
+        });
+
+        function validateForm() {
+            let isValid = true;
+
+            // Store validation
+            if (!storeSelect.value) {
+                alert('Please select a store');
+                isValid = false;
+            }
+
+            // Product name validation
+            if (!productName.value.trim()) {
+                showError(productName, 'Product name is required');
+                isValid = false;
+            } else {
+                removeError(productName);
+            }
+
+            // Description validation
+            if (!productDescription.value.trim()) {
+                showError(productDescription, 'Description is required');
+                isValid = false;
+            } else {
+                removeError(productDescription);
+            }
+
+            // Category validation
+            if (!productCategory.value) {
+                showError(productCategory, 'Please select a category');
+                isValid = false;
+            } else {
+                removeError(productCategory);
+            }
+
+            // Price validation
+            if (!price.value || parseFloat(price.value) <= 0) {
+                showError(price, 'Valid price is required');
+                isValid = false;
+            } else {
+                removeError(price);
+            }
+
+            return isValid;
+        }
+
+        function showError(element, message) {
+            const formGroup = element.closest('.form-group');
+            if (formGroup) {
+                formGroup.classList.add('error');
+                const errorMsg = formGroup.querySelector('.error-message');
+                if (errorMsg) {
+                    errorMsg.textContent = message;
+                }
+            }
+        }
+
+        function removeError(element) {
+            const formGroup = element.closest('.form-group');
+            if (formGroup) {
+                formGroup.classList.remove('error');
+            }
+        }
+
+        // Real-time validation
+        productName.addEventListener('input', () => {
+            if (productName.value.trim()) {
+                removeError(productName);
+            }
+        });
+
+        productDescription.addEventListener('input', () => {
+            if (productDescription.value.trim()) {
+                removeError(productDescription);
+            }
+        });
+
+        productCategory.addEventListener('change', () => {
+            if (productCategory.value) {
+                removeError(productCategory);
+            }
+        });
+
+        price.addEventListener('input', () => {
+            if (price.value && parseFloat(price.value) > 0) {
+                removeError(price);
+            }
+        });
+
+        // Simulate progress for better UX (optional)
+        function simulateUploadProgress() {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                if (progress <= 90) {
+                    progressFill.style.width = progress + '%';
+                } else {
+                    clearInterval(interval);
+                }
+            }, 300);
+            return interval;
+        }
+    </script>
+</body>
+</html>
