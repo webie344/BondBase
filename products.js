@@ -40,8 +40,8 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // IMPORTANT: Replace these with your actual Cloudinary credentials
-const CLOUDINARY_CLOUD_NAME = 'ddtdqrh1b'; // Get from Cloudinary dashboard
-const CLOUDINARY_UPLOAD_PRESET = 'profile-pictures'; // Create in Cloudinary settings
+const CLOUDINARY_CLOUD_NAME = 'ddtdqrh1b';
+const CLOUDINARY_UPLOAD_PRESET = 'profile-pictures';
 
 // Product Class
 class ProductManager {
@@ -49,13 +49,412 @@ class ProductManager {
         this.currentUser = null;
         this.cachePrefix = 'products_';
         this.cacheExpiry = 5 * 60 * 1000; // 5 minutes
+        this.stores = [];
+        this.currentStoreId = null;
+        this.products = {};
         this.init();
+        this.initProfileDisplay(); // Auto-initialize when loaded
     }
 
     async init() {
         onAuthStateChanged(auth, (user) => {
             this.currentUser = user;
         });
+    }
+
+    // Auto-detect and initialize profile display
+    async initProfileDisplay() {
+        // Check if we're on a profile page
+        if (!window.location.pathname.includes('profile.html') && !window.location.pathname.includes('account.html')) {
+            return; // Not on profile page, don't load stores
+        }
+
+        console.log('Profile page detected, loading stores...');
+
+        // Try to get profile user ID from multiple sources
+        let profileUserId = null;
+
+        // Method 1: Check URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        profileUserId = urlParams.get('userId') || urlParams.get('uid') || urlParams.get('id');
+
+        // Method 2: If on "my profile" page (account.html) and no user ID specified, use current user
+        if (!profileUserId && window.location.pathname.includes('account.html')) {
+            // Wait for auth to load
+            const checkAuth = setInterval(() => {
+                if (this.currentUser) {
+                    clearInterval(checkAuth);
+                    this.loadUserStoresForDisplay(this.currentUser.uid);
+                }
+            }, 100);
+            return;
+        }
+
+        if (profileUserId) {
+            console.log('Loading stores for user:', profileUserId);
+            await this.loadUserStoresForDisplay(profileUserId);
+        }
+    }
+
+    // Load user stores for profile display
+    async loadUserStoresForDisplay(userId) {
+        try {
+            if (!userId) return;
+
+            // Check if stores section exists
+            const storeTabs = document.getElementById('storeTabs');
+            if (!storeTabs) {
+                console.log('Store section not found on this page');
+                return;
+            }
+
+            // Show loading state
+            this.showStoreLoading();
+
+            // Get user's stores - WITHOUT orderBy to avoid index requirement
+            this.stores = await this.getUserStores(userId);
+            
+            // Sort manually in JavaScript instead of using orderBy
+            this.stores.sort((a, b) => {
+                const dateA = a.createdAt ? a.createdAt.seconds : 0;
+                const dateB = b.createdAt ? b.createdAt.seconds : 0;
+                return dateB - dateA; // Descending order (newest first)
+            });
+
+            console.log(`Found ${this.stores.length} stores for user ${userId}`);
+
+            if (this.stores.length === 0) {
+                this.showNoStoresMessage('This user hasn\'t created any stores yet');
+                return;
+            }
+
+            // Render store tabs
+            this.renderStoreTabs();
+
+            // Load products for the first store
+            if (this.stores.length > 0) {
+                this.currentStoreId = this.stores[0].id;
+                await this.loadStoreProductsForDisplay(this.currentStoreId);
+                this.renderStoreInfo(this.stores[0]);
+            }
+
+        } catch (error) {
+            console.error('Error loading stores for display:', error);
+            this.showStoreError('Failed to load stores');
+        }
+    }
+
+    // Show loading state in the stores section
+    showStoreLoading() {
+        const storeTabs = document.getElementById('storeTabs');
+        const productsGrid = document.getElementById('productsGrid');
+        
+        if (storeTabs) {
+            storeTabs.innerHTML = '<div class="loading">Loading stores...</div>';
+        }
+        
+        if (productsGrid) {
+            productsGrid.innerHTML = '<div class="loading">Loading products...</div>';
+        }
+    }
+
+    // Show no stores message
+    showNoStoresMessage(message) {
+        const storeTabs = document.getElementById('storeTabs');
+        const storeInfoCard = document.getElementById('storeInfoCard');
+        const productsGrid = document.getElementById('productsGrid');
+        
+        if (storeTabs) {
+            storeTabs.innerHTML = `
+                <div class="no-stores-message">
+                    <svg class="feather" data-feather="shopping-bag">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+        
+        if (storeInfoCard) {
+            storeInfoCard.style.display = 'none';
+        }
+        
+        if (productsGrid) {
+            productsGrid.innerHTML = '';
+        }
+        
+        // Re-initialize feather icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    }
+
+    // Show error message
+    showStoreError(message) {
+        const storeTabs = document.getElementById('storeTabs');
+        if (storeTabs) {
+            storeTabs.innerHTML = `<div class="error">${message}</div>`;
+        }
+    }
+
+    // Render store tabs
+    renderStoreTabs() {
+        const storeTabs = document.getElementById('storeTabs');
+        if (!storeTabs) return;
+
+        if (this.stores.length === 0) {
+            this.showNoStoresMessage('No stores available');
+            return;
+        }
+
+        let tabsHtml = '';
+        this.stores.forEach((store, index) => {
+            const isActive = index === 0 ? 'active' : '';
+            tabsHtml += `
+                <div class="store-tab ${isActive}" data-store-id="${store.id}">
+                    <svg class="feather" data-feather="${store.logo ? 'image' : 'shopping-bag'}"></svg>
+                    ${store.name || 'Unnamed Store'}
+                    <span class="product-count">${store.products || 0}</span>
+                </div>
+            `;
+        });
+
+        storeTabs.innerHTML = tabsHtml;
+
+        // Add click handlers
+        document.querySelectorAll('.store-tab').forEach(tab => {
+            tab.addEventListener('click', async (e) => {
+                const storeId = tab.dataset.storeId;
+                await this.switchStore(storeId);
+            });
+        });
+
+        // Re-initialize feather icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    }
+
+    // Switch between stores
+    async switchStore(storeId) {
+        if (this.currentStoreId === storeId) return;
+
+        // Update active tab
+        document.querySelectorAll('.store-tab').forEach(tab => {
+            if (tab.dataset.storeId === storeId) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+
+        this.currentStoreId = storeId;
+        
+        // Find store data
+        const store = this.stores.find(s => s.id === storeId);
+        if (store) {
+            this.renderStoreInfo(store);
+            await this.loadStoreProductsForDisplay(storeId);
+        }
+    }
+
+    // Render store information
+    renderStoreInfo(store) {
+        const storeInfoCard = document.getElementById('storeInfoCard');
+        const storeLogo = document.getElementById('storeLogo');
+        const storeName = document.getElementById('storeName');
+        const storeVerified = document.getElementById('storeVerified');
+        const storeDescription = document.getElementById('storeDescription');
+        const storeProductsCount = document.getElementById('storeProductsCount');
+        const storeFollowersCount = document.getElementById('storeFollowersCount');
+        const storeCreated = document.getElementById('storeCreated');
+
+        if (!storeInfoCard) return;
+
+        // Show the store info card
+        storeInfoCard.style.display = 'flex';
+
+        // Set store logo
+        if (storeLogo) {
+            if (store.logo && store.logo.url) {
+                storeLogo.src = store.logo.url;
+            } else {
+                storeLogo.src = 'images/default-store.jpg';
+            }
+        }
+
+        // Set store name
+        if (storeName) {
+            // Clear existing content
+            while (storeName.firstChild) {
+                storeName.removeChild(storeName.firstChild);
+            }
+            
+            // Add store name text
+            storeName.appendChild(document.createTextNode(store.name || 'Unnamed Store'));
+            
+            // Add verified badge if needed
+            if (store.verified) {
+                const verifiedSpan = document.createElement('span');
+                verifiedSpan.className = 'store-verified';
+                verifiedSpan.id = 'storeVerified';
+                verifiedSpan.textContent = 'Verified';
+                storeName.appendChild(verifiedSpan);
+            }
+        }
+
+        // Set description
+        if (storeDescription) {
+            storeDescription.textContent = store.description || 'No description provided';
+        }
+
+        // Set products count
+        if (storeProductsCount) {
+            const icon = storeProductsCount.querySelector('svg');
+            const textSpan = storeProductsCount.querySelector('span') || document.createElement('span');
+            if (!textSpan.parentNode) {
+                storeProductsCount.appendChild(textSpan);
+            }
+            textSpan.textContent = `${store.products || 0} products`;
+        }
+
+        // Set followers count
+        if (storeFollowersCount) {
+            const icon = storeFollowersCount.querySelector('svg');
+            const textSpan = storeFollowersCount.querySelector('span') || document.createElement('span');
+            if (!textSpan.parentNode) {
+                storeFollowersCount.appendChild(textSpan);
+            }
+            textSpan.textContent = `${store.followers ? store.followers.length : 0} followers`;
+        }
+
+        // Set creation date
+        if (storeCreated) {
+            const icon = storeCreated.querySelector('svg');
+            const textSpan = storeCreated.querySelector('span') || document.createElement('span');
+            if (!textSpan.parentNode) {
+                storeCreated.appendChild(textSpan);
+            }
+            const createdDate = store.createdAt ? new Date(store.createdAt.seconds * 1000) : new Date();
+            textSpan.textContent = `Joined ${this.formatDate(createdDate)}`;
+        }
+
+        // Re-initialize feather icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    }
+
+    // Load store products for display
+    async loadStoreProductsForDisplay(storeId) {
+        try {
+            const productsGrid = document.getElementById('productsGrid');
+            if (!productsGrid) return;
+
+            // Show loading
+            productsGrid.innerHTML = '<div class="loading">Loading products...</div>';
+
+            // Get products for this store - WITHOUT orderBy
+            const products = await this.getStoreProducts(storeId);
+            
+            // Sort manually in JavaScript
+            products.sort((a, b) => {
+                const dateA = a.createdAt ? a.createdAt.seconds : 0;
+                const dateB = b.createdAt ? b.createdAt.seconds : 0;
+                return dateB - dateA;
+            });
+            
+            this.products[storeId] = products;
+
+            if (products.length === 0) {
+                productsGrid.innerHTML = `
+                    <div class="no-products-message">
+                        <svg class="feather" data-feather="package">
+                            <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line>
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                        </svg>
+                        <p>No products in this store yet</p>
+                    </div>
+                `;
+            } else {
+                this.renderProductsGrid(products);
+            }
+
+            // Re-initialize feather icons
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+
+        } catch (error) {
+            console.error('Error loading products for display:', error);
+            const productsGrid = document.getElementById('productsGrid');
+            if (productsGrid) {
+                productsGrid.innerHTML = '<div class="error">Failed to load products</div>';
+            }
+        }
+    }
+
+    // Render products grid
+    renderProductsGrid(products) {
+        const productsGrid = document.getElementById('productsGrid');
+        if (!productsGrid) return;
+
+        let productsHtml = '';
+
+        products.forEach(product => {
+            const mainImage = product.images && product.images.length > 0 
+                ? product.images[0].url 
+                : 'images/default-product.jpg';
+            
+            const thumbnail = product.images && product.images.length > 0 && product.images[0].thumbnail
+                ? product.images[0].thumbnail
+                : mainImage;
+
+            const discount = product.discount || 0;
+            const discountedPrice = this.calculateDiscountedPrice(product.price, discount);
+            const isDiscounted = discount > 0 && discountedPrice < product.price;
+
+            productsHtml += `
+                <div class="product-card" onclick="window.location.href='product.html?id=${product.id}'">
+                    <div class="product-image-container">
+                        <img src="${thumbnail}" alt="${product.name || 'Product'}" class="product-image" loading="lazy">
+                        ${isDiscounted ? '<span class="product-badge">-' + discount + '%</span>' : ''}
+                    </div>
+                    <div class="product-info">
+                        <h4 class="product-name">${product.name || 'Unnamed Product'}</h4>
+                        <div class="product-price">
+                            ${this.formatPrice(discountedPrice)}
+                            ${isDiscounted ? `<span class="product-original-price">${this.formatPrice(product.price)}</span>` : ''}
+                        </div>
+                        <div class="product-stats">
+                            <span class="product-stat">
+                                <svg class="feather" data-feather="eye"></svg>
+                                ${product.views || 0}
+                            </span>
+                            <span class="product-stat">
+                                <svg class="feather" data-feather="heart"></svg>
+                                ${product.likes ? product.likes.length : 0}
+                            </span>
+                            <span class="product-stat">
+                                <svg class="feather" data-feather="shopping-cart"></svg>
+                                ${product.orders || 0}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        productsGrid.innerHTML = productsHtml;
+
+        // Re-initialize feather icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
     }
 
     // Upload image to Cloudinary
@@ -70,25 +469,16 @@ class ProductManager {
                 formData.append('folder', `stores/${this.currentUser.uid}/products`);
             }
 
-            console.log('Uploading to Cloudinary...', {
-                cloudName: CLOUDINARY_CLOUD_NAME,
-                preset: CLOUDINARY_UPLOAD_PRESET
-            });
-
             const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
                 method: 'POST',
                 body: formData
             });
 
             if (!response.ok) {
-                const errorData = await response.text();
-                console.error('Cloudinary upload failed:', errorData);
-                throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+                throw new Error(`Upload failed: ${response.status}`);
             }
 
             const data = await response.json();
-            
-            console.log('Upload successful:', data.secure_url);
             
             return {
                 url: data.secure_url,
@@ -122,14 +512,212 @@ class ProductManager {
         }
     }
 
+    // Create a new store
+    async createStore(storeData, logo = null) {
+        try {
+            if (!this.currentUser) {
+                throw new Error('You must be logged in to create a store');
+            }
+
+            // Upload logo to Cloudinary if provided
+            let logoData = null;
+            if (logo) {
+                logoData = await this.uploadToCloudinary(logo);
+            }
+
+            // Create store document in Firestore
+            const storeRef = await addDoc(collection(db, 'stores'), {
+                ...storeData,
+                logo: logoData,
+                ownerId: this.currentUser.uid,
+                ownerEmail: this.currentUser.email,
+                ownerName: this.currentUser.displayName || 'Store Owner',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                products: 0,
+                followers: [],
+                status: 'active',
+                verified: false
+            });
+
+            return {
+                storeId: storeRef.id,
+                logo: logoData
+            };
+
+        } catch (error) {
+            console.error('Error creating store:', error);
+            throw error;
+        }
+    }
+
+    // Get user's stores - WITHOUT orderBy to avoid index requirement
+    async getUserStores(userId) {
+        try {
+            if (!userId) {
+                return [];
+            }
+
+            const cacheKey = `user_stores_${userId}`;
+            const cached = this.getFromCache(cacheKey);
+            
+            if (cached) {
+                return cached;
+            }
+
+            // Remove orderBy to avoid index requirement
+            const q = query(
+                collection(db, 'stores'),
+                where('ownerId', '==', userId),
+                where('status', '==', 'active')
+                // No orderBy here - we'll sort in JavaScript
+            );
+
+            const querySnapshot = await getDocs(q);
+            const stores = [];
+            
+            querySnapshot.forEach((doc) => {
+                stores.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+
+            this.saveToCache(cacheKey, stores);
+            return stores;
+
+        } catch (error) {
+            console.error('Error getting user stores:', error);
+            return [];
+        }
+    }
+
+    // Get store by ID
+    async getStore(storeId) {
+        try {
+            const cacheKey = `store_${storeId}`;
+            const cached = this.getFromCache(cacheKey);
+            
+            if (cached) {
+                return cached;
+            }
+
+            const docRef = doc(db, 'stores', storeId);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+                const store = {
+                    id: docSnap.id,
+                    ...docSnap.data()
+                };
+                
+                this.saveToCache(cacheKey, store);
+                return store;
+            } else {
+                return null;
+            }
+
+        } catch (error) {
+            console.error('Error getting store:', error);
+            return null;
+        }
+    }
+
+    // Update store
+    async updateStore(storeId, updates, newLogo = null) {
+        try {
+            if (!this.currentUser) {
+                throw new Error('You must be logged in to update a store');
+            }
+
+            const storeRef = doc(db, 'stores', storeId);
+            const storeSnap = await getDoc(storeRef);
+
+            if (!storeSnap.exists()) {
+                throw new Error('Store not found');
+            }
+
+            // Check ownership
+            if (storeSnap.data().ownerId !== this.currentUser.uid) {
+                throw new Error('You do not have permission to update this store');
+            }
+
+            // Upload new logo to Cloudinary if provided
+            let logoData = updates.existingLogo || null;
+            if (newLogo) {
+                logoData = await this.uploadToCloudinary(newLogo);
+            }
+
+            await updateDoc(storeRef, {
+                ...updates,
+                logo: logoData,
+                updatedAt: serverTimestamp()
+            });
+
+            // Clear cache
+            this.clearStoreCache(storeId);
+            this.clearUserStoresCache(this.currentUser.uid);
+
+            return true;
+
+        } catch (error) {
+            console.error('Error updating store:', error);
+            throw error;
+        }
+    }
+
+    // Delete store
+    async deleteStore(storeId) {
+        try {
+            if (!this.currentUser) {
+                throw new Error('You must be logged in to delete a store');
+            }
+
+            const storeRef = doc(db, 'stores', storeId);
+            const storeSnap = await getDoc(storeRef);
+
+            if (!storeSnap.exists()) {
+                throw new Error('Store not found');
+            }
+
+            // Check ownership
+            if (storeSnap.data().ownerId !== this.currentUser.uid) {
+                throw new Error('You do not have permission to delete this store');
+            }
+
+            // Check if store has products
+            const productsQuery = query(
+                collection(db, 'products'),
+                where('storeId', '==', storeId),
+                limit(1)
+            );
+            const productsSnap = await getDocs(productsQuery);
+            
+            if (!productsSnap.empty) {
+                throw new Error('Cannot delete store with existing products. Delete products first.');
+            }
+
+            // Delete store document from Firestore
+            await deleteDoc(storeRef);
+
+            // Clear cache
+            this.clearStoreCache(storeId);
+            this.clearUserStoresCache(this.currentUser.uid);
+
+            return true;
+
+        } catch (error) {
+            console.error('Error deleting store:', error);
+            throw error;
+        }
+    }
+
     // Create a new product
     async createProduct(productData, images = []) {
         try {
             if (!this.currentUser) {
                 throw new Error('You must be logged in to create a product');
             }
-
-            console.log('Creating product with images:', images.length);
 
             // Upload images to Cloudinary
             let imageData = [];
@@ -152,8 +740,6 @@ class ProductManager {
                 status: 'active'
             });
 
-            console.log('Product created with ID:', productRef.id);
-
             // Update store product count
             if (productData.storeId) {
                 const storeRef = doc(db, 'stores', productData.storeId);
@@ -165,6 +751,7 @@ class ProductManager {
 
             // Clear cache for this store
             this.clearStoreCache(productData.storeId);
+            this.clearUserStoresCache(this.currentUser.uid);
 
             return {
                 productId: productRef.id,
@@ -177,65 +764,7 @@ class ProductManager {
         }
     }
 
-    // Get all products
-    async getAllProducts(filters = {}) {
-        try {
-            const cacheKey = `all_${JSON.stringify(filters)}`;
-            const cached = this.getFromCache(cacheKey);
-            
-            if (cached) {
-                console.log('Returning cached products');
-                return cached;
-            }
-
-            let q = collection(db, 'products');
-            const constraints = [];
-            
-            // Apply filters
-            if (filters.category && filters.category !== 'all') {
-                constraints.push(where('category', '==', filters.category));
-            }
-            
-            if (filters.status) {
-                constraints.push(where('status', '==', filters.status));
-            }
-            
-            // Sort by date (newest first)
-            constraints.push(orderBy('createdAt', 'desc'));
-            
-            // Apply limit
-            if (filters.limit) {
-                constraints.push(limit(filters.limit));
-            }
-
-            if (constraints.length > 0) {
-                q = query(collection(db, 'products'), ...constraints);
-            }
-
-            const querySnapshot = await getDocs(q);
-            const products = [];
-            
-            querySnapshot.forEach((doc) => {
-                products.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
-            });
-
-            console.log(`Found ${products.length} products`);
-
-            // Cache the result
-            this.saveToCache(cacheKey, products);
-
-            return products;
-
-        } catch (error) {
-            console.error('Error getting products:', error);
-            return [];
-        }
-    }
-
-    // Get products by store
+    // Get products by store - WITHOUT orderBy to avoid index requirement
     async getStoreProducts(storeId) {
         try {
             const cacheKey = `store_${storeId}`;
@@ -245,11 +774,12 @@ class ProductManager {
                 return cached;
             }
 
+            // Remove orderBy to avoid index requirement
             const q = query(
                 collection(db, 'products'),
                 where('storeId', '==', storeId),
-                where('status', '==', 'active'),
-                orderBy('createdAt', 'desc')
+                where('status', '==', 'active')
+                // No orderBy here - we'll sort in JavaScript
             );
 
             const querySnapshot = await getDocs(q);
@@ -342,6 +872,7 @@ class ProductManager {
             if (productSnap.data().storeId) {
                 this.clearStoreCache(productSnap.data().storeId);
             }
+            this.clearUserStoresCache(this.currentUser.uid);
 
             return true;
 
@@ -387,6 +918,7 @@ class ProductManager {
             if (productSnap.data().storeId) {
                 this.clearStoreCache(productSnap.data().storeId);
             }
+            this.clearUserStoresCache(this.currentUser.uid);
 
             return true;
 
@@ -443,27 +975,6 @@ class ProductManager {
         }
     }
 
-    // Search products
-    async searchProducts(searchTerm, filters = {}) {
-        try {
-            const allProducts = await this.getAllProducts(filters);
-            
-            const term = searchTerm.toLowerCase().trim();
-            if (!term) return allProducts;
-            
-            return allProducts.filter(product => 
-                (product.name && product.name.toLowerCase().includes(term)) ||
-                (product.description && product.description.toLowerCase().includes(term)) ||
-                (product.storeName && product.storeName.toLowerCase().includes(term)) ||
-                (product.category && product.category.toLowerCase().includes(term))
-            );
-
-        } catch (error) {
-            console.error('Error searching products:', error);
-            return [];
-        }
-    }
-
     // Get optimized image URL from Cloudinary
     getOptimizedImageUrl(imageData, options = {}) {
         if (!imageData || !imageData.url) return 'images/default-product.jpg';
@@ -475,6 +986,20 @@ class ProductManager {
         }
         
         return imageData.url;
+    }
+
+    // Format date
+    formatDate(date) {
+        const now = new Date();
+        const diffTime = Math.abs(now - date);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 0) return 'today';
+        if (diffDays === 1) return 'yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+        if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+        return `${Math.floor(diffDays / 365)} years ago`;
     }
 
     // Cache management
@@ -518,6 +1043,15 @@ class ProductManager {
     clearStoreCache(storeId) {
         try {
             localStorage.removeItem(this.cachePrefix + `store_${storeId}`);
+        } catch (error) {
+            console.log('Cache clear error:', error);
+        }
+    }
+
+    clearUserStoresCache(userId) {
+        try {
+            localStorage.removeItem(this.cachePrefix + `user_stores_${userId}`);
+            localStorage.removeItem(this.cachePrefix + `user_products_${userId}`);
         } catch (error) {
             console.log('Cache clear error:', error);
         }
@@ -570,8 +1104,7 @@ class ProductManager {
 // Export for use in other files
 export const productManager = new ProductManager();
 
-// Initialize
-productManager.init();
+// Make productManager available globally
+window.productManager = productManager;
 
-console.log('✅ products.js loaded successfully');
-
+console.log('✅ products.js loaded successfully - No indexes required!');

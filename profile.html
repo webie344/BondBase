@@ -38,6 +38,9 @@
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.7);
             --radius: 12px;
             --radius-lg: 16px;
+            --store-primary: #00b341;
+            --store-primary-dark: #00802c;
+            --store-primary-light: #33cc66;
         }
 
         * {
@@ -241,6 +244,29 @@
             border: 1px solid var(--border);
         }
 
+        /* Verified Checkmark Styles - ADD THIS */
+        .verified-gamer {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .verified-checkmark {
+            color: #00ff88;
+            font-size: 1.2rem;
+            animation: glow 2s ease-in-out infinite;
+        }
+        
+        .verified-checkmark i {
+            filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.5));
+        }
+        
+        @keyframes glow {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
         .gamer-info-row {
             display: flex;
             align-items: center;
@@ -257,6 +283,7 @@
             flex-shrink: 0;
         }
 
+        /* Improved Gamer Stats Grid - UPDATED */
         .gamer-stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -265,32 +292,52 @@
         }
 
         .gamer-stat-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: var(--radius);
-            padding: 1rem;
-            text-align: center;
+            background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
             border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.2rem 0.8rem;
+            text-align: center;
             transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gamer-stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-light), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s ease;
+        }
+
+        .gamer-stat-card:hover::before {
+            transform: translateX(100%);
         }
 
         .gamer-stat-card:hover {
-            transform: translateY(-2px);
-            border-color: var(--primary);
-            box-shadow: var(--shadow);
+            transform: translateY(-5px);
+            border-color: var(--primary-light);
+            box-shadow: 0 10px 20px rgba(179, 0, 75, 0.2);
         }
 
         .gamer-stat-card .stat-value {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: 700;
             color: var(--primary-light);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;
+            line-height: 1.2;
         }
 
         .gamer-stat-card .stat-label {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            font-weight: 500;
         }
 
         .gamer-screenshot-container {
@@ -353,6 +400,283 @@
             width: 16px;
             height: 16px;
             stroke: currentColor;
+        }
+
+        /* ===== NEW: STORES & PRODUCTS SECTION ===== */
+        .stores-products-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: linear-gradient(145deg, #1a1a1a 0%, #222222 100%);
+            border-radius: var(--radius);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stores-products-section h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .stores-products-section h3 .feather {
+            color: var(--store-primary);
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Store Tabs */
+        .store-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.75rem;
+        }
+
+        .store-tab {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 1px solid transparent;
+        }
+
+        .store-tab:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .store-tab.active {
+            background: var(--store-primary);
+            color: white;
+            border-color: var(--store-primary-dark);
+        }
+
+        .store-tab .product-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.15rem 0.4rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+        }
+
+        /* Store Info Card */
+        .store-info-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .store-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 16px;
+            object-fit: cover;
+            border: 2px solid var(--store-primary);
+        }
+
+        .store-details {
+            flex: 1;
+        }
+
+        .store-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .store-verified {
+            background: var(--store-primary);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .store-description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 0.75rem;
+        }
+
+        .store-meta {
+            display: flex;
+            gap: 1.5rem;
+            color: var(--text-light);
+            font-size: 0.85rem;
+        }
+
+        .store-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .store-meta-item .feather {
+            width: 14px;
+            height: 14px;
+            stroke: var(--store-primary);
+        }
+
+        /* Products Grid */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .product-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .product-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--store-primary);
+            box-shadow: 0 10px 20px rgba(0, 179, 65, 0.2);
+        }
+
+        .product-image-container {
+            position: relative;
+            width: 100%;
+            height: 150px;
+            overflow: hidden;
+        }
+
+        .product-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .product-card:hover .product-image {
+            transform: scale(1.05);
+        }
+
+        .product-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--store-primary);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            z-index: 1;
+        }
+
+        .product-info {
+            padding: 1rem;
+        }
+
+        .product-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .product-price {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--store-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .product-original-price {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            text-decoration: line-through;
+            margin-left: 0.5rem;
+        }
+
+        .product-stats {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-light);
+            font-size: 0.75rem;
+        }
+
+        .product-stat {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .product-stat .feather {
+            width: 12px;
+            height: 12px;
+            stroke: currentColor;
+        }
+
+        .no-stores-message, .no-products-message {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-light);
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: var(--radius);
+        }
+
+        .no-stores-message .feather, .no-products-message .feather {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 1rem;
+            color: var(--store-primary);
+            stroke-width: 1.5;
+        }
+
+        .create-store-btn {
+            background: var(--store-primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .create-store-btn:hover {
+            background: var(--store-primary-dark);
+            transform: translateY(-2px);
         }
 
         /* Social Links */
@@ -1012,6 +1336,21 @@
             .profile-video-thumbnail {
                 height: 300px;
             }
+
+            /* Responsive stores section */
+            .store-info-card {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .store-meta {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
         }
 
         @media (max-width: 480px) {
@@ -1067,6 +1406,25 @@
                 width: 32px;
                 height: 32px;
                 padding: 6px;
+            }
+
+            /* Mobile stores */
+            .products-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .product-image-container {
+                height: 120px;
+            }
+
+            .store-tabs {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                padding-bottom: 0.5rem;
+            }
+
+            .store-tab {
+                white-space: nowrap;
             }
         }
         
@@ -1854,6 +2212,10 @@
             .nav-toggle {
                 display: flex;
             }
+
+            .gamer-stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @media (max-width: 480px) {
@@ -1882,6 +2244,10 @@
             .profile-action-btn {
                 flex: 1;
                 justify-content: center;
+            }
+
+            .gamer-stats-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -2087,6 +2453,57 @@
                 </a>
             </div>
 
+            <!-- ===== NEW: STORES & PRODUCTS SECTION ===== -->
+            <div class="stores-products-section" id="storesProductsSection">
+                <h3>
+                    <svg class="feather" data-feather="shopping-bag">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                    My Stores & Products
+                </h3>
+                
+                <!-- Store Tabs Container -->
+                <div class="store-tabs" id="storeTabs">
+                    <!-- Will be populated by JavaScript -->
+                    <div class="loading">Loading stores...</div>
+                </div>
+                
+                <!-- Store Info Card -->
+                <div class="store-info-card" id="storeInfoCard" style="display: none;">
+                    <img src="images/default-store.jpg" alt="Store Logo" class="store-logo" id="storeLogo">
+                    <div class="store-details">
+                        <div class="store-name" id="storeName">
+                            Store Name
+                            <span class="store-verified" id="storeVerified" style="display: none;">Verified</span>
+                        </div>
+                        <div class="store-description" id="storeDescription">Store description</div>
+                        <div class="store-meta">
+                            <span class="store-meta-item" id="storeProductsCount">
+                                <svg class="feather" data-feather="package"></svg>
+                                <span>0 products</span>
+                            </span>
+                            <span class="store-meta-item" id="storeFollowersCount">
+                                <svg class="feather" data-feather="users"></svg>
+                                <span>0 followers</span>
+                            </span>
+                            <span class="store-meta-item" id="storeCreated">
+                                <svg class="feather" data-feather="calendar"></svg>
+                                <span>Joined recently</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Products Grid -->
+                <div id="productsContainer">
+                    <div class="products-grid" id="productsGrid">
+                        <!-- Products will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Social Media Links Section -->
             <div class="social-links-section" id="socialLinksSection">
                 <div class="social-links-title">
@@ -2171,6 +2588,9 @@
     <script type="module" src="games.js"></script>
     <!-- NEW: Add stream.js for video functionality -->
     <script type="module" src="stream.js"></script>
+    
+    <!-- Add profile-stores.js for stores and products functionality -->
+    <script type="module" src="products.js"></script>
     
     <!-- Initialize Feather Icons and Tab Functionality -->
     <script>
