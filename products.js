@@ -111,10 +111,10 @@ class ProductManager {
             // Show loading state
             this.showStoreLoading();
 
-            // Get user's stores - WITHOUT orderBy to avoid index requirement
+            // Get user's stores
             this.stores = await this.getUserStores(userId);
             
-            // Sort manually in JavaScript instead of using orderBy
+            // Sort manually in JavaScript
             this.stores.sort((a, b) => {
                 const dateA = a.createdAt ? a.createdAt.seconds : 0;
                 const dateB = b.createdAt ? b.createdAt.seconds : 0;
@@ -122,6 +122,7 @@ class ProductManager {
             });
 
             console.log(`Found ${this.stores.length} stores for user ${userId}`);
+            console.log('Store data:', this.stores); // Debug log
 
             if (this.stores.length === 0) {
                 this.showNoStoresMessage('This user hasn\'t created any stores yet');
@@ -212,10 +213,12 @@ class ProductManager {
         let tabsHtml = '';
         this.stores.forEach((store, index) => {
             const isActive = index === 0 ? 'active' : '';
+            const storeName = store.name || store.storeName || 'Unnamed Store';
+            
             tabsHtml += `
                 <div class="store-tab ${isActive}" data-store-id="${store.id}">
                     <svg class="feather" data-feather="${store.logo ? 'image' : 'shopping-bag'}"></svg>
-                    ${store.name || 'Unnamed Store'}
+                    ${storeName}
                     <span class="product-count">${store.products || 0}</span>
                 </div>
             `;
@@ -255,6 +258,7 @@ class ProductManager {
         // Find store data
         const store = this.stores.find(s => s.id === storeId);
         if (store) {
+            console.log('Switching to store:', store); // Debug log
             this.renderStoreInfo(store);
             await this.loadStoreProductsForDisplay(storeId);
         }
@@ -264,7 +268,7 @@ class ProductManager {
     renderStoreInfo(store) {
         const storeInfoCard = document.getElementById('storeInfoCard');
         const storeLogo = document.getElementById('storeLogo');
-        const storeName = document.getElementById('storeName');
+        const storeNameEl = document.getElementById('storeName');
         const storeVerified = document.getElementById('storeVerified');
         const storeDescription = document.getElementById('storeDescription');
         const storeProductsCount = document.getElementById('storeProductsCount');
@@ -273,6 +277,8 @@ class ProductManager {
 
         if (!storeInfoCard) return;
 
+        console.log('Rendering store info:', store); // Debug log
+
         // Show the store info card
         storeInfoCard.style.display = 'flex';
 
@@ -280,65 +286,53 @@ class ProductManager {
         if (storeLogo) {
             if (store.logo && store.logo.url) {
                 storeLogo.src = store.logo.url;
+                console.log('Setting logo to:', store.logo.url);
             } else {
                 storeLogo.src = 'images/default-store.jpg';
+                console.log('No logo found, using default');
             }
         }
 
         // Set store name
-        if (storeName) {
-            // Clear existing content
-            while (storeName.firstChild) {
-                storeName.removeChild(storeName.firstChild);
-            }
-            
-            // Add store name text
-            storeName.appendChild(document.createTextNode(store.name || 'Unnamed Store'));
-            
-            // Add verified badge if needed
-            if (store.verified) {
-                const verifiedSpan = document.createElement('span');
-                verifiedSpan.className = 'store-verified';
-                verifiedSpan.id = 'storeVerified';
-                verifiedSpan.textContent = 'Verified';
-                storeName.appendChild(verifiedSpan);
-            }
+        if (storeNameEl) {
+            const storeName = store.name || store.storeName || 'Unnamed Store';
+            storeNameEl.innerHTML = `${storeName} <span class="store-verified" id="storeVerified" style="display: ${store.verified ? 'inline-block' : 'none'};">Verified</span>`;
+            console.log('Setting store name to:', storeName);
+        }
+
+        // Set verified badge
+        if (storeVerified) {
+            storeVerified.style.display = store.verified ? 'inline-block' : 'none';
         }
 
         // Set description
         if (storeDescription) {
-            storeDescription.textContent = store.description || 'No description provided';
+            storeDescription.textContent = store.description || store.bio || 'No description provided';
         }
 
         // Set products count
         if (storeProductsCount) {
-            const icon = storeProductsCount.querySelector('svg');
-            const textSpan = storeProductsCount.querySelector('span') || document.createElement('span');
-            if (!textSpan.parentNode) {
-                storeProductsCount.appendChild(textSpan);
+            const countSpan = storeProductsCount.querySelector('span');
+            if (countSpan) {
+                countSpan.textContent = `${store.products || 0} products`;
             }
-            textSpan.textContent = `${store.products || 0} products`;
         }
 
         // Set followers count
         if (storeFollowersCount) {
-            const icon = storeFollowersCount.querySelector('svg');
-            const textSpan = storeFollowersCount.querySelector('span') || document.createElement('span');
-            if (!textSpan.parentNode) {
-                storeFollowersCount.appendChild(textSpan);
+            const countSpan = storeFollowersCount.querySelector('span');
+            if (countSpan) {
+                countSpan.textContent = `${store.followers ? store.followers.length : 0} followers`;
             }
-            textSpan.textContent = `${store.followers ? store.followers.length : 0} followers`;
         }
 
         // Set creation date
         if (storeCreated) {
-            const icon = storeCreated.querySelector('svg');
-            const textSpan = storeCreated.querySelector('span') || document.createElement('span');
-            if (!textSpan.parentNode) {
-                storeCreated.appendChild(textSpan);
+            const dateSpan = storeCreated.querySelector('span');
+            if (dateSpan) {
+                const createdDate = store.createdAt ? new Date(store.createdAt.seconds * 1000) : new Date();
+                dateSpan.textContent = `Joined ${this.formatDate(createdDate)}`;
             }
-            const createdDate = store.createdAt ? new Date(store.createdAt.seconds * 1000) : new Date();
-            textSpan.textContent = `Joined ${this.formatDate(createdDate)}`;
         }
 
         // Re-initialize feather icons
@@ -356,7 +350,7 @@ class ProductManager {
             // Show loading
             productsGrid.innerHTML = '<div class="loading">Loading products...</div>';
 
-            // Get products for this store - WITHOUT orderBy
+            // Get products for this store
             const products = await this.getStoreProducts(storeId);
             
             // Sort manually in JavaScript
@@ -367,6 +361,7 @@ class ProductManager {
             });
             
             this.products[storeId] = products;
+            console.log(`Found ${products.length} products for store ${storeId}`); // Debug log
 
             if (products.length === 0) {
                 productsGrid.innerHTML = `
@@ -551,7 +546,7 @@ class ProductManager {
         }
     }
 
-    // Get user's stores - WITHOUT orderBy to avoid index requirement
+    // Get user's stores
     async getUserStores(userId) {
         try {
             if (!userId) {
@@ -562,27 +557,29 @@ class ProductManager {
             const cached = this.getFromCache(cacheKey);
             
             if (cached) {
+                console.log('Returning cached stores:', cached);
                 return cached;
             }
 
-            // Remove orderBy to avoid index requirement
             const q = query(
                 collection(db, 'stores'),
                 where('ownerId', '==', userId),
                 where('status', '==', 'active')
-                // No orderBy here - we'll sort in JavaScript
             );
 
             const querySnapshot = await getDocs(q);
             const stores = [];
             
             querySnapshot.forEach((doc) => {
+                const storeData = doc.data();
+                console.log('Store data from Firestore:', storeData); // Debug log
                 stores.push({
                     id: doc.id,
-                    ...doc.data()
+                    ...storeData
                 });
             });
 
+            console.log('Raw stores from Firestore:', stores);
             this.saveToCache(cacheKey, stores);
             return stores;
 
@@ -623,148 +620,7 @@ class ProductManager {
         }
     }
 
-    // Update store
-    async updateStore(storeId, updates, newLogo = null) {
-        try {
-            if (!this.currentUser) {
-                throw new Error('You must be logged in to update a store');
-            }
-
-            const storeRef = doc(db, 'stores', storeId);
-            const storeSnap = await getDoc(storeRef);
-
-            if (!storeSnap.exists()) {
-                throw new Error('Store not found');
-            }
-
-            // Check ownership
-            if (storeSnap.data().ownerId !== this.currentUser.uid) {
-                throw new Error('You do not have permission to update this store');
-            }
-
-            // Upload new logo to Cloudinary if provided
-            let logoData = updates.existingLogo || null;
-            if (newLogo) {
-                logoData = await this.uploadToCloudinary(newLogo);
-            }
-
-            await updateDoc(storeRef, {
-                ...updates,
-                logo: logoData,
-                updatedAt: serverTimestamp()
-            });
-
-            // Clear cache
-            this.clearStoreCache(storeId);
-            this.clearUserStoresCache(this.currentUser.uid);
-
-            return true;
-
-        } catch (error) {
-            console.error('Error updating store:', error);
-            throw error;
-        }
-    }
-
-    // Delete store
-    async deleteStore(storeId) {
-        try {
-            if (!this.currentUser) {
-                throw new Error('You must be logged in to delete a store');
-            }
-
-            const storeRef = doc(db, 'stores', storeId);
-            const storeSnap = await getDoc(storeRef);
-
-            if (!storeSnap.exists()) {
-                throw new Error('Store not found');
-            }
-
-            // Check ownership
-            if (storeSnap.data().ownerId !== this.currentUser.uid) {
-                throw new Error('You do not have permission to delete this store');
-            }
-
-            // Check if store has products
-            const productsQuery = query(
-                collection(db, 'products'),
-                where('storeId', '==', storeId),
-                limit(1)
-            );
-            const productsSnap = await getDocs(productsQuery);
-            
-            if (!productsSnap.empty) {
-                throw new Error('Cannot delete store with existing products. Delete products first.');
-            }
-
-            // Delete store document from Firestore
-            await deleteDoc(storeRef);
-
-            // Clear cache
-            this.clearStoreCache(storeId);
-            this.clearUserStoresCache(this.currentUser.uid);
-
-            return true;
-
-        } catch (error) {
-            console.error('Error deleting store:', error);
-            throw error;
-        }
-    }
-
-    // Create a new product
-    async createProduct(productData, images = []) {
-        try {
-            if (!this.currentUser) {
-                throw new Error('You must be logged in to create a product');
-            }
-
-            // Upload images to Cloudinary
-            let imageData = [];
-            if (images.length > 0) {
-                imageData = await this.uploadImages(images);
-            }
-
-            // Create product document in Firestore
-            const productRef = await addDoc(collection(db, 'products'), {
-                ...productData,
-                images: imageData,
-                ownerId: this.currentUser.uid,
-                ownerEmail: this.currentUser.email,
-                ownerName: this.currentUser.displayName || 'Seller',
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                views: 0,
-                likes: [],
-                orders: 0,
-                status: 'active'
-            });
-
-            // Update store product count
-            if (productData.storeId) {
-                const storeRef = doc(db, 'stores', productData.storeId);
-                await updateDoc(storeRef, {
-                    products: increment(1),
-                    updatedAt: serverTimestamp()
-                });
-            }
-
-            // Clear cache for this store
-            this.clearStoreCache(productData.storeId);
-            this.clearUserStoresCache(this.currentUser.uid);
-
-            return {
-                productId: productRef.id,
-                images: imageData
-            };
-
-        } catch (error) {
-            console.error('Error creating product:', error);
-            throw error;
-        }
-    }
-
-    // Get products by store - WITHOUT orderBy to avoid index requirement
+    // Get products by store
     async getStoreProducts(storeId) {
         try {
             const cacheKey = `store_${storeId}`;
@@ -774,12 +630,10 @@ class ProductManager {
                 return cached;
             }
 
-            // Remove orderBy to avoid index requirement
             const q = query(
                 collection(db, 'products'),
                 where('storeId', '==', storeId),
                 where('status', '==', 'active')
-                // No orderBy here - we'll sort in JavaScript
             );
 
             const querySnapshot = await getDocs(q);
