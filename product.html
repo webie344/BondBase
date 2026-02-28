@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Product Details - Crypto Gamers</title>
+    <title>Product Details - Bondbase</title>
     
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -36,10 +36,8 @@
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
-            padding-top: 20px; /* Add slight padding at top since navbar is gone */
+            padding-top: 20px;
         }
-
-        /* NO NAVBAR - COMPLETELY REMOVED */
 
         /* Main Container */
         .container {
@@ -150,14 +148,14 @@
         .store-info {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 15px;
             padding-bottom: 15px;
             border-bottom: 1px solid var(--border);
         }
 
         .store-avatar {
-            width: 50px;
-            height: 50px;
+            width: 60px;
+            height: 60px;
             border-radius: 12px;
             object-fit: cover;
             background: var(--bg-secondary);
@@ -173,10 +171,28 @@
             font-weight: 600;
             color: var(--text-primary);
             text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
-        .store-name:hover {
+        .store-name a {
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .store-name a:hover {
             color: var(--primary);
+        }
+
+        .store-verified {
+            background: var(--primary);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
         }
 
         .store-rating {
@@ -381,12 +397,13 @@
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
         }
 
-        /* Seller Info */
+        /* Seller Info - FIXED to match marketplace style */
         .seller-section {
             background: var(--bg-card);
             border-radius: 16px;
             padding: 20px;
             border: 1px solid var(--border);
+            margin-top: 20px;
         }
 
         .seller-header {
@@ -412,6 +429,7 @@
         .seller-joined {
             font-size: 13px;
             color: var(--text-secondary);
+            margin-top: 4px;
         }
 
         .seller-stats {
@@ -424,6 +442,7 @@
 
         .seller-stat {
             text-align: center;
+            flex: 1;
         }
 
         .stat-value {
@@ -458,6 +477,59 @@
             color: white;
         }
 
+        /* Seller Products Preview - NEW */
+        .seller-products-preview {
+            margin-top: 20px;
+        }
+
+        .preview-title {
+            font-size: 16px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+        }
+
+        .preview-title i {
+            color: var(--primary);
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .preview-item {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+        }
+
+        .preview-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+        }
+
+        .preview-image {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+        }
+
+        .preview-name {
+            padding: 5px;
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+        }
+
         /* Related Products */
         .related-section {
             margin-top: 40px;
@@ -477,7 +549,7 @@
 
         .related-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 20px;
         }
 
@@ -498,12 +570,12 @@
 
         .related-image {
             width: 100%;
-            height: 150px;
+            aspect-ratio: 1;
             object-fit: cover;
         }
 
         .related-info {
-            padding: 15px;
+            padding: 12px;
         }
 
         .related-name {
@@ -645,16 +717,36 @@
             .container {
                 padding: 0 15px;
             }
+
+            .preview-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .seller-stats {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .seller-stat {
+                text-align: left;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .stat-value {
+                min-width: 40px;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- NO NAVIGATION - HEADER COMPLETELY REMOVED -->
-
     <!-- Main Container -->
     <div class="container">
         <!-- Back Button -->
-        <a href="market.html" class="back-btn">
+        <a href="market.html" class="back-btn" id="backBtn">
             <i class="fas fa-arrow-left"></i> Back to Marketplace
         </a>
 
@@ -674,7 +766,16 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, collection, query, where, getDocs, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            collection, 
+            query, 
+            where, 
+            getDocs, 
+            limit 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -693,7 +794,7 @@
 
         // DOM Elements
         const productContent = document.getElementById('productContent');
-        const backBtn = document.querySelector('.back-btn');
+        const backBtn = document.getElementById('backBtn');
 
         // Modal Elements
         const modal = document.getElementById('imageModal');
@@ -707,6 +808,7 @@
         let currentProduct = null;
         let currentImageIndex = 0;
         let productImages = [];
+        let sellerProducts = [];
 
         // Get product ID from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -716,13 +818,64 @@
             window.location.href = 'market.html';
         }
 
-        // Check authentication (optional - don't require login to view products)
+        // Check authentication
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
             }
             loadProduct();
         });
+
+        // Helper function to get image URL from various formats
+        function getImageUrl(image) {
+            if (!image) return 'images/default-product.jpg';
+            
+            if (typeof image === 'string') {
+                if (image.startsWith('http') || image.startsWith('/') || image.startsWith('./')) {
+                    return image;
+                }
+                return 'images/default-product.jpg';
+            }
+            
+            if (typeof image === 'object') {
+                if (image.thumbnail) return image.thumbnail;
+                if (image.url) return image.url;
+                if (image.secure_url) return image.secure_url;
+            }
+            
+            return 'images/default-product.jpg';
+        }
+
+        // Helper function to get store logo
+        function getStoreLogo(store) {
+            if (!store) return 'images/default-store.jpg';
+            
+            if (store.logo) {
+                if (typeof store.logo === 'string') return store.logo;
+                if (store.logo.url) return store.logo.url;
+                if (store.logo.thumbnail) return store.logo.thumbnail;
+            }
+            
+            if (store.logoThumbnail) return store.logoThumbnail;
+            
+            if (store.image) {
+                if (typeof store.image === 'string') return store.image;
+                if (store.image.url) return store.image.url;
+            }
+            
+            return 'images/default-store.jpg';
+        }
+
+        // Helper function to get seller avatar
+        function getAvatarUrl(seller) {
+            if (!seller) return 'images/default-avatar.jpg';
+            
+            if (seller.photoURL) return seller.photoURL;
+            if (seller.avatar) return seller.avatar;
+            if (seller.profilePicture) return seller.profilePicture;
+            
+            return 'images/default-avatar.jpg';
+        }
 
         // Load product
         async function loadProduct() {
@@ -742,17 +895,25 @@
                     ...productSnap.data()
                 };
 
+                console.log('Product loaded:', currentProduct);
+
                 // Process images
                 if (currentProduct.images && currentProduct.images.length > 0) {
-                    if (typeof currentProduct.images[0] === 'object') {
-                        productImages = currentProduct.images.map(img => img.url);
-                    } else {
-                        productImages = currentProduct.images;
-                    }
+                    productImages = currentProduct.images.map(img => getImageUrl(img));
                 }
 
-                // Load seller info
+                // Load store info
+                if (currentProduct.storeId) {
+                    await loadStoreInfo();
+                }
+
+                // Load seller info and their other products
                 await loadSellerInfo();
+                
+                // Load seller's other products
+                if (currentProduct.ownerId) {
+                    await loadSellerProducts();
+                }
 
                 // Load related products
                 await loadRelatedProducts();
@@ -766,6 +927,20 @@
             }
         }
 
+        async function loadStoreInfo() {
+            try {
+                const storeRef = doc(db, 'stores', currentProduct.storeId);
+                const storeSnap = await getDoc(storeRef);
+                
+                if (storeSnap.exists()) {
+                    currentProduct.store = storeSnap.data();
+                    console.log('Store info loaded:', currentProduct.store);
+                }
+            } catch (error) {
+                console.log('Error loading store info:', error);
+            }
+        }
+
         async function loadSellerInfo() {
             try {
                 const sellerRef = doc(db, 'users', currentProduct.ownerId);
@@ -773,14 +948,49 @@
                 
                 if (sellerSnap.exists()) {
                     currentProduct.seller = sellerSnap.data();
+                    console.log('Seller info loaded:', currentProduct.seller);
                 }
             } catch (error) {
                 console.log('Error loading seller info:', error);
             }
         }
 
+        async function loadSellerProducts() {
+            try {
+                const productsRef = collection(db, 'products');
+                const q = query(
+                    productsRef,
+                    where('ownerId', '==', currentProduct.ownerId),
+                    where('status', '==', 'active'),
+                    limit(6)
+                );
+                
+                const querySnapshot = await getDocs(q);
+                sellerProducts = [];
+                
+                querySnapshot.forEach((doc) => {
+                    if (doc.id !== currentProduct.id) {
+                        const product = doc.data();
+                        sellerProducts.push({
+                            id: doc.id,
+                            ...product,
+                            mainImage: product.images && product.images.length > 0 
+                                ? getImageUrl(product.images[0])
+                                : 'images/default-product.jpg'
+                        });
+                    }
+                });
+                
+                console.log(`Found ${sellerProducts.length} other products from seller`);
+            } catch (error) {
+                console.log('Error loading seller products:', error);
+            }
+        }
+
         async function loadRelatedProducts() {
             try {
+                if (!currentProduct.category) return;
+                
                 const productsRef = collection(db, 'products');
                 const q = query(
                     productsRef,
@@ -794,9 +1004,13 @@
                 
                 querySnapshot.forEach((doc) => {
                     if (doc.id !== currentProduct.id) {
+                        const product = doc.data();
                         currentProduct.related.push({
                             id: doc.id,
-                            ...doc.data()
+                            ...product,
+                            mainImage: product.images && product.images.length > 0 
+                                ? getImageUrl(product.images[0])
+                                : 'images/default-product.jpg'
                         });
                     }
                 });
@@ -835,9 +1049,19 @@
             const inStock = currentProduct.stock === undefined || currentProduct.stock > 0;
             
             // Get main image
-            const mainImage = productImages.length > 0 
-                ? productImages[0] 
-                : 'images/default-product.jpg';
+            const mainImage = productImages.length > 0 ? productImages[0] : 'images/default-product.jpg';
+
+            // Get store info
+            const store = currentProduct.store || {};
+            const storeName = store.name || store.storeName || currentProduct.storeName || 'Store';
+            const storeLogo = getStoreLogo(store);
+            const isVerified = store.verified || false;
+
+            // Get seller info
+            const seller = currentProduct.seller || {};
+            const sellerAvatar = getAvatarUrl(seller);
+            const sellerName = seller.displayName || seller.name || currentProduct.ownerName || 'Seller';
+            const sellerJoined = seller.createdAt ? new Date(seller.createdAt.seconds * 1000) : new Date();
 
             productContent.innerHTML = `
                 <!-- Product Container -->
@@ -869,26 +1093,28 @@
                     <div class="product-info">
                         <!-- Store Info -->
                         <div class="store-info">
-                            <img src="${currentProduct.seller?.photoURL || 'images/default-avatar.jpg'}" 
-                                 alt="${currentProduct.storeName}" class="store-avatar"
-                                 onerror="this.src='images/default-avatar.jpg'">
+                            <img src="${storeLogo}" 
+                                 alt="${storeName}" 
+                                 class="store-avatar"
+                                 onerror="this.src='images/default-store.jpg'">
                             <div class="store-details">
-                                <a href="store.html?id=${currentProduct.storeId}" class="store-name">
-                                    ${currentProduct.storeName || 'Store'}
-                                </a>
+                                <div class="store-name">
+                                    <a href="store.html?id=${currentProduct.storeId}">${storeName}</a>
+                                    ${isVerified ? '<span class="store-verified">Verified</span>' : ''}
+                                </div>
                                 <div class="store-rating">
                                     <i class="fas fa-star"></i>
-                                    <span>${currentProduct.seller?.rating || 'New'}</span>
+                                    <span>${store.rating || 'New'}</span>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Product Name -->
-                        <h1 class="product-name">${currentProduct.name}</h1>
+                        <h1 class="product-name">${currentProduct.name || 'Unnamed Product'}</h1>
 
                         <!-- Product Meta -->
                         <div class="product-meta">
-                            <span><i class="fas fa-tag"></i> ${currentProduct.category?.replace('-', ' ') || 'Uncategorized'}</span>
+                            <span><i class="fas fa-tag"></i> ${currentProduct.category?.replace(/-/g, ' ') || 'Uncategorized'}</span>
                             <span><i class="fas fa-eye"></i> ${currentProduct.views || 0} views</span>
                             <span><i class="fas fa-heart"></i> ${currentProduct.likes?.length || 0} likes</span>
                         </div>
@@ -896,9 +1122,9 @@
                         <!-- Price Section -->
                         <div class="product-price">
                             <div class="price-row">
-                                <span class="current-price">$${currentProduct.salePrice || currentProduct.price}</span>
+                                <span class="current-price">$${(currentProduct.salePrice || currentProduct.price || 0).toFixed(2)}</span>
                                 ${hasDiscount ? `
-                                    <span class="original-price">$${currentProduct.originalPrice}</span>
+                                    <span class="original-price">$${(currentProduct.originalPrice || currentProduct.price || 0).toFixed(2)}</span>
                                     <span class="discount-badge">-${currentProduct.discount}%</span>
                                 ` : ''}
                             </div>
@@ -923,7 +1149,7 @@
                                 <div class="features-grid">
                                     ${currentProduct.features.map(feature => `
                                         <span class="feature-item">
-                                            <i class="fas fa-check"></i> ${feature.replace('-', ' ')}
+                                            <i class="fas fa-check"></i> ${String(feature).replace(/-/g, ' ')}
                                         </span>
                                     `).join('')}
                                 </div>
@@ -950,7 +1176,7 @@
                             </div>
                             <div class="contact-buttons">
                                 ${currentProduct.ownerWhatsapp ? `
-                                    <a href="https://wa.me/${currentProduct.ownerWhatsapp.replace('+', '')}" 
+                                    <a href="https://wa.me/${currentProduct.ownerWhatsapp.replace(/[^0-9]/g, '')}" 
                                        target="_blank" class="contact-btn whatsapp">
                                         <i class="fab fa-whatsapp"></i> WhatsApp
                                     </a>
@@ -967,32 +1193,56 @@
                     </div>
                 </div>
 
-                <!-- Seller Information -->
+                <!-- Seller Information Section - FIXED to match marketplace style -->
                 <div class="seller-section">
                     <div class="seller-header">
-                        <img src="${currentProduct.seller?.photoURL || 'images/default-avatar.jpg'}" 
-                             alt="${currentProduct.ownerName}" class="seller-avatar-large"
+                        <img src="${sellerAvatar}" 
+                             alt="${sellerName}" 
+                             class="seller-avatar-large"
                              onerror="this.src='images/default-avatar.jpg'">
                         <div>
-                            <div class="seller-name-large">${currentProduct.ownerName || 'Seller'}</div>
-                            <div class="seller-joined">Member since ${new Date(currentProduct.seller?.createdAt?.toDate?.() || Date.now()).getFullYear()}</div>
+                            <div class="seller-name-large">${sellerName}</div>
+                            <div class="seller-joined">
+                                <i class="fas fa-calendar-alt"></i> 
+                                Member since ${sellerJoined.getFullYear()}
+                            </div>
                         </div>
                     </div>
                     
                     <div class="seller-stats">
                         <div class="seller-stat">
-                            <div class="stat-value">${currentProduct.seller?.products || 0}</div>
+                            <div class="stat-value">${seller.products || 0}</div>
                             <div class="stat-label">Products</div>
                         </div>
                         <div class="seller-stat">
-                            <div class="stat-value">${currentProduct.seller?.sales || 0}</div>
+                            <div class="stat-value">${seller.sales || 0}</div>
                             <div class="stat-label">Sales</div>
                         </div>
                         <div class="seller-stat">
-                            <div class="stat-value">${currentProduct.seller?.rating || 'New'}</div>
+                            <div class="stat-value">${seller.rating || 'New'}</div>
                             <div class="stat-label">Rating</div>
                         </div>
                     </div>
+
+                    <!-- Seller's Other Products Preview -->
+                    ${sellerProducts.length > 0 ? `
+                        <div class="seller-products-preview">
+                            <div class="preview-title">
+                                <i class="fas fa-box"></i> More from this seller
+                            </div>
+                            <div class="preview-grid">
+                                ${sellerProducts.slice(0, 3).map(product => `
+                                    <div class="preview-item" onclick="window.location.href='product.html?id=${product.id}'">
+                                        <img src="${product.mainImage}" 
+                                             alt="${product.name}" 
+                                             class="preview-image"
+                                             onerror="this.src='images/default-product.jpg'">
+                                        <div class="preview-name">${product.name}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
 
                     <a href="store.html?id=${currentProduct.storeId}" class="view-store-btn">
                         <i class="fas fa-store"></i> Visit Store
@@ -1006,22 +1256,16 @@
                             <i class="fas fa-link"></i> Related Products
                         </h2>
                         <div class="related-grid">
-                            ${currentProduct.related.map(product => {
-                                const productImage = product.images && product.images.length > 0
-                                    ? (typeof product.images[0] === 'object' ? product.images[0].thumbnail || product.images[0].url : product.images[0])
-                                    : 'images/default-product.jpg';
-                                
-                                return `
-                                    <div class="related-card" onclick="window.location.href='product.html?id=${product.id}'">
-                                        <img src="${productImage}" alt="${product.name}" class="related-image"
-                                             onerror="this.src='images/default-product.jpg'">
-                                        <div class="related-info">
-                                            <div class="related-name">${product.name}</div>
-                                            <div class="related-price">$${product.salePrice || product.price}</div>
-                                        </div>
+                            ${currentProduct.related.map(product => `
+                                <div class="related-card" onclick="window.location.href='product.html?id=${product.id}'">
+                                    <img src="${product.mainImage}" alt="${product.name}" class="related-image"
+                                         onerror="this.src='images/default-product.jpg'">
+                                    <div class="related-info">
+                                        <div class="related-name">${product.name}</div>
+                                        <div class="related-price">$${(product.salePrice || product.price || 0).toFixed(2)}</div>
                                     </div>
-                                `;
-                            }).join('')}
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
                 ` : ''}
@@ -1093,7 +1337,7 @@
             }
         });
 
-        // Update back button to preserve filter state
+        // Update back button
         const referrer = document.referrer;
         if (referrer.includes('market.html')) {
             backBtn.href = referrer;

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Marketplace — two products per line</title>
+    <title>Marketplace — Bondbase</title>
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -38,9 +38,7 @@
             min-height: 100vh;
         }
 
-        /* NO NAVBAR - COMPLETELY REMOVED */
-
-        /* MAIN CONTAINER - no header at all */
+        /* MAIN CONTAINER */
         .container {
             max-width: 1400px;
             margin: 30px auto;
@@ -117,10 +115,9 @@
             border-color: var(--secondary);
         }
 
-        /* PRODUCT GRID - at least 2 items per line even on smallest phones */
+        /* PRODUCT GRID */
         .products-grid {
             display: grid;
-            /* Key change: minimum column width 140px ensures two columns even on 280px screens */
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 15px;
             margin-top: 20px;
@@ -430,10 +427,7 @@
     </style>
 </head>
 <body>
-    <!-- NO HEADER - COMPLETELY REMOVED -->
-    <!-- The navbar and all header elements are gone -->
-
-    <!-- Main container starts directly -->
+    <!-- Main container -->
     <div class="container">
         <!-- Search and filters -->
         <div class="search-section">
@@ -466,7 +460,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
@@ -494,12 +488,79 @@
         let currentCategory = 'all';
         let isOnline = navigator.onLine;
 
+        // Cache for seller data to avoid repeated fetches
+        const sellerCache = new Map();
+
+        // Helper function to get image URL from various formats
+        function getImageUrl(image) {
+            if (!image) return 'images/default-product.jpg';
+            
+            if (typeof image === 'string') {
+                if (image.startsWith('http') || image.startsWith('/') || image.startsWith('./')) {
+                    return image;
+                }
+                return 'images/default-product.jpg';
+            }
+            
+            if (typeof image === 'object') {
+                if (image.thumbnail) return image.thumbnail;
+                if (image.url) return image.url;
+                if (image.secure_url) return image.secure_url;
+            }
+            
+            return 'images/default-product.jpg';
+        }
+
+        // Helper function to get avatar URL from user data
+        function getAvatarUrl(userData) {
+            if (!userData) return 'images/default-avatar.jpg';
+            
+            // Try different possible avatar fields
+            if (userData.photoURL) return userData.photoURL;
+            if (userData.avatar) return userData.avatar;
+            if (userData.profilePicture) return userData.profilePicture;
+            if (userData.profileImage) return userData.profileImage;
+            if (userData.photoUrl) return userData.photoUrl;
+            
+            // Check if there's a photo in the user object
+            if (userData.photo && typeof userData.photo === 'string') return userData.photo;
+            if (userData.photo && userData.photo.url) return userData.photo.url;
+            
+            return 'images/default-avatar.jpg';
+        }
+
+        // Fetch seller data for a product
+        async function fetchSellerData(ownerId) {
+            if (!ownerId) return null;
+            
+            // Check cache first
+            if (sellerCache.has(ownerId)) {
+                return sellerCache.get(ownerId);
+            }
+            
+            try {
+                const userRef = doc(db, 'users', ownerId);
+                const userSnap = await getDoc(userRef);
+                
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    sellerCache.set(ownerId, userData);
+                    return userData;
+                }
+            } catch (error) {
+                console.log('Error fetching seller data:', error);
+            }
+            
+            return null;
+        }
+
         // Network monitoring
         window.addEventListener('online', () => {
             isOnline = true;
             offlineIndicator.style.display = 'none';
             loadProducts(true);
         });
+        
         window.addEventListener('offline', () => {
             isOnline = false;
             offlineIndicator.style.display = 'flex';
@@ -512,24 +573,65 @@
                 loadCachedProducts();
                 return;
             }
+            
             try {
                 showLoading();
+                
                 const productsRef = collection(db, 'products');
-                const q = query(productsRef, orderBy('createdAt', 'desc'));
-                const snapshot = await getDocs(q);
-                allProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const snapshot = await getDocs(productsRef);
+                
+                // Process each product and fetch seller data
+                const productPromises = snapshot.docs.map(async (doc) => {
+                    const data = doc.data();
+                    
+                    // Process images
+                    let processedImages = [];
+                    if (data.images && Array.isArray(data.images)) {
+                        processedImages = data.images.map(img => getImageUrl(img));
+                    }
+                    
+                    // Fetch seller data
+                    const sellerData = await fetchSellerData(data.ownerId);
+                    
+                    return {
+                        id: doc.id,
+                        ...data,
+                        processedImages: processedImages,
+                        mainImage: processedImages.length > 0 ? processedImages[0] : 'images/default-product.jpg',
+                        seller: sellerData,
+                        avatarUrl: getAvatarUrl(sellerData)
+                    };
+                });
+                
+                // Wait for all seller data to load
+                allProducts = await Promise.all(productPromises);
+
+                // Sort in memory by createdAt (newest first)
+                allProducts.sort((a, b) => {
+                    const dateA = a.createdAt?.seconds || 0;
+                    const dateB = b.createdAt?.seconds || 0;
+                    return dateB - dateA;
+                });
+
+                console.log(`Loaded ${allProducts.length} products with seller data`);
                 cacheProducts(allProducts);
                 filterAndDisplay();
+                
             } catch (err) {
-                console.warn(err);
+                console.warn('Error loading products:', err);
                 loadCachedProducts();
             }
         }
 
         function cacheProducts(products) {
             try {
-                localStorage.setItem('cached_products', JSON.stringify({ data: products, timestamp: Date.now() }));
-            } catch (e) {}
+                localStorage.setItem('cached_products', JSON.stringify({ 
+                    data: products, 
+                    timestamp: Date.now() 
+                }));
+            } catch (e) {
+                console.log('Cache error:', e);
+            }
         }
 
         function loadCachedProducts() {
@@ -544,6 +646,7 @@
                     showEmptyState();
                 }
             } catch (e) {
+                console.log('Cache load error:', e);
                 showEmptyState();
             }
         }
@@ -573,14 +676,25 @@
         }
 
         function filterAndDisplay() {
-            let filtered = (currentCategory === 'all') ? [...allProducts] : allProducts.filter(p => p.category === currentCategory);
+            let filtered = [...allProducts];
             
+            // Filter by category
+            if (currentCategory !== 'all') {
+                filtered = filtered.filter(p => p.category === currentCategory);
+            }
+            
+            // Filter by special filters
             if (currentFilter === 'new') {
-                filtered = filtered.slice(0, 20);
+                const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+                filtered = filtered.filter(p => {
+                    const created = p.createdAt?.seconds ? p.createdAt.seconds * 1000 : 0;
+                    return created > oneWeekAgo;
+                });
             } else if (currentFilter === 'discount') {
                 filtered = filtered.filter(p => p.discount > 0);
             }
 
+            // Search filter
             const term = searchInput.value.toLowerCase().trim();
             if (term) {
                 filtered = filtered.filter(p => 
@@ -589,6 +703,7 @@
                     (p.storeName && p.storeName.toLowerCase().includes(term))
                 );
             }
+            
             filteredProducts = filtered;
             displayProducts();
         }
@@ -615,15 +730,16 @@
                     }
                 });
             });
+            
             document.querySelectorAll('.connect-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const whatsapp = btn.dataset.whatsapp;
                     const telegram = btn.dataset.telegram;
                     if (btn.classList.contains('telegram') && telegram) {
-                        window.open(`https://t.me/${telegram.replace('@','')}`, '_blank');
+                        window.open(`https://t.me/${telegram.replace('@', '')}`, '_blank');
                     } else if (whatsapp) {
-                        window.open(`https://wa.me/${whatsapp.replace('+','')}`, '_blank');
+                        window.open(`https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}`, '_blank');
                     }
                 });
             });
@@ -631,35 +747,75 @@
 
         function createProductCard(product) {
             const hasDiscount = product.discount > 0;
-            let imageUrl = 'https://via.placeholder.com/200?text=Game';
-            if (product.images && product.images.length) {
-                const first = product.images[0];
-                imageUrl = (typeof first === 'object' && first.thumbnail) ? first.thumbnail : (typeof first === 'string' ? first : 'https://via.placeholder.com/200?text=Img');
-            }
+            const price = product.salePrice || product.price || 0;
+            const originalPrice = product.originalPrice || price;
+            
+            // Get product image
+            const imageUrl = product.mainImage || 'images/default-product.jpg';
+            
+            // Get seller avatar - use the fetched avatarUrl or fallback
+            const avatarUrl = product.avatarUrl || 'images/default-avatar.jpg';
+            
+            // Get seller name
+            const sellerName = product.seller?.displayName || 
+                              product.seller?.username || 
+                              product.seller?.name || 
+                              product.ownerName || 
+                              'Seller';
+
             return `
-                <div class="product-card" data-product-id="${product.productId || product.id}">
-                    <img src="${imageUrl}" alt="${product.name || ''}" class="product-image" onerror="this.src='https://via.placeholder.com/200?text=Error'">
+                <div class="product-card" data-product-id="${product.id}">
+                    <img src="${imageUrl}" 
+                         alt="${product.name || 'Product'}" 
+                         class="product-image" 
+                         onerror="this.src='images/default-product.jpg'">
+                    
                     ${product.status === 'new' ? '<span class="product-badge">NEW</span>' : ''}
                     ${hasDiscount ? `<span class="product-discount">-${product.discount}%</span>` : ''}
+                    
                     <div class="product-info">
-                        <div class="product-store"><i class="fas fa-store"></i> ${product.storeName || 'Store'}</div>
-                        <h3 class="product-name">${product.name || 'Product'}</h3>
-                        <div class="product-price">
-                            <span class="current-price">$${product.salePrice || product.price || '0'}</span>
-                            ${hasDiscount ? `<span class="original-price">$${product.originalPrice || product.price}</span>` : ''}
+                        <div class="product-store">
+                            <i class="fas fa-store"></i> 
+                            ${product.storeName || 'Store'}
                         </div>
+                        
+                        <h3 class="product-name">${product.name || 'Product'}</h3>
+                        
+                        <div class="product-price">
+                            <span class="current-price">$${Number(price).toFixed(2)}</span>
+                            ${hasDiscount ? `<span class="original-price">$${Number(originalPrice).toFixed(2)}</span>` : ''}
+                        </div>
+                        
                         ${product.features && product.features.length ? `
-                        <div class="product-features">
-                            ${product.features.slice(0,2).map(f => `<span class="feature-tag"><i class="fas fa-check"></i>${f.substring(0,8)}</span>`).join('')}
-                        </div>` : ''}
+                            <div class="product-features">
+                                ${product.features.slice(0, 2).map(f => `
+                                    <span class="feature-tag">
+                                        <i class="fas fa-check"></i>${String(f).substring(0, 8)}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                        
                         <div class="product-footer">
                             <div class="seller-info">
-                                <img src="https://via.placeholder.com/24?text=U" class="seller-avatar" onerror="this.src='https://via.placeholder.com/24'">
-                                <span class="seller-name">${product.ownerName || 'Seller'}</span>
+                                <img src="${avatarUrl}" 
+                                     class="seller-avatar" 
+                                     onerror="this.src='images/default-avatar.jpg'">
+                                <span class="seller-name">${sellerName}</span>
                             </div>
+                            
                             <div style="display:flex; gap:4px;">
-                                ${product.ownerWhatsapp ? `<button class="connect-btn" data-whatsapp="${product.ownerWhatsapp}"><i class="fab fa-whatsapp"></i></button>` : ''}
-                                ${product.ownerTelegram ? `<button class="connect-btn telegram" data-telegram="${product.ownerTelegram}"><i class="fab fa-telegram"></i></button>` : ''}
+                                ${product.ownerWhatsapp ? `
+                                    <button class="connect-btn" data-whatsapp="${product.ownerWhatsapp}">
+                                        <i class="fab fa-whatsapp"></i>
+                                    </button>
+                                ` : ''}
+                                
+                                ${product.ownerTelegram ? `
+                                    <button class="connect-btn telegram" data-telegram="${product.ownerTelegram}">
+                                        <i class="fab fa-telegram"></i>
+                                    </button>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -669,18 +825,24 @@
 
         // Event listeners
         searchInput.addEventListener('input', debounce(filterAndDisplay, 300));
-        filterBtns.forEach(btn => btn.addEventListener('click', () => {
-            filterBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentFilter = btn.dataset.filter;
-            filterAndDisplay();
-        }));
-        categoryTags.forEach(tag => tag.addEventListener('click', () => {
-            categoryTags.forEach(t => t.classList.remove('active'));
-            tag.classList.add('active');
-            currentCategory = tag.dataset.category;
-            filterAndDisplay();
-        }));
+        
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                filterAndDisplay();
+            });
+        });
+        
+        categoryTags.forEach(tag => {
+            tag.addEventListener('click', () => {
+                categoryTags.forEach(t => t.classList.remove('active'));
+                tag.classList.add('active');
+                currentCategory = tag.dataset.category;
+                filterAndDisplay();
+            });
+        });
 
         function debounce(fn, delay) {
             let timer;
