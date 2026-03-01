@@ -1,3 +1,5 @@
+// notification.js - Complete file with nice notification sounds
+
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
@@ -46,6 +48,249 @@ let unreadCount = 0;
 let lastNotificationTime = 0;
 let notificationShown = false;
 
+// ==================== NOTIFICATION SOUNDS SYSTEM ====================
+
+// Create notification sounds using Web Audio API for better compatibility
+class NotificationSoundManager {
+    constructor() {
+        this.audioContext = null;
+        this.soundsEnabled = true;
+        this.soundVolume = 0.5; // 50% volume
+        this.lastPlayed = 0;
+        this.minPlayInterval = 1000; // Minimum 1 second between sounds
+        
+        // Try to load user preference
+        this.loadUserPreferences();
+        
+        // Initialize audio context on user interaction (required by browsers)
+        this.setupAudioContext();
+    }
+    
+    setupAudioContext() {
+        // Audio context must be created after user interaction
+        document.addEventListener('click', () => {
+            if (!this.audioContext) {
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.log('Web Audio API not supported');
+                }
+            }
+        }, { once: true });
+    }
+    
+    loadUserPreferences() {
+        try {
+            const savedPrefs = localStorage.getItem('notificationSoundPrefs');
+            if (savedPrefs) {
+                const prefs = JSON.parse(savedPrefs);
+                this.soundsEnabled = prefs.enabled !== false;
+                this.soundVolume = prefs.volume || 0.5;
+            }
+        } catch (e) {
+            console.error('Error loading sound preferences:', e);
+        }
+    }
+    
+    saveUserPreferences() {
+        try {
+            localStorage.setItem('notificationSoundPrefs', JSON.stringify({
+                enabled: this.soundsEnabled,
+                volume: this.soundVolume
+            }));
+        } catch (e) {
+            console.error('Error saving sound preferences:', e);
+        }
+    }
+    
+    toggleSounds() {
+        this.soundsEnabled = !this.soundsEnabled;
+        this.saveUserPreferences();
+        return this.soundsEnabled;
+    }
+    
+    setVolume(volume) {
+        this.soundVolume = Math.max(0, Math.min(1, volume));
+        this.saveUserPreferences();
+    }
+    
+    // Play a gentle notification sound (soft bell)
+    playSoftBell() {
+        this.playSound('softBell');
+    }
+    
+    // Play a gentle chime sound
+    playGentleChime() {
+        this.playSound('gentleChime');
+    }
+    
+    // Play a soft ping sound
+    playSoftPing() {
+        this.playSound('softPing');
+    }
+    
+    // Play a subtle pop sound
+    playSubtlePop() {
+        this.playSound('subtlePop');
+    }
+    
+    // Play sound based on notification type
+    playNotificationSound(type) {
+        if (!this.soundsEnabled) return;
+        
+        // Rate limiting - don't play sounds too frequently
+        const now = Date.now();
+        if (now - this.lastPlayed < this.minPlayInterval) return;
+        this.lastPlayed = now;
+        
+        switch(type) {
+            case 'message':
+            case 'group_message':
+                this.playSoftPing(); // Soft ping for messages
+                break;
+            case 'like':
+                this.playSubtlePop(); // Subtle pop for likes
+                break;
+            case 'post':
+                this.playGentleChime(); // Gentle chime for posts
+                break;
+            case 'group_invite':
+                this.playSoftBell(); // Soft bell for invites
+                break;
+            default:
+                this.playSoftBell(); // Default sound
+        }
+    }
+    
+    // Main method to play sounds using Web Audio API
+    playSound(soundType) {
+        if (!this.soundsEnabled) return;
+        if (!this.audioContext) {
+            // Try to create audio context if not exists
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.log('Web Audio API not supported');
+                return;
+            }
+        }
+        
+        // Resume audio context if suspended
+        if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+        
+        try {
+            switch(soundType) {
+                case 'softBell':
+                    this.createSoftBellSound();
+                    break;
+                case 'gentleChime':
+                    this.createGentleChimeSound();
+                    break;
+                case 'softPing':
+                    this.createSoftPingSound();
+                    break;
+                case 'subtlePop':
+                    this.createSubtlePopSound();
+                    break;
+            }
+        } catch (e) {
+            console.error('Error playing sound:', e);
+        }
+    }
+    
+    // Create soft bell sound
+    createSoftBellSound() {
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, this.audioContext.currentTime); // A5
+        oscillator.frequency.exponentialRampToValueAtTime(440, this.audioContext.currentTime + 0.5); // A4
+        
+        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.3, this.audioContext.currentTime + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.8);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        
+        oscillator.start();
+        oscillator.stop(this.audioContext.currentTime + 0.8);
+    }
+    
+    // Create gentle chime sound
+    createGentleChimeSound() {
+        const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+        
+        notes.forEach((freq, index) => {
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.value = freq;
+            
+            const startTime = this.audioContext.currentTime + (index * 0.1);
+            
+            gainNode.gain.setValueAtTime(0, startTime);
+            gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.2, startTime + 0.02);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            oscillator.start(startTime);
+            oscillator.stop(startTime + 0.4);
+        });
+    }
+    
+    // Create soft ping sound
+    createSoftPingSound() {
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(659.25, this.audioContext.currentTime); // E5
+        oscillator.frequency.exponentialRampToValueAtTime(523.25, this.audioContext.currentTime + 0.2); // C5
+        
+        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.25, this.audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        
+        oscillator.start();
+        oscillator.stop(this.audioContext.currentTime + 0.3);
+    }
+    
+    // Create subtle pop sound
+    createSubtlePopSound() {
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(330, this.audioContext.currentTime); // E4
+        oscillator.frequency.exponentialRampToValueAtTime(220, this.audioContext.currentTime + 0.1); // A3
+        
+        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(this.soundVolume * 0.2, this.audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.15);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        
+        oscillator.start();
+        oscillator.stop(this.audioContext.currentTime + 0.15);
+    }
+}
+
+// Create global sound manager instance
+const soundManager = new NotificationSoundManager();
+
+// ==================== END NOTIFICATION SOUNDS SYSTEM ====================
+
 // Initialize notification system
 function initNotificationSystem() {
     // Load dismissed notifications and viewed posts
@@ -61,10 +306,14 @@ function initNotificationSystem() {
             setupNotificationCreators();
             updateNotificationBadge();
             
+            // Add sound control button to UI
+            addSoundControlButton();
+            
             // If on notification page, load notifications
             if (window.location.pathname.includes('notification.html')) {
                 loadNotificationsForPage();
                 setupMarkAllReadButton();
+                addSoundSettingsToPage();
             }
             
             // Setup dropdown notifications if notification bell exists
@@ -81,6 +330,270 @@ function initNotificationSystem() {
             }
         }
     });
+}
+
+// Add sound control button to UI
+function addSoundControlButton() {
+    // Check if button already exists
+    if (document.getElementById('notification-sound-toggle')) return;
+    
+    const notificationBells = document.querySelectorAll('.notification-bell, .notification-icon, [data-notification-dropdown]');
+    
+    notificationBells.forEach(bell => {
+        // Create sound toggle button
+        const soundBtn = document.createElement('button');
+        soundBtn.id = 'notification-sound-toggle';
+        soundBtn.className = 'sound-toggle-btn';
+        soundBtn.innerHTML = soundManager.soundsEnabled ? 
+            '<i class="fas fa-volume-up"></i>' : 
+            '<i class="fas fa-volume-mute"></i>';
+        soundBtn.title = soundManager.soundsEnabled ? 'Mute notification sounds' : 'Unmute notification sounds';
+        
+        // Add styles
+        if (!document.getElementById('sound-toggle-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'sound-toggle-styles';
+            styles.textContent = `
+                .sound-toggle-btn {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border-color);
+                    border-radius: 50%;
+                    width: 36px;
+                    height: 36px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    color: var(--text-primary);
+                    font-size: 16px;
+                    margin-left: 10px;
+                    transition: all 0.2s ease;
+                }
+                
+                .sound-toggle-btn:hover {
+                    background: var(--primary);
+                    color: white;
+                    transform: scale(1.1);
+                }
+                
+                .sound-settings-panel {
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border-color);
+                    border-radius: 12px;
+                    padding: 20px;
+                    box-shadow: var(--shadow-lg);
+                    z-index: 10002;
+                    width: 250px;
+                    animation: slideUp 0.3s ease;
+                }
+                
+                .sound-settings-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 15px;
+                }
+                
+                .sound-settings-header h4 {
+                    margin: 0;
+                    font-size: 16px;
+                    color: var(--text-primary);
+                }
+                
+                .sound-settings-close {
+                    background: none;
+                    border: none;
+                    color: var(--text-secondary);
+                    font-size: 18px;
+                    cursor: pointer;
+                }
+                
+                .sound-settings-option {
+                    margin-bottom: 15px;
+                }
+                
+                .sound-settings-option label {
+                    display: block;
+                    margin-bottom: 5px;
+                    color: var(--text-secondary);
+                    font-size: 13px;
+                }
+                
+                .sound-settings-option input[type="range"] {
+                    width: 100%;
+                    height: 4px;
+                    background: var(--border-color);
+                    border-radius: 2px;
+                    -webkit-appearance: none;
+                }
+                
+                .sound-settings-option input[type="range"]::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    width: 16px;
+                    height: 16px;
+                    background: var(--primary);
+                    border-radius: 50%;
+                    cursor: pointer;
+                }
+                
+                .sound-test-btn {
+                    background: var(--bg-hover);
+                    border: 1px solid var(--border-color);
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                    color: var(--text-primary);
+                    cursor: pointer;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                }
+                
+                .sound-test-btn:hover {
+                    background: var(--primary);
+                    color: white;
+                }
+                
+                @keyframes slideUp {
+                    from { transform: translateY(100%); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        // Add click handler
+        soundBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showSoundSettings(soundBtn);
+        });
+        
+        // Insert after notification bell
+        bell.parentNode.insertBefore(soundBtn, bell.nextSibling);
+    });
+}
+
+// Show sound settings panel
+function showSoundSettings(triggerBtn) {
+    // Remove existing panel
+    const existingPanel = document.querySelector('.sound-settings-panel');
+    if (existingPanel) {
+        existingPanel.remove();
+        return;
+    }
+    
+    const panel = document.createElement('div');
+    panel.className = 'sound-settings-panel';
+    panel.innerHTML = `
+        <div class="sound-settings-header">
+            <h4>Notification Sounds</h4>
+            <button class="sound-settings-close">&times;</button>
+        </div>
+        <div class="sound-settings-option">
+            <label>
+                <input type="checkbox" id="sound-enabled" ${soundManager.soundsEnabled ? 'checked' : ''}>
+                Enable sounds
+            </label>
+        </div>
+        <div class="sound-settings-option">
+            <label>Volume</label>
+            <input type="range" id="sound-volume" min="0" max="1" step="0.1" value="${soundManager.soundVolume}">
+        </div>
+        <button class="sound-test-btn" id="test-sound-btn">
+            <i class="fas fa-play"></i> Test Sound
+        </button>
+    `;
+    
+    document.body.appendChild(panel);
+    
+    // Position panel near the button
+    const btnRect = triggerBtn.getBoundingClientRect();
+    panel.style.bottom = (window.innerHeight - btnRect.top + 10) + 'px';
+    panel.style.right = (window.innerWidth - btnRect.right) + 'px';
+    
+    // Add event listeners
+    panel.querySelector('.sound-settings-close').addEventListener('click', () => {
+        panel.remove();
+    });
+    
+    const enabledCheckbox = panel.querySelector('#sound-enabled');
+    enabledCheckbox.addEventListener('change', (e) => {
+        soundManager.toggleSounds();
+        triggerBtn.innerHTML = soundManager.soundsEnabled ? 
+            '<i class="fas fa-volume-up"></i>' : 
+            '<i class="fas fa-volume-mute"></i>';
+        triggerBtn.title = soundManager.soundsEnabled ? 'Mute notification sounds' : 'Unmute notification sounds';
+    });
+    
+    const volumeSlider = panel.querySelector('#sound-volume');
+    volumeSlider.addEventListener('input', (e) => {
+        soundManager.setVolume(parseFloat(e.target.value));
+    });
+    
+    panel.querySelector('#test-sound-btn').addEventListener('click', () => {
+        soundManager.playSoftBell();
+    });
+    
+    // Close when clicking outside
+    setTimeout(() => {
+        document.addEventListener('click', function closePanel(e) {
+            if (!panel.contains(e.target) && e.target !== triggerBtn && !triggerBtn.contains(e.target)) {
+                panel.remove();
+                document.removeEventListener('click', closePanel);
+            }
+        });
+    }, 100);
+}
+
+// Add sound settings to notification page
+function addSoundSettingsToPage() {
+    const header = document.querySelector('.notifications-header');
+    if (header) {
+        const soundSettingsBtn = document.createElement('button');
+        soundSettingsBtn.className = 'sound-settings-page-btn';
+        soundSettingsBtn.innerHTML = '<i class="fas fa-music"></i> Sound Settings';
+        
+        soundSettingsBtn.addEventListener('click', () => {
+            addSoundSettingsToPage();
+        });
+        
+        header.appendChild(soundSettingsBtn);
+        
+        // Add styles
+        if (!document.getElementById('sound-page-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'sound-page-styles';
+            styles.textContent = `
+                .sound-settings-page-btn {
+                    background: var(--bg-card);
+                    color: var(--text-primary);
+                    border: 1px solid var(--border-color);
+                    border-radius: 8px;
+                    padding: 10px 20px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: all 0.2s ease;
+                    margin-left: 10px;
+                }
+                
+                .sound-settings-page-btn:hover {
+                    background: var(--primary);
+                    color: white;
+                    border-color: var(--primary);
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+    }
 }
 
 // Setup dropdown notification functionality
@@ -436,10 +949,8 @@ async function handleNotificationClick(notificationId) {
             if (notification.type === 'message' && notification.senderId) {
                 window.location.href = `chat.html?id=${notification.senderId}`;
             } else if (notification.type === 'group_message' && notification.groupId) {
-                // UPDATED: Changed from prepare.html to group.html
                 window.location.href = `group.html?id=${notification.groupId}`;
             } else if (notification.type === 'group_invite' && notification.groupId) {
-                // UPDATED: Changed from prepare.html to group.html
                 window.location.href = `group.html?id=${notification.groupId}`;
             } else if (notification.type === 'post' && notification.senderId) {
                 window.location.href = 'posts.html';
@@ -566,7 +1077,7 @@ async function markAllNotificationsAsRead() {
     }
 }
 
-// Show notification popup (ONLY ONE popup with mark button)
+// Show notification popup (with sound)
 function showNotificationPopup() {
     // Don't show if already showing or on notification page
     if (notificationShown || window.location.pathname.includes('notification.html')) {
@@ -577,6 +1088,9 @@ function showNotificationPopup() {
     if (unreadCount === 0) {
         return;
     }
+    
+    // Play notification sound
+    soundManager.playSoftBell();
     
     // Remove any existing popup
     const existingPopup = document.querySelector('.notification-popup');
@@ -704,8 +1218,8 @@ function showNotificationPopup() {
             }
             
             @keyframes slideOutRight {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
             }
             
             .notification-popup.hiding {
@@ -1442,7 +1956,7 @@ async function checkExistingNotification(type, relatedId, senderId = null) {
     }
 }
 
-// Setup notification listener (UPDATED - Shows only ONE popup)
+// Setup notification listener (with sound for new notifications)
 function setupNotificationListener() {
     if (!currentUser) return;
 
@@ -1470,10 +1984,22 @@ function setupNotificationListener() {
                 return timeB - timeA;
             });
             
+            const previousUnreadCount = unreadCount;
             unreadCount = unreadNotifications.length;
             
             updateNotificationBadge(unreadCount);
             localStorage.setItem(`notification_count_${currentUser.uid}`, unreadCount);
+            
+            // Play sound for new notifications
+            snapshot.docChanges().forEach(change => {
+                if (change.type === 'added') {
+                    const notification = change.doc.data();
+                    if (!notification.read) {
+                        // Play notification sound based on type
+                        soundManager.playNotificationSound(notification.type);
+                    }
+                }
+            });
             
             // Reload notifications if on notification page
             if (window.location.pathname.includes('notification.html')) {
@@ -1489,21 +2015,13 @@ function setupNotificationListener() {
                 loadDropdownNotifications();
             }
             
-            // UPDATED: Show only ONE popup for new notifications, not individual ones
+            // Show popup for new notifications (but not too frequently)
             if (!window.location.pathname.includes('notification.html')) {
-                snapshot.docChanges().forEach(change => {
-                    if (change.type === 'added') {
-                        const notification = change.doc.data();
-                        if (!notification.read) {
-                            // Check if we should show popup (not too frequently)
-                            const now = Date.now();
-                            if (now - lastNotificationTime > 5000) { // At least 5 seconds between popups
-                                showNotificationPopup();
-                                lastNotificationTime = now;
-                            }
-                        }
-                    }
-                });
+                const now = Date.now();
+                if (unreadCount > previousUnreadCount && now - lastNotificationTime > 5000) {
+                    showNotificationPopup();
+                    lastNotificationTime = now;
+                }
             }
         }, (error) => {
             console.error('Notification listener error:', error);
@@ -1631,5 +2149,10 @@ window.NotificationSystem = {
         }
     },
     showDropdown: toggleDropdownNotifications,
-    markAllRead: markAllNotificationsAsRead
+    markAllRead: markAllNotificationsAsRead,
+    // Sound control methods
+    soundManager: soundManager,
+    toggleSounds: () => soundManager.toggleSounds(),
+    setSoundVolume: (volume) => soundManager.setVolume(volume),
+    testSound: () => soundManager.playSoftBell()
 };
