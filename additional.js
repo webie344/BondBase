@@ -3,6 +3,7 @@
 // FIXED: Stickers now persist after page reload
 // FIXED: Sticker button hides when input is active
 // FIXED: Prevent duplicate saved stickers
+// ADDED: Premium badges on premium users and sticker sending restriction
 
 // Import Firebase modules directly
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -26,7 +27,6 @@ import {
     limit,
     arrayUnion,
     getDocs,
-    Timestamp,
     where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -80,6 +80,8 @@ let currentThreadId = null;
 let userStickers = [];
 let savedStickers = new Map(); // Use Map to prevent duplicates (key = stickerId)
 let stickerPickerOpen = false;
+let userHasPremium = false; // NEW: Current user premium status
+let chatPartnerPremium = false; // NEW: Chat partner premium status
 let stickerCreatorVars = {
     currentStep: 1,
     stickerType: '',
@@ -103,9 +105,11 @@ document.addEventListener('DOMContentLoaded', () => {
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
+                checkCurrentUserPremium(); // NEW: Check current user premium status
                 initializeFeatures();
             } else {
                 currentUser = null;
+                userHasPremium = false;
                 try {
                     initializeBasicFeatures();
                 } catch (e) {
@@ -122,6 +126,204 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// NEW: Check if current user is premium
+async function checkCurrentUserPremium() {
+    if (!currentUser || !db) return;
+    
+    try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+            const userData = userSnap.data();
+            userHasPremium = (userData.paymentHistory && 
+                userData.paymentHistory.some(payment => 
+                    (payment.plan === 'lifetime' && payment.status === 'approved')
+                )) || (userData.chatPoints >= 9999);
+            
+            console.log('Current user premium status:', userHasPremium);
+        }
+    } catch (error) {
+        console.error('Error checking premium status:', error);
+    }
+}
+
+// NEW: Check if chat partner is premium
+async function checkChatPartnerPremium(partnerId) {
+    if (!partnerId || !db) return false;
+    
+    try {
+        const userRef = doc(db, 'users', partnerId);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+            const userData = userSnap.data();
+            const isPremium = (userData.paymentHistory && 
+                userData.paymentHistory.some(payment => 
+                    (payment.plan === 'lifetime' && payment.status === 'approved')
+                )) || (userData.chatPoints >= 9999);
+            
+            console.log('Chat partner premium status:', isPremium);
+            return isPremium;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error checking partner premium:', error);
+        return false;
+    }
+}
+
+// NEW: Add premium badge to profile cards in mingle.html
+async function addPremiumBadgesToProfiles() {
+    if (!window.location.pathname.includes('mingle.html') || !db) return;
+    
+    setTimeout(async () => {
+        const profileCards = document.querySelectorAll('.profile-card');
+        for (const card of profileCards) {
+            // Don't add duplicate badges
+            if (card.querySelector('.premium-badge')) continue;
+            
+            const profileId = card.dataset.profileId;
+            if (!profileId) continue;
+            
+            try {
+                const userRef = doc(db, 'users', profileId);
+                const userSnap = await getDoc(userRef);
+                
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    const isPremium = (userData.paymentHistory && 
+                        userData.paymentHistory.some(payment => 
+                            (payment.plan === 'lifetime' && payment.status === 'approved')
+                        )) || (userData.chatPoints >= 9999);
+                    
+                    if (isPremium) {
+                        const premiumBadge = document.createElement('div');
+                        premiumBadge.className = 'premium-badge';
+                        premiumBadge.innerHTML = '<i class="fas fa-crown"></i> PREMIUM';
+                        premiumBadge.style.cssText = `
+                            position: absolute;
+                            top: 10px;
+                            right: 10px;
+                            background: linear-gradient(135deg, #FFD700, #FFA500);
+                            color: white;
+                            padding: 4px 8px;
+                            border-radius: 12px;
+                            font-size: 10px;
+                            font-weight: bold;
+                            display: flex;
+                            align-items: center;
+                            gap: 3px;
+                            z-index: 10;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                        `;
+                        card.style.position = 'relative';
+                        card.appendChild(premiumBadge);
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking profile premium:', error);
+            }
+        }
+    }, 1000);
+}
+
+// NEW: Add premium badge to profile page
+async function addPremiumBadgeToProfile() {
+    if (!window.location.pathname.includes('profile.html') || !db) return;
+    
+    setTimeout(async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const profileId = urlParams.get('id');
+        
+        if (!profileId) return;
+        
+        try {
+            const userRef = doc(db, 'users', profileId);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                const isPremium = (userData.paymentHistory && 
+                    userData.paymentHistory.some(payment => 
+                        (payment.plan === 'lifetime' && payment.status === 'approved')
+                    )) || (userData.chatPoints >= 9999);
+                
+                if (isPremium) {
+                    // Find a good place to put the badge
+                    const profileHeader = document.querySelector('.profile-header') || 
+                                        document.querySelector('.profile-info') ||
+                                        document.querySelector('.profile-details') ||
+                                        document.querySelector('.profile-container');
+                    
+                    if (profileHeader && !profileHeader.querySelector('.premium-badge')) {
+                        const premiumBadge = document.createElement('div');
+                        premiumBadge.className = 'premium-badge';
+                        premiumBadge.innerHTML = '<i class="fas fa-crown"></i> PREMIUM MEMBER';
+                        premiumBadge.style.cssText = `
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 5px;
+                            background: linear-gradient(135deg, #FFD700, #FFA500);
+                            color: white;
+                            padding: 8px 15px;
+                            border-radius: 25px;
+                            font-size: 14px;
+                            font-weight: bold;
+                            margin: 10px 0;
+                            box-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
+                        `;
+                        profileHeader.appendChild(premiumBadge);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error adding profile badge:', error);
+        }
+    }, 1000);
+}
+
+// NEW: Add premium badge to chat header if partner is premium
+async function addPremiumBadgeToChatHeader() {
+    if (!window.location.pathname.includes('chat.html') || !chatPartnerId || !db) return;
+    
+    const isPremium = await checkChatPartnerPremium(chatPartnerId);
+    chatPartnerPremium = isPremium;
+    
+    if (isPremium) {
+        setTimeout(() => {
+            const chatHeader = document.querySelector('.chat-header') || 
+                              document.getElementById('chatHeader') ||
+                              document.querySelector('.chat-partner-info');
+            
+            if (chatHeader && !chatHeader.querySelector('.partner-premium-badge')) {
+                const premiumBadge = document.createElement('span');
+                premiumBadge.className = 'partner-premium-badge';
+                premiumBadge.innerHTML = '<i class="fas fa-crown"></i>';
+                premiumBadge.title = 'Premium Member';
+                premiumBadge.style.cssText = `
+                    color: #FFD700;
+                    font-size: 16px;
+                    margin-left: 8px;
+                    display: inline-block;
+                    filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.3));
+                `;
+                
+                // Find the partner name element
+                const partnerName = chatHeader.querySelector('.chat-partner-name') || 
+                                   chatHeader.querySelector('h2') ||
+                                   chatHeader.querySelector('h3');
+                
+                if (partnerName) {
+                    partnerName.appendChild(premiumBadge);
+                } else {
+                    chatHeader.appendChild(premiumBadge);
+                }
+            }
+        }, 500);
+    }
+}
+
 // Initialize basic UI features without Firebase
 function initializeBasicFeatures() {
     if (window.location.pathname.includes('chat.html')) {
@@ -132,7 +334,7 @@ function initializeBasicFeatures() {
                 addStickerButton();
                 setupStickerPickerEvents();
                 setupStickerInterceptor();
-                setupStickerButtonVisibility(); // NEW: Setup input focus listener
+                setupStickerButtonVisibility();
             } catch (e) {
                 console.log('Could not initialize all features:', e);
             }
@@ -140,7 +342,7 @@ function initializeBasicFeatures() {
     }
 }
 
-// NEW: Setup sticker button visibility based on input focus
+// Setup sticker button visibility based on input focus
 function setupStickerButtonVisibility() {
     const messageInput = document.getElementById('messageInput');
     const stickerBtn = document.getElementById('stickerPickerBtn');
@@ -150,11 +352,9 @@ function setupStickerButtonVisibility() {
         return;
     }
     
-    // Remove any existing listeners to prevent duplicates
     messageInput.removeEventListener('focus', handleInputFocus);
     messageInput.removeEventListener('blur', handleInputBlur);
     
-    // Add focus/blur listeners
     messageInput.addEventListener('focus', handleInputFocus);
     messageInput.addEventListener('blur', handleInputBlur);
     
@@ -181,20 +381,27 @@ function initializeFeatures() {
         const urlParams = new URLSearchParams(window.location.search);
         chatPartnerId = urlParams.get('id');
         currentThreadId = [currentUser.uid, chatPartnerId].sort().join('_');
+        
+        // Check if chat partner is premium and add badge
+        addPremiumBadgeToChatHeader();
     }
+    
+    // Add premium badges to profiles in mingle.html
+    addPremiumBadgesToProfiles();
+    
+    // Add premium badge to profile page
+    addPremiumBadgeToProfile();
     
     initProfilePictureNavigation();
     initStickerSystem();
     loadUserStickers();
-    loadSavedStickers(); // Load saved stickers with deduplication
+    loadSavedStickers();
     setupStickerInterceptor();
-    setupStickerButtonVisibility(); // NEW: Setup input focus listener
+    setupStickerButtonVisibility();
     
     if (window.location.pathname.includes('chat.html') && chatPartnerId) {
-        // First load all existing messages to populate cache
         loadAllMessagesForCache().then(() => {
             setupStickerListener();
-            // Process all messages after cache is populated
             setTimeout(() => {
                 processAllMessagesForStickers();
                 hasLoadedInitialMessages = true;
@@ -204,7 +411,7 @@ function initializeFeatures() {
 }
 
 // ============================================
-// NEW: Load all messages to populate sticker cache
+// Load all messages to populate sticker cache
 // ============================================
 async function loadAllMessagesForCache() {
     if (!currentUser || !chatPartnerId || !currentThreadId || !db) {
@@ -227,9 +434,7 @@ async function loadAllMessagesForCache() {
             const message = doc.data();
             const messageId = doc.id;
             
-            // If this is a sticker message, store in cache
             if (message.type === 'sticker' || message.isSticker || message.stickerId) {
-                
                 const stickerData = {
                     id: message.stickerId || `sticker_${Date.now()}`,
                     name: message.stickerName || 'Sticker',
@@ -239,7 +444,6 @@ async function loadAllMessagesForCache() {
                     text: message.stickerText || ''
                 };
                 
-                // Store in cache with the message ID
                 stickerDataCache.set(messageId, stickerData);
                 console.log(`Cached sticker for message ${messageId}:`, stickerData.name);
             }
@@ -252,7 +456,7 @@ async function loadAllMessagesForCache() {
 }
 
 // ============================================
-// STICKER INTERCEPTOR - This replaces [STICKER] with actual stickers
+// STICKER INTERCEPTOR
 // ============================================
 
 function setupStickerInterceptor() {
@@ -264,16 +468,13 @@ function setupStickerInterceptor() {
 
     console.log('Sticker interceptor set up');
 
-    // Process all existing messages
     processAllMessagesForStickers();
 
-    // Watch for new messages
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             if (mutation.addedNodes.length) {
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1 && node.classList && node.classList.contains('message')) {
-                        // Check if this is a sticker message
                         setTimeout(() => {
                             checkAndReplaceWithSticker(node);
                         }, 100);
@@ -299,21 +500,16 @@ function processAllMessagesForStickers() {
 }
 
 function checkAndReplaceWithSticker(messageElement) {
-    // Skip if already processed
     if (messageElement.dataset.stickerProcessed === 'true') return;
 
-    // Check if this message has sticker text
     const messageText = messageElement.querySelector('p');
     if (!messageText) return;
 
     const text = messageText.textContent || '';
     
-    // If it's our sticker marker
     if (text === '[STICKER]' || text.includes('[STICKER]')) {
-        // Try to get message ID from various possible locations
         let messageId = null;
         
-        // Check for data attributes
         if (messageElement.dataset.messageId) {
             messageId = messageElement.dataset.messageId;
         } else if (messageElement.dataset.id) {
@@ -322,16 +518,13 @@ function checkAndReplaceWithSticker(messageElement) {
             messageId = messageElement.id;
         }
         
-        // If we still don't have an ID, try to find it in the message content
         if (!messageId) {
-            // Look for any element with data-message-id
             const idElement = messageElement.querySelector('[data-message-id]');
             if (idElement) {
                 messageId = idElement.dataset.messageId;
             }
         }
         
-        // Get sticker data from cache
         let stickerData = null;
         
         if (messageId) {
@@ -341,7 +534,6 @@ function checkAndReplaceWithSticker(messageElement) {
             }
         }
         
-        // If still no sticker data, check if the message element itself has data attributes
         if (!stickerData) {
             stickerData = {
                 id: messageElement.dataset.stickerId || 'sticker',
@@ -359,7 +551,6 @@ function checkAndReplaceWithSticker(messageElement) {
 }
 
 function replaceMessageWithSticker(messageElement, textElement, stickerData) {
-    // Create sticker HTML
     let stickerHTML = '';
     
     if (stickerData.type === 'image' && stickerData.url) {
@@ -375,7 +566,6 @@ function replaceMessageWithSticker(messageElement, textElement, stickerData) {
             </div>
         `;
     } else {
-        // Text sticker or fallback
         stickerHTML = `
             <div class="sticker-message-content">
                 <div class="text-sticker-message">
@@ -386,11 +576,9 @@ function replaceMessageWithSticker(messageElement, textElement, stickerData) {
         `;
     }
     
-    // Replace the text content with sticker HTML
     textElement.innerHTML = stickerHTML;
     textElement.classList.add('sticker-display');
     
-    // Style based on sent/received
     const content = textElement.querySelector('.sticker-message-content');
     if (content) {
         if (messageElement.classList.contains('sent')) {
@@ -404,7 +592,6 @@ function replaceMessageWithSticker(messageElement, textElement, stickerData) {
         }
     }
     
-    // Hide any default message background
     messageElement.style.background = 'transparent';
     messageElement.style.border = 'none';
     messageElement.style.boxShadow = 'none';
@@ -436,7 +623,7 @@ function navigateToProfile() {
 }
 
 // ============================================
-// Sticker System UI
+// Sticker System UI - MODIFIED for premium restriction
 // ============================================
 function initStickerSystem() {
     if (window.location.pathname.includes('chat.html')) {
@@ -463,8 +650,8 @@ function addStickerButton() {
     const stickerBtn = document.createElement('button');
     stickerBtn.id = 'stickerPickerBtn';
     stickerBtn.className = 'sticker-picker-btn';
-    stickerBtn.innerHTML = '<i class="fas fa-smile"></i>';
-    stickerBtn.title = 'Stickers';
+    stickerBtn.innerHTML = '<i class="fas fa-smile"></i>'; // NO CROWN - keeping original icon
+    stickerBtn.title = userHasPremium ? 'Stickers' : 'Premium feature - Upgrade to send stickers';
     stickerBtn.type = 'button';
     stickerBtn.addEventListener('click', toggleStickerPicker);
 
@@ -476,7 +663,6 @@ function addStickerButton() {
 
     messageInput.style.paddingRight = '50px';
     
-    // Setup visibility listener after button is added
     setupStickerButtonVisibility();
 }
 
@@ -494,6 +680,19 @@ function createStickerPicker() {
                 <i class="fas fa-plus"></i> Create
             </button>
         </div>
+        ${!userHasPremium ? `
+        <div class="premium-upgrade-notice" style="
+            background: #fff3cd;
+            color: #856404;
+            padding: 12px 15px;
+            text-align: center;
+            font-size: 14px;
+            border-bottom: 1px solid #ffeaa7;
+        ">
+            <i class="fas fa-crown" style="color: #FFD700; margin-right: 8px;"></i>
+            Upgrade to Premium ($30 lifetime) to send stickers
+        </div>
+        ` : ''}
         <div class="sticker-tabs">
             <button class="sticker-tab active" data-tab="my-stickers">My Stickers</button>
             <button class="sticker-tab" data-tab="saved-stickers">Saved</button>
@@ -547,10 +746,23 @@ function setupStickerPickerEvents() {
     }
 
     if (createBtn) {
-        createBtn.addEventListener('click', openStickerCreator);
+        createBtn.addEventListener('click', () => {
+            if (userHasPremium) {
+                openStickerCreator();
+            } else {
+                showNotification('Premium required to create stickers. Upgrade to $200 lifetime plan!', 'warning');
+            }
+        });
     }
+    
     if (createFirstBtn) {
-        createFirstBtn.addEventListener('click', openStickerCreator);
+        createFirstBtn.addEventListener('click', () => {
+            if (userHasPremium) {
+                openStickerCreator();
+            } else {
+                showNotification('Premium required to create stickers. Upgrade to $200 lifetime plan!', 'warning');
+            }
+        });
     }
 
     tabButtons.forEach(button => {
@@ -568,7 +780,7 @@ function setupStickerPickerEvents() {
             });
             
             if (tabName === 'saved-stickers') {
-                updateSavedStickersDisplay(); // Update display without reloading from Firebase
+                updateSavedStickersDisplay();
             }
         });
     });
@@ -586,6 +798,12 @@ function toggleStickerPicker(e) {
     if (e) {
         e.preventDefault();
         e.stopPropagation();
+    }
+    
+    // Check premium status before opening
+    if (!userHasPremium) {
+        showNotification('Premium feature: Upgrade to $200 lifetime plan to use stickers!', 'warning');
+        return;
     }
     
     if (stickerPickerOpen) {
@@ -670,6 +888,13 @@ function updateStickerPicker() {
         stickerItem.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            
+            // Check premium before sending
+            if (!userHasPremium) {
+                showNotification('Premium required to send stickers. Upgrade to $0 lifetime plan!', 'warning');
+                return;
+            }
+            
             sendSticker(sticker);
         }, true);
         myStickersGrid.appendChild(stickerItem);
@@ -701,7 +926,6 @@ function createStickerElement(sticker, index) {
     return stickerItem;
 }
 
-// FIXED: Load saved stickers with deduplication
 async function loadSavedStickers() {
     if (!currentUser || !db) return;
     
@@ -712,11 +936,9 @@ async function loadSavedStickers() {
         if (userSnap.exists()) {
             const savedStickersArray = userSnap.data().savedStickers || [];
             
-            // Clear the Map and add stickers with deduplication
             savedStickers.clear();
             
             savedStickersArray.forEach(sticker => {
-                // Use sticker.id as the key to prevent duplicates
                 if (!savedStickers.has(sticker.id)) {
                     savedStickers.set(sticker.id, sticker);
                 }
@@ -730,12 +952,10 @@ async function loadSavedStickers() {
     }
 }
 
-// FIXED: Update display using the Map instead of reloading from Firebase
 function updateSavedStickersDisplay() {
     const savedStickersGrid = document.getElementById('savedStickersGrid');
     if (!savedStickersGrid) return;
     
-    // Clear current display
     savedStickersGrid.innerHTML = '';
     
     if (savedStickers.size === 0) {
@@ -748,7 +968,6 @@ function updateSavedStickersDisplay() {
         return;
     }
     
-    // Convert Map values to array and display
     const stickersArray = Array.from(savedStickers.values());
     stickersArray.forEach(sticker => {
         const stickerItem = createStickerElement(sticker);
@@ -756,6 +975,13 @@ function updateSavedStickersDisplay() {
         stickerItem.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            
+            // Check premium before sending saved stickers too
+            if (!userHasPremium) {
+                showNotification('Premium required to send stickers. Upgrade to $200 lifetime plan!', 'warning');
+                return;
+            }
+            
             sendSticker(sticker);
         }, true);
         savedStickersGrid.appendChild(stickerItem);
@@ -763,11 +989,17 @@ function updateSavedStickersDisplay() {
 }
 
 // ============================================
-// FIXED: Send sticker with data for cache
+// Send sticker - MODIFIED for premium
 // ============================================
 async function sendSticker(sticker) {
     if (!currentUser || !chatPartnerId || !currentThreadId || !db) {
         showNotification('Cannot send sticker', 'error');
+        return;
+    }
+
+    // Double-check premium status
+    if (!userHasPremium) {
+        showNotification('Premium required: Upgrade to $200 lifetime plan to send stickers', 'warning');
         return;
     }
 
@@ -779,7 +1011,7 @@ async function sendSticker(sticker) {
     isStickerSending = true;
 
     try {
-        // Check chat points
+        // Check chat points (still deduct points even for premium? Adjust as needed)
         const hasPoints = await deductChatPoint();
         if (!hasPoints) {
             isStickerSending = false;
@@ -788,38 +1020,32 @@ async function sendSticker(sticker) {
 
         const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
-        // Create sticker message with ALL data
         const messageData = {
             senderId: currentUser.uid,
-            text: '[STICKER]', // Special marker that we'll replace with visual sticker
-            
-            // Store all sticker data in the message
+            text: '[STICKER]',
             stickerId: sticker.id,
             stickerName: sticker.name,
             stickerType: sticker.type,
             stickerUrl: sticker.url || '',
             stickerEmoji: sticker.emoji || '😊',
             stickerText: sticker.text || '',
-            
             read: false,
             timestamp: serverTimestamp(),
             type: 'sticker',
             isCustom: true,
             isSticker: true,
             messageId: messageId,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            sentByPremium: userHasPremium
         };
 
         console.log('Sending sticker to Firebase:', messageData);
 
-        // Send to Firebase
         const docRef = await addDoc(collection(db, 'conversations', currentThreadId, 'messages'), messageData);
         const firestoreId = docRef.id;
         
-        // Store sticker data in cache with the Firestore ID
         stickerDataCache.set(firestoreId, sticker);
         
-        // Update conversation
         await setDoc(doc(db, 'conversations', currentThreadId), {
             participants: [currentUser.uid, chatPartnerId],
             lastMessage: {
@@ -830,9 +1056,7 @@ async function sendSticker(sticker) {
             updatedAt: serverTimestamp()
         }, { merge: true });
 
-        // Close sticker picker
         closeStickerPicker();
-        
         showNotification('Sticker sent!', 'success');
         
     } catch (error) {
@@ -845,7 +1069,7 @@ async function sendSticker(sticker) {
     }
 }
 
-// Deduct chat points
+// Deduct chat points - MODIFIED to allow premium users to have unlimited
 async function deductChatPoint() {
     if (!currentUser || !db) return false;
     
@@ -857,11 +1081,25 @@ async function deductChatPoint() {
             const userData = userSnap.data();
             const currentPoints = userData.chatPoints || 0;
             
+            // Check if user is premium (should have unlimited points)
+            const isPremium = (userData.paymentHistory && 
+                userData.paymentHistory.some(payment => 
+                    (payment.plan === 'lifetime' && payment.status === 'approved')
+                )) || (currentPoints >= 9999);
+            
+            // If premium, don't deduct points
+            if (isPremium) {
+                console.log('Premium user - no points deducted');
+                return true;
+            }
+            
+            // Regular user - check points
             if (currentPoints <= 0) {
                 showNotification('You have no chat points left. Please purchase more.', 'warning');
                 return false;
             }
             
+            // Deduct one point for regular users
             await updateDoc(userRef, {
                 chatPoints: currentPoints - 1
             });
@@ -904,10 +1142,8 @@ function setupStickerListener() {
                 
                 console.log('New message received:', message.type, messageId);
                 
-                // If this is a sticker message
                 if (message.type === 'sticker' || message.isSticker || message.stickerId) {
                     
-                    // Create sticker data from message
                     const stickerData = {
                         id: message.stickerId || `sticker_${Date.now()}`,
                         name: message.stickerName || 'Sticker',
@@ -917,16 +1153,13 @@ function setupStickerListener() {
                         text: message.stickerText || ''
                     };
                     
-                    // Store in cache with the message ID
                     stickerDataCache.set(messageId, stickerData);
                     console.log(`Cached new sticker for message ${messageId}:`, stickerData.name);
                     
-                    // If it's not from current user, save it
                     if (message.senderId !== currentUser.uid) {
                         saveReceivedSticker(message);
                     }
                     
-                    // Try to find and replace the message in the DOM
                     setTimeout(() => {
                         findAndReplaceMessageById(messageId);
                     }, 500);
@@ -936,14 +1169,12 @@ function setupStickerListener() {
     });
 }
 
-// Helper function to find and replace a message by its ID
 function findAndReplaceMessageById(messageId) {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
     
     const messages = messagesContainer.querySelectorAll('.message');
     messages.forEach(msg => {
-        // Check various places where ID might be stored
         if (msg.dataset.messageId === messageId || 
             msg.dataset.id === messageId ||
             msg.id === messageId) {
@@ -952,12 +1183,10 @@ function findAndReplaceMessageById(messageId) {
     });
 }
 
-// FIXED: Save received sticker with deduplication
 async function saveReceivedSticker(message) {
     if (!currentUser || !db) return;
     
     try {
-        // Only save if it's a custom sticker (not from the predefined set)
         if (message.isCustom !== true) return;
         
         const stickerData = {
@@ -972,7 +1201,6 @@ async function saveReceivedSticker(message) {
             savedFrom: message.senderId
         };
 
-        // Check if sticker already exists in saved stickers Map
         if (savedStickers.has(stickerData.id)) {
             console.log('Sticker already saved, skipping duplicate');
             return;
@@ -983,10 +1211,8 @@ async function saveReceivedSticker(message) {
             savedStickers: arrayUnion(stickerData)
         });
 
-        // Add to local Map to prevent future duplicates
         savedStickers.set(stickerData.id, stickerData);
         
-        // Update the display if the saved stickers tab is active
         const savedTab = document.querySelector('.sticker-tab[data-tab="saved-stickers"]');
         if (savedTab && savedTab.classList.contains('active')) {
             updateSavedStickersDisplay();
@@ -999,9 +1225,15 @@ async function saveReceivedSticker(message) {
 }
 
 // ============================================
-// Sticker Creator
+// Sticker Creator - MODIFIED for premium
 // ============================================
 function openStickerCreator() {
+    // Check premium status
+    if (!userHasPremium) {
+        showNotification('Premium required: Upgrade to $200 lifetime plan to create stickers', 'warning');
+        return;
+    }
+    
     closeStickerPicker();
     
     stickerCreatorVars = {
@@ -1473,7 +1705,7 @@ function loadStickerStyles() {
     if (document.getElementById('sticker-styles')) return;
 
     const styles = `
-        /* Sticker Picker Styles */
+        /* Sticker Picker Styles - ORIGINAL STYLES UNCHANGED */
         .sticker-picker-btn {
             background: linear-gradient(135deg, #FF6B8B 0%, #FF8E53 100%);
             border: none;
@@ -1761,7 +1993,7 @@ function loadStickerStyles() {
             transform: scale(1.05);
         }
 
-        /* STICKER MESSAGE STYLES */
+        /* STICKER MESSAGE STYLES - ORIGINAL */
         .message.sticker-message {
             background: transparent !important;
             border: none !important;
@@ -1893,7 +2125,7 @@ function loadStickerStyles() {
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Sticker Creator Modal Styles */
+        /* Sticker Creator Modal Styles - ORIGINAL */
         .sticker-creator-modal {
             display: none;
             position: fixed;
