@@ -1365,33 +1365,42 @@
             border: 1px solid var(--border);
         }
 
-        /* Share Section */
+        /* Share Section - Made more compact */
         .share-container {
             background: rgba(255, 255, 255, 0.03);
             border-radius: var(--radius);
-            padding: 1rem;
+            padding: 1.5rem;
             border: 1px solid var(--border);
-            margin-bottom: 1.5rem;
+            max-width: 100%;
+            overflow: hidden;
         }
 
         .share-link-section {
+            width: 100%;
+        }
+
+        .share-link-section h3 {
+            font-size: 1.2rem;
             margin-bottom: 1rem;
+            color: var(--text-primary);
         }
 
         .link-input-group {
             display: flex;
-            gap: 0.15rem;
-            margin-top: 1rem;
+            gap: 0.5rem;
+            width: 100%;
+            flex-wrap: wrap;
         }
 
         .share-input {
             flex: 1;
+            min-width: 200px;
             padding: 0.75rem 1rem;
             border: 2px solid var(--border);
             border-radius: var(--radius);
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 15px;
+            font-size: 0.95rem;
         }
 
         .share-input:focus {
@@ -1401,10 +1410,11 @@
 
         .copy-feedback {
             margin-top: 0.75rem;
-            padding: 0.75rem 1rem;
+            padding: 0.5rem 1rem;
             border-radius: var(--radius);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             display: none;
+            word-break: break-word;
         }
 
         .copy-feedback.success {
@@ -1421,459 +1431,26 @@
             display: block;
         }
 
-        /* ========== GAMER PROFILE STYLES ========== */
-        .gamer-profile-form-container {
-            background: linear-gradient(145deg, #1a1a1a 0%, #222222 100%);
-            border-radius: var(--radius-lg);
-            padding: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            margin-bottom: 2rem;
-            box-shadow: var(--shadow-lg);
-            animation: fadeIn 0.5s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .profile-preview-container {
-            background: linear-gradient(145deg, #1a1a1a 0%, #222222 100%);
-            border-radius: var(--radius-lg);
-            padding: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            margin-bottom: 2rem;
-            box-shadow: var(--shadow-lg);
-            animation: fadeIn 0.5s ease;
-        }
-
-        .profile-preview-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .profile-preview-content {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            border: 1px solid var(--border);
-        }
-
-        .gamer-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 1rem;
-            margin-top: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: var(--radius);
-            padding: 1rem;
-            text-align: center;
-            border: 1px solid var(--border);
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-            border-color: var(--primary);
-            box-shadow: var(--shadow);
-        }
-
-        .stat-card .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-light);
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-card .stat-label {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .gamer-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: rgba(179, 0, 75, 0.2);
-            color: var(--primary-light);
-            border-radius: 20px;
-            font-size: 0.9rem;
-            margin-right: 0.5rem;
-            margin-bottom: 0.5rem;
-            border: 1px solid rgba(179, 0, 75, 0.3);
-            animation: slideUp 0.5s ease;
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .gamer-screenshot {
-            width: 100%;
-            max-width: 300px;
-            border-radius: var(--radius);
-            margin-top: 1rem;
-            border: 2px solid var(--border);
-            display: block;
-        }
-
-        .generate-profile-btn {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: var(--radius);
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-            font-size: 1rem;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 5px 15px rgba(179, 0, 75, 0.3); }
-            50% { box-shadow: 0 5px 25px rgba(179, 0, 75, 0.5); }
-            100% { box-shadow: 0 5px 15px rgba(179, 0, 75, 0.3); }
-        }
-
-        .generate-profile-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(179, 0, 75, 0.4);
-            background: linear-gradient(135deg, var(--primary-light), var(--primary));
-        }
-
-        .generate-profile-btn .feather {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-        }
-
-        .screenshot-upload {
-            margin-top: 1.5rem;
-            padding: 1.5rem;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: var(--radius);
-            border: 2px dashed var(--border);
-            transition: all 0.3s ease;
-        }
-
-        .screenshot-upload:hover {
-            border-color: var(--primary);
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .screenshot-preview {
-            width: 100%;
-            max-width: 300px;
-            max-height: 200px;
-            border-radius: var(--radius);
-            margin-top: 1rem;
-            display: none;
-            border: 2px solid var(--border);
-            object-fit: cover;
-        }
-
-        .gamer-profile-link {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-            align-items: stretch;
-        }
-
-        .gamer-profile-link input {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 0.9rem;
-        }
-
-        .link-preview {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: var(--radius);
-            padding: 1rem;
-            margin-top: 1.5rem;
-            border: 1px solid var(--border);
-            display: none;
-            animation: slideIn 0.5s ease;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        .link-preview h4 {
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-            font-size: 1.1rem;
-        }
-
-        .link-preview-content {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .link-preview-image {
-            width: 80px;
-            height: 80px;
-            border-radius: var(--radius);
-            object-fit: cover;
-            border: 2px solid var(--border);
-        }
-
-        .link-preview-info {
-            flex: 1;
-        }
-
-        .link-preview-info h5 {
-            margin: 0 0 0.5rem 0;
-            color: var(--text-primary);
-            font-size: 1rem;
-        }
-
-        .link-preview-info p {
-            margin: 0 0 0.5rem 0;
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-        }
-
-        .stats-preview {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .stat-preview-item {
-            background: rgba(179, 0, 75, 0.15);
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            color: var(--primary-light);
-            font-weight: 500;
-        }
-
-        /* Section Headers */
-        .stats-section h4,
-        .preferences-section h4,
-        .achievements-section h4 {
-            color: var(--text-primary);
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 1.1rem;
-        }
-
-        .stats-section h4 .feather,
-        .preferences-section h4 .feather,
-        .achievements-section h4 .feather {
-            width: 18px;
-            height: 18px;
-            stroke: var(--primary-light);
-        }
-
-        /* XP System Card */
+        /* Remove all gaming-specific styles */
+        .gamer-profile-form-container,
+        .profile-preview-container,
+        .gamer-stats-grid,
+        .stat-card,
+        .gamer-badge,
+        .gamer-screenshot,
+        .generate-profile-btn,
+        .screenshot-upload,
+        .screenshot-preview,
+        .gamer-profile-link,
+        .link-preview,
+        .stats-section,
+        .preferences-section,
+        .achievements-section,
         .xp-system-card {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            padding: 20px;
-            border-radius: 15px;
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .xp-system-card a:hover {
-            transform: scale(1.05);
+            display: none;
         }
 
         /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .gamer-stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .gamer-profile-link {
-                flex-direction: column;
-            }
-            
-            .link-preview-content {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .link-preview-image {
-                width: 120px;
-                height: 120px;
-            }
-            
-            .profile-preview-header {
-                flex-direction: column;
-                gap: 1rem;
-                align-items: flex-start;
-            }
-            
-            .screenshot-preview {
-                max-width: 100%;
-            }
-
-            .store-header {
-                flex-direction: column;
-                text-align: center;
-            }
-
-            .store-actions {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .products-grid {
-                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            }
-        }
-
-        @media (max-width: 480px) {
-            .gamer-stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .profile-preview-container,
-            .gamer-profile-form-container {
-                padding: 1.5rem;
-            }
-            
-            .generate-profile-btn {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .modal-actions {
-                flex-direction: column;
-            }
-
-            .products-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .store-meta {
-                flex-direction: column;
-                gap: 0.5rem;
-                align-items: center;
-            }
-        }
-
-        /* Form sections spacing */
-        .stats-section,
-        .preferences-section,
-        .achievements-section {
-            margin-bottom: 2rem;
-            padding-bottom: 2rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .achievements-section:last-child {
-            border-bottom: none;
-        }
-
-        /* Input focus effects */
-        #gamerProfileForm input:focus,
-        #gamerProfileForm select:focus,
-        #gamerProfileForm textarea:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(179, 0, 75, 0.2);
-            outline: none;
-        }
-
-        /* Checkbox styling */
-        .checkbox-group input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--primary);
-            cursor: pointer;
-        }
-
-        .checkbox-group label {
-            cursor: pointer;
-            user-select: none;
-        }
-
-        /* Button animations */
-        #generateProfileBtn,
-        #copyProfileLinkBtn,
-        #editGamerProfileBtn {
-            position: relative;
-            overflow: hidden;
-        }
-
-        #generateProfileBtn::after,
-        #copyProfileLinkBtn::after,
-        #editGamerProfileBtn::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: 0.5s;
-        }
-
-        #generateProfileBtn:hover::after,
-        #copyProfileLinkBtn:hover::after,
-        #editGamerProfileBtn:hover::after {
-            left: 100%;
-        }
-
-        /* Success animations */
-        .success-animation {
-            animation: successPulse 0.5s ease;
-        }
-
-        @keyframes successPulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
-        /* Loading state for generate button */
-        .generate-profile-btn.loading {
-            opacity: 0.7;
-            cursor: not-allowed;
-            animation: none;
-        }
-
-        .generate-profile-btn.loading .feather {
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Responsive Design */
         @media (max-width: 768px) {
             .account-content {
                 grid-template-columns: 1fr;
@@ -1918,12 +1495,31 @@
                 display: flex;
             }
 
-            .profile-preview-content {
-                grid-template-columns: 1fr;
+            .link-input-group {
+                flex-direction: column;
+            }
+            
+            .share-input {
+                width: 100%;
+            }
+            
+            .btn-primary {
+                width: 100%;
+                justify-content: center;
             }
 
-            .gamer-stats-grid {
-                grid-template-columns: 1fr 1fr;
+            .store-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .store-actions {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             }
         }
 
@@ -1958,7 +1554,7 @@
                 flex-direction: column;
             }
 
-            .gamer-stats-grid {
+            .products-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -1966,6 +1562,10 @@
                 flex-direction: column;
                 gap: 0.5rem;
                 align-items: center;
+            }
+            
+            .share-container {
+                padding: 1rem;
             }
         }
     </style>
@@ -2055,33 +1655,14 @@
     <div class="account-container">
         <div class="account-header">
             <h1>My Profile</h1>
-            <p>Update your gaming information and preferences</p>
+            <p>Update your personal information and preferences</p>
             <a href="payment.html" class="back-btn">
                 <svg class="feather" data-feather="arrow-left">
                     <line x1="19" y1="12" x2="5" y2="12"></line>
                     <polyline points="12 19 5 12 12 5"></polyline>
                 </svg>
-                Manage Gaming Credits
+                Manage Payment Methods
             </a>
-            <!-- XP System Card -->
-            <div class="xp-system-card">
-                <div style="font-size: 40px; margin-bottom: 10px;">🏆</div>
-                <h3 style="margin: 0 0 10px 0;">XP & Rank System</h3>
-                <p style="margin: 0 0 20px 0; opacity: 0.9;">Track your progress, earn XP, and unlock achievements!</p>
-                <a href="xp.html" style="
-                    display: inline-block;
-                    background: white;
-                    color: #667eea;
-                    padding: 10px 30px;
-                    border-radius: 25px;
-                    text-decoration: none;
-                    font-weight: bold;
-                    transition: transform 0.3s;
-                " onmouseover="this.style.transform='scale(1.05)'" 
-                 onmouseout="this.style.transform='scale(1)'">
-                    View My XP Progress
-                </a>
-            </div>
         </div>
         
         <div class="account-content">
@@ -2105,7 +1686,7 @@
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        Gaming Profile
+                        Profile Information
                     </button>
                     <button class="menu-item" data-section="social">
                         <svg class="feather" data-feather="share-2">
@@ -2122,27 +1703,11 @@
                             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                         </svg>
-                        My Content
+                        My Posts
                     </button>
-                    <!-- NEW: Stores & Products Menu Item -->
                     <button class="menu-item" data-section="stores">
                         <i class="fas fa-store"></i>
                         My Stores & Products
-                    </button>
-                    <button class="menu-item" data-section="gamer">
-                        <svg class="feather" data-feather="cpu">
-                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-                            <rect x="9" y="9" width="6" height="6"></rect>
-                            <line x1="9" y1="1" x2="9" y2="4"></line>
-                            <line x1="15" y1="1" x2="15" y2="4"></line>
-                            <line x1="9" y1="20" x2="9" y2="23"></line>
-                            <line x1="15" y1="20" x2="15" y2="23"></line>
-                            <line x1="20" y1="9" x2="23" y2="9"></line>
-                            <line x1="20" y1="14" x2="23" y2="14"></line>
-                            <line x1="1" y1="9" x2="4" y2="9"></line>
-                            <line x1="1" y1="14" x2="4" y2="14"></line>
-                        </svg>
-                        Gamer Stats
                     </button>
                     <button class="menu-item" data-section="display">
                         <svg class="feather" data-feather="palette">
@@ -2186,32 +1751,31 @@
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        Gaming Information
+                        Profile Information
                     </h2>
                     <form id="profileForm">
                         <div class="form-group">
-                            <label for="accountName">Gamer Tag / Username</label>
+                            <label for="accountName">Display Name</label>
                             <input type="text" id="accountName" required>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="accountAge">Gaming Experience (Years)</label>
-                                <input type="number" id="accountAge" min="1" max="50" required>
+                                <label for="accountAge">Age</label>
+                                <input type="number" id="accountAge" min="13" max="120" required>
                             </div>
                             <div class="form-group">
-                                <label for="accountGender">Preferred Game Genre</label>
+                                <label for="accountGender">Gender</label>
                                 <select id="accountGender" required>
-                                    <option value="fps">First-Person Shooter</option>
-                                    <option value="rpg">Role-Playing Games</option>
-                                    <option value="strategy">Strategy Games</option>
-                                    <option value="sports">Sports Games</option>
-                                    <option value="racing">Racing Games</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="non-binary">Non-binary</option>
+                                    <option value="prefer-not">Prefer not to say</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="accountLocation">Gaming Region</label>
+                            <label for="accountLocation">Location</label>
                             <div id="locationContainer" class="location-container">
                                 <div id="selectedLocation" class="selected-location"></div>
                                 <input type="hidden" id="accountLocation" name="location">
@@ -2227,13 +1791,13 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="accountBio">Gaming Bio</label>
-                            <textarea id="accountBio" rows="4" placeholder="Describe your gaming style, favorite games, and gaming achievements..."></textarea>
+                            <label for="accountBio">Bio</label>
+                            <textarea id="accountBio" rows="4" placeholder="Tell us about yourself, your interests, and what you like to do..."></textarea>
                         </div>
                         <div class="form-group">
-                            <label>Favorite Games (Add up to 5)</label>
+                            <label>Interests (Add up to 10)</label>
                             <div class="interests-input">
-                                <input type="text" id="accountInterests" placeholder="Add favorite game">
+                                <input type="text" id="accountInterests" placeholder="e.g., photography, hiking, cooking, reading">
                                 <button type="button" id="addInterestBtn">
                                     <svg class="feather" data-feather="plus">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -2244,8 +1808,8 @@
                             <div class="interests-container" id="accountInterestsContainer"></div>
                         </div>
                         <div class="form-group">
-                            <label for="accountPhone">Discord / Steam ID (Optional)</label>
-                            <input type="tel" id="accountPhone" placeholder="e.g., username#1234">
+                            <label for="accountPhone">Phone Number (Optional)</label>
+                            <input type="tel" id="accountPhone" placeholder="Your phone number">
                         </div>
                         <button type="submit" class="btn-primary">
                             <svg class="feather" data-feather="save">
@@ -2268,9 +1832,9 @@
                             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
                             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                         </svg>
-                        Gaming Social Links
+                        Social Links
                     </h2>
-                    <p class="section-description">Add your gaming social media links to connect with other gamers. These will be displayed on your gaming profile.</p>
+                    <p class="section-description">Add your social media links to connect with friends. These will be displayed on your profile.</p>
                     
                     <div class="social-links-container">
                         <div class="social-input-group">
@@ -2278,9 +1842,9 @@
                                 <svg class="feather" data-feather="facebook" style="color: #1877F2;">
                                     <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
                                 </svg>
-                                <span>Facebook Gaming</span>
+                                <span>Facebook</span>
                             </div>
-                            <input type="text" id="social-facebook" class="social-input" placeholder="Facebook Gaming profile" data-platform="facebook">
+                            <input type="text" id="social-facebook" class="social-input" placeholder="Facebook profile" data-platform="facebook">
                             <div class="social-preview" id="preview-facebook">
                                 <small>Link: https://facebook.com/<span id="preview-text-facebook">username</span></small>
                             </div>
@@ -2293,9 +1857,9 @@
                                     <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                                     <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
                                 </svg>
-                                <span>Instagram Gaming</span>
+                                <span>Instagram</span>
                             </div>
-                            <input type="text" id="social-instagram" class="social-input" placeholder="Gaming Instagram" data-platform="instagram">
+                            <input type="text" id="social-instagram" class="social-input" placeholder="Instagram username" data-platform="instagram">
                             <div class="social-preview" id="preview-instagram">
                                 <small>Link: https://instagram.com/<span id="preview-text-instagram">username</span></small>
                             </div>
@@ -2308,7 +1872,7 @@
                                     <rect x="2" y="9" width="4" height="12"></rect>
                                     <circle cx="4" cy="4" r="2"></circle>
                                 </svg>
-                                <span>LinkedIn Gaming</span>
+                                <span>LinkedIn</span>
                             </div>
                             <input type="text" id="social-linkedin" class="social-input" placeholder="LinkedIn profile" data-platform="linkedin">
                             <div class="social-preview" id="preview-linkedin">
@@ -2323,11 +1887,22 @@
                                     <line x1="2" y1="12" x2="22" y2="12"></line>
                                     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                                 </svg>
-                                <span>Gaming Website / Twitch</span>
+                                <span>Personal Website</span>
                             </div>
-                            <input type="text" id="social-website" class="social-input" placeholder="Your gaming website or Twitch" data-platform="website">
+                            <input type="text" id="social-website" class="social-input" placeholder="Your personal website" data-platform="website">
                             <div class="social-preview" id="preview-website">
                                 <small>Link: <span id="preview-text-website">website.com</span></small>
+                            </div>
+                        </div>
+
+                        <div class="social-input-group">
+                            <div class="social-platform-header">
+                                <i class="fab fa-x-twitter" style="color: #1DA1F2; font-size: 20px;"></i>
+                                <span>X (Twitter)</span>
+                            </div>
+                            <input type="text" id="social-twitter" class="social-input" placeholder="X username" data-platform="twitter">
+                            <div class="social-preview" id="preview-twitter">
+                                <small>Link: https://x.com/<span id="preview-text-twitter">username</span></small>
                             </div>
                         </div>
                     </div>
@@ -2338,42 +1913,42 @@
                             <line x1="12" y1="8" x2="12" y2="12"></line>
                             <line x1="12" y1="16" x2="12.01" y2="16"></line>
                         </svg>
-                        <span>Please add at least one gaming link to save your profile</span>
+                        <span>Please add at least one social link to save your profile</span>
                     </div>
 
                     <div class="social-preview-section">
-                        <h3>Your Gaming Links Preview</h3>
-                        <p class="section-description">This is how your gaming links will appear to other gamers:</p>
+                        <h3>Your Social Links Preview</h3>
+                        <p class="section-description">This is how your social links will appear to others:</p>
                         <div class="social-icons-preview" id="socialIconsPreview">
                             <!-- Social icons will be dynamically added here -->
                         </div>
                     </div>
                 </div>
 
-                <!-- My Content Section -->
+                <!-- My Posts Section -->
                 <div class="account-section" id="postsSection" style="display: none;">
                     <h2>
                         <svg class="feather" data-feather="book-open">
                             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                         </svg>
-                        My Gaming Content
+                        My Posts
                     </h2>
-                    <p class="section-description">Manage your gaming content - click on any post to delete it</p>
+                    <p class="section-description">Manage your posts - click on any post to delete it</p>
                     
                     <div class="user-posts-container" id="userPostsContainer">
-                        <div class="loading">Loading your gaming content...</div>
+                        <div class="loading">Loading your posts...</div>
                     </div>
 
                     <!-- Delete Confirmation Modal -->
                     <div id="deletePostModal" class="modal" style="display: none;">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h3>Delete Gaming Content</h3>
+                                <h3>Delete Post</h3>
                                 <span class="close-modal">&times;</span>
                             </div>
                             <div class="modal-body">
-                                <p>Are you sure you want to delete this gaming content? This action cannot be undone.</p>
+                                <p>Are you sure you want to delete this post? This action cannot be undone.</p>
                                 <div class="post-preview" id="postPreview"></div>
                             </div>
                             <div class="modal-actions">
@@ -2385,7 +1960,7 @@
                                         <line x1="10" y1="11" x2="10" y2="17"></line>
                                         <line x1="14" y1="11" x2="14" y2="17"></line>
                                     </svg>
-                                    Delete Content
+                                    Delete Post
                                 </button>
                             </div>
                         </div>
@@ -2449,323 +2024,6 @@
                     </div>
                 </div>
 
-                <!-- Gamer Stats Section -->
-                <div class="account-section" id="gamerSection" style="display: none;">
-                    <h2>
-                        <svg class="feather" data-feather="cpu">
-                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-                            <rect x="9" y="9" width="6" height="6"></rect>
-                            <line x1="9" y1="1" x2="9" y2="4"></line>
-                            <line x1="15" y1="1" x2="15" y2="4"></line>
-                            <line x1="9" y1="20" x2="9" y2="23"></line>
-                            <line x1="15" y1="20" x2="15" y2="23"></line>
-                            <line x1="20" y1="9" x2="23" y2="9"></line>
-                            <line x1="20" y1="14" x2="23" y2="14"></line>
-                            <line x1="1" y1="9" x2="4" y2="9"></line>
-                            <line x1="1" y1="14" x2="4" y2="14"></line>
-                        </svg>
-                        Gamer Stats
-                    </h2>
-                    <p class="section-description">Showcase your gaming skills and achievements. Share your stats and connect with fellow gamers.</p>
-                    
-                    <!-- Current Gamer Profile Preview -->
-                    <div id="currentGamerProfile" class="profile-preview-container">
-                        <div class="profile-preview-header">
-                            <h3>Your Current Gamer Stats</h3>
-                            <button id="editGamerProfileBtn" class="btn-primary">
-                                <svg class="feather" data-feather="edit">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                </svg>
-                                Edit Stats
-                            </button>
-                        </div>
-                        <div id="gamerProfilePreview" class="profile-preview-content">
-                            <!-- Will be populated by JavaScript -->
-                        </div>
-                    </div>
-
-                    <!-- Create/Update Gamer Profile -->
-                    <div class="gamer-profile-form-container" id="gamerProfileFormContainer" style="display: none;">
-                        <h3>
-                            <svg class="feather" data-feather="edit">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                            </svg>
-                            Gamer Stats Details
-                        </h3>
-                        
-                        <div id="introStatus" style="margin: 1rem 0;"></div>
-                        <button id="changeIntroBtn" style="display: none;">Change Intro Animation</button>
-                        <button id="setupIntroBtn" style="display: none;" onclick="window.location.href='intro.html'">
-                            Setup Intro Animation
-                        </button>
-                        
-                        <form id="gamerProfileForm">
-                            <!-- Primary Gaming Info -->
-                            <div class="form-group">
-                                <label for="gamerTag">Gamer Tag / Username *</label>
-                                <input type="text" id="gamerTag" required placeholder="e.g., Gunzblazing104">
-                            </div>
-                            
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="primaryGame">Primary Game</label>
-                                    <select id="primaryGame" required>
-                                        <option value="">Select game</option>
-                                        <option value="rainbow-six">Rainbow Six Siege</option>
-                                        <option value="call-of-duty">Call of Duty</option>
-                                        <option value="fortnite">Fortnite</option>
-                                        <option value="valorant">Valorant</option>
-                                        <option value="apex-legends">Apex Legends</option>
-                                        <option value="league-of-legends">League of Legends</option>
-                                        <option value="dota-2">Dota 2</option>
-                                        <option value="cs-go">CS:GO</option>
-                                        <option value="overwatch">Overwatch</option>
-                                        <option value="pubg">PUBG</option>
-                                        <option value="minecraft">Minecraft</option>
-                                        <option value="other">Other</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="platform">Primary Platform</label>
-                                    <select id="platform" required>
-                                        <option value="">Select platform</option>
-                                        <option value="psn">PlayStation Network</option>
-                                        <option value="xbox-live">Xbox Live</option>
-                                        <option value="pc">PC</option>
-                                        <option value="steam">Steam</option>
-                                        <option value="epic">Epic Games</option>
-                                        <option value="nintendo">Nintendo Switch</option>
-                                        <option value="mobile">Mobile</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <!-- Gaming Stats -->
-                            <div class="stats-section">
-                                <h4>
-                                    <svg class="feather" data-feather="trending-up">
-                                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                                        <polyline points="17 6 23 6 23 12"></polyline>
-                                    </svg>
-                                    Gaming Statistics
-                                </h4>
-                                
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="rank">Rank / Tier</label>
-                                        <input type="text" id="rank" placeholder="e.g., Diamond III, Grandmaster, Global Elite">
-                                    </div>
-                                    
-                                    <div class="form-group">
-                                        <label for="level">Player Level</label>
-                                        <input type="number" id="level" min="1" placeholder="e.g., 250">
-                                    </div>
-                                </div>
-                                
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="kdRatio">K/D Ratio</label>
-                                        <input type="number" id="kdRatio" step="0.01" placeholder="e.g., 2.5">
-                                    </div>
-                                    
-                                    <div class="form-group">
-                                        <label for="winRate">Win Rate %</label>
-                                        <input type="number" id="winRate" min="0" max="100" placeholder="e.g., 68">
-                                    </div>
-                                </div>
-                                
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="totalKills">Total Kills</label>
-                                        <input type="number" id="totalKills" min="0" placeholder="e.g., 15000">
-                                    </div>
-                                    
-                                    <div class="form-group">
-                                        <label for="topKills">Top Kills in Match</label>
-                                        <input type="number" id="topKills" min="0" placeholder="e.g., 28">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Gaming Preferences -->
-                            <div class="preferences-section">
-                                <h4>
-                                    <svg class="feather" data-feather="sliders">
-                                        <line x1="4" y1="21" x2="4" y2="14"></line>
-                                        <line x1="4" y1="10" x2="4" y2="3"></line>
-                                        <line x1="12" y1="21" x2="12" y2="12"></line>
-                                        <line x1="12" y1="8" x2="12" y2="3"></line>
-                                        <line x1="20" y1="21" x2="20" y2="16"></line>
-                                        <line x1="20" y1="12" x2="20" y2="3"></line>
-                                        <line x1="1" y1="14" x2="7" y2="14"></line>
-                                        <line x1="9" y1="8" x2="15" y2="8"></line>
-                                        <line x1="17" y1="16" x2="23" y2="16"></line>
-                                    </svg>
-                                    Gaming Preferences
-                                </h4>
-                                
-                                <div class="form-group">
-                                    <label for="playStyle">Preferred Play Style</label>
-                                    <select id="playStyle">
-                                        <option value="">Select style</option>
-                                        <option value="competitive">Competitive</option>
-                                        <option value="casual">Casual</option>
-                                        <option value="ranked">Ranked</option>
-                                        <option value="tournament">Tournament</option>
-                                        <option value="fun">Just for Fun</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="micPreference">Microphone Preference</label>
-                                    <select id="micPreference">
-                                        <option value="">Select preference</option>
-                                        <option value="mic-on">Mic Always On</option>
-                                        <option value="mic-optional">Mic Optional</option>
-                                        <option value="mic-strategic">Mic for Strategy Only</option>
-                                        <option value="no-mic">No Mic</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>Looking For</label>
-                                    <div class="checkbox-group" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="checkbox" id="lookingTeammates" value="teammates">
-                                            <span>Teammates</span>
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="checkbox" id="lookingRanked" value="ranked">
-                                            <span>Ranked Players</span>
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="checkbox" id="lookingCasual" value="casual">
-                                            <span>Casual Players</span>
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="checkbox" id="lookingTournament" value="tournament">
-                                            <span>Tournament Teams</span>
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="checkbox" id="lookingFriends" value="friends">
-                                            <span>Gaming Friends</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Gaming Achievements -->
-                            <div class="achievements-section">
-                                <h4>
-                                    <svg class="feather" data-feather="award">
-                                        <circle cx="12" cy="8" r="7"></circle>
-                                        <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
-                                    </svg>
-                                    Gaming Achievements
-                                </h4>
-                                
-                                <div class="form-group">
-                                    <label for="achievements">Notable Achievements</label>
-                                    <textarea id="achievements" rows="3" placeholder="List your notable gaming achievements, tournaments won, records, etc."></textarea>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="hoursPlayed">Total Hours Played</label>
-                                    <input type="number" id="hoursPlayed" min="0" placeholder="e.g., 1500">
-                                </div>
-                            </div>
-                            
-                            <!-- Screenshot Upload -->
-                            <div class="screenshot-upload">
-                                <h4>
-                                    <svg class="feather" data-feather="camera">
-                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                                        <circle cx="12" cy="13" r="4"></circle>
-                                    </svg>
-                                    Profile Screenshot
-                                </h4>
-                                <p class="section-description">Upload a screenshot of your gaming profile/stats for verification and display.</p>
-                                
-                                <input type="file" id="gamerScreenshot" accept="image/*" style="display: none;">
-                                <label for="gamerScreenshot" class="upload-btn">
-                                    <svg class="feather" data-feather="upload">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                        <polyline points="17 8 12 3 7 8"></polyline>
-                                        <line x1="12" y1="3" x2="12" y2="15"></line>
-                                    </svg>
-                                    Upload Screenshot
-                                </label>
-                                
-                                <div id="screenshotPreviewContainer" style="display: none;">
-                                    <img id="screenshotPreview" class="screenshot-preview" alt="Screenshot Preview">
-                                    <button type="button" id="removeScreenshot" class="btn-secondary" style="margin-top: 0.5rem;">
-                                        <svg class="feather" data-feather="trash">
-                                            <polyline points="3 6 5 6 21 6"></polyline>
-                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                        </svg>
-                                        Remove Screenshot
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- Submit Button -->
-                            <button type="submit" class="btn-primary" style="margin-top: 2rem;">
-                                <svg class="feather" data-feather="save">
-                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                    <polyline points="7 3 7 8 15 8"></polyline>
-                                </svg>
-                                Save Gamer Stats
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- Generate Public Profile -->
-                    <div class="generate-profile-section" id="generateProfileSection" style="display: none;">
-                        <h3>
-                            <svg class="feather" data-feather="share-2">
-                                <circle cx="18" cy="5" r="3"></circle>
-                                <circle cx="6" cy="12" r="3"></circle>
-                                <circle cx="18" cy="19" r="3"></circle>
-                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                            </svg>
-                            Generate Public Profile
-                        </h3>
-                        <p class="section-description">Create a public link to share your gamer stats with others.</p>
-                        
-                        <button id="generateProfileBtn" class="generate-profile-btn">
-                            <svg class="feather" data-feather="zap">
-                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                            </svg>
-                            Generate Public Profile Link
-                        </button>
-                        
-                        <!-- Profile Link Display -->
-                        <div id="profileLinkContainer" class="gamer-profile-link" style="display: none;">
-                            <input type="text" id="gamerProfileLink" readonly>
-                            <button id="copyProfileLinkBtn" class="btn-primary">
-                                <svg class="feather" data-feather="copy">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                                Copy
-                            </button>
-                        </div>
-                        
-                        <!-- Link Preview -->
-                        <div id="linkPreview" class="link-preview">
-                            <h4>Link Preview</h4>
-                            <div id="linkPreviewContent" class="link-preview-content">
-                                <!-- Preview will be populated here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Profile Display Section - Only Themes -->
                 <div class="account-section" id="displaySection" style="display: none;">
                     <h2>
@@ -2788,16 +2046,16 @@
                             </svg>
                             Chat Themes
                         </h3>
-                        <p class="section-description">Choose how your gaming chat interface looks</p>
+                        <p class="section-description">Choose how your chat interface looks</p>
                         
                         <div class="themes-grid" id="themesGrid">
                             <div class="theme-item">
                                 <div class="theme-preview">
                                     <div class="theme-preview-content" style="background: linear-gradient(135deg, #b3004b, #7a0034);">
-                                        Gaming Theme
+                                        Vibrant
                                     </div>
                                 </div>
-                                <div class="theme-label">Gaming Theme</div>
+                                <div class="theme-label">Vibrant Theme</div>
                             </div>
                             <div class="theme-item">
                                 <div class="theme-preview">
@@ -2835,18 +2093,18 @@
                             </svg>
                             Live Preview
                         </h3>
-                        <p class="section-description">See how your selected theme will look in gaming chats</p>
+                        <p class="section-description">See how your selected theme will look in chats</p>
                         
                         <div class="chat-preview" id="chatPreview">
                             <div class="preview-messages">
                                 <div class="preview-message received">
-                                    Hey, are you ready for the tournament this weekend?
+                                    Hey, how's your day going?
                                 </div>
                                 <div class="preview-message sent">
-                                    Definitely! I've been practicing all week. Our team is ready!
+                                    Pretty good! Just finished work. Want to catch up later?
                                 </div>
                                 <div class="preview-message received">
-                                    Awesome! What's our strategy for the first match?
+                                    Sounds great! Let's meet at the usual spot.
                                 </div>
                             </div>
                         </div>
@@ -2871,7 +2129,7 @@
                     </div>
                 </div>
 
-                <!-- Share BondBase Section -->
+                <!-- Share BondBase Section - Made more compact -->
                 <div class="account-section" id="shareSection" style="display: none;">
                     <h2>
                         <svg class="feather" data-feather="share">
@@ -2881,13 +2139,13 @@
                         </svg>
                         Share BondBase
                     </h2>
-                    <p class="section-description">Invite friends to join BondBase. Help grow our gaming community!</p>
+                    <p class="section-description">Invite friends to join BondBase. Help grow our community!</p>
                     
                     <div class="share-container">
                         <div class="share-link-section">
-                            <h3>Share BondBase with Friends</h3>
+                            <h3>Share with Friends</h3>
                             <div class="link-input-group">
-                                <input type="text" id="bondlyLink" class="share-input" value="https://BondBaseGaming.com" readonly>
+                                <input type="text" id="bondlyLink" class="share-input" value="https://BondBase.com" readonly>
                                 <button id="copyBondlyLinkBtn" class="btn-primary">
                                     <svg class="feather" data-feather="copy">
                                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -2949,23 +2207,23 @@
                     <form id="privacyForm">
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="showAge" checked>
-                            <label for="showAge">Show my gaming experience level on profile</label>
+                            <label for="showAge">Show my age on profile</label>
                         </div>
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="showLocation" checked>
-                            <label for="showLocation">Show my gaming region on profile</label>
+                            <label for="showLocation">Show my location on profile</label>
                         </div>
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="showOnlineStatus" checked>
-                            <label for="showOnlineStatus">Show when I'm online and gaming</label>
+                            <label for="showOnlineStatus">Show when I'm online</label>
                         </div>
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="showSocialLinks" checked>
-                            <label for="showSocialLinks">Show my gaming social links</label>
+                            <label for="showSocialLinks">Show my social links on profile</label>
                         </div>
                         <div class="form-group checkbox-group">
-                            <input type="checkbox" id="showProfileEffects" checked>
-                            <label for="showProfileEffects">Show my profile as an active gamer</label>
+                            <input type="checkbox" id="showInterests" checked>
+                            <label for="showInterests">Show my interests on profile</label>
                         </div>
                         <button type="submit" class="btn-primary">
                             <svg class="feather" data-feather="save">
@@ -3071,7 +2329,7 @@
                 const container = document.getElementById('accountInterestsContainer');
                 const tags = container.querySelectorAll('.interest-tag');
                 
-                if (tags.length < 5) {
+                if (tags.length < 10) {
                     const tag = document.createElement('span');
                     tag.className = 'interest-tag';
                     tag.innerHTML = `
@@ -3081,7 +2339,7 @@
                     container.appendChild(tag);
                     interestInput.value = '';
                 } else {
-                    alert('Maximum 5 favorite games allowed');
+                    alert('Maximum 10 interests allowed');
                 }
             }
         });
@@ -3162,7 +2420,7 @@
                     // Populate profile form
                     document.getElementById('accountName').value = userData.name || '';
                     document.getElementById('accountAge').value = userData.age || '';
-                    document.getElementById('accountGender').value = userData.gender || 'fps';
+                    document.getElementById('accountGender').value = userData.gender || 'male';
                     document.getElementById('accountBio').value = userData.bio || '';
                     document.getElementById('accountPhone').value = userData.phone || '';
                     
@@ -3265,7 +2523,7 @@
                 <div class="create-store-prompt">
                     <i class="fas fa-store"></i>
                     <h3>You don't have a store yet!</h3>
-                    <p>Create your first store and start selling your gaming products to the community</p>
+                    <p>Create your first store and start selling your products to the community</p>
                     <a href="create-store.html" class="create-store-btn">
                         <i class="fas fa-plus"></i> Create Your Store Now
                     </a>
@@ -3541,51 +2799,8 @@
             }
         });
 
-        // Gamer Profile Screenshot Upload
-        document.getElementById('gamerScreenshot')?.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('screenshotPreview').src = e.target.result;
-                    document.getElementById('screenshotPreviewContainer').style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Remove Screenshot
-        document.getElementById('removeScreenshot')?.addEventListener('click', function() {
-            document.getElementById('screenshotPreview').src = '';
-            document.getElementById('screenshotPreviewContainer').style.display = 'none';
-            document.getElementById('gamerScreenshot').value = '';
-        });
-
-        // Copy Profile Link
-        document.getElementById('copyProfileLinkBtn')?.addEventListener('click', function() {
-            const profileLink = document.getElementById('gamerProfileLink');
-            profileLink.select();
-            profileLink.setSelectionRange(0, 99999);
-            
-            try {
-                navigator.clipboard.writeText(profileLink.value);
-                alert('Profile link copied to clipboard!');
-            } catch (err) {
-                alert('Failed to copy link');
-            }
-        });
-
-        // Initialize gamer profile section
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check if we're on the gamer section
-            const gamerMenuItem = document.querySelector('.menu-item[data-section="gamer"]');
-            if (gamerMenuItem) {
-                gamerMenuItem.addEventListener('click', function() {
-                    // This will be handled by games.js
-                    console.log('Gamer profile section clicked');
-                });
-            }
-        });
+        // Remove all gaming-related code
+        // Gamer Profile section has been completely removed
     </script>
 
     <!-- Your existing script imports -->
@@ -3598,6 +2813,6 @@
     <script type="module" src="form.js"></script>
     <script src="location.js"></script>
     <script type="module" src="social.js"></script>
-    <script type="module" src="games.js"></script>
+    <!-- Removed games.js import -->
 </body>
 </html>
