@@ -1,6 +1,8 @@
-// additional-group.js - COMPLETE FIXED VERSION
+// additional-group.js - COMPLETE FIXED VERSION WITH PREMIUM
 // FIXED: Sticker button disappears when input is active
 // FIXED: Prevent duplicate saved stickers
+// ADDED: Premium user restriction - only premium users can send stickers
+// ADDED: Premium badges on group members
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
@@ -20,7 +22,8 @@ import {
     limit,
     arrayUnion,
     getDocs,
-    onSnapshot
+    onSnapshot,
+    where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -79,6 +82,8 @@ let isSendingSticker = false;
 let stickerListenerUnsubscribe = null;
 let hasLoadedInitialMessages = false;
 let messageObserver = null;
+let userHasPremium = false; // NEW: Current user premium status
+let groupMembers = new Map(); // NEW: Track group members and their premium status
 
 // Sticker creator state
 let stickerCreator = {
@@ -104,20 +109,182 @@ document.addEventListener('DOMContentLoaded', () => {
                 const urlParams = new URLSearchParams(window.location.search);
                 currentGroupId = urlParams.get('id');
                 
+                // Check current user premium status
+                checkCurrentUserPremium();
+                
                 // Wait a bit for the chat to load
                 setTimeout(() => {
                     initializeFeatures();
                 }, 1000);
             } else {
                 currentUser = null;
+                userHasPremium = false;
             }
         });
     }
 });
 
+// NEW: Check if current user is premium
+async function checkCurrentUserPremium() {
+    if (!currentUser || !db) return;
+    
+    try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+            const userData = userSnap.data();
+            userHasPremium = (userData.paymentHistory && 
+                userData.paymentHistory.some(payment => 
+                    (payment.plan === 'lifetime' && payment.status === 'approved')
+                )) || (userData.chatPoints >= 9999);
+            
+            console.log('Current user premium status:', userHasPremium);
+            
+            // Update sticker button title based on premium status
+            updateStickerButtonTitle();
+        }
+    } catch (error) {
+        console.error('Error checking premium status:', error);
+    }
+}
+
+// NEW: Update sticker button title based on premium status
+function updateStickerButtonTitle() {
+    const stickerBtn = document.getElementById('stickerPickerBtn');
+    if (stickerBtn) {
+        stickerBtn.title = userHasPremium ? 'Stickers' : 'Premium feature - Upgrade to $30 lifetime plan to send stickers';
+    }
+}
+
+// NEW: Load group members and add premium badges
+async function loadGroupMembers() {
+    if (!currentGroupId || !db) return;
+    
+    try {
+        const groupRef = doc(db, 'groups', currentGroupId);
+        const groupSnap = await getDoc(groupRef);
+        
+        if (groupSnap.exists()) {
+            const groupData = groupSnap.data();
+            const members = groupData.members || [];
+            
+            // Clear previous members
+            groupMembers.clear();
+            
+            // Check premium status for each member
+            for (const memberId of members) {
+                if (memberId === currentUser?.uid) continue; // Skip current user
+                
+                try {
+                    const userRef = doc(db, 'users', memberId);
+                    const userSnap = await getDoc(userRef);
+                    
+                    if (userSnap.exists()) {
+                        const userData = userSnap.data();
+                        const isPremium = (userData.paymentHistory && 
+                            userData.paymentHistory.some(payment => 
+                                (payment.plan === 'lifetime' && payment.status === 'approved')
+                            )) || (userData.chatPoints >= 9999);
+                        
+                        groupMembers.set(memberId, {
+                            premium: isPremium,
+                            name: userData.displayName || userData.email?.split('@')[0] || 'User',
+                            photoURL: userData.photoURL
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error checking member premium:', error);
+                }
+            }
+            
+            console.log(`Loaded ${groupMembers.size} group members with premium status`);
+            
+            // Add premium badges to member list
+            setTimeout(() => {
+                addPremiumBadgesToMemberList();
+            }, 500);
+        }
+    } catch (error) {
+        console.error('Error loading group members:', error);
+    }
+}
+
+// NEW: Add premium badges to group member list
+function addPremiumBadgesToMemberList() {
+    // Look for member list elements - adjust selectors based on your HTML structure
+    const memberItems = document.querySelectorAll('.member-item, .group-member, .participant-item, [class*="member"]');
+    
+    memberItems.forEach(item => {
+        // Don't add duplicate badges
+        if (item.querySelector('.group-premium-badge')) return;
+        
+        // Try to get member ID from data attribute or other means
+        const memberId = item.dataset.userId || item.dataset.memberId || item.dataset.id;
+        
+        if (memberId && groupMembers.has(memberId)) {
+            const member = groupMembers.get(memberId);
+            
+            if (member.premium) {
+                const premiumBadge = document.createElement('span');
+                premiumBadge.className = 'group-premium-badge';
+                premiumBadge.innerHTML = '<i class="fas fa-crown"></i>';
+                premiumBadge.title = 'Premium Member';
+                premiumBadge.style.cssText = `
+                    color: #FFD700;
+                    font-size: 14px;
+                    margin-left: 5px;
+                    display: inline-block;
+                    filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.3));
+                `;
+                
+                // Find member name element
+                const nameElement = item.querySelector('.member-name, .participant-name, h4, h5, span:not(.badge)');
+                if (nameElement) {
+                    nameElement.appendChild(premiumBadge);
+                } else {
+                    item.appendChild(premiumBadge);
+                }
+            }
+        }
+    });
+}
+
+// NEW: Add premium badge to message sender
+function addPremiumBadgeToMessage(messageElement, senderId) {
+    if (!senderId || !groupMembers.has(senderId)) return;
+    
+    const member = groupMembers.get(senderId);
+    if (!member.premium) return;
+    
+    // Don't add duplicate badges
+    if (messageElement.querySelector('.message-premium-badge')) return;
+    
+    // Find sender name element
+    const senderName = messageElement.querySelector('.sender-name, .message-sender, .username, [class*="sender"]');
+    
+    if (senderName) {
+        const premiumBadge = document.createElement('span');
+        premiumBadge.className = 'message-premium-badge';
+        premiumBadge.innerHTML = '<i class="fas fa-crown"></i>';
+        premiumBadge.title = 'Premium Member';
+        premiumBadge.style.cssText = `
+            color: #FFD700;
+            font-size: 12px;
+            margin-left: 4px;
+            display: inline-block;
+            vertical-align: middle;
+        `;
+        senderName.appendChild(premiumBadge);
+    }
+}
+
 // Initialize features after auth
 function initializeFeatures() {
     console.log('Initializing sticker system for group:', currentGroupId);
+    
+    // Load group members and check premium status
+    loadGroupMembers();
     
     // Add sticker button
     addStickerButton();
@@ -145,7 +312,7 @@ function initializeFeatures() {
 }
 
 // ============================================
-// NEW: Setup sticker button visibility based on input focus
+// Setup sticker button visibility based on input focus
 // ============================================
 function setupStickerButtonVisibility() {
     const messageInput = document.getElementById('messageInput');
@@ -182,7 +349,7 @@ function handleInputBlur() {
 }
 
 // ============================================
-// FIXED: Load ALL messages for cache
+// Load ALL messages for cache
 // ============================================
 async function loadAllMessagesForCache() {
     if (!currentUser || !currentGroupId || !db) {
@@ -282,7 +449,7 @@ function setupStickerInterceptor() {
 }
 
 // ============================================
-// IMPROVED: Process all messages for stickers
+// Process all messages for stickers
 // ============================================
 function processAllMessagesForStickers() {
     const messagesContainer = document.getElementById('messagesContainer');
@@ -311,11 +478,17 @@ function processAllMessagesForStickers() {
 }
 
 // ============================================
-// IMPROVED: Check and replace with sticker
+// Check and replace with sticker
 // ============================================
 function checkAndReplaceWithSticker(messageElement) {
     // Skip if already processed
     if (messageElement.dataset.stickerProcessed === 'true') return false;
+
+    // Try to get sender ID for premium badge
+    const senderId = messageElement.dataset.senderId || messageElement.dataset.userId;
+    if (senderId) {
+        addPremiumBadgeToMessage(messageElement, senderId);
+    }
 
     // Find the text element that might contain [STICKER]
     const messageText = messageElement.querySelector('p, .message-content, .message-content-wrapper, .message-text, .text');
@@ -460,8 +633,8 @@ function addStickerButton() {
         const stickerBtn = document.createElement('button');
         stickerBtn.id = 'stickerPickerBtn';
         stickerBtn.className = 'sticker-picker-btn';
-        stickerBtn.innerHTML = '<i class="fas fa-smile"></i>';
-        stickerBtn.title = 'Stickers';
+        stickerBtn.innerHTML = '<i class="fas fa-smile"></i>'; // NO CROWN - keeping original icon
+        stickerBtn.title = userHasPremium ? 'Stickers' : 'Premium feature - Upgrade to $30 lifetime plan to send stickers';
         stickerBtn.type = 'button';
         stickerBtn.addEventListener('click', toggleStickerPicker);
 
@@ -498,6 +671,20 @@ function createStickerPicker() {
             </button>
         </div>
         
+        ${!userHasPremium ? `
+        <div class="premium-upgrade-notice" style="
+            background: #fff3cd;
+            color: #856404;
+            padding: 12px 15px;
+            text-align: center;
+            font-size: 14px;
+            border-bottom: 1px solid #ffeaa7;
+        ">
+            <i class="fas fa-crown" style="color: #FFD700; margin-right: 8px;"></i>
+            Upgrade to Premium ($30 lifetime) to send stickers
+        </div>
+        ` : ''}
+        
         <div class="sticker-tabs">
             <button class="sticker-tab active" data-tab="my-stickers">My Stickers</button>
             <button class="sticker-tab" data-tab="saved-stickers">Saved</button>
@@ -510,7 +697,9 @@ function createStickerPicker() {
                     <div class="no-stickers" id="noStickersMessage">
                         <i class="fas fa-smile-wink"></i>
                         <p>No stickers yet</p>
-                        <button class="create-first-sticker">Create your first sticker</button>
+                        ${userHasPremium ? 
+                            '<button class="create-first-sticker">Create your first sticker</button>' : 
+                            '<p class="premium-required" style="color: #667eea; font-size: 14px;">Premium required to create stickers</p>'}
                     </div>
                 </div>
             </div>
@@ -561,10 +750,23 @@ function setupStickerPickerEvents() {
     }
 
     if (createBtn) {
-        createBtn.addEventListener('click', openStickerCreator);
+        createBtn.addEventListener('click', () => {
+            if (userHasPremium) {
+                openStickerCreator();
+            } else {
+                showNotification('Premium required to create stickers. Upgrade to $30 lifetime plan!', 'warning');
+            }
+        });
     }
+    
     if (createFirstBtn) {
-        createFirstBtn.addEventListener('click', openStickerCreator);
+        createFirstBtn.addEventListener('click', () => {
+            if (userHasPremium) {
+                openStickerCreator();
+            } else {
+                showNotification('Premium required to create stickers. Upgrade to $30 lifetime plan!', 'warning');
+            }
+        });
     }
 
     tabButtons.forEach(button => {
@@ -582,7 +784,7 @@ function setupStickerPickerEvents() {
             });
             
             if (tabName === 'saved-stickers') {
-                updateSavedStickersDisplay(); // Update display without reloading from Firebase
+                updateSavedStickersDisplay();
             } else if (tabName === 'packs') {
                 loadStickerPacks();
             }
@@ -602,6 +804,12 @@ function toggleStickerPicker(e) {
     if (e) {
         e.preventDefault();
         e.stopPropagation();
+    }
+    
+    // Check premium status before opening
+    if (!userHasPremium) {
+        showNotification('Premium feature: Upgrade to $30 lifetime plan to use stickers!', 'warning');
+        return;
     }
     
     if (stickerPickerOpen) {
@@ -661,7 +869,7 @@ async function loadUserStickers() {
     }
 }
 
-// FIXED: Load saved stickers with deduplication
+// Load saved stickers with deduplication
 async function loadSavedStickers() {
     if (!currentUser || !db) return;
     
@@ -690,7 +898,7 @@ async function loadSavedStickers() {
     }
 }
 
-// FIXED: Update display using the Map instead of reloading from Firebase
+// Update display using the Map instead of reloading from Firebase
 function updateSavedStickersDisplay() {
     const savedStickersGrid = document.getElementById('savedStickersGrid');
     if (!savedStickersGrid) return;
@@ -717,6 +925,13 @@ function updateSavedStickersDisplay() {
         stickerItem.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            
+            // Check premium before sending saved stickers
+            if (!userHasPremium) {
+                showNotification('Premium required to send stickers. Upgrade to $30 lifetime plan!', 'warning');
+                return;
+            }
+            
             sendSticker(sticker);
         }, true);
         savedStickersGrid.appendChild(stickerItem);
@@ -772,6 +987,13 @@ function updateStickerGrid() {
         stickerItem.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            
+            // Check premium before sending
+            if (!userHasPremium) {
+                showNotification('Premium required to send stickers. Upgrade to $30 lifetime plan!', 'warning');
+                return;
+            }
+            
             sendSticker(sticker);
         }, true);
         myStickersGrid.appendChild(stickerItem);
@@ -790,15 +1012,21 @@ function updatePacksGrid(packs) {
         packElement.innerHTML = `
             <div class="pack-header">
                 <h5>${pack.name}</h5>
+                ${userHasPremium ? `
                 <button class="add-pack-btn" data-pack-id="${pack.id}">
                     <i class="fas fa-plus"></i> Add
                 </button>
+                ` : ''}
             </div>
             <div class="pack-stickers">
                 ${pack.stickers.map(s => `
-                    <div class="pack-sticker" data-emoji="${s.emoji}" data-text="${s.text}">
+                    <div class="pack-sticker ${!userHasPremium ? 'premium-locked' : ''}" 
+                         data-emoji="${s.emoji}" 
+                         data-text="${s.text}"
+                         ${!userHasPremium ? 'title="Premium feature"' : ''}>
                         <span class="pack-emoji">${s.emoji}</span>
                         <span class="pack-text">${s.text}</span>
+                        ${!userHasPremium ? '<span class="lock-icon">🔒</span>' : ''}
                     </div>
                 `).join('')}
             </div>
@@ -806,6 +1034,11 @@ function updatePacksGrid(packs) {
         
         packElement.querySelectorAll('.pack-sticker').forEach(el => {
             el.addEventListener('click', () => {
+                if (!userHasPremium) {
+                    showNotification('Premium required to send stickers. Upgrade to $30 lifetime plan!', 'warning');
+                    return;
+                }
+                
                 const sticker = {
                     id: `pack_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     name: el.dataset.text,
@@ -853,11 +1086,17 @@ function createStickerElement(sticker) {
 }
 
 // ============================================
-// SEND STICKER
+// SEND STICKER - MODIFIED for premium
 // ============================================
 async function sendSticker(sticker) {
     if (!currentUser || !currentGroupId || !db) {
         showNotification('Cannot send sticker', 'error');
+        return;
+    }
+
+    // Double-check premium status
+    if (!userHasPremium) {
+        showNotification('Premium required: Upgrade to $30 lifetime plan to send stickers', 'warning');
         return;
     }
 
@@ -885,7 +1124,8 @@ async function sendSticker(sticker) {
             
             type: 'sticker',
             isCustom: true,
-            timestamp: serverTimestamp()
+            timestamp: serverTimestamp(),
+            sentByPremium: userHasPremium
         };
 
         console.log('Sending sticker to Firebase:', messageData);
@@ -919,7 +1159,7 @@ async function sendSticker(sticker) {
 }
 
 // ============================================
-// FIXED: STICKER LISTENER - Cache ALL new messages with deduplication
+// STICKER LISTENER - Cache ALL new messages with deduplication
 // ============================================
 function setupStickerListener() {
     if (!currentUser || !currentGroupId || !db) {
@@ -995,7 +1235,7 @@ function findAndReplaceMessageById(messageId) {
     });
 }
 
-// FIXED: Save received sticker with deduplication
+// Save received sticker with deduplication
 async function saveReceivedSticker(message) {
     if (!currentUser || !db) return;
     
@@ -1062,9 +1302,15 @@ async function addStickerPack(pack) {
 }
 
 // ============================================
-// STICKER CREATOR
+// STICKER CREATOR - MODIFIED for premium
 // ============================================
 function openStickerCreator() {
+    // Check premium status
+    if (!userHasPremium) {
+        showNotification('Premium required: Upgrade to $30 lifetime plan to create stickers', 'warning');
+        return;
+    }
+    
     closeStickerPicker();
     
     stickerCreator = {
@@ -1531,13 +1777,13 @@ function showNotification(message, type = 'info') {
 }
 
 // ============================================
-// LOAD STICKER STYLES
+// LOAD STICKER STYLES - ADDED PREMIUM STYLES
 // ============================================
 function loadStickerStyles() {
     if (document.getElementById('sticker-styles')) return;
 
     const styles = `
-        /* Sticker Picker Button */
+        /* Sticker Picker Button - ORIGINAL STYLES UNCHANGED */
         .sticker-picker-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
@@ -1562,6 +1808,57 @@ function loadStickerStyles() {
         .sticker-picker-btn:hover {
             transform: translateY(-50%) scale(1.1);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* Premium badge styles for group members */
+        .group-premium-badge, .message-premium-badge {
+            display: inline-block;
+            vertical-align: middle;
+        }
+        
+        .group-premium-badge i, .message-premium-badge i {
+            font-size: inherit;
+        }
+        
+        /* Premium locked items in packs */
+        .pack-sticker.premium-locked {
+            opacity: 0.6;
+            position: relative;
+            cursor: not-allowed;
+        }
+        
+        .pack-sticker.premium-locked .lock-icon {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .pack-sticker.premium-locked:hover {
+            border-color: #e8e8e8 !important;
+            transform: none !important;
+        }
+        
+        /* Premium upgrade notice */
+        .premium-upgrade-notice {
+            background: #fff3cd;
+            color: #856404;
+            padding: 12px 15px;
+            text-align: center;
+            font-size: 14px;
+            border-bottom: 1px solid #ffeaa7;
+        }
+        
+        .premium-upgrade-notice i {
+            color: #FFD700;
+            margin-right: 8px;
+        }
+        
+        .premium-required {
+            color: #667eea;
+            font-size: 14px;
+            margin-top: 10px;
         }
         
         .sticker-picker-panel {
@@ -1885,6 +2182,7 @@ function loadStickerStyles() {
             border: 2px solid #e8e8e8;
             cursor: pointer;
             transition: all 0.3s ease;
+            position: relative;
         }
         
         .pack-sticker:hover {

@@ -1230,7 +1230,7 @@ async function saveReceivedSticker(message) {
 function openStickerCreator() {
     // Check premium status
     if (!userHasPremium) {
-        showNotification('Premium required: Upgrade to $200 lifetime plan to create stickers', 'warning');
+        showNotification('Premium required: Upgrade to $30 lifetime plan to create stickers', 'warning');
         return;
     }
     
