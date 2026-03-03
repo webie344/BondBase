@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resources - BondBase</title>
     
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Remove Google Fonts - using system fonts instead -->
     
     <!-- Feather Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
@@ -42,9 +39,23 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            /* Apple's system font stack */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 17px; /* Apple's body text size */
+            font-weight: 400;
+            line-height: 1.47059; /* Apple's typical line-height */
+            letter-spacing: -0.022em; /* Apple's slight negative tracking */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             background: var(--bg-primary);
             color: var(--text-primary);
+        }
+
+        /* Responsive font adjustment */
+        @media (max-width: 768px) {
+            body {
+                font-size: 16px; /* Slightly smaller on mobile if needed */
+            }
         }
 
         /* Add to your CSS file */
@@ -541,7 +552,7 @@
         .time-display {
             font-size: 14px;
             color: white;
-            font-family: monospace;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
             min-width: 90px;
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
@@ -602,6 +613,7 @@
             font-size: 14px;
             outline: none;
             transition: var(--transition);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         .comment-input:focus {
@@ -622,6 +634,7 @@
             display: flex;
             align-items: center;
             gap: 4px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         .send-comment-btn:hover {
@@ -867,8 +880,9 @@
         }
 
         .page-title {
-            font-size: 1.5rem;
-            font-weight: 800;
+            font-size: 34px; /* Apple's H1 size */
+            font-weight: 700;
+            letter-spacing: -0.022em;
             color: var(--text-primary);
             display: flex;
             align-items: center;
@@ -877,8 +891,8 @@
 
         .page-title .feather {
             color: var(--primary-light);
-            width: 24px;
-            height: 24px;
+            width: 32px;
+            height: 32px;
         }
 
         /* Create Post Button */
@@ -897,12 +911,14 @@
             padding: 0.875rem 1.75rem;
             border-radius: 50px;
             text-decoration: none;
-            font-weight: 700;
-            font-size: 0.875rem;
+            font-weight: 600;
+            font-size: 15px; /* Apple's button text size */
             transition: var(--transition);
             box-shadow: 0 2px 8px rgba(182, 0, 75, 0.3);
             border: none;
             cursor: pointer;
+            letter-spacing: -0.022em;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         .create-post-btn:hover {
@@ -912,8 +928,8 @@
         }
 
         .create-post-btn .feather {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             stroke: currentColor;
         }
 
@@ -948,8 +964,9 @@
         .user-posts-info h2 {
             margin: 0;
             color: var(--text-primary);
-            font-size: 1.25rem;
-            font-weight: 700;
+            font-size: 28px; /* Apple's H2 size */
+            font-weight: 600;
+            letter-spacing: -0.022em;
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -958,8 +975,9 @@
         .user-posts-info p {
             margin: 0.375rem 0 0 0;
             color: var(--text-secondary);
-            font-size: 0.875rem;
+            font-size: 15px; /* Apple's secondary text */
             font-weight: 400;
+            line-height: 1.47059;
         }
 
         /* Posts Feed - Takes available space */
@@ -973,7 +991,7 @@
             text-align: center;
             padding: 3rem 1.25rem;
             color: var(--text-light);
-            font-size: 15px;
+            font-size: 17px; /* Apple's body text */
             background: var(--bg-primary);
         }
 
@@ -1042,13 +1060,15 @@
             border: none;
             padding: 0.875rem 2rem;
             border-radius: 50px;
-            font-size: 0.875rem;
+            font-size: 15px; /* Apple's button text */
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
+            letter-spacing: -0.022em;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         .load-more-btn:hover:not(:disabled) {
@@ -1096,8 +1116,9 @@
         }
 
         .logo {
-            font-size: 1.5rem;
-            font-weight: 800;
+            font-size: 24px; /* Apple-style logo size */
+            font-weight: 700;
+            letter-spacing: -0.022em;
             color: var(--primary-light);
             text-decoration: none;
             display: flex;
@@ -1126,7 +1147,7 @@
             align-items: center;
             text-decoration: none;
             color: var(--text-secondary);
-            font-size: 0.75rem;
+            font-size: 12px; /* Apple's small text */
             font-weight: 500;
             gap: 0.25rem;
             padding: 0.75rem;
@@ -1146,8 +1167,8 @@
         }
 
         .nav-links .feather {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             stroke: currentColor;
             margin-bottom: 2px;
         }
@@ -1168,7 +1189,7 @@
             border-radius: 50%;
             width: 18px;
             height: 18px;
-            font-size: 0.7rem;
+            font-size: 11px; /* Apple's small text */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1181,7 +1202,7 @@
             border-radius: 50%;
             width: 16px;
             height: 16px;
-            font-size: 0.65rem;
+            font-size: 11px; /* Apple's small text */
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -1264,9 +1285,21 @@
                 width: 40px;
                 height: 40px;
             }
+            
+            .page-title {
+                font-size: 28px; /* Slightly smaller H1 on mobile */
+            }
+            
+            .user-posts-info h2 {
+                font-size: 24px; /* Slightly smaller H2 on mobile */
+            }
         }
 
         @media (max-width: 480px) {
+            body {
+                font-size: 16px; /* Apple uses 16px on smaller screens */
+            }
+            
             .post-actions {
                 gap: 2px !important;
                 padding: 10px 0 !important;
@@ -1305,12 +1338,12 @@
             }
 
             .page-title {
-                font-size: 1.25rem;
+                font-size: 28px;
             }
 
             .create-post-btn {
                 padding: 0.75rem 1.5rem;
-                font-size: 0.813rem;
+                font-size: 15px;
             }
         }
     </style>
@@ -1484,4 +1517,4 @@
         };
     </script>
 </body>
-</html>aa
+</html>
