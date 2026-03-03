@@ -211,16 +211,16 @@ class SocialManager {
                 z-index: 100000;
                 align-items: center;
                 justify-content: center;
-                padding: 20px;
+                padding: 5px;
                 backdrop-filter: blur(10px);
             }
             
             .post-modal-content {
                 background: #1a1d21;
                 border-radius: 24px;
-                max-width: 800px;
+                max-width: 900px;
                 width: 100%;
-                max-height: 90vh;
+                max-height: 100vh;
                 display: flex;
                 flex-direction: column;
                 animation: modalFadeIn 0.3s ease;
@@ -306,7 +306,7 @@ class SocialManager {
             }
             
             .post-modal-body .post-actions {
-                margin-left: 60px;
+                margin-left: 40px;
             }
         `;
         document.head.appendChild(style);
