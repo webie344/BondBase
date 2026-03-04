@@ -52,8 +52,9 @@ class ProductManager {
         this.stores = [];
         this.currentStoreId = null;
         this.products = {};
+        this.profileUserId = null;
         this.init();
-        this.initProfileDisplay(); // Auto-initialize when loaded
+        this.initProfileDisplay();
     }
 
     async init() {
@@ -66,7 +67,7 @@ class ProductManager {
     async initProfileDisplay() {
         // Check if we're on a profile page
         if (!window.location.pathname.includes('profile.html') && !window.location.pathname.includes('account.html')) {
-            return; // Not on profile page, don't load stores
+            return;
         }
 
         console.log('Profile page detected, loading stores...');
@@ -78,7 +79,16 @@ class ProductManager {
         const urlParams = new URLSearchParams(window.location.search);
         profileUserId = urlParams.get('userId') || urlParams.get('uid') || urlParams.get('id');
 
-        // Method 2: If on "my profile" page (account.html) and no user ID specified, use current user
+        // Method 2: Check for user ID in profile data
+        if (!profileUserId) {
+            // Look for common profile data elements
+            const profileElements = document.querySelectorAll('[data-user-id], [data-uid]');
+            profileElements.forEach(el => {
+                profileUserId = el.dataset.userId || el.dataset.uid;
+            });
+        }
+
+        // Method 3: If on "my profile" page (account.html) and no user ID specified, use current user
         if (!profileUserId && window.location.pathname.includes('account.html')) {
             // Wait for auth to load
             const checkAuth = setInterval(() => {
@@ -118,11 +128,11 @@ class ProductManager {
             this.stores.sort((a, b) => {
                 const dateA = a.createdAt ? a.createdAt.seconds : 0;
                 const dateB = b.createdAt ? b.createdAt.seconds : 0;
-                return dateB - dateA; // Descending order (newest first)
+                return dateB - dateA;
             });
 
             console.log(`Found ${this.stores.length} stores for user ${userId}`);
-            console.log('Store data:', this.stores); // Debug log
+            console.log('Store data:', this.stores);
 
             if (this.stores.length === 0) {
                 this.showNoStoresMessage('This user hasn\'t created any stores yet');
@@ -168,11 +178,7 @@ class ProductManager {
         if (storeTabs) {
             storeTabs.innerHTML = `
                 <div class="no-stores-message">
-                    <svg class="feather" data-feather="shopping-bag">
-                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-                        <line x1="3" y1="6" x2="21" y2="6"></line>
-                        <path d="M16 10a4 4 0 0 1-8 0"></path>
-                    </svg>
+                    <i data-feather="shopping-bag"></i>
                     <p>${message}</p>
                 </div>
             `;
@@ -186,7 +192,6 @@ class ProductManager {
             productsGrid.innerHTML = '';
         }
         
-        // Re-initialize feather icons
         if (typeof feather !== 'undefined') {
             feather.replace();
         }
@@ -213,11 +218,11 @@ class ProductManager {
         let tabsHtml = '';
         this.stores.forEach((store, index) => {
             const isActive = index === 0 ? 'active' : '';
-            const storeName = store.name || store.storeName || 'Unnamed Store';
+            const storeName = store.name || store.storeName || store.store_name || 'Unnamed Store';
             
             tabsHtml += `
                 <div class="store-tab ${isActive}" data-store-id="${store.id}">
-                    <svg class="feather" data-feather="${store.logo ? 'image' : 'shopping-bag'}"></svg>
+                    <i data-feather="${store.logo ? 'image' : 'shopping-bag'}"></i>
                     ${storeName}
                     <span class="product-count">${store.products || 0}</span>
                 </div>
@@ -234,7 +239,6 @@ class ProductManager {
             });
         });
 
-        // Re-initialize feather icons
         if (typeof feather !== 'undefined') {
             feather.replace();
         }
@@ -255,16 +259,15 @@ class ProductManager {
 
         this.currentStoreId = storeId;
         
-        // Find store data
         const store = this.stores.find(s => s.id === storeId);
         if (store) {
-            console.log('Switching to store:', store); // Debug log
+            console.log('Switching to store:', store);
             this.renderStoreInfo(store);
             await this.loadStoreProductsForDisplay(storeId);
         }
     }
 
-    // Render store information
+    // Render store information - FIXED to match store.html
     renderStoreInfo(store) {
         const storeInfoCard = document.getElementById('storeInfoCard');
         const storeLogo = document.getElementById('storeLogo');
@@ -277,27 +280,51 @@ class ProductManager {
 
         if (!storeInfoCard) return;
 
-        console.log('Rendering store info:', store); // Debug log
+        console.log('Rendering store info:', store);
 
         // Show the store info card
         storeInfoCard.style.display = 'flex';
 
-        // Set store logo
+        // Set store logo - FIXED to match store.html pattern
         if (storeLogo) {
-            if (store.logo && store.logo.url) {
-                storeLogo.src = store.logo.url;
-                console.log('Setting logo to:', store.logo.url);
-            } else {
-                storeLogo.src = 'images/default-store.jpg';
-                console.log('No logo found, using default');
+            let logoUrl = 'images/default-store.jpg';
+            
+            // Try to get logo from various possible locations
+            if (store.logo) {
+                if (typeof store.logo === 'string') {
+                    logoUrl = store.logo;
+                } else if (store.logo.url) {
+                    logoUrl = store.logo.url;
+                } else if (store.logo.thumbnail) {
+                    logoUrl = store.logo.thumbnail;
+                }
             }
+            // Check for logoThumbnail field (like in store.html)
+            else if (store.logoThumbnail) {
+                logoUrl = store.logoThumbnail;
+            }
+            // Check for image field
+            else if (store.image) {
+                if (typeof store.image === 'string') {
+                    logoUrl = store.image;
+                } else if (store.image.url) {
+                    logoUrl = store.image.url;
+                }
+            }
+            
+            console.log('Setting logo to:', logoUrl);
+            storeLogo.src = logoUrl;
+            
+            // Add error handler
+            storeLogo.onerror = function() {
+                this.src = 'images/default-store.jpg';
+            };
         }
 
         // Set store name
         if (storeNameEl) {
-            const storeName = store.name || store.storeName || 'Unnamed Store';
-            storeNameEl.innerHTML = `${storeName} <span class="store-verified" id="storeVerified" style="display: ${store.verified ? 'inline-block' : 'none'};">Verified</span>`;
-            console.log('Setting store name to:', storeName);
+            const storeName = store.name || store.storeName || store.store_name || 'Unnamed Store';
+            storeNameEl.innerHTML = `${storeName} <span class="store-verified" style="display: ${store.verified ? 'inline-block' : 'none'};">Verified</span>`;
         }
 
         // Set verified badge
@@ -307,14 +334,14 @@ class ProductManager {
 
         // Set description
         if (storeDescription) {
-            storeDescription.textContent = store.description || store.bio || 'No description provided';
+            storeDescription.textContent = store.description || store.bio || store.about || 'No description provided';
         }
 
         // Set products count
         if (storeProductsCount) {
             const countSpan = storeProductsCount.querySelector('span');
             if (countSpan) {
-                countSpan.textContent = `${store.products || 0} products`;
+                countSpan.textContent = `${store.products || store.productCount || 0} products`;
             }
         }
 
@@ -335,7 +362,6 @@ class ProductManager {
             }
         }
 
-        // Re-initialize feather icons
         if (typeof feather !== 'undefined') {
             feather.replace();
         }
@@ -347,13 +373,10 @@ class ProductManager {
             const productsGrid = document.getElementById('productsGrid');
             if (!productsGrid) return;
 
-            // Show loading
             productsGrid.innerHTML = '<div class="loading">Loading products...</div>';
 
-            // Get products for this store
             const products = await this.getStoreProducts(storeId);
             
-            // Sort manually in JavaScript
             products.sort((a, b) => {
                 const dateA = a.createdAt ? a.createdAt.seconds : 0;
                 const dateB = b.createdAt ? b.createdAt.seconds : 0;
@@ -361,17 +384,12 @@ class ProductManager {
             });
             
             this.products[storeId] = products;
-            console.log(`Found ${products.length} products for store ${storeId}`); // Debug log
+            console.log(`Found ${products.length} products for store ${storeId}`);
 
             if (products.length === 0) {
                 productsGrid.innerHTML = `
                     <div class="no-products-message">
-                        <svg class="feather" data-feather="package">
-                            <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line>
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                        </svg>
+                        <i data-feather="package"></i>
                         <p>No products in this store yet</p>
                     </div>
                 `;
@@ -379,7 +397,6 @@ class ProductManager {
                 this.renderProductsGrid(products);
             }
 
-            // Re-initialize feather icons
             if (typeof feather !== 'undefined') {
                 feather.replace();
             }
@@ -393,7 +410,7 @@ class ProductManager {
         }
     }
 
-    // Render products grid
+    // Render products grid - FIXED to match store.html product display
     renderProductsGrid(products) {
         const productsGrid = document.getElementById('productsGrid');
         if (!productsGrid) return;
@@ -401,42 +418,53 @@ class ProductManager {
         let productsHtml = '';
 
         products.forEach(product => {
-            const mainImage = product.images && product.images.length > 0 
-                ? product.images[0].url 
-                : 'images/default-product.jpg';
+            // Get product image - FIXED to match store.html pattern
+            let productImage = 'images/default-product.jpg';
             
-            const thumbnail = product.images && product.images.length > 0 && product.images[0].thumbnail
-                ? product.images[0].thumbnail
-                : mainImage;
+            if (product.images && product.images.length > 0) {
+                const firstImage = product.images[0];
+                if (typeof firstImage === 'string') {
+                    productImage = firstImage;
+                } else if (firstImage && firstImage.thumbnail) {
+                    productImage = firstImage.thumbnail;
+                } else if (firstImage && firstImage.url) {
+                    productImage = firstImage.url;
+                }
+            } else if (product.image) {
+                if (typeof product.image === 'string') {
+                    productImage = product.image;
+                } else if (product.image.url) {
+                    productImage = product.image.url;
+                }
+            }
 
             const discount = product.discount || 0;
-            const discountedPrice = this.calculateDiscountedPrice(product.price, discount);
-            const isDiscounted = discount > 0 && discountedPrice < product.price;
+            const price = product.salePrice || product.price || 0;
+            const originalPrice = product.originalPrice || price;
+            const hasDiscount = discount > 0 && price < originalPrice;
 
             productsHtml += `
                 <div class="product-card" onclick="window.location.href='product.html?id=${product.id}'">
                     <div class="product-image-container">
-                        <img src="${thumbnail}" alt="${product.name || 'Product'}" class="product-image" loading="lazy">
-                        ${isDiscounted ? '<span class="product-badge">-' + discount + '%</span>' : ''}
+                        <img src="${productImage}" alt="${product.name || 'Product'}" class="product-image" 
+                             loading="lazy" onerror="this.src='images/default-product.jpg'">
+                        ${product.status === 'new' ? '<span class="product-badge">NEW</span>' : ''}
+                        ${hasDiscount ? '<span class="product-badge discount">-' + discount + '%</span>' : ''}
                     </div>
                     <div class="product-info">
                         <h4 class="product-name">${product.name || 'Unnamed Product'}</h4>
                         <div class="product-price">
-                            ${this.formatPrice(discountedPrice)}
-                            ${isDiscounted ? `<span class="product-original-price">${this.formatPrice(product.price)}</span>` : ''}
+                            <span class="current-price">$${price.toFixed(2)}</span>
+                            ${hasDiscount ? `<span class="original-price">$${originalPrice.toFixed(2)}</span>` : ''}
                         </div>
                         <div class="product-stats">
                             <span class="product-stat">
-                                <svg class="feather" data-feather="eye"></svg>
+                                <i data-feather="eye"></i>
                                 ${product.views || 0}
                             </span>
                             <span class="product-stat">
-                                <svg class="feather" data-feather="heart"></svg>
+                                <i data-feather="heart"></i>
                                 ${product.likes ? product.likes.length : 0}
-                            </span>
-                            <span class="product-stat">
-                                <svg class="feather" data-feather="shopping-cart"></svg>
-                                ${product.orders || 0}
                             </span>
                         </div>
                     </div>
@@ -446,7 +474,6 @@ class ProductManager {
 
         productsGrid.innerHTML = productsHtml;
 
-        // Re-initialize feather icons
         if (typeof feather !== 'undefined') {
             feather.replace();
         }
@@ -459,7 +486,6 @@ class ProductManager {
             formData.append('file', file);
             formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
             
-            // Add folder path for organization
             if (this.currentUser) {
                 formData.append('folder', `stores/${this.currentUser.uid}/products`);
             }
@@ -514,16 +540,20 @@ class ProductManager {
                 throw new Error('You must be logged in to create a store');
             }
 
-            // Upload logo to Cloudinary if provided
             let logoData = null;
             if (logo) {
                 logoData = await this.uploadToCloudinary(logo);
+                
+                // Create thumbnail version
+                if (logoData) {
+                    logoData.thumbnail = logoData.url.replace('/image/upload/', '/image/upload/w_200,h_200,c_fill/');
+                }
             }
 
-            // Create store document in Firestore
             const storeRef = await addDoc(collection(db, 'stores'), {
                 ...storeData,
                 logo: logoData,
+                logoThumbnail: logoData?.thumbnail,
                 ownerId: this.currentUser.uid,
                 ownerEmail: this.currentUser.email,
                 ownerName: this.currentUser.displayName || 'Store Owner',
@@ -572,14 +602,13 @@ class ProductManager {
             
             querySnapshot.forEach((doc) => {
                 const storeData = doc.data();
-                console.log('Store data from Firestore:', storeData); // Debug log
+                console.log('Store data from Firestore:', storeData);
                 stores.push({
                     id: doc.id,
                     ...storeData
                 });
             });
 
-            console.log('Raw stores from Firestore:', stores);
             this.saveToCache(cacheKey, stores);
             return stores;
 
@@ -617,6 +646,146 @@ class ProductManager {
         } catch (error) {
             console.error('Error getting store:', error);
             return null;
+        }
+    }
+
+    // Update store
+    async updateStore(storeId, updates, newLogo = null) {
+        try {
+            if (!this.currentUser) {
+                throw new Error('You must be logged in to update a store');
+            }
+
+            const storeRef = doc(db, 'stores', storeId);
+            const storeSnap = await getDoc(storeRef);
+
+            if (!storeSnap.exists()) {
+                throw new Error('Store not found');
+            }
+
+            if (storeSnap.data().ownerId !== this.currentUser.uid) {
+                throw new Error('You do not have permission to update this store');
+            }
+
+            let logoData = updates.existingLogo || null;
+            if (newLogo) {
+                logoData = await this.uploadToCloudinary(newLogo);
+                if (logoData) {
+                    logoData.thumbnail = logoData.url.replace('/image/upload/', '/image/upload/w_200,h_200,c_fill/');
+                }
+            }
+
+            await updateDoc(storeRef, {
+                ...updates,
+                logo: logoData,
+                logoThumbnail: logoData?.thumbnail,
+                updatedAt: serverTimestamp()
+            });
+
+            this.clearStoreCache(storeId);
+            this.clearUserStoresCache(this.currentUser.uid);
+
+            return true;
+
+        } catch (error) {
+            console.error('Error updating store:', error);
+            throw error;
+        }
+    }
+
+    // Delete store
+    async deleteStore(storeId) {
+        try {
+            if (!this.currentUser) {
+                throw new Error('You must be logged in to delete a store');
+            }
+
+            const storeRef = doc(db, 'stores', storeId);
+            const storeSnap = await getDoc(storeRef);
+
+            if (!storeSnap.exists()) {
+                throw new Error('Store not found');
+            }
+
+            if (storeSnap.data().ownerId !== this.currentUser.uid) {
+                throw new Error('You do not have permission to delete this store');
+            }
+
+            const productsQuery = query(
+                collection(db, 'products'),
+                where('storeId', '==', storeId),
+                limit(1)
+            );
+            const productsSnap = await getDocs(productsQuery);
+            
+            if (!productsSnap.empty) {
+                throw new Error('Cannot delete store with existing products. Delete products first.');
+            }
+
+            await deleteDoc(storeRef);
+
+            this.clearStoreCache(storeId);
+            this.clearUserStoresCache(this.currentUser.uid);
+
+            return true;
+
+        } catch (error) {
+            console.error('Error deleting store:', error);
+            throw error;
+        }
+    }
+
+    // Create a new product
+    async createProduct(productData, images = []) {
+        try {
+            if (!this.currentUser) {
+                throw new Error('You must be logged in to create a product');
+            }
+
+            let imageData = [];
+            if (images.length > 0) {
+                imageData = await this.uploadImages(images);
+                
+                // Add thumbnails
+                imageData = imageData.map(img => ({
+                    ...img,
+                    thumbnail: img.url.replace('/image/upload/', '/image/upload/w_200,h_200,c_fill/')
+                }));
+            }
+
+            const productRef = await addDoc(collection(db, 'products'), {
+                ...productData,
+                images: imageData,
+                ownerId: this.currentUser.uid,
+                ownerEmail: this.currentUser.email,
+                ownerName: this.currentUser.displayName || 'Seller',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                views: 0,
+                likes: [],
+                orders: 0,
+                status: 'active'
+            });
+
+            if (productData.storeId) {
+                const storeRef = doc(db, 'stores', productData.storeId);
+                await updateDoc(storeRef, {
+                    products: increment(1),
+                    updatedAt: serverTimestamp()
+                });
+            }
+
+            this.clearStoreCache(productData.storeId);
+            this.clearUserStoresCache(this.currentUser.uid);
+
+            return {
+                productId: productRef.id,
+                images: imageData
+            };
+
+        } catch (error) {
+            console.error('Error creating product:', error);
+            throw error;
         }
     }
 
@@ -674,7 +843,6 @@ class ProductManager {
                     ...docSnap.data()
                 };
                 
-                // Increment view count
                 await this.incrementViews(productId);
                 
                 this.saveToCache(cacheKey, product);
@@ -703,16 +871,21 @@ class ProductManager {
                 throw new Error('Product not found');
             }
 
-            // Check ownership
             if (productSnap.data().ownerId !== this.currentUser.uid) {
                 throw new Error('You do not have permission to update this product');
             }
 
-            // Upload new images to Cloudinary if any
             let imageData = [...(updates.existingImages || [])];
             if (newImages.length > 0) {
                 const newImageData = await this.uploadImages(newImages);
-                imageData = [...imageData, ...newImageData];
+                
+                // Add thumbnails
+                const processedImages = newImageData.map(img => ({
+                    ...img,
+                    thumbnail: img.url.replace('/image/upload/', '/image/upload/w_200,h_200,c_fill/')
+                }));
+                
+                imageData = [...imageData, ...processedImages];
             }
 
             await updateDoc(productRef, {
@@ -721,7 +894,6 @@ class ProductManager {
                 updatedAt: serverTimestamp()
             });
 
-            // Clear cache
             this.clearProductCache(productId);
             if (productSnap.data().storeId) {
                 this.clearStoreCache(productSnap.data().storeId);
@@ -750,15 +922,12 @@ class ProductManager {
                 throw new Error('Product not found');
             }
 
-            // Check ownership
             if (productSnap.data().ownerId !== this.currentUser.uid) {
                 throw new Error('You do not have permission to delete this product');
             }
 
-            // Delete product document from Firestore
             await deleteDoc(productRef);
 
-            // Update store product count
             if (productSnap.data().storeId) {
                 const storeRef = doc(db, 'stores', productSnap.data().storeId);
                 await updateDoc(storeRef, {
@@ -767,7 +936,6 @@ class ProductManager {
                 });
             }
 
-            // Clear cache
             this.clearProductCache(productId);
             if (productSnap.data().storeId) {
                 this.clearStoreCache(productSnap.data().storeId);
@@ -827,19 +995,6 @@ class ProductManager {
         } catch (error) {
             console.log('Error incrementing views:', error);
         }
-    }
-
-    // Get optimized image URL from Cloudinary
-    getOptimizedImageUrl(imageData, options = {}) {
-        if (!imageData || !imageData.url) return 'images/default-product.jpg';
-        
-        // If it's a Cloudinary URL, we can add transformations
-        if (imageData.url.includes('cloudinary.com')) {
-            const { width = 400, height = 400, crop = 'fill', quality = 'auto' } = options;
-            return imageData.url.replace('/image/upload/', `/image/upload/w_${width},h_${height},c_${crop},q_${quality}/`);
-        }
-        
-        return imageData.url;
     }
 
     // Format date
@@ -932,27 +1087,6 @@ class ProductManager {
             maximumFractionDigits: 2
         }).format(price);
     }
-
-    // Calculate discounted price
-    calculateDiscountedPrice(price, discount) {
-        if (!discount || discount <= 0) return price;
-        return price * (1 - discount / 100);
-    }
-
-    // Check if product is in stock
-    isInStock(product) {
-        if (product.stock === undefined) return true;
-        return product.stock > 0;
-    }
-
-    // Get contact info
-    getContactInfo(product) {
-        return {
-            whatsapp: product.ownerWhatsapp || null,
-            telegram: product.ownerTelegram || null,
-            email: product.ownerEmail || null
-        };
-    }
 }
 
 // Export for use in other files
@@ -961,4 +1095,4 @@ export const productManager = new ProductManager();
 // Make productManager available globally
 window.productManager = productManager;
 
-console.log('✅ products.js loaded successfully - No indexes required!');
+console.log('✅ products.js loaded successfully - Fixed logo display to match store.html');
