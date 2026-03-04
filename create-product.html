@@ -151,6 +151,37 @@
             margin-bottom: 0;
         }
 
+        /* Currency and Price Row */
+        .price-row {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .currency-selector {
+            flex: 0 0 120px;
+        }
+
+        .currency-selector select {
+            width: 100%;
+            padding: 12px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        .currency-selector select option {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .price-input-container {
+            flex: 1;
+        }
+
         .price-input {
             display: flex;
             align-items: center;
@@ -166,6 +197,8 @@
             color: var(--primary);
             font-weight: 600;
             border-right: 1px solid var(--border);
+            min-width: 60px;
+            text-align: center;
         }
 
         .price-input input {
@@ -400,6 +433,16 @@
                 flex-direction: column;
                 gap: 20px;
             }
+
+            .price-row {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .currency-selector {
+                flex: 0 0 auto;
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -412,7 +455,7 @@
         </div>
 
         <form id="createProductForm">
-            <!-- Store Selection - Now properly loads all stores -->
+            <!-- Store Selection -->
             <div class="form-group" id="storeSelectionGroup">
                 <label><i class="fas fa-store"></i> Select Store *</label>
                 <select class="form-control" id="storeSelect" required>
@@ -450,22 +493,32 @@
                 <div class="error-message">Please select a category</div>
             </div>
 
-            <!-- Price Row -->
-            <div class="row">
-                <div class="form-group">
-                    <label><i class="fas fa-dollar-sign"></i> Price *</label>
-                    <div class="price-input">
-                        <span>$</span>
-                        <input type="number" id="price" step="0.01" min="0" placeholder="0.00" required>
+            <!-- Price Row with Currency Selection -->
+            <div class="form-group">
+                <label><i class="fas fa-money-bill-wave"></i> Price *</label>
+                <div class="price-row">
+                    <div class="currency-selector">
+                        <select id="currency" class="form-control" required>
+                            <option value="USD" data-symbol="$" selected>USD ($)</option>
+                            <option value="NGN" data-symbol="₦">NGN (₦)</option>
+                            <option value="GBP" data-symbol="£">GBP (£)</option>
+                        </select>
                     </div>
-                    <div class="error-message">Valid price is required</div>
+                    <div class="price-input-container">
+                        <div class="price-input">
+                            <span id="currencySymbol">$</span>
+                            <input type="number" id="price" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                    </div>
                 </div>
+                <div class="error-message">Valid price is required</div>
+            </div>
 
-                <div class="form-group">
-                    <label><i class="fas fa-boxes"></i> Stock Quantity</label>
-                    <input type="number" class="form-control" id="stockQuantity" min="0" value="1" placeholder="Quantity available">
-                    <small style="color: var(--text-secondary);">Leave 0 for unlimited/digital items</small>
-                </div>
+            <!-- Stock Quantity -->
+            <div class="form-group">
+                <label><i class="fas fa-boxes"></i> Stock Quantity</label>
+                <input type="number" class="form-control" id="stockQuantity" min="0" value="1" placeholder="Quantity available">
+                <small style="color: var(--text-secondary);">Leave 0 for unlimited/digital items</small>
             </div>
 
             <!-- Discount Row -->
@@ -478,7 +531,7 @@
                 <div class="form-group">
                     <label><i class="fas fa-tag"></i> Sale Price</label>
                     <div class="price-input">
-                        <span>$</span>
+                        <span id="saleCurrencySymbol">$</span>
                         <input type="number" id="salePrice" step="0.01" min="0" readonly placeholder="Auto-calculated">
                     </div>
                 </div>
@@ -559,7 +612,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         
         // Import product manager
         import { productManager } from './products.js';
@@ -586,10 +639,13 @@
         const productName = document.getElementById('productName');
         const productDescription = document.getElementById('productDescription');
         const productCategory = document.getElementById('productCategory');
+        const currency = document.getElementById('currency');
+        const currencySymbol = document.getElementById('currencySymbol');
         const price = document.getElementById('price');
         const stockQuantity = document.getElementById('stockQuantity');
         const discount = document.getElementById('discount');
         const salePrice = document.getElementById('salePrice');
+        const saleCurrencySymbol = document.getElementById('saleCurrencySymbol');
         const condition = document.getElementById('condition');
         const additionalDetails = document.getElementById('additionalDetails');
         const submitBtn = document.getElementById('submitBtn');
@@ -606,6 +662,13 @@
         let selectedFiles = [];
         let selectedFeatures = [];
 
+        // Currency symbols mapping
+        const currencySymbols = {
+            USD: '$',
+            NGN: '₦',
+            GBP: '£'
+        };
+
         // Feature tag selection
         featureTags.forEach(tag => {
             tag.addEventListener('click', () => {
@@ -618,9 +681,32 @@
                 } else {
                     selectedFeatures = selectedFeatures.filter(f => f !== feature);
                 }
-                console.log('Selected features:', selectedFeatures);
             });
         });
+
+        // Update currency symbol when currency changes
+        currency.addEventListener('change', () => {
+            const selectedCurrency = currency.value;
+            const symbol = currencySymbols[selectedCurrency];
+            currencySymbol.textContent = symbol;
+            saleCurrencySymbol.textContent = symbol;
+        });
+
+        // Calculate sale price when discount changes
+        price.addEventListener('input', calculateSalePrice);
+        discount.addEventListener('input', calculateSalePrice);
+
+        function calculateSalePrice() {
+            const originalPrice = parseFloat(price.value) || 0;
+            const discountPercent = parseFloat(discount.value) || 0;
+            
+            if (originalPrice > 0 && discountPercent > 0) {
+                const discounted = originalPrice * (1 - discountPercent / 100);
+                salePrice.value = discounted.toFixed(2);
+            } else {
+                salePrice.value = originalPrice.toFixed(2);
+            }
+        }
 
         // Check authentication and load stores
         onAuthStateChanged(auth, async (user) => {
@@ -633,12 +719,11 @@
             }
         });
 
-        // ========== FIXED: Load ALL user's stores ==========
+        // Load ALL user's stores
         async function loadUserStores() {
             try {
                 console.log('Loading stores for user:', currentUser.uid);
                 
-                // Query ALL stores where ownerId equals current user's UID
                 const storesQuery = query(collection(db, 'stores'), where('ownerId', '==', currentUser.uid));
                 const storesSnap = await getDocs(storesQuery);
                 
@@ -648,8 +733,7 @@
                     
                     storesSnap.forEach(doc => {
                         const storeData = doc.data();
-                        console.log('Store found:', doc.id, storeData.storeName);
-                        options += `<option value="${doc.id}" data-store='${JSON.stringify(storeData)}'>${storeData.storeName}</option>`;
+                        options += `<option value="${doc.id}" data-store='${JSON.stringify(storeData)}'>${storeData.storeName || storeData.name || 'Unnamed Store'}</option>`;
                     });
                     
                     storeSelect.innerHTML = options;
@@ -665,7 +749,6 @@
         }
 
         function showNoStoreMessage() {
-            // Disable all form inputs
             const inputs = form.querySelectorAll('input, select, textarea, button');
             inputs.forEach(input => {
                 if (input.id !== 'storeSelect') {
@@ -673,7 +756,6 @@
                 }
             });
 
-            // Show warning
             const warningDiv = document.createElement('div');
             warningDiv.style.cssText = `
                 background: rgba(255, 42, 109, 0.1);
@@ -706,7 +788,6 @@
             productImages.click();
         });
 
-        // Drag and drop
         imageUpload.addEventListener('dragover', (e) => {
             e.preventDefault();
             imageUpload.style.borderColor = 'var(--primary)';
@@ -741,7 +822,6 @@
             files.forEach(file => {
                 selectedFiles.push(file);
                 
-                // Create preview
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const previewDiv = document.createElement('div');
@@ -768,31 +848,13 @@
                 reader.readAsDataURL(file);
             });
 
-            // Clear input so same file can be selected again if removed
             productImages.value = '';
         }
 
-        // Calculate sale price when discount changes
-        price.addEventListener('input', calculateSalePrice);
-        discount.addEventListener('input', calculateSalePrice);
-
-        function calculateSalePrice() {
-            const originalPrice = parseFloat(price.value) || 0;
-            const discountPercent = parseFloat(discount.value) || 0;
-            
-            if (originalPrice > 0 && discountPercent > 0) {
-                const discounted = originalPrice * (1 - discountPercent / 100);
-                salePrice.value = discounted.toFixed(2);
-            } else {
-                salePrice.value = originalPrice.toFixed(2);
-            }
-        }
-
-        // Form submission - USING PRODUCT MANAGER WITH CLOUDINARY
+        // Form submission
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            // Validate form
             if (!validateForm()) {
                 return;
             }
@@ -803,13 +865,11 @@
                 return;
             }
 
-            // Show loading
             submitBtn.disabled = true;
             loading.style.display = 'block';
             submitBtn.style.opacity = '0.7';
 
             try {
-                // Get selected store data
                 const selectedOption = storeSelect.options[storeSelect.selectedIndex];
                 let storeData = {};
                 try {
@@ -818,42 +878,42 @@
                     console.log('Error parsing store data:', e);
                 }
 
-                // Prepare product data
+                // Get the selected currency and price
+                const selectedCurrency = currency.value;
+                const priceValue = parseFloat(price.value) || 0;
+                const discountPercent = parseFloat(discount.value) || 0;
+                const salePriceValue = priceValue * (1 - discountPercent / 100);
+
+                // Prepare product data - store the actual price in the selected currency
                 const productData = {
                     storeId: storeSelect.value,
-                    storeName: storeData.storeName || 'Store',
-                    ownerId: currentUser.uid,
-                    ownerName: currentUser.displayName || 'Seller',
-                    ownerEmail: currentUser.email,
-                    ownerWhatsapp: storeData.whatsapp || '',
-                    ownerTelegram: storeData.telegram || '',
+                    storeName: storeData.storeName || storeData.name || 'Store',
                     name: productName.value.trim(),
                     description: productDescription.value.trim(),
                     category: productCategory.value,
-                    price: parseFloat(price.value) || 0,
-                    originalPrice: parseFloat(price.value) || 0,
-                    discount: parseFloat(discount.value) || 0,
-                    salePrice: parseFloat(salePrice.value) || parseFloat(price.value) || 0,
+                    price: priceValue, // Store the actual price in the selected currency
+                    originalPrice: priceValue,
+                    discount: discountPercent,
+                    salePrice: salePriceValue,
                     stock: parseInt(stockQuantity.value) || 0,
                     condition: condition.value,
                     features: selectedFeatures,
                     additionalDetails: additionalDetails.value.trim() || '',
-                    status: 'active'
+                    status: 'active',
+                    currency: selectedCurrency // Store which currency was used
                 };
 
-                console.log('Creating product with Cloudinary images:', selectedFiles.length);
-                console.log('Selected store:', storeSelect.value, storeData.storeName);
+                console.log('Creating product:', productData);
+                console.log('Images to upload:', selectedFiles.length);
 
                 // Use productManager to create product with Cloudinary upload
                 const result = await productManager.createProduct(productData, selectedFiles);
                 
                 console.log('Product created successfully:', result);
 
-                // Show success message
                 loading.style.display = 'none';
                 successMessage.style.display = 'block';
 
-                // Redirect after 2 seconds
                 setTimeout(() => {
                     window.location.href = 'market.html';
                 }, 2000);
@@ -864,12 +924,9 @@
                 submitBtn.disabled = false;
                 submitBtn.style.opacity = '1';
                 
-                // Show user-friendly error
                 let errorMessage = 'Error creating product';
                 if (error.message.includes('Cloudinary')) {
                     errorMessage = 'Image upload failed. Please check your Cloudinary settings.';
-                } else if (error.message.includes('permission')) {
-                    errorMessage = 'You don\'t have permission to create products';
                 } else {
                     errorMessage = error.message || 'Unknown error occurred';
                 }
@@ -881,13 +938,11 @@
         function validateForm() {
             let isValid = true;
 
-            // Store validation
             if (!storeSelect.value) {
                 alert('Please select a store');
                 isValid = false;
             }
 
-            // Product name validation
             if (!productName.value.trim()) {
                 showError(productName, 'Product name is required');
                 isValid = false;
@@ -895,7 +950,6 @@
                 removeError(productName);
             }
 
-            // Description validation
             if (!productDescription.value.trim()) {
                 showError(productDescription, 'Description is required');
                 isValid = false;
@@ -903,7 +957,6 @@
                 removeError(productDescription);
             }
 
-            // Category validation
             if (!productCategory.value) {
                 showError(productCategory, 'Please select a category');
                 isValid = false;
@@ -911,7 +964,6 @@
                 removeError(productCategory);
             }
 
-            // Price validation
             if (!price.value || parseFloat(price.value) <= 0) {
                 showError(price, 'Valid price is required');
                 isValid = false;
@@ -964,20 +1016,6 @@
                 removeError(price);
             }
         });
-
-        // Simulate progress for better UX (optional)
-        function simulateUploadProgress() {
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 10;
-                if (progress <= 90) {
-                    progressFill.style.width = progress + '%';
-                } else {
-                    clearInterval(interval);
-                }
-            }, 300);
-            return interval;
-        }
     </script>
 </body>
 </html>

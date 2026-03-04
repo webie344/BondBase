@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store - Crypto Gamers</title>
+    <title>Store - Bondbase</title>
     
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -321,6 +321,7 @@
             align-items: center;
             gap: 8px;
             margin-bottom: 8px;
+            flex-wrap: wrap;
         }
 
         .current-price {
@@ -333,6 +334,17 @@
             font-size: 13px;
             color: var(--text-secondary);
             text-decoration: line-through;
+        }
+
+        .currency-badge {
+            display: inline-block;
+            background: var(--bg-secondary);
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 10px;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            margin-left: 5px;
         }
 
         .product-meta {
@@ -1108,6 +1120,13 @@
         let storeReviews = [];
         let currentTab = 'products';
 
+        // Currency symbols mapping
+        const currencySymbols = {
+            USD: '$',
+            NGN: '₦',
+            GBP: '£'
+        };
+
         // Get store ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const storeId = urlParams.get('id');
@@ -1128,6 +1147,13 @@
             }
             loadStore();
         });
+
+        // Format price with currency symbol
+        function formatPrice(price, currency = 'USD') {
+            const numPrice = Number(price) || 0;
+            const symbol = currencySymbols[currency] || '$';
+            return `${symbol}${numPrice.toFixed(2)}`;
+        }
 
         // Show toast notification
         function showToast(message, isError = false) {
@@ -1201,7 +1227,8 @@
                     storeProducts.push({
                         id: doc.id,
                         productId: doc.id,
-                        ...data
+                        ...data,
+                        currency: data.currency || 'USD' // Ensure currency field exists
                     });
                     seenProducts.add(doc.id);
                 });
@@ -1544,6 +1571,12 @@
                         
                         const productIdentifier = product.productId || product.id;
                         const price = product.salePrice || product.price || 0;
+                        const originalPrice = product.originalPrice || product.price || 0;
+                        const productCurrency = product.currency || 'USD';
+                        
+                        // Format prices with currency
+                        const currentPriceFormatted = formatPrice(price, productCurrency);
+                        const originalPriceFormatted = hasDiscount ? formatPrice(originalPrice, productCurrency) : '';
                         
                         return `
                             <div class="product-card" data-product-id="${productIdentifier}">
@@ -1557,8 +1590,9 @@
                                     <h3 class="product-name">${product.name}</h3>
                                     
                                     <div class="product-price">
-                                        <span class="current-price">$${price.toFixed(2)}</span>
-                                        ${hasDiscount ? `<span class="original-price">$${product.originalPrice?.toFixed(2)}</span>` : ''}
+                                        <span class="current-price">${currentPriceFormatted}</span>
+                                        ${hasDiscount ? `<span class="original-price">${originalPriceFormatted}</span>` : ''}
+                                        <span class="currency-badge">${productCurrency}</span>
                                     </div>
                                     
                                     <div class="product-meta">

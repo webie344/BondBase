@@ -226,6 +226,16 @@
             margin-left: 5px;
         }
 
+        .product-currency {
+            display: inline-block;
+            background: var(--bg-secondary);
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 9px;
+            color: var(--text-secondary);
+            margin-left: 5px;
+        }
+
         .product-features {
             display: flex;
             flex-wrap: wrap;
@@ -491,6 +501,13 @@
         // Cache for seller data to avoid repeated fetches
         const sellerCache = new Map();
 
+        // Currency symbols mapping
+        const currencySymbols = {
+            USD: '$',
+            NGN: '₦',
+            GBP: '£'
+        };
+
         // Helper function to get image URL from various formats
         function getImageUrl(image) {
             if (!image) return 'images/default-product.jpg';
@@ -527,6 +544,13 @@
             if (userData.photo && userData.photo.url) return userData.photo.url;
             
             return 'images/default-avatar.jpg';
+        }
+
+        // Format price with the product's own currency symbol
+        function formatPrice(price, currency = 'USD') {
+            const numPrice = Number(price) || 0;
+            const symbol = currencySymbols[currency] || '$';
+            return `${symbol}${numPrice.toFixed(2)}`;
         }
 
         // Fetch seller data for a product
@@ -599,7 +623,9 @@
                         processedImages: processedImages,
                         mainImage: processedImages.length > 0 ? processedImages[0] : 'images/default-product.jpg',
                         seller: sellerData,
-                        avatarUrl: getAvatarUrl(sellerData)
+                        avatarUrl: getAvatarUrl(sellerData),
+                        // Ensure currency field exists (default to USD for backward compatibility)
+                        currency: data.currency || 'USD'
                     };
                 });
                 
@@ -613,7 +639,7 @@
                     return dateB - dateA;
                 });
 
-                console.log(`Loaded ${allProducts.length} products with seller data`);
+                console.log(`Loaded ${allProducts.length} products with seller data and currency info`);
                 cacheProducts(allProducts);
                 filterAndDisplay();
                 
@@ -753,7 +779,7 @@
             // Get product image
             const imageUrl = product.mainImage || 'images/default-product.jpg';
             
-            // Get seller avatar - use the fetched avatarUrl or fallback
+            // Get seller avatar
             const avatarUrl = product.avatarUrl || 'images/default-avatar.jpg';
             
             // Get seller name
@@ -762,6 +788,13 @@
                               product.seller?.name || 
                               product.ownerName || 
                               'Seller';
+
+            // Get product currency (default to USD for backward compatibility)
+            const productCurrency = product.currency || 'USD';
+
+            // Format prices with the product's own currency
+            const currentPriceFormatted = formatPrice(price, productCurrency);
+            const originalPriceFormatted = hasDiscount ? formatPrice(originalPrice, productCurrency) : '';
 
             return `
                 <div class="product-card" data-product-id="${product.id}">
@@ -782,8 +815,9 @@
                         <h3 class="product-name">${product.name || 'Product'}</h3>
                         
                         <div class="product-price">
-                            <span class="current-price">$${Number(price).toFixed(2)}</span>
-                            ${hasDiscount ? `<span class="original-price">$${Number(originalPrice).toFixed(2)}</span>` : ''}
+                            <span class="current-price">${currentPriceFormatted}</span>
+                            ${hasDiscount ? `<span class="original-price">${originalPriceFormatted}</span>` : ''}
+                            <span class="product-currency">${productCurrency}</span>
                         </div>
                         
                         ${product.features && product.features.length ? `

@@ -261,6 +261,17 @@
             font-size: 14px;
         }
 
+        .currency-badge {
+            display: inline-block;
+            background: var(--bg-card);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            margin-left: 10px;
+        }
+
         .stock-status {
             margin-top: 10px;
             font-size: 14px;
@@ -397,7 +408,7 @@
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
         }
 
-        /* Seller Info - FIXED to match marketplace style */
+        /* Seller Info */
         .seller-section {
             background: var(--bg-card);
             border-radius: 16px;
@@ -477,7 +488,7 @@
             color: white;
         }
 
-        /* Seller Products Preview - NEW */
+        /* Seller Products Preview */
         .seller-products-preview {
             margin-top: 20px;
         }
@@ -528,6 +539,13 @@
             overflow: hidden;
             text-overflow: ellipsis;
             text-align: center;
+        }
+
+        .preview-price {
+            font-size: 10px;
+            color: var(--primary);
+            text-align: center;
+            padding-bottom: 5px;
         }
 
         /* Related Products */
@@ -592,6 +610,12 @@
             font-size: 16px;
             font-weight: 700;
             color: var(--primary);
+        }
+
+        .related-currency {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-left: 4px;
         }
 
         /* Loading State */
@@ -810,6 +834,13 @@
         let productImages = [];
         let sellerProducts = [];
 
+        // Currency symbols mapping
+        const currencySymbols = {
+            USD: '$',
+            NGN: '₦',
+            GBP: '£'
+        };
+
         // Get product ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const productId = urlParams.get('id');
@@ -877,6 +908,13 @@
             return 'images/default-avatar.jpg';
         }
 
+        // Format price with currency symbol
+        function formatPrice(price, currency = 'USD') {
+            const numPrice = Number(price) || 0;
+            const symbol = currencySymbols[currency] || '$';
+            return `${symbol}${numPrice.toFixed(2)}`;
+        }
+
         // Load product
         async function loadProduct() {
             try {
@@ -894,6 +932,9 @@
                     id: productSnap.id,
                     ...productSnap.data()
                 };
+
+                // Ensure currency field exists (default to USD for backward compatibility)
+                currentProduct.currency = currentProduct.currency || 'USD';
 
                 console.log('Product loaded:', currentProduct);
 
@@ -974,6 +1015,7 @@
                         sellerProducts.push({
                             id: doc.id,
                             ...product,
+                            currency: product.currency || 'USD',
                             mainImage: product.images && product.images.length > 0 
                                 ? getImageUrl(product.images[0])
                                 : 'images/default-product.jpg'
@@ -1008,6 +1050,7 @@
                         currentProduct.related.push({
                             id: doc.id,
                             ...product,
+                            currency: product.currency || 'USD',
                             mainImage: product.images && product.images.length > 0 
                                 ? getImageUrl(product.images[0])
                                 : 'images/default-product.jpg'
@@ -1047,6 +1090,17 @@
         function renderProduct() {
             const hasDiscount = currentProduct.discount > 0;
             const inStock = currentProduct.stock === undefined || currentProduct.stock > 0;
+            
+            // Get product currency
+            const productCurrency = currentProduct.currency || 'USD';
+            
+            // Get prices with proper formatting
+            const currentPrice = currentProduct.salePrice || currentProduct.price || 0;
+            const originalPrice = currentProduct.originalPrice || currentProduct.price || 0;
+            
+            // Format prices with currency symbol
+            const currentPriceFormatted = formatPrice(currentPrice, productCurrency);
+            const originalPriceFormatted = formatPrice(originalPrice, productCurrency);
             
             // Get main image
             const mainImage = productImages.length > 0 ? productImages[0] : 'images/default-product.jpg';
@@ -1122,11 +1176,12 @@
                         <!-- Price Section -->
                         <div class="product-price">
                             <div class="price-row">
-                                <span class="current-price">$${(currentProduct.salePrice || currentProduct.price || 0).toFixed(2)}</span>
+                                <span class="current-price">${currentPriceFormatted}</span>
                                 ${hasDiscount ? `
-                                    <span class="original-price">$${(currentProduct.originalPrice || currentProduct.price || 0).toFixed(2)}</span>
+                                    <span class="original-price">${originalPriceFormatted}</span>
                                     <span class="discount-badge">-${currentProduct.discount}%</span>
                                 ` : ''}
+                                <span class="currency-badge">${productCurrency}</span>
                             </div>
                             <div class="stock-status">
                                 ${inStock ? `
@@ -1193,7 +1248,7 @@
                     </div>
                 </div>
 
-                <!-- Seller Information Section - FIXED to match marketplace style -->
+                <!-- Seller Information Section -->
                 <div class="seller-section">
                     <div class="seller-header">
                         <img src="${sellerAvatar}" 
@@ -1231,15 +1286,20 @@
                                 <i class="fas fa-box"></i> More from this seller
                             </div>
                             <div class="preview-grid">
-                                ${sellerProducts.slice(0, 3).map(product => `
-                                    <div class="preview-item" onclick="window.location.href='product.html?id=${product.id}'">
-                                        <img src="${product.mainImage}" 
-                                             alt="${product.name}" 
-                                             class="preview-image"
-                                             onerror="this.src='images/default-product.jpg'">
-                                        <div class="preview-name">${product.name}</div>
-                                    </div>
-                                `).join('')}
+                                ${sellerProducts.slice(0, 3).map(product => {
+                                    const productPrice = product.salePrice || product.price || 0;
+                                    const productCurrency = product.currency || 'USD';
+                                    return `
+                                        <div class="preview-item" onclick="window.location.href='product.html?id=${product.id}'">
+                                            <img src="${product.mainImage}" 
+                                                 alt="${product.name}" 
+                                                 class="preview-image"
+                                                 onerror="this.src='images/default-product.jpg'">
+                                            <div class="preview-name">${product.name}</div>
+                                            <div class="preview-price">${formatPrice(productPrice, productCurrency)}</div>
+                                        </div>
+                                    `;
+                                }).join('')}
                             </div>
                         </div>
                     ` : ''}
@@ -1256,16 +1316,20 @@
                             <i class="fas fa-link"></i> Related Products
                         </h2>
                         <div class="related-grid">
-                            ${currentProduct.related.map(product => `
-                                <div class="related-card" onclick="window.location.href='product.html?id=${product.id}'">
-                                    <img src="${product.mainImage}" alt="${product.name}" class="related-image"
-                                         onerror="this.src='images/default-product.jpg'">
-                                    <div class="related-info">
-                                        <div class="related-name">${product.name}</div>
-                                        <div class="related-price">$${(product.salePrice || product.price || 0).toFixed(2)}</div>
+                            ${currentProduct.related.map(product => {
+                                const productPrice = product.salePrice || product.price || 0;
+                                const productCurrency = product.currency || 'USD';
+                                return `
+                                    <div class="related-card" onclick="window.location.href='product.html?id=${product.id}'">
+                                        <img src="${product.mainImage}" alt="${product.name}" class="related-image"
+                                             onerror="this.src='images/default-product.jpg'">
+                                        <div class="related-info">
+                                            <div class="related-name">${product.name}</div>
+                                            <div class="related-price">${formatPrice(productPrice, productCurrency)}</div>
+                                        </div>
                                     </div>
-                                </div>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </div>
                     </div>
                 ` : ''}

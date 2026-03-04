@@ -39,7 +39,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// IMPORTANT: Replace these with your actual Cloudinary credentials
+// Cloudinary credentials
 const CLOUDINARY_CLOUD_NAME = 'ddtdqrh1b';
 const CLOUDINARY_UPLOAD_PRESET = 'profile-pictures';
 
@@ -267,7 +267,7 @@ class ProductManager {
         }
     }
 
-    // Render store information - FIXED to match store.html
+    // Render store information
     renderStoreInfo(store) {
         const storeInfoCard = document.getElementById('storeInfoCard');
         const storeLogo = document.getElementById('storeLogo');
@@ -285,7 +285,7 @@ class ProductManager {
         // Show the store info card
         storeInfoCard.style.display = 'flex';
 
-        // Set store logo - FIXED to match store.html pattern
+        // Set store logo
         if (storeLogo) {
             let logoUrl = 'images/default-store.jpg';
             
@@ -299,7 +299,7 @@ class ProductManager {
                     logoUrl = store.logo.thumbnail;
                 }
             }
-            // Check for logoThumbnail field (like in store.html)
+            // Check for logoThumbnail field
             else if (store.logoThumbnail) {
                 logoUrl = store.logoThumbnail;
             }
@@ -410,7 +410,7 @@ class ProductManager {
         }
     }
 
-    // Render products grid - FIXED to match store.html product display
+    // Render products grid with multi-currency support
     renderProductsGrid(products) {
         const productsGrid = document.getElementById('productsGrid');
         if (!productsGrid) return;
@@ -418,7 +418,7 @@ class ProductManager {
         let productsHtml = '';
 
         products.forEach(product => {
-            // Get product image - FIXED to match store.html pattern
+            // Get product image
             let productImage = 'images/default-product.jpg';
             
             if (product.images && product.images.length > 0) {
@@ -438,6 +438,17 @@ class ProductManager {
                 }
             }
 
+            // Get currency symbol
+            const currencySymbols = {
+                USD: '$',
+                NGN: '₦',
+                GBP: '£'
+            };
+            
+            const currency = product.currency || 'USD';
+            const symbol = currencySymbols[currency] || '$';
+            
+            // Get prices
             const discount = product.discount || 0;
             const price = product.salePrice || product.price || 0;
             const originalPrice = product.originalPrice || price;
@@ -454,8 +465,8 @@ class ProductManager {
                     <div class="product-info">
                         <h4 class="product-name">${product.name || 'Unnamed Product'}</h4>
                         <div class="product-price">
-                            <span class="current-price">$${price.toFixed(2)}</span>
-                            ${hasDiscount ? `<span class="original-price">$${originalPrice.toFixed(2)}</span>` : ''}
+                            <span class="current-price">${symbol}${price.toFixed(2)}</span>
+                            ${hasDiscount ? `<span class="original-price">${symbol}${originalPrice.toFixed(2)}</span>` : ''}
                         </div>
                         <div class="product-stats">
                             <span class="product-stat">
@@ -735,7 +746,7 @@ class ProductManager {
         }
     }
 
-    // Create a new product
+    // Create a new product with multi-currency support
     async createProduct(productData, images = []) {
         try {
             if (!this.currentUser) {
@@ -1011,6 +1022,17 @@ class ProductManager {
         return `${Math.floor(diffDays / 365)} years ago`;
     }
 
+    // Format price with currency symbol
+    formatPrice(price, currency = 'USD') {
+        const symbols = {
+            USD: '$',
+            NGN: '₦',
+            GBP: '£'
+        };
+        const symbol = symbols[currency] || '$';
+        return `${symbol}${parseFloat(price).toFixed(2)}`;
+    }
+
     // Cache management
     saveToCache(key, data) {
         try {
@@ -1077,16 +1099,6 @@ class ProductManager {
             console.log('Cache clear error:', error);
         }
     }
-
-    // Format price
-    formatPrice(price) {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(price);
-    }
 }
 
 // Export for use in other files
@@ -1095,4 +1107,4 @@ export const productManager = new ProductManager();
 // Make productManager available globally
 window.productManager = productManager;
 
-console.log('✅ products.js loaded successfully - Fixed logo display to match store.html');
+console.log('✅ products.js loaded successfully - Added multi-currency support');
