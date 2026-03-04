@@ -1,11 +1,14 @@
-<!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resources - BondBase</title>
     
-    <!-- Remove Google Fonts - using system fonts instead -->
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Feather Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
@@ -39,23 +42,9 @@
         }
 
         body {
-            /* Apple's system font stack */
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            font-size: 17px; /* Apple's body text size */
-            font-weight: 400;
-            line-height: 1.47059; /* Apple's typical line-height */
-            letter-spacing: -0.022em; /* Apple's slight negative tracking */
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            font-family: 'Inter', sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
-        }
-
-        /* Responsive font adjustment */
-        @media (max-width: 768px) {
-            body {
-                font-size: 16px; /* Slightly smaller on mobile if needed */
-            }
         }
 
         /* Add to your CSS file */
@@ -70,7 +59,7 @@
 
         .post-video {
             width: 100%;
-            max-height: 700px!important;
+            max-height: 500px;
             object-fit: contain;
             background: #000;
         }
@@ -81,8 +70,8 @@
             align-items: center !important;
             flex-wrap: nowrap !important;
             gap: 5px !important;
-            padding:12px 0 !important;
-            margin:12px 0 0 0 !important;
+            padding: 12px 0 !important;
+            margin: 12px 0 0 0 !important;
             border-top: 1px solid var(--border-light) !important;
             border-bottom: none !important;
             width: 100% !important;
@@ -210,7 +199,9 @@
             transition: box-shadow 0.3s ease;
         }
 
-        
+        .post-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
 
         /* Post Header */
         .post-header {
@@ -550,7 +541,7 @@
         .time-display {
             font-size: 14px;
             color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+            font-family: monospace;
             min-width: 90px;
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
@@ -611,7 +602,6 @@
             font-size: 14px;
             outline: none;
             transition: var(--transition);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         .comment-input:focus {
@@ -632,7 +622,6 @@
             display: flex;
             align-items: center;
             gap: 4px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         .send-comment-btn:hover {
@@ -856,9 +845,6 @@
             max-width: 600px;
             width: 100%;
             background: var(--bg-primary);
-            min-height: calc(100vh - 60px);
-            display: flex;
-            flex-direction: column;
         }
 
         /* Header */
@@ -869,6 +855,9 @@
             background: var(--bg-primary);
             padding: 1.5rem 1.25rem 1rem;
             border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
 
         .header-content {
@@ -878,9 +867,8 @@
         }
 
         .page-title {
-            font-size: 34px; /* Apple's H1 size */
-            font-weight: 700;
-            letter-spacing: -0.022em;
+            font-size: 1.5rem;
+            font-weight: 800;
             color: var(--text-primary);
             display: flex;
             align-items: center;
@@ -889,15 +877,21 @@
 
         .page-title .feather {
             color: var(--primary-light);
-            width: 32px;
-            height: 32px;
+            width: 24px;
+            height: 24px;
+        }
+
+        .page-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            line-height: 1.4;
         }
 
         /* Create Post Button */
         .create-post-container {
             display: flex;
             justify-content: flex-start;
-            margin-top: 1rem;
         }
 
         .create-post-btn {
@@ -909,14 +903,12 @@
             padding: 0.875rem 1.75rem;
             border-radius: 50px;
             text-decoration: none;
-            font-weight: 600;
-            font-size: 15px; /* Apple's button text size */
+            font-weight: 700;
+            font-size: 0.875rem;
             transition: var(--transition);
             box-shadow: 0 2px 8px rgba(182, 0, 75, 0.3);
             border: none;
             cursor: pointer;
-            letter-spacing: -0.022em;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         .create-post-btn:hover {
@@ -926,8 +918,8 @@
         }
 
         .create-post-btn .feather {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             stroke: currentColor;
         }
 
@@ -962,9 +954,8 @@
         .user-posts-info h2 {
             margin: 0;
             color: var(--text-primary);
-            font-size: 28px; /* Apple's H2 size */
-            font-weight: 600;
-            letter-spacing: -0.022em;
+            font-size: 1.25rem;
+            font-weight: 700;
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -973,15 +964,8 @@
         .user-posts-info p {
             margin: 0.375rem 0 0 0;
             color: var(--text-secondary);
-            font-size: 15px; /* Apple's secondary text */
+            font-size: 0.875rem;
             font-weight: 400;
-            line-height: 1.47059;
-        }
-
-        /* Posts Feed - Takes available space */
-        .posts-feed {
-            flex: 1 0 auto;
-            padding: 1rem 1.25rem;
         }
 
         /* Loading States */
@@ -989,8 +973,9 @@
             text-align: center;
             padding: 3rem 1.25rem;
             color: var(--text-light);
-            font-size: 17px; /* Apple's body text */
+            font-size: 15px;
             background: var(--bg-primary);
+            border-bottom: 1px solid var(--border);
         }
 
         .loading .feather {
@@ -1042,13 +1027,10 @@
             width: 60%;
         }
 
-        /* Load More Button Container - Fixed at bottom */
+        /* Load More Button */
         .load-more-container {
             text-align: center;
             padding: 2rem 1.25rem;
-            background: var(--bg-primary);
-            flex-shrink: 0;
-            margin-top: auto;
             border-top: 1px solid var(--border);
         }
 
@@ -1058,15 +1040,14 @@
             border: none;
             padding: 0.875rem 2rem;
             border-radius: 50px;
-            font-size: 15px; /* Apple's button text */
+            font-size: 0.875rem;
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            letter-spacing: -0.022em;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            
         }
 
         .load-more-btn:hover:not(:disabled) {
@@ -1114,9 +1095,8 @@
         }
 
         .logo {
-            font-size: 24px; /* Apple-style logo size */
-            font-weight: 700;
-            letter-spacing: -0.022em;
+            font-size: 1.5rem;
+            font-weight: 800;
             color: var(--primary-light);
             text-decoration: none;
             display: flex;
@@ -1145,7 +1125,7 @@
             align-items: center;
             text-decoration: none;
             color: var(--text-secondary);
-            font-size: 12px; /* Apple's small text */
+            font-size: 0.75rem;
             font-weight: 500;
             gap: 0.25rem;
             padding: 0.75rem;
@@ -1165,8 +1145,8 @@
         }
 
         .nav-links .feather {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             stroke: currentColor;
             margin-bottom: 2px;
         }
@@ -1187,7 +1167,7 @@
             border-radius: 50%;
             width: 18px;
             height: 18px;
-            font-size: 11px; /* Apple's small text */
+            font-size: 0.7rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1200,7 +1180,7 @@
             border-radius: 50%;
             width: 16px;
             height: 16px;
-            font-size: 11px; /* Apple's small text */
+            font-size: 0.65rem;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -1283,21 +1263,9 @@
                 width: 40px;
                 height: 40px;
             }
-            
-            .page-title {
-                font-size: 28px; /* Slightly smaller H1 on mobile */
-            }
-            
-            .user-posts-info h2 {
-                font-size: 24px; /* Slightly smaller H2 on mobile */
-            }
         }
 
         @media (max-width: 480px) {
-            body {
-                font-size: 16px; /* Apple uses 16px on smaller screens */
-            }
-            
             .post-actions {
                 gap: 2px !important;
                 padding: 10px 0 !important;
@@ -1336,12 +1304,12 @@
             }
 
             .page-title {
-                font-size: 28px;
+                font-size: 1.25rem;
             }
 
             .create-post-btn {
                 padding: 0.75rem 1.5rem;
-                font-size: 15px;
+                font-size: 0.813rem;
             }
         }
     </style>
@@ -1422,6 +1390,7 @@
                         </svg>
                         Resources
                     </h1>
+                    <p class="page-subtitle">Discover  content, tutorials, and learning resources from experts</p>
                 </div>
                 <!-- Create Post Button -->
                 <div class="create-post-container">
@@ -1481,7 +1450,7 @@
                 </div>
             </div>
             
-            <!-- Load More Posts Button - Fixed at bottom -->
+            <!-- Load More Posts Button -->
             <div class="load-more-container">
                 <button id="loadMorePosts" class="load-more-btn">
                     <i class="fas fa-plus"></i> Load More Posts
@@ -1503,7 +1472,9 @@
             if (typeof feather !== 'undefined') {
                 feather.replace();
             }
+
         });
+        
 
         // Helper function for your JavaScript
         window.clearLoadingStates = function() {
