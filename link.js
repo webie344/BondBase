@@ -7,7 +7,7 @@ const SITE_INFO = {
     domain: 'bond-base.vercel.app',
     title: 'Bond Base - Anonymous Gaming & Anime Chat App',
     description: 'Anonymous gaming and anime fans chat app dedicated to bringing anime lovers and gamers together in a friendly arena. Connect with like-minded fans anonymously!',
-    image: '/Bondbase.png',
+    image: '/Bondbases.png',
     imageAlt: 'Bond Base - Gaming & Anime Community',
     themeColor: '#4a8cff'
 };
