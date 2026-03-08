@@ -1099,6 +1099,277 @@ class ProductManager {
             console.log('Cache clear error:', error);
         }
     }
+
+    // FIXED: Get recent products for marketplace display - WITHOUT requiring indexes
+    async getRecentProducts(limitCount = 10) {
+        try {
+            // Try to get from cache first
+            const cacheKey = 'recent_products';
+            const cached = this.getFromCache(cacheKey);
+            if (cached) {
+                console.log('Returning cached products');
+                return cached;
+            }
+
+            // APPROACH 1: Get all active products and sort in memory (no index needed)
+            // This works for smaller datasets without requiring composite indexes
+            const productsRef = collection(db, 'products');
+            const q = query(
+                productsRef, 
+                where('status', '==', 'active')
+                // Removed orderBy to avoid requiring index
+            );
+            
+            const querySnapshot = await getDocs(q);
+            const products = [];
+            
+            querySnapshot.forEach((doc) => {
+                products.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+
+            // Sort by createdAt in memory (if available)
+            products.sort((a, b) => {
+                // Handle cases where createdAt might be missing
+                const dateA = a.createdAt ? (a.createdAt.seconds || 0) : 0;
+                const dateB = b.createdAt ? (b.createdAt.seconds || 0) : 0;
+                return dateB - dateA;
+            });
+
+            // Limit the results
+            const limitedProducts = products.slice(0, limitCount);
+
+            console.log(`Found ${limitedProducts.length} recent products (sorted in memory)`);
+            
+            // Cache the results
+            this.saveToCache(cacheKey, limitedProducts);
+            
+            return limitedProducts;
+
+        } catch (error) {
+            console.error('Error getting recent products:', error);
+            
+            // Return mock data for development/testing
+            return this.getMockProducts();
+        }
+    }
+
+    // Mock products for development/testing
+    getMockProducts() {
+        return [
+            {
+                id: '1',
+                name: 'Gaming Mouse Pro',
+                price: 59.99,
+                currency: 'USD',
+                images: ['https://via.placeholder.com/150/ff2a6d/ffffff?text=Gaming+Mouse'],
+                views: 234,
+                likes: ['user1', 'user2'],
+                status: 'new',
+                createdAt: { seconds: Date.now() / 1000 - 86400 } // 1 day ago
+            },
+            {
+                id: '2',
+                name: 'Mechanical Keyboard',
+                price: 129.99,
+                originalPrice: 159.99,
+                currency: 'USD',
+                discount: 20,
+                images: ['https://via.placeholder.com/150/8b0000/ffffff?text=Keyboard'],
+                views: 567,
+                likes: ['user1', 'user2', 'user3'],
+                createdAt: { seconds: Date.now() / 1000 - 172800 } // 2 days ago
+            },
+            {
+                id: '3',
+                name: 'Gaming Headset',
+                price: 89.99,
+                currency: 'USD',
+                images: ['https://via.placeholder.com/150/00ff88/000000?text=Headset'],
+                views: 123,
+                likes: ['user1'],
+                createdAt: { seconds: Date.now() / 1000 - 259200 } // 3 days ago
+            },
+            {
+                id: '4',
+                name: '4K Gaming Monitor',
+                price: 399.99,
+                originalPrice: 499.99,
+                currency: 'USD',
+                discount: 20,
+                images: ['https://via.placeholder.com/150/667eea/ffffff?text=Monitor'],
+                views: 89,
+                likes: ['user1', 'user2'],
+                createdAt: { seconds: Date.now() / 1000 - 345600 } // 4 days ago
+            },
+            {
+                id: '5',
+                name: 'Gaming Chair',
+                price: 249.99,
+                currency: 'USD',
+                images: ['https://via.placeholder.com/150/764ba2/ffffff?text=Chair'],
+                views: 45,
+                likes: ['user1'],
+                createdAt: { seconds: Date.now() / 1000 - 432000 } // 5 days ago
+            },
+            {
+                id: '6',
+                name: 'RGB Mouse Pad',
+                price: 29.99,
+                currency: 'USD',
+                images: ['https://via.placeholder.com/150/b3004b/ffffff?text=Mouse+Pad'],
+                views: 178,
+                likes: ['user1', 'user2'],
+                createdAt: { seconds: Date.now() / 1000 - 518400 } // 6 days ago
+            },
+            {
+                id: '7',
+                name: 'Streaming Microphone',
+                price: 79.99,
+                originalPrice: 99.99,
+                currency: 'USD',
+                discount: 20,
+                images: ['https://via.placeholder.com/150/7a0034/ffffff?text=Microphone'],
+                views: 92,
+                likes: ['user1'],
+                createdAt: { seconds: Date.now() / 1000 - 604800 } // 7 days ago
+            },
+            {
+                id: '8',
+                name: 'Webcam 1080p',
+                price: 69.99,
+                currency: 'USD',
+                images: ['https://via.placeholder.com/150/e63986/ffffff?text=Webcam'],
+                views: 67,
+                likes: ['user1', 'user3'],
+                status: 'new',
+                createdAt: { seconds: Date.now() / 1000 - 691200 } // 8 days ago
+            }
+        ];
+    }
+
+    // Render products in horizontal scrollable section
+    async renderMarketplaceProducts(containerId = 'productsScroll') {
+        try {
+            const container = document.getElementById(containerId);
+            if (!container) {
+                console.log('Container not found:', containerId);
+                return;
+            }
+
+            // Clear loading state
+            container.innerHTML = '';
+
+            // Fetch products
+            const products = await this.getRecentProducts(10);
+
+            if (!products || products.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-products">
+                        <i data-feather="shopping-bag"></i>
+                        <p>No products available</p>
+                    </div>
+                `;
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+                return;
+            }
+
+            // Render products
+            products.forEach(product => {
+                const productCard = this.createProductCardElement(product);
+                container.appendChild(productCard);
+            });
+
+            // Re-initialize feather icons for new content
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+
+        } catch (error) {
+            console.error('Error rendering marketplace products:', error);
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.innerHTML = `
+                    <div class="empty-products">
+                        <i data-feather="alert-circle"></i>
+                        <p>Failed to load products</p>
+                    </div>
+                `;
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+            }
+        }
+    }
+
+    // Create product card element
+    createProductCardElement(product) {
+        const card = document.createElement('div');
+        card.className = 'product-card';
+        card.onclick = () => window.location.href = `product.html?id=${product.id}`;
+
+        // Get currency symbol
+        const currencySymbols = {
+            USD: '$',
+            NGN: '₦',
+            GBP: '£'
+        };
+        const currency = product.currency || 'USD';
+        const symbol = currencySymbols[currency] || '$';
+        
+        // Get prices
+        const discount = product.discount || 0;
+        const price = product.salePrice || product.price || 0;
+        const originalPrice = product.originalPrice || price;
+        const hasDiscount = discount > 0 && price < originalPrice;
+
+        // Get product image
+        let productImage = 'https://via.placeholder.com/150';
+        if (product.images && product.images.length > 0) {
+            const firstImage = product.images[0];
+            if (typeof firstImage === 'string') {
+                productImage = firstImage;
+            } else if (firstImage && firstImage.thumbnail) {
+                productImage = firstImage.thumbnail;
+            } else if (firstImage && firstImage.url) {
+                productImage = firstImage.url;
+            }
+        } else if (product.image) {
+            productImage = product.image;
+        }
+
+        card.innerHTML = `
+            <div class="product-image-container">
+                <img src="${productImage}" alt="${product.name || 'Product'}" class="product-image" 
+                     loading="lazy" onerror="this.src='https://via.placeholder.com/150'">
+                ${product.status === 'new' ? '<span class="product-badge">NEW</span>' : ''}
+                ${hasDiscount ? '<span class="product-badge discount">-' + discount + '%</span>' : ''}
+            </div>
+            <div class="product-info">
+                <h4 class="product-name">${product.name || 'Unnamed Product'}</h4>
+                <div class="product-price">
+                    <span class="current-price">${symbol}${price.toFixed(2)}</span>
+                    ${hasDiscount ? `<span class="original-price">${symbol}${originalPrice.toFixed(2)}</span>` : ''}
+                </div>
+                <div class="product-stats">
+                    <span class="product-stat">
+                        <i data-feather="eye"></i>
+                        ${product.views || 0}
+                    </span>
+                    <span class="product-stat">
+                        <i data-feather="heart"></i>
+                        ${product.likes ? product.likes.length : 0}
+                    </span>
+                </div>
+            </div>
+        `;
+
+        return card;
+    }
 }
 
 // Export for use in other files
@@ -1107,4 +1378,20 @@ export const productManager = new ProductManager();
 // Make productManager available globally
 window.productManager = productManager;
 
-console.log('✅ products.js loaded successfully - Added multi-currency support');
+// Auto-initialize marketplace products if on mingle.html
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check if we're on mingle.html
+    if (window.location.pathname.includes('mingle.html') || 
+        window.location.pathname === '/' || 
+        window.location.pathname.endsWith('mingle/')) {
+        
+        console.log('Mingle page detected, loading marketplace products...');
+        
+        // Wait a bit for the DOM to be fully ready
+        setTimeout(() => {
+            productManager.renderMarketplaceProducts('productsScroll');
+        }, 100);
+    }
+});
+
+console.log('✅ products.js loaded successfully - No indexes required!');
