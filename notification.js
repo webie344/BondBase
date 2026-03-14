@@ -22,7 +22,8 @@ import {
     serverTimestamp,
     writeBatch,
     increment,
-    arrayUnion
+    arrayUnion,
+    arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -52,6 +53,8 @@ let notificationShown = false;
 let currentCommentPostId = null;
 let currentCommentId = null;
 let currentReplyToUserId = null;
+let processedLikes = new Set(); // Track processed likes to prevent duplicates
+let processedComments = new Set(); // Track processed comments to prevent duplicates
 
 // ==================== NOTIFICATION SOUNDS SYSTEM ====================
 
@@ -312,6 +315,7 @@ function initNotificationSystem() {
         if (user) {
             currentUser = user;
             loadViewedPosts();
+            loadProcessedItems();
             
             setupNotificationListener();
             setupNotificationCreators();
@@ -344,6 +348,41 @@ function initNotificationSystem() {
             }
         }
     });
+}
+
+// Load processed items from localStorage
+function loadProcessedItems() {
+    if (!currentUser) return;
+    
+    try {
+        const storedLikes = localStorage.getItem(`processedLikes_${currentUser.uid}`);
+        if (storedLikes) {
+            processedLikes = new Set(JSON.parse(storedLikes));
+        }
+        
+        const storedComments = localStorage.getItem(`processedComments_${currentUser.uid}`);
+        if (storedComments) {
+            processedComments = new Set(JSON.parse(storedComments));
+        }
+    } catch (error) {
+        console.error('Error loading processed items:', error);
+    }
+}
+
+// Save processed items to localStorage
+function saveProcessedItems() {
+    if (!currentUser) return;
+    
+    try {
+        // Keep only last 100 items to prevent localStorage from getting too big
+        const limitedLikes = Array.from(processedLikes).slice(-100);
+        const limitedComments = Array.from(processedComments).slice(-100);
+        
+        localStorage.setItem(`processedLikes_${currentUser.uid}`, JSON.stringify(limitedLikes));
+        localStorage.setItem(`processedComments_${currentUser.uid}`, JSON.stringify(limitedComments));
+    } catch (error) {
+        console.error('Error saving processed items:', error);
+    }
 }
 
 // ==================== COMMENT REPLY FUNCTIONALITY ====================
@@ -770,9 +809,18 @@ async function createCommentReplyNotification(postId, commentId, targetUserId, r
 // ==================== LIKE NOTIFICATION FUNCTIONS ====================
 
 // Create notification for post like
-async function createLikeNotification(postId, postOwnerId, likerId) {
+async function createLikeNotification(postId, postOwnerId, likerId, likeId) {
     try {
-        // Check if notification already exists (prevent duplicates for same like)
+        // Create a unique key for this like
+        const likeKey = `${postId}_${likerId}`;
+        
+        // Check if we've already processed this like
+        if (processedLikes.has(likeKey)) {
+            console.log('Like already processed, skipping notification');
+            return;
+        }
+        
+        // Check if notification already exists in Firestore
         const existingQuery = query(
             collection(db, 'notifications'),
             where('userId', '==', postOwnerId),
@@ -783,7 +831,10 @@ async function createLikeNotification(postId, postOwnerId, likerId) {
         
         const existingSnap = await getDocs(existingQuery);
         if (!existingSnap.empty) {
-            return; // Notification already exists
+            // Mark as processed even if it exists in Firestore
+            processedLikes.add(likeKey);
+            saveProcessedItems();
+            return;
         }
         
         // Get liker data
@@ -798,9 +849,17 @@ async function createLikeNotification(postId, postOwnerId, likerId) {
         const postRef = doc(db, 'posts', postId);
         const postSnap = await getDoc(postRef);
         let postPreview = '';
+        let postOwnerName = '';
         
         if (postSnap.exists()) {
             const postData = postSnap.data();
+            
+            // Verify this post actually belongs to postOwnerId
+            if (postData.userId !== postOwnerId) {
+                console.log('Post owner mismatch, skipping notification');
+                return;
+            }
+            
             if (postData.caption) {
                 postPreview = postData.caption.length > 30 ? 
                     postData.caption.substring(0, 30) + '...' : 
@@ -812,8 +871,16 @@ async function createLikeNotification(postId, postOwnerId, likerId) {
             } else if (postData.mediaType === 'poll') {
                 postPreview = 'a poll';
             }
+            
+            // Get post owner name
+            const ownerRef = doc(db, 'users', postOwnerId);
+            const ownerSnap = await getDoc(ownerRef);
+            if (ownerSnap.exists()) {
+                postOwnerName = ownerSnap.data().name || 'Someone';
+            }
         }
         
+        // Create the notification
         await addDoc(collection(db, 'notifications'), {
             type: 'like',
             title: 'New Like on Your Post',
@@ -826,18 +893,36 @@ async function createLikeNotification(postId, postOwnerId, likerId) {
             postPreview: postPreview,
             userId: postOwnerId,
             timestamp: serverTimestamp(),
-            read: false
+            read: false,
+            likeId: likeId || null
         });
+        
+        // Mark as processed
+        processedLikes.add(likeKey);
+        saveProcessedItems();
+        
+        console.log('Like notification created successfully');
         
     } catch (error) {
         console.error('Error creating like notification:', error);
     }
 }
 
+// ==================== COMMENT NOTIFICATION FUNCTIONS ====================
+
 // Create notification for comment on post
 async function createCommentNotification(postId, postOwnerId, commenterId, commentText, commentId) {
     try {
-        // Check if notification already exists (prevent duplicates)
+        // Create a unique key for this comment
+        const commentKey = `${postId}_${commentId}`;
+        
+        // Check if we've already processed this comment
+        if (processedComments.has(commentKey)) {
+            console.log('Comment already processed, skipping notification');
+            return;
+        }
+        
+        // Check if notification already exists in Firestore
         const existingQuery = query(
             collection(db, 'notifications'),
             where('userId', '==', postOwnerId),
@@ -848,7 +933,10 @@ async function createCommentNotification(postId, postOwnerId, commenterId, comme
         
         const existingSnap = await getDocs(existingQuery);
         if (!existingSnap.empty) {
-            return; // Notification already exists
+            // Mark as processed even if it exists in Firestore
+            processedComments.add(commentKey);
+            saveProcessedItems();
+            return;
         }
         
         // Get commenter data
@@ -866,6 +954,13 @@ async function createCommentNotification(postId, postOwnerId, commenterId, comme
         
         if (postSnap.exists()) {
             const postData = postSnap.data();
+            
+            // Verify this post actually belongs to postOwnerId
+            if (postData.userId !== postOwnerId) {
+                console.log('Post owner mismatch, skipping notification');
+                return;
+            }
+            
             if (postData.caption) {
                 postPreview = postData.caption.length > 30 ? 
                     postData.caption.substring(0, 30) + '...' : 
@@ -896,6 +991,12 @@ async function createCommentNotification(postId, postOwnerId, commenterId, comme
             actionable: true, // This notification can be acted upon (reply)
             actionType: 'reply_to_comment'
         });
+        
+        // Mark as processed
+        processedComments.add(commentKey);
+        saveProcessedItems();
+        
+        console.log('Comment notification created successfully');
         
     } catch (error) {
         console.error('Error creating comment notification:', error);
@@ -1113,7 +1214,7 @@ function addNotificationActionListeners() {
     });
 }
 
-// Load notifications for dropdown (modified to include reply buttons context)
+// Load notifications for dropdown
 async function loadDropdownNotifications() {
     if (!currentUser) return;
     
@@ -1123,7 +1224,8 @@ async function loadDropdownNotifications() {
     try {
         const notificationsQuery = query(
             collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid)
+            where('userId', '==', currentUser.uid),
+            orderBy('timestamp', 'desc')
         );
         
         const notificationsSnap = await getDocs(notificationsQuery);
@@ -1138,16 +1240,12 @@ async function loadDropdownNotifications() {
             return;
         }
         
-        // Sort by timestamp
-        const sortedNotifications = notificationsSnap.docs.sort((a, b) => {
-            const timeA = a.data().timestamp?.toDate?.() || new Date(0);
-            const timeB = b.data().timestamp?.toDate?.() || new Date(0);
-            return timeB - timeA;
-        }).slice(0, 10); // Show only 10 most recent
+        // Show only 10 most recent
+        const recentNotifications = notificationsSnap.docs.slice(0, 10);
         
         let html = '';
         
-        sortedNotifications.forEach(doc => {
+        recentNotifications.forEach(doc => {
             const notification = doc.data();
             const timeAgo = formatTime(notification.timestamp);
             const iconClass = getNotificationIcon(notification.type);
@@ -1243,9 +1341,9 @@ async function loadDropdownNotifications() {
     }
 }
 
-// ==================== EXISTING NOTIFICATION CREATOR FUNCTIONS ====================
+// ==================== NOTIFICATION CREATOR FUNCTIONS ====================
 
-// Setup notification creators (modified to include likes and comments)
+// Setup notification creators
 function setupNotificationCreators() {
     if (!currentUser) return;
 
@@ -1253,23 +1351,23 @@ function setupNotificationCreators() {
     checkIntervals.forEach(interval => clearInterval(interval));
     checkIntervals = [];
 
+    // Check for new likes every 10 seconds (more frequent)
+    const likeInterval = setInterval(() => {
+        checkForNewLikes();
+    }, 10000);
+    checkIntervals.push(likeInterval);
+
+    // Check for new comments every 10 seconds (more frequent)
+    const commentInterval = setInterval(() => {
+        checkForNewComments();
+    }, 10000);
+    checkIntervals.push(commentInterval);
+
     // Check for new messages every 30 seconds
     const messageInterval = setInterval(() => {
         checkForNewMessages();
     }, 30000);
     checkIntervals.push(messageInterval);
-
-    // Check for new likes every 15 seconds (more frequent)
-    const likeInterval = setInterval(() => {
-        checkForNewLikes();
-    }, 15000);
-    checkIntervals.push(likeInterval);
-
-    // Check for new comments every 15 seconds (more frequent)
-    const commentInterval = setInterval(() => {
-        checkForNewComments();
-    }, 15000);
-    checkIntervals.push(commentInterval);
 
     // Check for new posts every 30 seconds
     const postInterval = setInterval(() => {
@@ -1284,18 +1382,22 @@ function setupNotificationCreators() {
     checkIntervals.push(groupInterval);
 
     // Initial checks
-    checkForNewMessages();
-    checkForNewLikes();
-    checkForNewComments();
-    checkForNewPosts();
-    checkForGroupNotifications();
+    setTimeout(() => {
+        checkForNewLikes();
+        checkForNewComments();
+        checkForNewMessages();
+        checkForNewPosts();
+        checkForGroupNotifications();
+    }, 2000);
 }
 
-// Check for new likes (modified to use the new notification function)
+// Check for new likes (fixed version)
 async function checkForNewLikes() {
     if (!currentUser) return;
 
     try {
+        console.log('Checking for new likes...');
+        
         // Get all posts by current user
         const postsQuery = query(
             collection(db, 'posts'),
@@ -1304,42 +1406,70 @@ async function checkForNewLikes() {
         
         const postsSnap = await getDocs(postsQuery);
         
+        if (postsSnap.empty) {
+            console.log('No posts found for current user');
+            return;
+        }
+        
         for (const postDoc of postsSnap.docs) {
             const postId = postDoc.id;
             const postData = postDoc.data();
             
-            // Check if post has likes
-            if (postData.likes && postData.likes > 0) {
-                // We need to track which users have liked the post
-                // This requires storing likers in the post document or a subcollection
-                // For now, we'll assume likes are stored in a separate collection
+            console.log(`Checking likes for post: ${postId}`);
+            
+            // Check if post has a likes subcollection
+            const likesRef = collection(db, 'posts', postId, 'likes');
+            const likesSnap = await getDocs(likesRef);
+            
+            if (likesSnap.empty) {
+                console.log(`No likes found for post: ${postId}`);
+                continue;
+            }
+            
+            console.log(`Found ${likesSnap.size} likes for post: ${postId}`);
+            
+            for (const likeDoc of likesSnap.docs) {
+                const likeData = likeDoc.data();
+                const likerId = likeData.userId;
+                const likeId = likeDoc.id;
+                const likeTimestamp = likeData.timestamp?.toDate?.() || new Date();
                 
-                // Get likes for this post
-                const likesRef = collection(db, 'posts', postId, 'likes');
-                const likesSnap = await getDocs(likesRef);
+                // Skip if liked by current user
+                if (likerId === currentUser.uid) {
+                    console.log('Skipping self-like');
+                    continue;
+                }
                 
-                for (const likeDoc of likesSnap.docs) {
-                    const likeData = likeDoc.data();
-                    const likerId = likeData.userId;
+                // Create unique key for this like
+                const likeKey = `${postId}_${likerId}`;
+                
+                // Check if we've already processed this like
+                if (processedLikes.has(likeKey)) {
+                    console.log(`Like already processed: ${likeKey}`);
+                    continue;
+                }
+                
+                // Check if notification already exists in Firestore
+                const existingQuery = query(
+                    collection(db, 'notifications'),
+                    where('userId', '==', currentUser.uid),
+                    where('type', '==', 'like'),
+                    where('relatedId', '==', postId),
+                    where('senderId', '==', likerId)
+                );
+                
+                const existingSnap = await getDocs(existingQuery);
+                
+                if (existingSnap.empty) {
+                    console.log(`Creating like notification for post: ${postId} from user: ${likerId}`);
                     
-                    // Skip if liked by current user
-                    if (likerId === currentUser.uid) continue;
-                    
-                    // Check if notification already exists
-                    const existingQuery = query(
-                        collection(db, 'notifications'),
-                        where('userId', '==', currentUser.uid),
-                        where('type', '==', 'like'),
-                        where('relatedId', '==', postId),
-                        where('senderId', '==', likerId)
-                    );
-                    
-                    const existingSnap = await getDocs(existingQuery);
-                    
-                    if (existingSnap.empty) {
-                        // Create like notification
-                        await createLikeNotification(postId, currentUser.uid, likerId);
-                    }
+                    // Create like notification
+                    await createLikeNotification(postId, currentUser.uid, likerId, likeId);
+                } else {
+                    // Mark as processed if it exists in Firestore
+                    console.log(`Like notification already exists in Firestore for: ${likeKey}`);
+                    processedLikes.add(likeKey);
+                    saveProcessedItems();
                 }
             }
         }
@@ -1353,6 +1483,8 @@ async function checkForNewComments() {
     if (!currentUser) return;
 
     try {
+        console.log('Checking for new comments...');
+        
         // Get all posts by current user
         const postsQuery = query(
             collection(db, 'posts'),
@@ -1361,8 +1493,15 @@ async function checkForNewComments() {
         
         const postsSnap = await getDocs(postsQuery);
         
+        if (postsSnap.empty) {
+            console.log('No posts found for current user');
+            return;
+        }
+        
         for (const postDoc of postsSnap.docs) {
             const postId = postDoc.id;
+            
+            console.log(`Checking comments for post: ${postId}`);
             
             // Get comments for this post
             const commentsQuery = query(
@@ -1372,33 +1511,60 @@ async function checkForNewComments() {
             
             const commentsSnap = await getDocs(commentsQuery);
             
+            if (commentsSnap.empty) {
+                console.log(`No comments found for post: ${postId}`);
+                continue;
+            }
+            
+            console.log(`Found ${commentsSnap.size} comments for post: ${postId}`);
+            
             for (const commentDoc of commentsSnap.docs) {
                 const commentData = commentDoc.data();
                 const commenterId = commentData.userId;
+                const commentId = commentDoc.id;
                 
                 // Skip if commented by current user
-                if (commenterId === currentUser.uid) continue;
+                if (commenterId === currentUser.uid) {
+                    console.log('Skipping self-comment');
+                    continue;
+                }
                 
-                // Check if notification already exists
+                // Create unique key for this comment
+                const commentKey = `${postId}_${commentId}`;
+                
+                // Check if we've already processed this comment
+                if (processedComments.has(commentKey)) {
+                    console.log(`Comment already processed: ${commentKey}`);
+                    continue;
+                }
+                
+                // Check if notification already exists in Firestore
                 const existingQuery = query(
                     collection(db, 'notifications'),
                     where('userId', '==', currentUser.uid),
                     where('type', '==', 'comment'),
-                    where('relatedId', '==', commentDoc.id),
+                    where('relatedId', '==', commentId),
                     where('senderId', '==', commenterId)
                 );
                 
                 const existingSnap = await getDocs(existingQuery);
                 
                 if (existingSnap.empty) {
+                    console.log(`Creating comment notification for post: ${postId} from user: ${commenterId}`);
+                    
                     // Create comment notification
                     await createCommentNotification(
                         postId, 
                         currentUser.uid, 
                         commenterId, 
                         commentData.text, 
-                        commentDoc.id
+                        commentId
                     );
+                } else {
+                    // Mark as processed if it exists in Firestore
+                    console.log(`Comment notification already exists in Firestore for: ${commentKey}`);
+                    processedComments.add(commentKey);
+                    saveProcessedItems();
                 }
             }
         }
@@ -1409,6 +1575,10 @@ async function checkForNewComments() {
 
 // Helper function to show custom notification
 function showCustomNotification(message, type = 'info') {
+    // Remove existing notifications
+    const existing = document.querySelector('.custom-notification');
+    if (existing) existing.remove();
+    
     const notification = document.createElement('div');
     notification.className = `custom-notification ${type}`;
     notification.innerHTML = `
@@ -2349,19 +2519,13 @@ async function loadNotificationsForPage() {
     try {
         const notificationsQuery = query(
             collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid)
+            where('userId', '==', currentUser.uid),
+            orderBy('timestamp', 'desc')
         );
 
         const notificationsSnap = await getDocs(notificationsQuery);
         
-        // Sort by timestamp in memory (no index needed)
-        const sortedNotifications = notificationsSnap.docs.sort((a, b) => {
-            const timeA = a.data().timestamp?.toDate?.() || new Date(0);
-            const timeB = b.data().timestamp?.toDate?.() || new Date(0);
-            return timeB - timeA; // Descending order
-        });
-        
-        displayNotifications(sortedNotifications);
+        displayNotifications(notificationsSnap.docs);
     } catch (error) {
         console.error('Error loading notifications:', error);
         const notificationsList = document.getElementById('notificationsList');
@@ -3000,16 +3164,34 @@ window.NotificationSystem = {
             console.error('Error creating group notification:', error);
         }
     },
+    // Like notification functions
     createLikeNotification: createLikeNotification,
+    checkForNewLikes: checkForNewLikes,
+    
+    // Comment notification functions
     createCommentNotification: createCommentNotification,
     createCommentReplyNotification: createCommentReplyNotification,
+    checkForNewComments: checkForNewComments,
+    
+    // Reply modal functions
     openReplyModal: openReplyModal,
     closeReplyModal: closeReplyModal,
+    
+    // Dropdown functions
     showDropdown: toggleDropdownNotifications,
     markAllRead: markAllNotificationsAsRead,
+    
     // Sound control methods
     soundManager: soundManager,
     toggleSounds: () => soundManager.toggleSounds(),
     setSoundVolume: (volume) => soundManager.setVolume(volume),
-    testSound: () => soundManager.playSoftBell()
+    testSound: () => soundManager.playSoftBell(),
+    
+    // Force check for new notifications
+    forceCheckLikes: () => {
+        if (currentUser) {
+            checkForNewLikes();
+            checkForNewComments();
+        }
+    }
 };
