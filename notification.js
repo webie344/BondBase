@@ -1,4 +1,4 @@
-// notification.js - Complete file with nice notification sounds
+// notification.js - Complete file with nice notification sounds and comment reply functionality
 
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -20,7 +20,9 @@ import {
     onSnapshot,
     orderBy,
     serverTimestamp,
-    writeBatch
+    writeBatch,
+    increment,
+    arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -31,7 +33,7 @@ const firebaseConfig = {
     storageBucket: "crypto-6517d.firebasestorage.app",
     messagingSenderId: "60263975159",
     appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-};
+  };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -47,6 +49,9 @@ let viewedPosts = new Set();
 let unreadCount = 0;
 let lastNotificationTime = 0;
 let notificationShown = false;
+let currentCommentPostId = null;
+let currentCommentId = null;
+let currentReplyToUserId = null;
 
 // ==================== NOTIFICATION SOUNDS SYSTEM ====================
 
@@ -150,6 +155,12 @@ class NotificationSoundManager {
                 break;
             case 'like':
                 this.playSubtlePop(); // Subtle pop for likes
+                break;
+            case 'comment':
+                this.playGentleChime(); // Gentle chime for comments
+                break;
+            case 'comment_reply':
+                this.playSoftPing(); // Soft ping for comment replies
                 break;
             case 'post':
                 this.playGentleChime(); // Gentle chime for posts
@@ -309,6 +320,9 @@ function initNotificationSystem() {
             // Add sound control button to UI
             addSoundControlButton();
             
+            // Setup reply modal for comment replies
+            setupReplyModal();
+            
             // If on notification page, load notifications
             if (window.location.pathname.includes('notification.html')) {
                 loadNotificationsForPage();
@@ -331,6 +345,1086 @@ function initNotificationSystem() {
         }
     });
 }
+
+// ==================== COMMENT REPLY FUNCTIONALITY ====================
+
+// Setup reply modal for replying to comments from notifications
+function setupReplyModal() {
+    // Create modal if it doesn't exist
+    if (!document.getElementById('replyModal')) {
+        const modal = document.createElement('div');
+        modal.id = 'replyModal';
+        modal.className = 'reply-modal';
+        modal.innerHTML = `
+            <div class="reply-modal-content">
+                <button class="reply-modal-close">&times;</button>
+                <div class="reply-to-info">
+                    <img id="replyToAvatar" class="reply-to-avatar" src="images/default-profile.jpg" alt="">
+                    <div class="reply-to-details">
+                        <div id="replyToName" class="reply-to-name"></div>
+                        <div id="replyToText" class="reply-to-text"></div>
+                    </div>
+                </div>
+                <div class="reply-modal-input-container">
+                    <input type="text" id="replyModalInput" class="reply-modal-input" placeholder="Write your reply..." autocomplete="off">
+                    <button id="replyModalSend" class="reply-modal-send">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Add styles for reply modal
+        addReplyModalStyles();
+        
+        // Close button event
+        const closeBtn = modal.querySelector('.reply-modal-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                closeReplyModal();
+            });
+        }
+        
+        // Send button event
+        const sendBtn = document.getElementById('replyModalSend');
+        if (sendBtn) {
+            sendBtn.addEventListener('click', () => {
+                submitReply();
+            });
+        }
+        
+        // Enter key event
+        const input = document.getElementById('replyModalInput');
+        if (input) {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    submitReply();
+                }
+            });
+        }
+        
+        // Click outside to close
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeReplyModal();
+            }
+        });
+    }
+}
+
+// Add styles for reply modal
+function addReplyModalStyles() {
+    if (!document.getElementById('reply-modal-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'reply-modal-styles';
+        styles.textContent = `
+            .reply-modal {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: var(--bg-primary);
+                border-top: 2px solid var(--border-color);
+                padding: 16px;
+                z-index: 10002;
+                display: none;
+                box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+                animation: slideUp 0.3s ease;
+            }
+            
+            @keyframes slideUp {
+                from {
+                    transform: translateY(100%);
+                }
+                to {
+                    transform: translateY(0);
+                }
+            }
+            
+            .reply-modal-content {
+                max-width: 600px;
+                margin: 0 auto;
+                position: relative;
+            }
+            
+            .reply-to-info {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 16px;
+                padding-bottom: 12px;
+                border-bottom: 1px solid var(--border-color);
+            }
+            
+            .reply-to-avatar {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                object-fit: cover;
+                cursor: pointer;
+            }
+            
+            .reply-to-avatar:hover {
+                opacity: 0.8;
+            }
+            
+            .reply-to-name {
+                font-weight: 600;
+                color: var(--primary);
+                font-size: 14px;
+                cursor: pointer;
+            }
+            
+            .reply-to-name:hover {
+                text-decoration: underline;
+            }
+            
+            .reply-to-text {
+                font-size: 13px;
+                color: var(--text-secondary);
+                margin-top: 2px;
+            }
+            
+            .reply-modal-input-container {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            
+            .reply-modal-input {
+                flex: 1;
+                padding: 14px 18px;
+                border: 2px solid var(--border-color);
+                border-radius: 30px;
+                font-size: 15px;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+            }
+            
+            .reply-modal-input:focus {
+                outline: none;
+                border-color: var(--primary);
+            }
+            
+            .reply-modal-send {
+                background: var(--primary);
+                border: none;
+                color: white;
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .reply-modal-send:hover {
+                transform: scale(1.1);
+                background: var(--primary-dark);
+            }
+            
+            .reply-modal-close {
+                position: absolute;
+                top: -40px;
+                right: 0;
+                background: transparent;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 24px;
+                cursor: pointer;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+            }
+            
+            .reply-modal-close:hover {
+                background: rgba(255,255,255,0.1);
+                color: var(--text-primary);
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+}
+
+// Open reply modal for comment reply
+function openReplyModal(commentData, postId, commentId) {
+    const modal = document.getElementById('replyModal');
+    if (!modal) {
+        setupReplyModal();
+        setTimeout(() => openReplyModal(commentData, postId, commentId), 100);
+        return;
+    }
+    
+    // Store data for later use
+    currentCommentPostId = postId;
+    currentCommentId = commentId;
+    currentReplyToUserId = commentData.userId;
+    
+    modal.dataset.postId = postId;
+    modal.dataset.commentId = commentId;
+    modal.dataset.replyToUserId = commentData.userId;
+    modal.dataset.replyToUsername = commentData.userName || 'User';
+    
+    // Set avatar
+    const avatar = document.getElementById('replyToAvatar');
+    if (avatar) {
+        avatar.src = commentData.userAvatar || 'images/default-profile.jpg';
+        
+        // Add click to view profile
+        avatar.onclick = () => {
+            window.location.href = `profile.html?id=${commentData.userId}`;
+        };
+    }
+    
+    // Set name
+    const nameEl = document.getElementById('replyToName');
+    if (nameEl) {
+        nameEl.textContent = `Replying to ${commentData.userName || 'User'}`;
+        
+        // Add click to view profile
+        nameEl.onclick = () => {
+            window.location.href = `profile.html?id=${commentData.userId}`;
+        };
+    }
+    
+    // Set comment text
+    const textEl = document.getElementById('replyToText');
+    if (textEl) {
+        let commentText = commentData.text || '';
+        if (commentText.length > 50) {
+            commentText = commentText.substring(0, 50) + '...';
+        }
+        textEl.textContent = `"${commentText}"`;
+    }
+    
+    // Clear and focus input
+    const input = document.getElementById('replyModalInput');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    
+    modal.style.display = 'block';
+}
+
+// Close reply modal
+function closeReplyModal() {
+    const modal = document.getElementById('replyModal');
+    if (modal) {
+        modal.style.display = 'none';
+        currentCommentPostId = null;
+        currentCommentId = null;
+        currentReplyToUserId = null;
+    }
+}
+
+// Submit reply to comment
+async function submitReply() {
+    const modal = document.getElementById('replyModal');
+    if (!modal) return;
+    
+    const postId = modal.dataset.postId;
+    const commentId = modal.dataset.commentId;
+    const replyToUserId = modal.dataset.replyToUserId;
+    const replyToUsername = modal.dataset.replyToUsername;
+    
+    const input = document.getElementById('replyModalInput');
+    const replyText = input.value.trim();
+    
+    if (!replyText) {
+        alert('Please enter a reply');
+        return;
+    }
+    
+    if (!currentUser) {
+        alert('Please login to reply');
+        return;
+    }
+    
+    try {
+        // Get current user data
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        
+        const replyData = {
+            userId: currentUser.uid,
+            userName: userData.name || currentUser.displayName || 'User',
+            userAvatar: userData.profileImage || currentUser.photoURL || 'images/default-profile.jpg',
+            text: replyText,
+            replyToUserId: replyToUserId,
+            replyToUsername: replyToUsername,
+            createdAt: serverTimestamp(),
+            likes: 0
+        };
+        
+        // Add reply to Firestore
+        await addDoc(
+            collection(db, 'posts', postId, 'comments', commentId, 'replies'), 
+            replyData
+        );
+        
+        // Update comment's reply count
+        const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+        await updateDoc(commentRef, {
+            repliesCount: increment(1),
+            updatedAt: serverTimestamp()
+        });
+        
+        // Create notification for the comment owner (if not replying to self)
+        if (replyToUserId && replyToUserId !== currentUser.uid) {
+            await createCommentReplyNotification(
+                postId, 
+                commentId, 
+                replyToUserId, 
+                replyText,
+                replyToUsername
+            );
+        }
+        
+        // Show success message
+        showCustomNotification('Reply posted!', 'success');
+        
+        // Close modal
+        closeReplyModal();
+        
+    } catch (error) {
+        console.error('Error adding reply:', error);
+        alert('Error posting reply: ' + error.message);
+    }
+}
+
+// Create notification for comment reply
+async function createCommentReplyNotification(postId, commentId, targetUserId, replyText, originalCommenterName) {
+    try {
+        // Check if notification already exists (prevent duplicates)
+        const existingQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', targetUserId),
+            where('type', '==', 'comment_reply'),
+            where('relatedId', '==', commentId),
+            where('senderId', '==', currentUser.uid)
+        );
+        
+        const existingSnap = await getDocs(existingQuery);
+        if (!existingSnap.empty) {
+            return; // Notification already exists
+        }
+        
+        // Get current user data
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        const userName = userData.name || currentUser.displayName || 'Someone';
+        
+        // Get post data to include in notification
+        const postRef = doc(db, 'posts', postId);
+        const postSnap = await getDoc(postRef);
+        let postPreview = '';
+        
+        if (postSnap.exists()) {
+            const postData = postSnap.data();
+            if (postData.caption) {
+                postPreview = postData.caption.length > 30 ? 
+                    postData.caption.substring(0, 30) + '...' : 
+                    postData.caption;
+            }
+        }
+        
+        // Truncate reply text for notification
+        const shortReply = replyText.length > 40 ? 
+            replyText.substring(0, 40) + '...' : 
+            replyText;
+        
+        await addDoc(collection(db, 'notifications'), {
+            type: 'comment_reply',
+            title: 'New Reply to Your Comment',
+            message: `${userName} replied to your comment: "${shortReply}"`,
+            senderId: currentUser.uid,
+            senderName: userName,
+            senderAvatar: userData.profileImage || currentUser.photoURL || 'images/default-profile.jpg',
+            relatedId: commentId,
+            postId: postId,
+            postPreview: postPreview,
+            commentId: commentId,
+            replyText: replyText,
+            originalCommenterName: originalCommenterName,
+            userId: targetUserId,
+            timestamp: serverTimestamp(),
+            read: false,
+            actionable: true, // This notification can be acted upon (reply)
+            actionType: 'reply_to_comment'
+        });
+        
+    } catch (error) {
+        console.error('Error creating comment reply notification:', error);
+    }
+}
+
+// ==================== LIKE NOTIFICATION FUNCTIONS ====================
+
+// Create notification for post like
+async function createLikeNotification(postId, postOwnerId, likerId) {
+    try {
+        // Check if notification already exists (prevent duplicates for same like)
+        const existingQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', postOwnerId),
+            where('type', '==', 'like'),
+            where('relatedId', '==', postId),
+            where('senderId', '==', likerId)
+        );
+        
+        const existingSnap = await getDocs(existingQuery);
+        if (!existingSnap.empty) {
+            return; // Notification already exists
+        }
+        
+        // Get liker data
+        const likerRef = doc(db, 'users', likerId);
+        const likerSnap = await getDoc(likerRef);
+        if (!likerSnap.exists()) return;
+        
+        const likerData = likerSnap.data();
+        const likerName = likerData.name || 'Someone';
+        
+        // Get post data for preview
+        const postRef = doc(db, 'posts', postId);
+        const postSnap = await getDoc(postRef);
+        let postPreview = '';
+        
+        if (postSnap.exists()) {
+            const postData = postSnap.data();
+            if (postData.caption) {
+                postPreview = postData.caption.length > 30 ? 
+                    postData.caption.substring(0, 30) + '...' : 
+                    postData.caption;
+            } else if (postData.mediaType === 'image') {
+                postPreview = 'an image';
+            } else if (postData.mediaType === 'video') {
+                postPreview = 'a video';
+            } else if (postData.mediaType === 'poll') {
+                postPreview = 'a poll';
+            }
+        }
+        
+        await addDoc(collection(db, 'notifications'), {
+            type: 'like',
+            title: 'New Like on Your Post',
+            message: `${likerName} liked your post${postPreview ? ': ' + postPreview : ''}`,
+            senderId: likerId,
+            senderName: likerName,
+            senderAvatar: likerData.profileImage || 'images/default-profile.jpg',
+            relatedId: postId,
+            postId: postId,
+            postPreview: postPreview,
+            userId: postOwnerId,
+            timestamp: serverTimestamp(),
+            read: false
+        });
+        
+    } catch (error) {
+        console.error('Error creating like notification:', error);
+    }
+}
+
+// Create notification for comment on post
+async function createCommentNotification(postId, postOwnerId, commenterId, commentText, commentId) {
+    try {
+        // Check if notification already exists (prevent duplicates)
+        const existingQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', postOwnerId),
+            where('type', '==', 'comment'),
+            where('relatedId', '==', commentId),
+            where('senderId', '==', commenterId)
+        );
+        
+        const existingSnap = await getDocs(existingQuery);
+        if (!existingSnap.empty) {
+            return; // Notification already exists
+        }
+        
+        // Get commenter data
+        const commenterRef = doc(db, 'users', commenterId);
+        const commenterSnap = await getDoc(commenterRef);
+        if (!commenterSnap.exists()) return;
+        
+        const commenterData = commenterSnap.data();
+        const commenterName = commenterData.name || 'Someone';
+        
+        // Get post data for preview
+        const postRef = doc(db, 'posts', postId);
+        const postSnap = await getDoc(postRef);
+        let postPreview = '';
+        
+        if (postSnap.exists()) {
+            const postData = postSnap.data();
+            if (postData.caption) {
+                postPreview = postData.caption.length > 30 ? 
+                    postData.caption.substring(0, 30) + '...' : 
+                    postData.caption;
+            }
+        }
+        
+        // Truncate comment text for notification
+        const shortComment = commentText.length > 40 ? 
+            commentText.substring(0, 40) + '...' : 
+            commentText;
+        
+        await addDoc(collection(db, 'notifications'), {
+            type: 'comment',
+            title: 'New Comment on Your Post',
+            message: `${commenterName} commented: "${shortComment}"`,
+            senderId: commenterId,
+            senderName: commenterName,
+            senderAvatar: commenterData.profileImage || 'images/default-profile.jpg',
+            relatedId: commentId,
+            postId: postId,
+            postPreview: postPreview,
+            commentId: commentId,
+            commentText: commentText,
+            userId: postOwnerId,
+            timestamp: serverTimestamp(),
+            read: false,
+            actionable: true, // This notification can be acted upon (reply)
+            actionType: 'reply_to_comment'
+        });
+        
+    } catch (error) {
+        console.error('Error creating comment notification:', error);
+    }
+}
+
+// ==================== NOTIFICATION HANDLING ====================
+
+// Handle notification click (modified to support comment replies)
+async function handleNotificationClick(notificationId) {
+    // Mark as read
+    await markNotificationAsRead(notificationId);
+    
+    // Get notification data to determine where to navigate
+    try {
+        const notificationDoc = await getDoc(doc(db, 'notifications', notificationId));
+        if (notificationDoc.exists()) {
+            const notification = notificationDoc.data();
+            
+            // Handle different notification types
+            if (notification.type === 'like') {
+                // Navigate to the post that was liked
+                if (notification.postId) {
+                    window.location.href = `posts.html?post=${notification.postId}`;
+                } else if (notification.relatedId) {
+                    window.location.href = `posts.html?post=${notification.relatedId}`;
+                } else {
+                    window.location.href = 'posts.html';
+                }
+            }
+            else if (notification.type === 'comment') {
+                // Navigate to the post and scroll to comment
+                if (notification.postId && notification.commentId) {
+                    window.location.href = `posts.html?post=${notification.postId}&comment=${notification.commentId}`;
+                } else if (notification.postId) {
+                    window.location.href = `posts.html?post=${notification.postId}`;
+                } else {
+                    window.location.href = 'posts.html';
+                }
+            }
+            else if (notification.type === 'comment_reply') {
+                // Navigate to the post and scroll to the reply
+                if (notification.postId && notification.commentId) {
+                    window.location.href = `posts.html?post=${notification.postId}&comment=${notification.commentId}&reply=true`;
+                } else {
+                    window.location.href = 'posts.html';
+                }
+            }
+            else if (notification.type === 'message' && notification.senderId) {
+                window.location.href = `chat.html?id=${notification.senderId}`;
+            } else if (notification.type === 'group_message' && notification.groupId) {
+                window.location.href = `group.html?id=${notification.groupId}`;
+            } else if (notification.type === 'group_invite' && notification.groupId) {
+                window.location.href = `group.html?id=${notification.groupId}`;
+            } else if (notification.type === 'post' && notification.senderId) {
+                window.location.href = 'posts.html';
+                // Mark post as viewed
+                viewedPosts.add(notification.relatedId);
+                saveViewedPosts();
+                dismissedNotifications.add(`post_${notification.relatedId}`);
+                saveDismissedNotifications();
+            } else if (notification.senderId) {
+                window.location.href = `profile.html?id=${notification.senderId}`;
+            } else {
+                window.location.href = 'notification.html';
+            }
+        }
+    } catch (error) {
+        console.error('Error getting notification:', error);
+        window.location.href = 'notification.html';
+    }
+}
+
+// ==================== DISPLAY NOTIFICATIONS WITH REPLY BUTTONS ====================
+
+// Display notifications in notification.html (modified to add reply buttons for comments)
+function displayNotifications(notificationDocs) {
+    const notificationsList = document.getElementById('notificationsList');
+    if (!notificationsList) return;
+
+    if (notificationDocs.length === 0) {
+        notificationsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-bell-slash"></i>
+                <h3>No notifications yet</h3>
+                <p>When you receive notifications, they will appear here.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const notificationsHTML = notificationDocs.map(doc => {
+        const notification = doc.data();
+        const timeAgo = formatTime(notification.timestamp);
+        const iconClass = getNotificationIcon(notification.type);
+        const unreadClass = notification.read ? '' : 'unread';
+        const unreadDot = notification.read ? '' : '<div class="unread-dot"></div>';
+        
+        // Check if this is a comment or comment_reply notification that can be replied to
+        const showReplyButton = (notification.type === 'comment' || notification.type === 'comment_reply') && 
+                                notification.actionable === true;
+        
+        // Get reply button HTML if applicable
+        const replyButtonHTML = showReplyButton ? `
+            <button class="action-btn reply-to-comment-btn" 
+                    data-notification-id="${doc.id}"
+                    data-post-id="${notification.postId || ''}" 
+                    data-comment-id="${notification.commentId || notification.relatedId || ''}"
+                    data-user-id="${notification.senderId || ''}"
+                    data-user-name="${notification.senderName || 'User'}"
+                    data-user-avatar="${notification.senderAvatar || 'images/default-profile.jpg'}"
+                    data-comment-text="${notification.commentText || notification.message || ''}"
+                    title="Reply to comment">
+                <i class="fas fa-reply"></i>
+            </button>
+        ` : '';
+        
+        return `
+            <div class="notification-item ${unreadClass}" data-id="${doc.id}">
+                <div class="notification-icon ${notification.type}">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="notification-content">
+                    <div class="notification-title">
+                        ${notification.title}
+                        ${unreadDot}
+                    </div>
+                    <div class="notification-text">${notification.message}</div>
+                    <div class="notification-time">${timeAgo}</div>
+                </div>
+                <div class="notification-actions">
+                    ${replyButtonHTML}
+                    ${!notification.read ? `
+                        <button class="action-btn mark-read-btn" title="Mark as read">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    ` : ''}
+                    <button class="action-btn delete-btn" title="Delete notification">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    notificationsList.innerHTML = notificationsHTML;
+    addNotificationActionListeners();
+    addReplyButtonListeners();
+}
+
+// Add event listeners to reply buttons
+function addReplyButtonListeners() {
+    document.querySelectorAll('.reply-to-comment-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            const postId = button.dataset.postId;
+            const commentId = button.dataset.commentId;
+            const userId = button.dataset.userId;
+            const userName = button.dataset.userName;
+            const userAvatar = button.dataset.userAvatar;
+            const commentText = button.dataset.commentText;
+            
+            if (!postId || !commentId) {
+                console.error('Missing postId or commentId for reply');
+                alert('Cannot reply: missing post information');
+                return;
+            }
+            
+            const commentData = {
+                userId: userId,
+                userName: userName,
+                userAvatar: userAvatar,
+                text: commentText
+            };
+            
+            openReplyModal(commentData, postId, commentId);
+        });
+    });
+}
+
+// Add event listeners to notification actions (modified to include reply buttons)
+function addNotificationActionListeners() {
+    // Mark as read buttons
+    document.querySelectorAll('.mark-read-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const notificationItem = button.closest('.notification-item');
+            const notificationId = notificationItem.dataset.id;
+            markNotificationAsRead(notificationId);
+        });
+    });
+
+    // Delete buttons
+    document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const notificationItem = button.closest('.notification-item');
+            const notificationId = notificationItem.dataset.id;
+            deleteNotification(notificationId);
+        });
+    });
+
+    // Notification item click (whole item)
+    document.querySelectorAll('.notification-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            // Don't navigate if clicking on action buttons
+            if (e.target.closest('.action-btn')) {
+                return;
+            }
+            
+            const notificationId = item.dataset.id;
+            handleNotificationClick(notificationId);
+        });
+    });
+}
+
+// Load notifications for dropdown (modified to include reply buttons context)
+async function loadDropdownNotifications() {
+    if (!currentUser) return;
+    
+    const dropdownContent = document.getElementById('dropdown-notifications');
+    if (!dropdownContent) return;
+    
+    try {
+        const notificationsQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', currentUser.uid)
+        );
+        
+        const notificationsSnap = await getDocs(notificationsQuery);
+        
+        if (notificationsSnap.empty) {
+            dropdownContent.innerHTML = `
+                <div class="empty-notifications">
+                    <i class="fas fa-bell-slash"></i>
+                    <p>No notifications yet</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Sort by timestamp
+        const sortedNotifications = notificationsSnap.docs.sort((a, b) => {
+            const timeA = a.data().timestamp?.toDate?.() || new Date(0);
+            const timeB = b.data().timestamp?.toDate?.() || new Date(0);
+            return timeB - timeA;
+        }).slice(0, 10); // Show only 10 most recent
+        
+        let html = '';
+        
+        sortedNotifications.forEach(doc => {
+            const notification = doc.data();
+            const timeAgo = formatTime(notification.timestamp);
+            const iconClass = getNotificationIcon(notification.type);
+            const unreadClass = notification.read ? '' : 'unread';
+            
+            html += `
+                <div class="dropdown-notification-item ${unreadClass}" data-id="${doc.id}" 
+                     data-type="${notification.type}"
+                     data-post-id="${notification.postId || ''}"
+                     data-comment-id="${notification.commentId || notification.relatedId || ''}"
+                     data-user-id="${notification.senderId || ''}"
+                     data-user-name="${notification.senderName || 'User'}"
+                     data-user-avatar="${notification.senderAvatar || 'images/default-profile.jpg'}"
+                     data-comment-text="${notification.commentText || notification.message || ''}"
+                     data-actionable="${notification.actionable || false}">
+                    <div class="dropdown-notification-icon ${notification.type}">
+                        <i class="${iconClass}"></i>
+                    </div>
+                    <div class="dropdown-notification-content">
+                        <div class="dropdown-notification-title">
+                            ${notification.title}
+                            ${!notification.read ? '<span class="unread-indicator"></span>' : ''}
+                        </div>
+                        <div class="dropdown-notification-text">${notification.message}</div>
+                        <div class="dropdown-notification-time">${timeAgo}</div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        dropdownContent.innerHTML = html;
+        
+        // Add click handlers with reply context
+        document.querySelectorAll('.dropdown-notification-item').forEach(item => {
+            item.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const notificationId = item.dataset.id;
+                const notificationType = item.dataset.type;
+                const actionable = item.dataset.actionable === 'true';
+                
+                // If it's a comment notification and actionable, check if shift key is pressed for reply
+                if ((notificationType === 'comment' || notificationType === 'comment_reply') && actionable && e.shiftKey) {
+                    // Shift+click to reply directly
+                    const postId = item.dataset.postId;
+                    const commentId = item.dataset.commentId;
+                    const userId = item.dataset.userId;
+                    const userName = item.dataset.userName;
+                    const userAvatar = item.dataset.userAvatar;
+                    const commentText = item.dataset.commentText;
+                    
+                    if (postId && commentId) {
+                        const commentData = {
+                            userId: userId,
+                            userName: userName,
+                            userAvatar: userAvatar,
+                            text: commentText
+                        };
+                        
+                        // Mark as read first
+                        await markNotificationAsRead(notificationId);
+                        
+                        // Open reply modal
+                        openReplyModal(commentData, postId, commentId);
+                        
+                        // Close dropdown
+                        const dropdown = document.getElementById('notification-dropdown');
+                        if (dropdown) {
+                            dropdown.style.display = 'none';
+                        }
+                        return;
+                    }
+                }
+                
+                // Normal click - handle normally
+                await handleNotificationClick(notificationId);
+                
+                // Close dropdown
+                const dropdown = document.getElementById('notification-dropdown');
+                if (dropdown) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        });
+        
+    } catch (error) {
+        console.error('Error loading dropdown notifications:', error);
+        dropdownContent.innerHTML = `
+            <div class="empty-notifications">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>Error loading notifications</p>
+            </div>
+        `;
+    }
+}
+
+// ==================== EXISTING NOTIFICATION CREATOR FUNCTIONS ====================
+
+// Setup notification creators (modified to include likes and comments)
+function setupNotificationCreators() {
+    if (!currentUser) return;
+
+    // Clear any existing intervals
+    checkIntervals.forEach(interval => clearInterval(interval));
+    checkIntervals = [];
+
+    // Check for new messages every 30 seconds
+    const messageInterval = setInterval(() => {
+        checkForNewMessages();
+    }, 30000);
+    checkIntervals.push(messageInterval);
+
+    // Check for new likes every 15 seconds (more frequent)
+    const likeInterval = setInterval(() => {
+        checkForNewLikes();
+    }, 15000);
+    checkIntervals.push(likeInterval);
+
+    // Check for new comments every 15 seconds (more frequent)
+    const commentInterval = setInterval(() => {
+        checkForNewComments();
+    }, 15000);
+    checkIntervals.push(commentInterval);
+
+    // Check for new posts every 30 seconds
+    const postInterval = setInterval(() => {
+        checkForNewPosts();
+    }, 30000);
+    checkIntervals.push(postInterval);
+
+    // Check for group notifications every 30 seconds
+    const groupInterval = setInterval(() => {
+        checkForGroupNotifications();
+    }, 30000);
+    checkIntervals.push(groupInterval);
+
+    // Initial checks
+    checkForNewMessages();
+    checkForNewLikes();
+    checkForNewComments();
+    checkForNewPosts();
+    checkForGroupNotifications();
+}
+
+// Check for new likes (modified to use the new notification function)
+async function checkForNewLikes() {
+    if (!currentUser) return;
+
+    try {
+        // Get all posts by current user
+        const postsQuery = query(
+            collection(db, 'posts'),
+            where('userId', '==', currentUser.uid)
+        );
+        
+        const postsSnap = await getDocs(postsQuery);
+        
+        for (const postDoc of postsSnap.docs) {
+            const postId = postDoc.id;
+            const postData = postDoc.data();
+            
+            // Check if post has likes
+            if (postData.likes && postData.likes > 0) {
+                // We need to track which users have liked the post
+                // This requires storing likers in the post document or a subcollection
+                // For now, we'll assume likes are stored in a separate collection
+                
+                // Get likes for this post
+                const likesRef = collection(db, 'posts', postId, 'likes');
+                const likesSnap = await getDocs(likesRef);
+                
+                for (const likeDoc of likesSnap.docs) {
+                    const likeData = likeDoc.data();
+                    const likerId = likeData.userId;
+                    
+                    // Skip if liked by current user
+                    if (likerId === currentUser.uid) continue;
+                    
+                    // Check if notification already exists
+                    const existingQuery = query(
+                        collection(db, 'notifications'),
+                        where('userId', '==', currentUser.uid),
+                        where('type', '==', 'like'),
+                        where('relatedId', '==', postId),
+                        where('senderId', '==', likerId)
+                    );
+                    
+                    const existingSnap = await getDocs(existingQuery);
+                    
+                    if (existingSnap.empty) {
+                        // Create like notification
+                        await createLikeNotification(postId, currentUser.uid, likerId);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error checking likes:', error);
+    }
+}
+
+// Check for new comments
+async function checkForNewComments() {
+    if (!currentUser) return;
+
+    try {
+        // Get all posts by current user
+        const postsQuery = query(
+            collection(db, 'posts'),
+            where('userId', '==', currentUser.uid)
+        );
+        
+        const postsSnap = await getDocs(postsQuery);
+        
+        for (const postDoc of postsSnap.docs) {
+            const postId = postDoc.id;
+            
+            // Get comments for this post
+            const commentsQuery = query(
+                collection(db, 'posts', postId, 'comments'),
+                orderBy('createdAt', 'desc')
+            );
+            
+            const commentsSnap = await getDocs(commentsQuery);
+            
+            for (const commentDoc of commentsSnap.docs) {
+                const commentData = commentDoc.data();
+                const commenterId = commentData.userId;
+                
+                // Skip if commented by current user
+                if (commenterId === currentUser.uid) continue;
+                
+                // Check if notification already exists
+                const existingQuery = query(
+                    collection(db, 'notifications'),
+                    where('userId', '==', currentUser.uid),
+                    where('type', '==', 'comment'),
+                    where('relatedId', '==', commentDoc.id),
+                    where('senderId', '==', commenterId)
+                );
+                
+                const existingSnap = await getDocs(existingQuery);
+                
+                if (existingSnap.empty) {
+                    // Create comment notification
+                    await createCommentNotification(
+                        postId, 
+                        currentUser.uid, 
+                        commenterId, 
+                        commentData.text, 
+                        commentDoc.id
+                    );
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error checking comments:', error);
+    }
+}
+
+// Helper function to show custom notification
+function showCustomNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `custom-notification ${type}`;
+    notification.innerHTML = `
+        <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// ==================== EXISTING FUNCTIONS (keep all your existing code below) ====================
 
 // Add sound control button to UI
 function addSoundControlButton() {
@@ -463,6 +1557,53 @@ function addSoundControlButton() {
                 @keyframes slideUp {
                     from { transform: translateY(100%); opacity: 0; }
                     to { transform: translateY(0); opacity: 1; }
+                }
+                
+                .custom-notification {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    z-index: 10003;
+                    animation: slideInRight 0.3s ease;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                }
+                
+                .custom-notification.success {
+                    background: #10b981;
+                }
+                
+                .custom-notification.info {
+                    background: #3b82f6;
+                }
+                
+                .custom-notification.fade-out {
+                    animation: fadeOut 0.3s ease forwards;
+                }
+                
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+                
+                @keyframes fadeOut {
+                    from {
+                        opacity: 1;
+                    }
+                    to {
+                        opacity: 0;
+                    }
                 }
             `;
             document.head.appendChild(styles);
@@ -847,128 +1988,6 @@ function createDropdownElement() {
     dropdown.querySelector('.mark-all-read-btn').addEventListener('click', markAllNotificationsAsRead);
     
     return dropdown;
-}
-
-// Load notifications for dropdown
-async function loadDropdownNotifications() {
-    if (!currentUser) return;
-    
-    const dropdownContent = document.getElementById('dropdown-notifications');
-    if (!dropdownContent) return;
-    
-    try {
-        const notificationsQuery = query(
-            collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid)
-        );
-        
-        const notificationsSnap = await getDocs(notificationsQuery);
-        
-        if (notificationsSnap.empty) {
-            dropdownContent.innerHTML = `
-                <div class="empty-notifications">
-                    <i class="fas fa-bell-slash"></i>
-                    <p>No notifications yet</p>
-                </div>
-            `;
-            return;
-        }
-        
-        // Sort by timestamp
-        const sortedNotifications = notificationsSnap.docs.sort((a, b) => {
-            const timeA = a.data().timestamp?.toDate?.() || new Date(0);
-            const timeB = b.data().timestamp?.toDate?.() || new Date(0);
-            return timeB - timeA;
-        }).slice(0, 10); // Show only 10 most recent
-        
-        let html = '';
-        
-        sortedNotifications.forEach(doc => {
-            const notification = doc.data();
-            const timeAgo = formatTime(notification.timestamp);
-            const iconClass = getNotificationIcon(notification.type);
-            const unreadClass = notification.read ? '' : 'unread';
-            
-            html += `
-                <div class="dropdown-notification-item ${unreadClass}" data-id="${doc.id}">
-                    <div class="dropdown-notification-icon ${notification.type}">
-                        <i class="${iconClass}"></i>
-                    </div>
-                    <div class="dropdown-notification-content">
-                        <div class="dropdown-notification-title">
-                            ${notification.title}
-                            ${!notification.read ? '<span class="unread-indicator"></span>' : ''}
-                        </div>
-                        <div class="dropdown-notification-text">${notification.message}</div>
-                        <div class="dropdown-notification-time">${timeAgo}</div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        dropdownContent.innerHTML = html;
-        
-        // Add click handlers
-        document.querySelectorAll('.dropdown-notification-item').forEach(item => {
-            item.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const notificationId = item.dataset.id;
-                await handleNotificationClick(notificationId);
-                
-                // Close dropdown
-                const dropdown = document.getElementById('notification-dropdown');
-                if (dropdown) {
-                    dropdown.style.display = 'none';
-                }
-            });
-        });
-        
-    } catch (error) {
-        console.error('Error loading dropdown notifications:', error);
-        dropdownContent.innerHTML = `
-            <div class="empty-notifications">
-                <i class="fas fa-exclamation-circle"></i>
-                <p>Error loading notifications</p>
-            </div>
-        `;
-    }
-}
-
-// Handle notification click
-async function handleNotificationClick(notificationId) {
-    // Mark as read
-    await markNotificationAsRead(notificationId);
-    
-    // Get notification data to determine where to navigate
-    try {
-        const notificationDoc = await getDoc(doc(db, 'notifications', notificationId));
-        if (notificationDoc.exists()) {
-            const notification = notificationDoc.data();
-            
-            // Navigate based on notification type
-            if (notification.type === 'message' && notification.senderId) {
-                window.location.href = `chat.html?id=${notification.senderId}`;
-            } else if (notification.type === 'group_message' && notification.groupId) {
-                window.location.href = `group.html?id=${notification.groupId}`;
-            } else if (notification.type === 'group_invite' && notification.groupId) {
-                window.location.href = `group.html?id=${notification.groupId}`;
-            } else if (notification.type === 'post' && notification.senderId) {
-                window.location.href = 'posts.html';
-                // Mark post as viewed
-                viewedPosts.add(notification.relatedId);
-                saveViewedPosts();
-                dismissedNotifications.add(`post_${notification.relatedId}`);
-                saveDismissedNotifications();
-            } else if (notification.senderId) {
-                window.location.href = `profile.html?id=${notification.senderId}`;
-            } else {
-                window.location.href = 'notification.html';
-            }
-        }
-    } catch (error) {
-        console.error('Error getting notification:', error);
-        window.location.href = 'notification.html';
-    }
 }
 
 // Setup mark all read button for notification page
@@ -1358,91 +2377,6 @@ async function loadNotificationsForPage() {
     }
 }
 
-// Display notifications in notification.html
-function displayNotifications(notificationDocs) {
-    const notificationsList = document.getElementById('notificationsList');
-    if (!notificationsList) return;
-
-    if (notificationDocs.length === 0) {
-        notificationsList.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-bell-slash"></i>
-                <h3>No notifications yet</h3>
-                <p>When you receive notifications, they will appear here.</p>
-            </div>
-        `;
-        return;
-    }
-
-    const notificationsHTML = notificationDocs.map(doc => {
-        const notification = doc.data();
-        const timeAgo = formatTime(notification.timestamp);
-        const iconClass = getNotificationIcon(notification.type);
-        const unreadClass = notification.read ? '' : 'unread';
-        const unreadDot = notification.read ? '' : '<div class="unread-dot"></div>';
-        
-        return `
-            <div class="notification-item ${unreadClass}" data-id="${doc.id}">
-                <div class="notification-icon ${notification.type}">
-                    <i class="${iconClass}"></i>
-                </div>
-                <div class="notification-content">
-                    <div class="notification-title">
-                        ${notification.title}
-                        ${unreadDot}
-                    </div>
-                    <div class="notification-text">${notification.message}</div>
-                    <div class="notification-time">${timeAgo}</div>
-                </div>
-                <div class="notification-actions">
-                    ${!notification.read ? `
-                        <button class="action-btn mark-read-btn" title="Mark as read">
-                            <i class="fas fa-check"></i>
-                        </button>
-                    ` : ''}
-                    <button class="action-btn delete-btn" title="Delete notification">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    notificationsList.innerHTML = notificationsHTML;
-    addNotificationActionListeners();
-}
-
-// Add event listeners to notification actions
-function addNotificationActionListeners() {
-    // Mark as read buttons
-    document.querySelectorAll('.mark-read-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const notificationItem = button.closest('.notification-item');
-            const notificationId = notificationItem.dataset.id;
-            markNotificationAsRead(notificationId);
-        });
-    });
-
-    // Delete buttons
-    document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const notificationItem = button.closest('.notification-item');
-            const notificationId = notificationItem.dataset.id;
-            deleteNotification(notificationId);
-        });
-    });
-
-    // Notification item click
-    document.querySelectorAll('.notification-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const notificationId = item.dataset.id;
-            handleNotificationClick(notificationId);
-        });
-    });
-}
-
 // Mark notification as read
 async function markNotificationAsRead(notificationId) {
     if (!currentUser) return;
@@ -1504,43 +2438,136 @@ function showLoginMessage() {
     }
 }
 
-// Setup notification creators (messages, likes, posts, and groups)
-function setupNotificationCreators() {
+// Check for new messages (existing function)
+async function checkForNewMessages() {
     if (!currentUser) return;
 
-    // Clear any existing intervals
-    checkIntervals.forEach(interval => clearInterval(interval));
-    checkIntervals = [];
+    try {
+        const threadsQuery = query(
+            collection(db, 'conversations'),
+            where('participants', 'array-contains', currentUser.uid)
+        );
 
-    // Check for new messages every 30 seconds
-    const messageInterval = setInterval(() => {
-        checkForNewMessages();
-    }, 30000);
-    checkIntervals.push(messageInterval);
+        const threadsSnap = await getDocs(threadsQuery);
 
-    // Check for new likes every 30 seconds
-    const likeInterval = setInterval(() => {
-        checkForNewLikes();
-    }, 30000);
-    checkIntervals.push(likeInterval);
+        for (const threadDoc of threadsSnap.docs) {
+            const thread = threadDoc.data();
+            const partnerId = thread.participants.find(id => id !== currentUser.uid);
+            
+            if (partnerId) {
+                // Get all messages and filter in memory
+                const messagesQuery = collection(db, 'conversations', threadDoc.id, 'messages');
+                const messagesSnap = await getDocs(messagesQuery);
 
-    // Check for new posts every 30 seconds
-    const postInterval = setInterval(() => {
-        checkForNewPosts();
-    }, 30000);
-    checkIntervals.push(postInterval);
+                for (const messageDoc of messagesSnap.docs) {
+                    const message = messageDoc.data();
+                    // Check if message is from partner and unread
+                    if (message.senderId === partnerId && !message.read) {
+                        await createMessageNotification(messageDoc.id, partnerId, message);
+                        break; // Only create one notification per conversation
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error checking messages:', error);
+    }
+}
 
-    // Check for group notifications every 30 seconds
-    const groupInterval = setInterval(() => {
-        checkForGroupNotifications();
-    }, 30000);
-    checkIntervals.push(groupInterval);
+// Create message notification (existing function)
+async function createMessageNotification(messageId, partnerId, message) {
+    try {
+        const existing = await checkExistingNotification('message', messageId, partnerId);
+        if (existing) return;
 
-    // Initial checks
-    checkForNewMessages();
-    checkForNewLikes();
-    checkForNewPosts();
-    checkForGroupNotifications();
+        const senderDoc = await getDoc(doc(db, 'users', partnerId));
+        if (!senderDoc.exists()) return;
+
+        const senderData = senderDoc.data();
+        const messageText = message.text ? 
+            (message.text.length > 50 ? message.text.substring(0, 50) + '...' : message.text) : 
+            'sent you a photo/video';
+
+        await addDoc(collection(db, 'notifications'), {
+            type: 'message',
+            title: 'New Message',
+            message: `${senderData.name || 'Someone'} ${messageText}`,
+            senderId: partnerId,
+            senderName: senderData.name || 'Someone',
+            relatedId: messageId,
+            userId: currentUser.uid,
+            timestamp: serverTimestamp(),
+            read: false
+        });
+
+    } catch (error) {
+        console.error('Error creating message notification:', error);
+    }
+}
+
+// Check for new posts (existing function)
+async function checkForNewPosts() {
+    if (!currentUser) return;
+
+    try {
+        const postsQuery = collection(db, 'posts');
+        const postsSnap = await getDocs(postsQuery);
+
+        for (const postDoc of postsSnap.docs) {
+            const post = postDoc.data();
+            const postId = postDoc.id;
+            
+            // Skip if post is from current user or already viewed
+            if (post.userId === currentUser.uid || viewedPosts.has(postId)) {
+                continue;
+            }
+
+            // Skip if this notification was already dismissed
+            if (dismissedNotifications.has(`post_${postId}`)) {
+                continue;
+            }
+
+            // Check if user is not on posts page
+            const currentPage = window.location.pathname.split('/').pop().split('.')[0];
+            
+            if (currentPage !== 'posts') {
+                await createPostNotification(postId, post);
+            }
+        }
+    } catch (error) {
+        console.error('Error checking posts:', error);
+    }
+}
+
+// Create post notification (existing function)
+async function createPostNotification(postId, post) {
+    try {
+        const existing = await checkExistingNotification('post', postId, post.userId);
+        if (existing) return;
+
+        const authorDoc = await getDoc(doc(db, 'users', post.userId));
+        if (!authorDoc.exists()) return;
+
+        const authorData = authorDoc.data();
+        const postText = post.caption ? 
+            (post.caption.length > 50 ? post.caption.substring(0, 50) + '...' : post.caption) : 
+            'created a new post';
+
+        await addDoc(collection(db, 'notifications'), {
+            type: 'post',
+            title: 'New Post',
+            message: `${authorData.name || 'Someone'} ${postText}`,
+            senderId: post.userId,
+            senderName: authorData.name || 'Someone',
+            relatedId: postId,
+            userId: currentUser.uid,
+            timestamp: serverTimestamp(),
+            read: false
+        });
+
+    } catch (error) {
+        console.error('Error creating post notification:', error);
+    }
 }
 
 // Check for group-related notifications
@@ -1756,183 +2783,6 @@ async function checkForAdminNotifications() {
     }
 }
 
-// Check for new messages (existing function)
-async function checkForNewMessages() {
-    if (!currentUser) return;
-
-    try {
-        const threadsQuery = query(
-            collection(db, 'conversations'),
-            where('participants', 'array-contains', currentUser.uid)
-        );
-
-        const threadsSnap = await getDocs(threadsQuery);
-
-        for (const threadDoc of threadsSnap.docs) {
-            const thread = threadDoc.data();
-            const partnerId = thread.participants.find(id => id !== currentUser.uid);
-            
-            if (partnerId) {
-                // Get all messages and filter in memory
-                const messagesQuery = collection(db, 'conversations', threadDoc.id, 'messages');
-                const messagesSnap = await getDocs(messagesQuery);
-
-                for (const messageDoc of messagesSnap.docs) {
-                    const message = messageDoc.data();
-                    // Check if message is from partner and unread
-                    if (message.senderId === partnerId && !message.read) {
-                        await createMessageNotification(messageDoc.id, partnerId, message);
-                        break; // Only create one notification per conversation
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Error checking messages:', error);
-    }
-}
-
-// Create message notification (existing function)
-async function createMessageNotification(messageId, partnerId, message) {
-    try {
-        const existing = await checkExistingNotification('message', messageId, partnerId);
-        if (existing) return;
-
-        const senderDoc = await getDoc(doc(db, 'users', partnerId));
-        if (!senderDoc.exists()) return;
-
-        const senderData = senderDoc.data();
-        const messageText = message.text ? 
-            (message.text.length > 50 ? message.text.substring(0, 50) + '...' : message.text) : 
-            'sent you a photo/video';
-
-        await addDoc(collection(db, 'notifications'), {
-            type: 'message',
-            title: 'New Message',
-            message: `${senderData.name || 'Someone'} ${messageText}`,
-            senderId: partnerId,
-            senderName: senderData.name || 'Someone',
-            relatedId: messageId,
-            userId: currentUser.uid,
-            timestamp: serverTimestamp(),
-            read: false
-        });
-
-    } catch (error) {
-        console.error('Error creating message notification:', error);
-    }
-}
-
-// Check for new likes (existing function)
-async function checkForNewLikes() {
-    if (!currentUser) return;
-
-    try {
-        const likesQuery = collection(db, 'users', currentUser.uid, 'likes');
-        const likesSnap = await getDocs(likesQuery);
-
-        for (const likeDoc of likesSnap.docs) {
-            const likeData = likeDoc.data();
-            await createLikeNotification(likeDoc.id, likeData.userId);
-        }
-    } catch (error) {
-        console.error('Error checking likes:', error);
-    }
-}
-
-// Create like notification (existing function)
-async function createLikeNotification(likeId, likerId) {
-    try {
-        const existing = await checkExistingNotification('like', likeId, likerId);
-        if (existing) return;
-
-        const likerDoc = await getDoc(doc(db, 'users', likerId));
-        if (!likerDoc.exists()) return;
-
-        const likerData = likerDoc.data();
-
-        await addDoc(collection(db, 'notifications'), {
-            type: 'like',
-            title: 'New Like',
-            message: `${likerData.name || 'Someone'} liked your profile`,
-            senderId: likerId,
-            senderName: likerData.name || 'Someone',
-            relatedId: likeId,
-            userId: currentUser.uid,
-            timestamp: serverTimestamp(),
-            read: false
-        });
-
-    } catch (error) {
-        console.error('Error creating like notification:', error);
-    }
-}
-
-// Check for new posts (existing function)
-async function checkForNewPosts() {
-    if (!currentUser) return;
-
-    try {
-        const postsQuery = collection(db, 'posts');
-        const postsSnap = await getDocs(postsQuery);
-
-        for (const postDoc of postsSnap.docs) {
-            const post = postDoc.data();
-            const postId = postDoc.id;
-            
-            // Skip if post is from current user or already viewed
-            if (post.userId === currentUser.uid || viewedPosts.has(postId)) {
-                continue;
-            }
-
-            // Skip if this notification was already dismissed
-            if (dismissedNotifications.has(`post_${postId}`)) {
-                continue;
-            }
-
-            // Check if user is not on posts page
-            const currentPage = window.location.pathname.split('/').pop().split('.')[0];
-            
-            if (currentPage !== 'posts') {
-                await createPostNotification(postId, post);
-            }
-        }
-    } catch (error) {
-        console.error('Error checking posts:', error);
-    }
-}
-
-// Create post notification (existing function)
-async function createPostNotification(postId, post) {
-    try {
-        const existing = await checkExistingNotification('post', postId, post.userId);
-        if (existing) return;
-
-        const authorDoc = await getDoc(doc(db, 'users', post.userId));
-        if (!authorDoc.exists()) return;
-
-        const authorData = authorDoc.data();
-        const postText = post.caption ? 
-            (post.caption.length > 50 ? post.caption.substring(0, 50) + '...' : post.caption) : 
-            'created a new post';
-
-        await addDoc(collection(db, 'notifications'), {
-            type: 'post',
-            title: 'New Post',
-            message: `${authorData.name || 'Someone'} ${postText}`,
-            senderId: post.userId,
-            senderName: authorData.name || 'Someone',
-            relatedId: postId,
-            userId: currentUser.uid,
-            timestamp: serverTimestamp(),
-            read: false
-        });
-
-    } catch (error) {
-        console.error('Error creating post notification:', error);
-    }
-}
-
 // Check if notification already exists
 async function checkExistingNotification(type, relatedId, senderId = null) {
     try {
@@ -2061,6 +2911,8 @@ function getNotificationIcon(type) {
     switch (type) {
         case 'message': return 'fas fa-comment-alt';
         case 'like': return 'fas fa-heart';
+        case 'comment':
+        case 'comment_reply': return 'fas fa-comment';
         case 'post': return 'fas fa-newspaper';
         case 'group_message': return 'fas fa-users';
         case 'group_invite': return 'fas fa-user-plus';
@@ -2148,6 +3000,11 @@ window.NotificationSystem = {
             console.error('Error creating group notification:', error);
         }
     },
+    createLikeNotification: createLikeNotification,
+    createCommentNotification: createCommentNotification,
+    createCommentReplyNotification: createCommentReplyNotification,
+    openReplyModal: openReplyModal,
+    closeReplyModal: closeReplyModal,
     showDropdown: toggleDropdownNotifications,
     markAllRead: markAllNotificationsAsRead,
     // Sound control methods
