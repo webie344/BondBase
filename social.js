@@ -126,10 +126,45 @@ class SocialManager {
         this.maxPollOptions = 4;
         this.minPollOptions = 2;
         
+        // Add loader to page immediately
+        this.addLoader();
+        
         // Add all styles
         this.addAllStyles();
         
         this.init();
+    }
+
+    // Add loader overlay to page
+    addLoader() {
+        // Check if loader already exists
+        if (document.getElementById('initialLoader')) return;
+        
+        const loader = document.createElement('div');
+        loader.id = 'initialLoader';
+        loader.innerHTML = `
+            <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #1a1d21; display: flex; align-items: center; justify-content: center; z-index: 99999;">
+                <div style="text-align: center;">
+                    <div style="border: 4px solid rgba(255,75,110,0.3); border-top: 4px solid #ff4b6e; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                    <div style="color: #ff4b6e; font-size: 18px; font-weight: 600;">Loading posts...</div>
+                </div>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+        document.body.appendChild(loader);
+    }
+
+    // Remove loader
+    removeLoader() {
+        const loader = document.getElementById('initialLoader');
+        if (loader) {
+            loader.remove();
+        }
     }
 
     init() {
@@ -211,16 +246,16 @@ class SocialManager {
                 z-index: 100000;
                 align-items: center;
                 justify-content: center;
-                padding: 5px;
+                padding: 20px;
                 backdrop-filter: blur(10px);
             }
             
             .post-modal-content {
                 background: #1a1d21;
                 border-radius: 24px;
-                max-width: 900px;
+                max-width: 800px;
                 width: 100%;
-                max-height: 100vh;
+                max-height: 90vh;
                 display: flex;
                 flex-direction: column;
                 animation: modalFadeIn 0.3s ease;
@@ -306,7 +341,7 @@ class SocialManager {
             }
             
             .post-modal-body .post-actions {
-                margin-left: 40px;
+                margin-left: 60px;
             }
         `;
         document.head.appendChild(style);
@@ -3946,9 +3981,9 @@ class SocialManager {
             
             const postsSnap = await getDocs(postsQuery);
             
+            // Remove loader when data is loaded
             if (lastVisible === null) {
-                const loadingItems = container.querySelectorAll('.post-item.loading');
-                loadingItems.forEach(item => item.remove());
+                this.removeLoader();
             }
             
             if (postsSnap.empty) {
