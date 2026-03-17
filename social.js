@@ -126,8 +126,11 @@ class SocialManager {
         this.maxPollOptions = 4;
         this.minPollOptions = 2;
         
-        // Add loader to page immediately
-        this.addLoader();
+        // Check if we're on posts.html and add loader
+        const currentPage = window.location.pathname.split('/').pop();
+        if (currentPage === 'posts.html') {
+            this.addLoader();
+        }
         
         // Add all styles
         this.addAllStyles();
@@ -135,7 +138,7 @@ class SocialManager {
         this.init();
     }
 
-    // Add loader overlay to page
+    // Add loader overlay to page (only for posts.html)
     addLoader() {
         // Check if loader already exists
         if (document.getElementById('initialLoader')) return;
@@ -246,7 +249,7 @@ class SocialManager {
                 z-index: 100000;
                 align-items: center;
                 justify-content: center;
-                padding: 20px;
+                padding: ;
                 backdrop-filter: blur(10px);
             }
             
@@ -3981,7 +3984,7 @@ class SocialManager {
             
             const postsSnap = await getDocs(postsQuery);
             
-            // Remove loader when data is loaded
+            // Remove loader when data is loaded (only on first page load)
             if (lastVisible === null) {
                 this.removeLoader();
             }
