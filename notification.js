@@ -1,4 +1,5 @@
 // notification.js - Complete file with nice notification sounds and comment reply functionality
+// Fixed version - No Firebase indexes required
 
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -18,7 +19,6 @@ import {
     getDocs,
     addDoc,
     onSnapshot,
-    orderBy,
     serverTimestamp,
     writeBatch,
     increment,
@@ -55,6 +55,11 @@ let currentCommentId = null;
 let currentReplyToUserId = null;
 let processedLikes = new Set(); // Track processed likes to prevent duplicates
 let processedComments = new Set(); // Track processed comments to prevent duplicates
+
+// Cache for notifications to avoid multiple queries
+let notificationsCache = [];
+let lastCacheUpdate = 0;
+const CACHE_DURATION = 30000; // 30 seconds
 
 // ==================== NOTIFICATION SOUNDS SYSTEM ====================
 
@@ -1088,8 +1093,15 @@ function displayNotifications(notificationDocs) {
         return;
     }
 
-    const notificationsHTML = notificationDocs.map(doc => {
-        const notification = doc.data();
+    // Sort notifications by timestamp (newest first) in memory
+    const sortedDocs = [...notificationDocs].sort((a, b) => {
+        const timeA = a.timestamp?.toDate?.() || new Date(0);
+        const timeB = b.timestamp?.toDate?.() || new Date(0);
+        return timeB - timeA;
+    });
+
+    const notificationsHTML = sortedDocs.map(doc => {
+        const notification = doc;
         const timeAgo = formatTime(notification.timestamp);
         const iconClass = getNotificationIcon(notification.type);
         const unreadClass = notification.read ? '' : 'unread';
@@ -1214,7 +1226,7 @@ function addNotificationActionListeners() {
     });
 }
 
-// Load notifications for dropdown
+// Load notifications for dropdown - FIXED VERSION (no index required)
 async function loadDropdownNotifications() {
     if (!currentUser) return;
     
@@ -1222,10 +1234,18 @@ async function loadDropdownNotifications() {
     if (!dropdownContent) return;
     
     try {
+        // Show loading state
+        dropdownContent.innerHTML = `
+            <div class="loading-notifications">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Loading notifications...</span>
+            </div>
+        `;
+        
+        // Simple query without orderBy to avoid index requirement
         const notificationsQuery = query(
             collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid),
-            orderBy('timestamp', 'desc')
+            where('userId', '==', currentUser.uid)
         );
         
         const notificationsSnap = await getDocs(notificationsQuery);
@@ -1240,19 +1260,32 @@ async function loadDropdownNotifications() {
             return;
         }
         
+        // Convert to array and sort in memory by timestamp
+        const notifications = [];
+        notificationsSnap.forEach(doc => {
+            const data = doc.data();
+            notifications.push({
+                id: doc.id,
+                ...data,
+                timestampObj: data.timestamp?.toDate?.() || new Date(0)
+            });
+        });
+        
+        // Sort by timestamp (newest first) in memory
+        notifications.sort((a, b) => b.timestampObj - a.timestampObj);
+        
         // Show only 10 most recent
-        const recentNotifications = notificationsSnap.docs.slice(0, 10);
+        const recentNotifications = notifications.slice(0, 10);
         
         let html = '';
         
-        recentNotifications.forEach(doc => {
-            const notification = doc.data();
+        recentNotifications.forEach(notification => {
             const timeAgo = formatTime(notification.timestamp);
             const iconClass = getNotificationIcon(notification.type);
             const unreadClass = notification.read ? '' : 'unread';
             
             html += `
-                <div class="dropdown-notification-item ${unreadClass}" data-id="${doc.id}" 
+                <div class="dropdown-notification-item ${unreadClass}" data-id="${notification.id}" 
                      data-type="${notification.type}"
                      data-post-id="${notification.postId || ''}"
                      data-comment-id="${notification.commentId || notification.relatedId || ''}"
@@ -1336,6 +1369,7 @@ async function loadDropdownNotifications() {
             <div class="empty-notifications">
                 <i class="fas fa-exclamation-circle"></i>
                 <p>Error loading notifications</p>
+                <small>${error.message}</small>
             </div>
         `;
     }
@@ -1505,8 +1539,7 @@ async function checkForNewComments() {
             
             // Get comments for this post
             const commentsQuery = query(
-                collection(db, 'posts', postId, 'comments'),
-                orderBy('createdAt', 'desc')
+                collection(db, 'posts', postId, 'comments')
             );
             
             const commentsSnap = await getDocs(commentsQuery);
@@ -1518,10 +1551,23 @@ async function checkForNewComments() {
             
             console.log(`Found ${commentsSnap.size} comments for post: ${postId}`);
             
-            for (const commentDoc of commentsSnap.docs) {
-                const commentData = commentDoc.data();
+            // Convert to array and sort by createdAt in memory
+            const comments = [];
+            commentsSnap.forEach(doc => {
+                const data = doc.data();
+                comments.push({
+                    id: doc.id,
+                    ...data,
+                    createdAtObj: data.createdAt?.toDate?.() || new Date(0)
+                });
+            });
+            
+            // Sort by newest first
+            comments.sort((a, b) => b.createdAtObj - a.createdAtObj);
+            
+            for (const commentData of comments) {
                 const commenterId = commentData.userId;
-                const commentId = commentDoc.id;
+                const commentId = commentData.id;
                 
                 // Skip if commented by current user
                 if (commenterId === currentUser.uid) {
@@ -1871,7 +1917,7 @@ function addSoundSettingsToPage() {
         soundSettingsBtn.innerHTML = '<i class="fas fa-music"></i> Sound Settings';
         
         soundSettingsBtn.addEventListener('click', () => {
-            addSoundSettingsToPage();
+            showSoundSettings(soundSettingsBtn);
         });
         
         header.appendChild(soundSettingsBtn);
@@ -2013,7 +2059,7 @@ function createDropdownElement() {
             
             .mark-all-read-btn {
                 background: var(--primary);
-                color: var(--text-primary);
+                color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 6px 12px;
@@ -2180,7 +2226,7 @@ function setupMarkAllReadButton() {
                 styles.textContent = `
                     .mark-all-read-page-btn {
                         background: var(--primary);
-                        color: var(--text-primary);
+                        color: white;
                         border: none;
                         border-radius: 8px;
                         padding: 10px 20px;
@@ -2519,13 +2565,26 @@ async function loadNotificationsForPage() {
     try {
         const notificationsQuery = query(
             collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid),
-            orderBy('timestamp', 'desc')
+            where('userId', '==', currentUser.uid)
         );
 
         const notificationsSnap = await getDocs(notificationsQuery);
         
-        displayNotifications(notificationsSnap.docs);
+        // Convert to array with timestamps
+        const notifications = [];
+        notificationsSnap.forEach(doc => {
+            const data = doc.data();
+            notifications.push({
+                id: doc.id,
+                ...data,
+                timestampObj: data.timestamp?.toDate?.() || new Date(0)
+            });
+        });
+        
+        // Sort in memory by timestamp (newest first)
+        notifications.sort((a, b) => b.timestampObj - a.timestampObj);
+        
+        displayNotifications(notifications);
     } catch (error) {
         console.error('Error loading notifications:', error);
         const notificationsList = document.getElementById('notificationsList');
@@ -2622,12 +2681,25 @@ async function checkForNewMessages() {
                 // Get all messages and filter in memory
                 const messagesQuery = collection(db, 'conversations', threadDoc.id, 'messages');
                 const messagesSnap = await getDocs(messagesQuery);
+                
+                // Convert to array and sort in memory
+                const messages = [];
+                messagesSnap.forEach(doc => {
+                    const data = doc.data();
+                    messages.push({
+                        id: doc.id,
+                        ...data,
+                        timestampObj: data.timestamp?.toDate?.() || new Date(0)
+                    });
+                });
+                
+                // Sort by newest first
+                messages.sort((a, b) => b.timestampObj - a.timestampObj);
 
-                for (const messageDoc of messagesSnap.docs) {
-                    const message = messageDoc.data();
+                for (const message of messages) {
                     // Check if message is from partner and unread
                     if (message.senderId === partnerId && !message.read) {
-                        await createMessageNotification(messageDoc.id, partnerId, message);
+                        await createMessageNotification(message.id, partnerId, message);
                         break; // Only create one notification per conversation
                     }
                 }
@@ -2676,10 +2748,23 @@ async function checkForNewPosts() {
     try {
         const postsQuery = collection(db, 'posts');
         const postsSnap = await getDocs(postsQuery);
+        
+        // Convert to array and sort in memory
+        const posts = [];
+        postsSnap.forEach(doc => {
+            const data = doc.data();
+            posts.push({
+                id: doc.id,
+                ...data,
+                timestampObj: data.timestamp?.toDate?.() || new Date(0)
+            });
+        });
+        
+        // Sort by newest first
+        posts.sort((a, b) => b.timestampObj - a.timestampObj);
 
-        for (const postDoc of postsSnap.docs) {
-            const post = postDoc.data();
-            const postId = postDoc.id;
+        for (const post of posts) {
+            const postId = post.id;
             
             // Skip if post is from current user or already viewed
             if (post.userId === currentUser.uid || viewedPosts.has(postId)) {
@@ -2783,15 +2868,24 @@ async function checkForNewGroupMessages() {
 
             // Get recent messages
             const messagesRef = collection(db, 'groups', groupId, 'messages');
-            const messagesQuery = query(
-                messagesRef,
-                orderBy('timestamp', 'desc')
-            );
-            const messagesSnap = await getDocs(messagesQuery);
+            const messagesSnap = await getDocs(messagesRef);
             
-            for (const messageDoc of messagesSnap.docs) {
-                const message = messageDoc.data();
-                const messageTime = message.timestamp?.toDate?.()?.getTime() || new Date(message.timestamp).getTime();
+            // Convert to array and sort in memory
+            const messages = [];
+            messagesSnap.forEach(doc => {
+                const data = doc.data();
+                messages.push({
+                    id: doc.id,
+                    ...data,
+                    timestampObj: data.timestamp?.toDate?.() || new Date(0)
+                });
+            });
+            
+            // Sort by newest first
+            messages.sort((a, b) => b.timestampObj - a.timestampObj);
+            
+            for (const message of messages) {
+                const messageTime = message.timestampObj.getTime();
                 
                 // Skip if message is from current user
                 if (message.senderId === currentUser.uid) continue;
@@ -2800,7 +2894,7 @@ async function checkForNewGroupMessages() {
                 if (messageTime <= lastMessageTime) break;
                 
                 // Create notification for new message
-                await createGroupMessageNotification(groupId, group.name, message, messageDoc.id);
+                await createGroupMessageNotification(groupId, group.name, message, message.id);
                 
                 // Update last message time
                 localStorage.setItem(lastMessageKey, messageTime.toString());
@@ -2818,8 +2912,8 @@ async function createGroupMessageNotification(groupId, groupName, message, messa
         const existing = await checkExistingNotification('group_message', messageId, message.senderId);
         if (existing) return;
 
-        const senderDoc = await getDoc(doc(db, 'group_users', message.senderId));
-        const senderName = senderDoc.exists() ? senderDoc.data().displayName : 'Someone';
+        const senderDoc = await getDoc(doc(db, 'users', message.senderId));
+        const senderName = senderDoc.exists() ? senderDoc.data().name : 'Someone';
 
         const messageText = message.text ? 
             (message.text.length > 50 ? message.text.substring(0, 50) + '...' : message.text) : 
@@ -2991,12 +3085,13 @@ function setupNotificationListener() {
                 ...doc.data()
             }));
             
-            const unreadNotifications = allNotifications.filter(notification => !notification.read);
-            const sortedNotifications = allNotifications.sort((a, b) => {
-                const timeA = a.timestamp?.toDate?.() || new Date(0);
-                const timeB = b.timestamp?.toDate?.() || new Date(0);
-                return timeB - timeA;
+            // Add timestamp objects for sorting
+            allNotifications.forEach(notification => {
+                notification.timestampObj = notification.timestamp?.toDate?.() || new Date(0);
             });
+            
+            const unreadNotifications = allNotifications.filter(notification => !notification.read);
+            const sortedNotifications = allNotifications.sort((a, b) => b.timestampObj - a.timestampObj);
             
             const previousUnreadCount = unreadCount;
             unreadCount = unreadNotifications.length;
@@ -3017,10 +3112,7 @@ function setupNotificationListener() {
             
             // Reload notifications if on notification page
             if (window.location.pathname.includes('notification.html')) {
-                displayNotifications(sortedNotifications.map((notification, index) => ({
-                    id: notification.id,
-                    data: () => notification
-                })));
+                displayNotifications(sortedNotifications);
             }
             
             // Update dropdown if open
@@ -3045,7 +3137,7 @@ function setupNotificationListener() {
 
     } catch (error) {
         console.error('Error setting up notification listener:', error);
-        const cachedCount = localStorage.getItem(`notification_count_${currentUser.uid}`) || 0;
+        const cachedCount = localStorage.getItem(`notification_count_${currentUser ? currentUser.uid : 'anonymous'}`) || 0;
         updateNotificationBadge(parseInt(cachedCount));
     }
 }
