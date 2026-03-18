@@ -7,6 +7,166 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
+<style>
+/* Development Notice */
+.development-notice {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.development-notice i {
+    font-size: 1.5rem;
+}
+
+.development-notice p {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+/* Naira Payment Section */
+.naira-payment-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 10px;
+    border: 2px solid #667eea;
+}
+
+.naira-payment-section h3 {
+    color: #333;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.naira-payment-section h3 i {
+    color: #667eea;
+}
+
+.naira-plans {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.naira-plan-item {
+    background: white;
+    padding: 1rem 2rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: center;
+    min-width: 150px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.naira-plan-item:hover {
+    transform: translateY(-3px);
+    border-color: #667eea;
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.naira-amount {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+}
+
+.naira-points {
+    display: block;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.naira-payment-details {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-top: 1rem;
+}
+
+.payment-method h4 {
+    color: #333;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.account-details {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.detail-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-row span:first-child {
+    color: #666;
+    min-width: 120px;
+}
+
+.detail-row strong {
+    color: #333;
+    flex: 1;
+}
+
+.detail-row .copy-btn {
+    background: transparent;
+    border: none;
+    color: #667eea;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.detail-row .copy-btn:hover {
+    background: #667eea;
+    color: white;
+}
+
+/* Responsive Design for Naira Section */
+@media (max-width: 768px) {
+    .naira-plans {
+        flex-direction: column;
+    }
+    
+    .naira-plan-item {
+        width: 100%;
+    }
+    
+    .detail-row {
+        flex-wrap: wrap;
+    }
+    
+    .detail-row span:first-child {
+        min-width: 100%;
+        margin-bottom: 0.25rem;
+    }
+}
+</style>
 <body>
     <nav class="navbar">
         <div class="nav-container">
@@ -69,6 +229,12 @@
                 <span>Current Points:</span>
                 <span class="chat-points-display">0</span>
             </div>
+        </div>
+
+        <!-- Development Notice -->
+        <div class="development-notice">
+            <i class="fas fa-info-circle"></i>
+            <p>This  is used for further development of the app</p>
         </div>
 
         <div class="plans-container">
@@ -135,6 +301,49 @@
                     <button class="copy-btn" data-address="0x6672E799207FDd2271326565B4280b15C0475f81">
                         <i class="far fa-copy"></i> Copy
                     </button>
+                </div>
+            </div>
+
+            <!-- Naira Payment Section -->
+            <div class="naira-payment-section">
+                <h3><i class="fas fa-naira-sign"></i> Naira Payment (Nigeria)</h3>
+                
+                <div class="naira-plans">
+                    <div class="naira-plan-item">
+                        <span class="naira-amount">₦1,000</span>
+                        <span class="naira-points">Basic Plan</span>
+                    </div>
+                    <div class="naira-plan-item">
+                        <span class="naira-amount">₦2,000</span>
+                        <span class="naira-points">Standard Plan</span>
+                    </div>
+                    <div class="naira-plan-item">
+                        <span class="naira-amount">₦5,000</span>
+                        <span class="naira-points">Premium Plan</span>
+                    </div>
+                </div>
+
+                <div class="naira-payment-details">
+                    <div class="payment-method">
+                        <h4>OPay Account</h4>
+                        <div class="account-details">
+                            <div class="detail-row">
+                                <span>Account Number:</span>
+                                <strong>9130063806</strong>
+                                <button class="copy-btn" data-address="9130063806">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="detail-row">
+                                <span>Account Name:</span>
+                                <strong>Cyprian David</strong>
+                            </div>
+                            <div class="detail-row">
+                                <span>Bank:</span>
+                                <strong>OPay</strong>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
