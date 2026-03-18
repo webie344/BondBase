@@ -301,7 +301,7 @@ Get Started.</p>
 
         <div class="button-container">
             <button class="get-started-btn" id="getStartedBtn">
-                <span id="buttonText">GET STARTED</span>
+                <span id="buttonText">Logging in..</span>
             </button>
         </div>
     </div>
@@ -378,7 +378,7 @@ Get Started.</p>
                 // Check if user is already logged in
                 if (window.auth && window.auth.currentUser) {
                     // User is already logged in, redirect to mingle
-                    window.location.href = 'mingle.html';
+                    window.location.href = 'posts.html';
                     return;
                 }
                 
@@ -388,7 +388,7 @@ Get Started.</p>
                     console.log('Anonymous user signed in:', userCredential.user.uid);
                     
                     // Redirect to mingle page
-                    window.location.href = 'mingle.html';
+                    window.location.href = 'posts.html';
                 } else {
                     // Fallback: redirect to login page if Firebase is not loaded
                     window.location.href = 'login.html';
@@ -397,7 +397,7 @@ Get Started.</p>
                 console.error('Login error:', error);
                 
                 // Reset button state
-                buttonText.textContent = 'GET STARTED';
+                buttonText.textContent = 'Logging you in';
                 button.disabled = false;
                 
                 // Show error and redirect to login page as fallback
@@ -421,7 +421,7 @@ Get Started.</p>
                         // Update button click handler for logged-in users
                         const button = document.getElementById('getStartedBtn');
                         button.addEventListener('click', () => {
-                            window.location.href = 'mingle.html';
+                            window.location.href = 'posts.html';
                         }, { once: true });
                     }
                 });
