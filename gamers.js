@@ -16,19 +16,19 @@ import {
     arrayRemove,
     serverTimestamp,
     increment,
-    Timestamp
+    Timestamp,
+    onSnapshot // Add this for real-time listeners
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
-    authDomain: "crypto-6517d.firebaseapp.com",
-    projectId: "crypto-6517d",
-    storageBucket: "crypto-6517d.firebasestorage.app",
-    messagingSenderId: "60263975159",
-    appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-  };
-
+    apiKey: "AIzaSyCwSv_Xb2ZzD_M_dKmGz9aI7WSXyxanza8",
+    authDomain: "fir-auth-be493.firebaseapp.com",
+    projectId: "fir-auth-be493",
+    storageBucket: "fir-auth-be493.firebasestorage.app",
+    messagingSenderId: "1074457503152",
+    appId: "1:1074457503152:web:c4220c1ba1c7ad607be275"
+};
 
 // Initialize Firebase
 let app, auth, db;
@@ -39,6 +39,766 @@ try {
     console.log('Firebase initialized successfully');
 } catch (error) {
     console.error('Firebase initialization error:', error);
+}
+
+// ==================== FOLLOWER NOTIFICATION SYSTEM ====================
+class FollowerNotificationSystem {
+    constructor() {
+        this.notificationSound = null;
+        this.lastCheckTime = Date.now();
+        this.checkInterval = null;
+        this.notificationPermission = false;
+        this.notificationCache = new Set(); // Track shown notifications
+        this.unreadCount = 0;
+        this.unfollowListener = null;
+        this.followListener = null;
+        this.currentUserId = null;
+    }
+
+    async initialize() {
+        console.log('🔔 Initializing follower notification system...');
+        
+        // Request notification permission
+        if ('Notification' in window) {
+            if (Notification.permission === 'default') {
+                this.notificationPermission = await Notification.requestPermission();
+            } else {
+                this.notificationPermission = Notification.permission;
+            }
+            console.log('Notification permission:', this.notificationPermission);
+        }
+
+        // Create notification bell in UI
+        this.createNotificationBell();
+
+        // Start checking for new followers when user is logged in
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                console.log('👤 User logged in, starting follower checks for:', user.uid);
+                this.currentUserId = user.uid;
+                this.startChecking(user.uid);
+                await this.loadUnreadCount(user.uid);
+            } else {
+                console.log('👤 User logged out, stopping follower checks');
+                this.currentUserId = null;
+                this.stopChecking();
+            }
+        });
+
+        // Add notification styles
+        this.addNotificationStyles();
+    }
+
+    createNotificationBell() {
+        // Check if notification bell already exists
+        if (document.getElementById('notificationBell')) return;
+
+        const notificationBell = document.createElement('div');
+        notificationBell.id = 'notificationBell';
+        notificationBell.className = 'notification-bell';
+        notificationBell.innerHTML = `
+            <i class="fas fa-bell"></i>
+            <span class="notification-badge" style="display: none;">0</span>
+            <div class="notification-dropdown" style="display: none;">
+                <div class="notification-header">
+                    <h3>Notifications</h3>
+                    <button class="mark-all-read">Mark all as read</button>
+                </div>
+                <div class="notification-list">
+                    <div class="notification-empty">
+                        <i class="fas fa-bell-slash"></i>
+                        <p>No notifications yet</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add to header
+        const header = document.querySelector('.header-right, .nav-right, .user-menu');
+        if (header) {
+            header.insertBefore(notificationBell, header.firstChild);
+        } else {
+            // Create a header if none exists
+            const nav = document.querySelector('nav') || document.body;
+            const customHeader = document.createElement('div');
+            customHeader.className = 'notification-header-wrapper';
+            customHeader.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 20px;
+                z-index: 1000;
+            `;
+            customHeader.appendChild(notificationBell);
+            nav.appendChild(customHeader);
+        }
+
+        // Add click event
+        notificationBell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleNotificationDropdown();
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!notificationBell.contains(e.target)) {
+                const dropdown = document.querySelector('.notification-dropdown');
+                if (dropdown) {
+                    dropdown.style.display = 'none';
+                }
+            }
+        });
+
+        // Mark all as read button
+        const markAllBtn = notificationBell.querySelector('.mark-all-read');
+        if (markAllBtn) {
+            markAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.markAllAsRead();
+            });
+        }
+    }
+
+    toggleNotificationDropdown() {
+        const dropdown = document.querySelector('.notification-dropdown');
+        if (dropdown) {
+            const isVisible = dropdown.style.display === 'block';
+            dropdown.style.display = isVisible ? 'none' : 'block';
+            
+            // If opening, mark notifications as read
+            if (!isVisible) {
+                this.markNotificationsAsRead();
+            }
+        }
+    }
+
+    async startChecking(userId) {
+        // Clear any existing intervals/listeners
+        this.stopChecking();
+
+        console.log('🔄 Setting up real-time follower listener for user:', userId);
+        
+        // Set up real-time listener for the user's document to detect new followers
+        const userRef = doc(db, 'users', userId);
+        
+        this.followListener = onSnapshot(userRef, (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const userData = docSnapshot.data();
+                const followers = userData.followers || [];
+                
+                // Check for new followers since last check
+                this.checkForNewFollowers(userId, followers);
+            }
+        }, (error) => {
+            console.error('Error in follower listener:', error);
+        });
+
+        // Also listen for the user's notifications subcollection if it exists
+        const notificationsRef = collection(db, 'users', userId, 'notifications');
+        this.notificationListener = onSnapshot(
+            query(notificationsRef, where('createdAt', '>', this.lastCheckTime)),
+            (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const notification = change.doc.data();
+                        this.showFollowerNotification(notification);
+                    }
+                });
+            },
+            (error) => {
+                console.error('Error in notification listener:', error);
+            }
+        );
+
+        // Also check periodically as backup
+        this.checkInterval = setInterval(() => {
+            this.checkForNewFollowers(userId);
+        }, 10000); // Check every 10 seconds
+    }
+
+    stopChecking() {
+        if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+            this.checkInterval = null;
+        }
+        if (this.followListener) {
+            this.followListener();
+            this.followListener = null;
+        }
+        if (this.notificationListener) {
+            this.notificationListener();
+            this.notificationListener = null;
+        }
+    }
+
+    async checkForNewFollowers(userId, currentFollowers = null) {
+        try {
+            // Get current followers if not provided
+            if (!currentFollowers) {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                if (!userSnap.exists()) return;
+                currentFollowers = userSnap.data().followers || [];
+            }
+
+            // Get previous followers from cache
+            const cachedFollowers = await this.getCachedFollowers(userId);
+            
+            // Find new followers
+            const newFollowers = currentFollowers.filter(
+                followerId => !cachedFollowers.includes(followerId)
+            );
+
+            if (newFollowers.length > 0) {
+                console.log(`🎉 Found ${newFollowers.length} new followers!`);
+                
+                // Process each new follower
+                for (const followerId of newFollowers) {
+                    await this.processNewFollower(userId, followerId);
+                }
+
+                // Update cache
+                await this.cacheFollowers(userId, currentFollowers);
+            }
+
+        } catch (error) {
+            console.error('Error checking for new followers:', error);
+        }
+    }
+
+    async processNewFollower(userId, followerId) {
+        // Check if we already showed notification for this follower
+        const notificationKey = `${userId}_${followerId}`;
+        if (this.notificationCache.has(notificationKey)) return;
+
+        try {
+            // Get follower details
+            const followerRef = doc(db, 'users', followerId);
+            const followerSnap = await getDoc(followerRef);
+            
+            if (!followerSnap.exists()) return;
+
+            const followerData = followerSnap.data();
+            const followerName = followerData.name || 'Someone';
+            const followerImage = followerData.profileImage || 'images-default-profile.jpg';
+
+            // Create notification object
+            const notification = {
+                id: notificationKey,
+                type: 'new_follower',
+                followerId: followerId,
+                followerName: followerName,
+                followerImage: followerImage,
+                timestamp: Date.now(),
+                read: false
+            };
+
+            // Show notification
+            this.showFollowerNotification(notification);
+
+            // Add to cache
+            this.notificationCache.add(notificationKey);
+
+            // Update unread count
+            this.updateUnreadCount(1);
+
+            // Store in IndexedDB for persistence
+            await this.storeNotification(userId, notification);
+
+        } catch (error) {
+            console.error('Error processing new follower:', error);
+        }
+    }
+
+    showFollowerNotification(notification) {
+        // Show in-app notification
+        this.showInAppNotification(notification);
+
+        // Show browser notification if permitted
+        if (this.notificationPermission === 'granted') {
+            this.showBrowserNotification(notification);
+        }
+
+        // Add to notification dropdown
+        this.addToNotificationDropdown(notification);
+    }
+
+    showInAppNotification(notification) {
+        const notificationDiv = document.createElement('div');
+        notificationDiv.className = 'follower-notification';
+        notificationDiv.innerHTML = `
+            <img src="${notification.followerImage}" alt="${notification.followerName}" class="notification-avatar">
+            <div class="notification-content">
+                <strong>${notification.followerName}</strong> started following you!
+                <div class="notification-time">${this.getTimeAgo(notification.timestamp)}</div>
+            </div>
+            <button class="notification-close"><i class="fas fa-times"></i></button>
+        `;
+
+        // Add styles
+        notificationDiv.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 300px;
+            animation: slideInRight 0.5s ease;
+            cursor: pointer;
+        `;
+
+        // Add close button functionality
+        const closeBtn = notificationDiv.querySelector('.notification-close');
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notificationDiv.remove();
+        });
+
+        // Click to view profile
+        notificationDiv.addEventListener('click', () => {
+            window.location.href = `profile.html?id=${notification.followerId}`;
+        });
+
+        document.body.appendChild(notificationDiv);
+
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (notificationDiv.parentElement) {
+                notificationDiv.style.animation = 'slideOutRight 0.5s ease';
+                setTimeout(() => notificationDiv.remove(), 500);
+            }
+        }, 5000);
+    }
+
+    showBrowserNotification(notification) {
+        try {
+            const browserNotification = new Notification('New Follower! 🎉', {
+                body: `${notification.followerName} started following you`,
+                icon: notification.followerImage,
+                badge: 'images-default-profile.jpg',
+                tag: notification.id,
+                requireInteraction: false
+            });
+
+            browserNotification.onclick = () => {
+                window.focus();
+                window.location.href = `profile.html?id=${notification.followerId}`;
+                browserNotification.close();
+            };
+
+            setTimeout(() => browserNotification.close(), 5000);
+        } catch (error) {
+            console.error('Error showing browser notification:', error);
+        }
+    }
+
+    addToNotificationDropdown(notification) {
+        const notificationList = document.querySelector('.notification-list');
+        if (!notificationList) return;
+
+        // Remove empty state if exists
+        const emptyState = notificationList.querySelector('.notification-empty');
+        if (emptyState) {
+            emptyState.remove();
+        }
+
+        const notificationItem = document.createElement('div');
+        notificationItem.className = 'notification-item unread';
+        notificationItem.dataset.id = notification.id;
+        notificationItem.innerHTML = `
+            <img src="${notification.followerImage}" alt="${notification.followerName}" class="notification-avatar">
+            <div class="notification-item-content">
+                <div class="notification-item-text">
+                    <strong>${notification.followerName}</strong> started following you
+                </div>
+                <div class="notification-item-time">${this.getTimeAgo(notification.timestamp)}</div>
+            </div>
+            <button class="notification-item-close"><i class="fas fa-times"></i></button>
+        `;
+
+        // Add styles
+        notificationItem.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: background 0.2s;
+        `;
+
+        // Mark as read on click
+        notificationItem.addEventListener('click', (e) => {
+            if (!e.target.closest('.notification-item-close')) {
+                window.location.href = `profile.html?id=${notification.followerId}`;
+                notificationItem.classList.remove('unread');
+                this.updateUnreadCount(-1);
+            }
+        });
+
+        // Close button
+        const closeBtn = notificationItem.querySelector('.notification-item-close');
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notificationItem.remove();
+            this.removeNotification(notification.id);
+            
+            // Show empty state if no notifications
+            if (notificationList.children.length === 0) {
+                notificationList.innerHTML = `
+                    <div class="notification-empty">
+                        <i class="fas fa-bell-slash"></i>
+                        <p>No notifications yet</p>
+                    </div>
+                `;
+            }
+        });
+
+        notificationList.prepend(notificationItem);
+    }
+
+    async getCachedFollowers(userId) {
+        try {
+            const cached = await indexedDBCache.get('followers', userId);
+            return cached || [];
+        } catch (error) {
+            console.log('Could not get cached followers:', error);
+            return [];
+        }
+    }
+
+    async cacheFollowers(userId, followers) {
+        try {
+            await indexedDBCache.set('followers', userId, followers);
+        } catch (error) {
+            console.log('Could not cache followers:', error);
+        }
+    }
+
+    async storeNotification(userId, notification) {
+        try {
+            // Store in IndexedDB
+            const notifications = await indexedDBCache.get('notifications', userId) || [];
+            notifications.unshift(notification);
+            
+            // Keep only last 50 notifications
+            if (notifications.length > 50) {
+                notifications.pop();
+            }
+            
+            await indexedDBCache.set('notifications', userId, notifications);
+        } catch (error) {
+            console.log('Could not store notification:', error);
+        }
+    }
+
+    async loadUnreadCount(userId) {
+        try {
+            const notifications = await indexedDBCache.get('notifications', userId) || [];
+            const unread = notifications.filter(n => !n.read).length;
+            this.unreadCount = unread;
+            this.updateNotificationBadge();
+        } catch (error) {
+            console.log('Could not load unread count:', error);
+        }
+    }
+
+    updateUnreadCount(change) {
+        this.unreadCount += change;
+        if (this.unreadCount < 0) this.unreadCount = 0;
+        this.updateNotificationBadge();
+    }
+
+    updateNotificationBadge() {
+        const badge = document.querySelector('.notification-badge');
+        if (!badge) return;
+
+        if (this.unreadCount > 0) {
+            badge.style.display = 'flex';
+            badge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    markAllAsRead() {
+        const notificationItems = document.querySelectorAll('.notification-item.unread');
+        notificationItems.forEach(item => item.classList.remove('unread'));
+        this.unreadCount = 0;
+        this.updateNotificationBadge();
+    }
+
+    markNotificationsAsRead() {
+        // Mark all notifications in dropdown as read
+        const notificationItems = document.querySelectorAll('.notification-item.unread');
+        notificationItems.forEach(item => item.classList.remove('unread'));
+        this.unreadCount = 0;
+        this.updateNotificationBadge();
+    }
+
+    removeNotification(notificationId) {
+        // Remove from cache if needed
+        this.notificationCache.delete(notificationId);
+    }
+
+    getTimeAgo(timestamp) {
+        const seconds = Math.floor((Date.now() - timestamp) / 1000);
+        
+        if (seconds < 60) return 'just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+        return `${Math.floor(seconds / 86400)}d ago`;
+    }
+
+    addNotificationStyles() {
+        if (document.getElementById('notificationStyles')) return;
+
+        const style = document.createElement('style');
+        style.id = 'notificationStyles';
+        style.textContent = `
+            .notification-bell {
+                position: relative;
+                cursor: pointer;
+                padding: 8px;
+                border-radius: 50%;
+                transition: background 0.3s;
+                margin-right: 15px;
+            }
+
+            .notification-bell:hover {
+                background: rgba(255,255,255,0.1);
+            }
+
+            .notification-bell i {
+                font-size: 20px;
+                color: white;
+            }
+
+            .notification-badge {
+                position: absolute;
+                top: 0;
+                right: 0;
+                background: #ff2a6d;
+                color: white;
+                font-size: 10px;
+                font-weight: bold;
+                min-width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 2px solid #1a1a2e;
+            }
+
+            .notification-dropdown {
+                position: absolute;
+                top: 100%;
+                right: 0;
+                width: 350px;
+                background: #16213e;
+                border-radius: 10px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                z-index: 1000;
+                margin-top: 10px;
+                border: 1px solid rgba(255,255,255,0.1);
+            }
+
+            .notification-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+            }
+
+            .notification-header h3 {
+                margin: 0;
+                font-size: 16px;
+                color: white;
+            }
+
+            .mark-all-read {
+                background: none;
+                border: none;
+                color: #7a4fff;
+                font-size: 12px;
+                cursor: pointer;
+                padding: 5px 10px;
+                border-radius: 5px;
+                transition: background 0.2s;
+            }
+
+            .mark-all-read:hover {
+                background: rgba(122, 79, 255, 0.1);
+            }
+
+            .notification-list {
+                max-height: 400px;
+                overflow-y: auto;
+            }
+
+            .notification-item {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 15px;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+
+            .notification-item:hover {
+                background: rgba(255,255,255,0.05);
+            }
+
+            .notification-item.unread {
+                background: rgba(122, 79, 255, 0.1);
+            }
+
+            .notification-avatar {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                object-fit: cover;
+            }
+
+            .notification-item-content {
+                flex: 1;
+            }
+
+            .notification-item-text {
+                color: white;
+                font-size: 13px;
+                margin-bottom: 4px;
+            }
+
+            .notification-item-time {
+                color: rgba(255,255,255,0.5);
+                font-size: 11px;
+            }
+
+            .notification-item-close {
+                background: none;
+                border: none;
+                color: rgba(255,255,255,0.3);
+                cursor: pointer;
+                padding: 5px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s;
+            }
+
+            .notification-item-close:hover {
+                color: white;
+                background: rgba(255,255,255,0.1);
+            }
+
+            .notification-empty {
+                text-align: center;
+                padding: 40px 20px;
+                color: rgba(255,255,255,0.5);
+            }
+
+            .notification-empty i {
+                font-size: 40px;
+                margin-bottom: 10px;
+                opacity: 0.5;
+            }
+
+            .notification-empty p {
+                margin: 0;
+                font-size: 14px;
+            }
+
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+
+            @keyframes slideOutRight {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+            }
+
+            .follower-notification {
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                min-width: 300px;
+                animation: slideInRight 0.5s ease;
+                cursor: pointer;
+            }
+
+            .follower-notification .notification-avatar {
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                object-fit: cover;
+                border: 2px solid white;
+            }
+
+            .follower-notification .notification-content {
+                flex: 1;
+            }
+
+            .follower-notification .notification-time {
+                font-size: 11px;
+                opacity: 0.8;
+                margin-top: 4px;
+            }
+
+            .follower-notification .notification-close {
+                background: none;
+                border: none;
+                color: white;
+                opacity: 0.7;
+                cursor: pointer;
+                padding: 5px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s;
+            }
+
+            .follower-notification .notification-close:hover {
+                opacity: 1;
+                background: rgba(255,255,255,0.2);
+            }
+        `;
+
+        document.head.appendChild(style);
+    }
 }
 
 // ==================== INSTANT LOADING SYSTEM ====================
@@ -256,7 +1016,7 @@ class InstantLoadingSystem {
 class GamersIndexedDBCache {
     constructor() {
         this.dbName = 'GamersAppDB';
-        this.dbVersion = 9; // Increment version for stores store
+        this.dbVersion = 10; // Increment version for notifications and followers
         this.db = null;
     }
 
@@ -298,17 +1058,43 @@ class GamersIndexedDBCache {
                     storesStore.createIndex('storeId', 'storeId', { unique: true });
                     storesStore.createIndex('storeName', 'storeName', { unique: false });
                 }
+                // Add followers cache
+                if (!db.objectStoreNames.contains('followers')) {
+                    const followersStore = db.createObjectStore('followers', { keyPath: 'userId' });
+                    followersStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+                }
+                // Add notifications store
+                if (!db.objectStoreNames.contains('notifications')) {
+                    const notificationsStore = db.createObjectStore('notifications', { keyPath: 'userId' });
+                    notificationsStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+                }
             };
         });
     }
 
-    async set(storeName, data) {
+    async set(storeName, key, data) {
         if (!this.db) await this.init();
         
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction([storeName], 'readwrite');
             const store = transaction.objectStore(storeName);
-            const request = store.put(data);
+            
+            // Handle different store structures
+            let record;
+            if (storeName === 'followers' || storeName === 'notifications') {
+                record = {
+                    userId: key,
+                    data: data,
+                    lastUpdated: Date.now()
+                };
+            } else {
+                record = {
+                    ...data,
+                    lastUpdated: Date.now()
+                };
+            }
+            
+            const request = store.put(record);
             
             request.onerror = () => reject(request.error);
             request.onsuccess = () => resolve(request.result);
@@ -324,7 +1110,14 @@ class GamersIndexedDBCache {
             const request = store.get(key);
             
             request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => {
+                const result = request.result;
+                if (result && (storeName === 'followers' || storeName === 'notifications')) {
+                    resolve(result.data);
+                } else {
+                    resolve(result);
+                }
+            };
         });
     }
 
@@ -345,7 +1138,14 @@ class GamersIndexedDBCache {
             }
             
             request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve(request.result || []);
+            request.onsuccess = () => {
+                let results = request.result || [];
+                // For followers and notifications, extract the data property
+                if (storeName === 'followers' || storeName === 'notifications') {
+                    results = results.map(r => r.data);
+                }
+                resolve(results);
+            };
         });
     }
 
@@ -378,7 +1178,7 @@ class GamersIndexedDBCache {
     async setProfiles(profiles) {
         await this.init();
         for (const profile of profiles) {
-            await this.set('profiles', {
+            await this.set('profiles', profile.id, {
                 ...profile,
                 lastUpdated: Date.now()
             });
@@ -392,7 +1192,7 @@ class GamersIndexedDBCache {
 
     async setProfileDetail(userId, detail) {
         await this.init();
-        return await this.set('profileDetails', {
+        return await this.set('profileDetails', userId, {
             userId,
             ...detail,
             lastUpdated: Date.now()
@@ -406,7 +1206,7 @@ class GamersIndexedDBCache {
 
     async setFollowStatus(userId, targetId, isFollowing) {
         await this.init();
-        return await this.set('followStatus', {
+        return await this.set('followStatus', `${userId}_${targetId}`, {
             id: `${userId}_${targetId}`,
             userId,
             targetId,
@@ -423,7 +1223,7 @@ class GamersIndexedDBCache {
 
     async setXPData(userId, xpData) {
         await this.init();
-        return await this.set('xpData', {
+        return await this.set('xpData', userId, {
             userId,
             ...xpData,
             lastUpdated: Date.now()
@@ -438,7 +1238,7 @@ class GamersIndexedDBCache {
     // Add store methods
     async setStore(storeData) {
         await this.init();
-        return await this.set('stores', {
+        return await this.set('stores', storeData.ownerId, {
             ownerId: storeData.ownerId,
             storeId: storeData.storeId,
             storeName: storeData.storeName,
@@ -456,6 +1256,28 @@ class GamersIndexedDBCache {
     async getAllStores() {
         await this.init();
         return await this.getAll('stores');
+    }
+
+    // Add follower cache methods
+    async setFollowers(userId, followers) {
+        await this.init();
+        return await this.set('followers', userId, followers);
+    }
+
+    async getFollowers(userId) {
+        await this.init();
+        return await this.get('followers', userId) || [];
+    }
+
+    // Add notification methods
+    async setNotifications(userId, notifications) {
+        await this.init();
+        return await this.set('notifications', userId, notifications);
+    }
+
+    async getNotifications(userId) {
+        await this.init();
+        return await this.get('notifications', userId) || [];
     }
 }
 
@@ -633,6 +1455,9 @@ const isGamersPage = window.location.pathname.includes('gamers.html') ||
                      window.location.pathname.includes('mingle.html');
 const isXpPage = window.location.pathname.includes('xp.html');
 
+// Initialize notification system
+const followerNotifier = new FollowerNotificationSystem();
+
 // ==================== XP SYSTEM INTEGRATION ====================
 // Import XP system
 async function loadXPSystem() {
@@ -740,6 +1565,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Start instant loading IMMEDIATELY (before auth)
     await instantLoader.initialize();
+    
+    // Initialize follower notification system
+    await followerNotifier.initialize();
     
     // Render instantly if we're on gamers page
     if (isGamersPage) {
@@ -2686,4 +3514,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('✅ gamers.js loaded successfully - Instant loading with IndexedDB caching, Service Worker support, and XP System integration');
+console.log('✅ gamers.js loaded successfully - Instant loading with IndexedDB caching, Service Worker support, XP System integration, and Follower Notifications');

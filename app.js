@@ -2166,7 +2166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 // Hide auth pages if user is logged in
                 if (['login', 'signup', 'index'].includes(currentPage)) {
-                    window.location.href = 'mingle.html';
+                    window.location.href = 'posts.html';
                 }
             }).catch(error => {
                 logError(error, 'ensuring user document');
@@ -4071,7 +4071,7 @@ function initLoginPage() {
                 
                 showNotification('Login successful! Redirecting...', 'success');
                 setTimeout(() => {
-                    window.location.href = 'mingle.html';
+                    window.location.href = 'posts.html';
                 }, 1500);
                 
             } catch (error) {
@@ -4132,7 +4132,7 @@ function initSignupPage() {
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
                     profileComplete: false,
-                    chatPoints: 12,
+                    chatPoints: 20,
                     paymentHistory: [],
                     accountDisabled: false
                 });
