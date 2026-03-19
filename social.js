@@ -126,6 +126,12 @@ class SocialManager {
         this.maxPollOptions = 4;
         this.minPollOptions = 2;
         
+        // Video players map for managing instances
+        this.videoPlayers = new Map();
+        
+        // Intersection Observer for auto-play
+        this.setupVideoIntersectionObserver();
+        
         // Check if we're on posts.html and add loader
         const currentPage = window.location.pathname.split('/').pop();
         if (currentPage === 'posts.html') {
@@ -168,6 +174,28 @@ class SocialManager {
         if (loader) {
             loader.remove();
         }
+    }
+
+    // Setup Intersection Observer for video auto-play
+    setupVideoIntersectionObserver() {
+        this.videoObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const videoContainer = entry.target;
+                    const videoId = videoContainer.dataset.videoId;
+                    const videoUrl = videoContainer.dataset.videoUrl;
+                    const thumbnailUrl = videoContainer.dataset.thumbnailUrl;
+                    const duration = videoContainer.dataset.duration;
+                    
+                    if (videoId && videoUrl && !videoContainer.classList.contains('video-initialized')) {
+                        this.initializeVideoPlayer(videoContainer, videoId, videoUrl, thumbnailUrl, duration);
+                    }
+                }
+            });
+        }, {
+            threshold: 0.5,
+            rootMargin: '50px'
+        });
     }
 
     init() {
@@ -256,7 +284,7 @@ class SocialManager {
             .post-modal-content {
                 background: #1a1d21;
                 border-radius: 24px;
-                max-width: 800px;
+                max-width: 900px;
                 width: 100%;
                 max-height: 90vh;
                 display: flex;
@@ -394,6 +422,12 @@ class SocialManager {
         const modal = document.getElementById('postModal');
         if (modal) {
             modal.style.display = 'none';
+            
+            // Pause all videos in modal
+            const videos = modal.querySelectorAll('video');
+            videos.forEach(video => {
+                video.pause();
+            });
         }
     }
     
@@ -414,19 +448,7 @@ class SocialManager {
         } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl;
             if (videoUrl) {
-                postContentHTML = `<div id="modal-video-container-${postId}"></div>`;
-                
-                setTimeout(() => {
-                    const container = document.getElementById(`modal-video-container-${postId}`);
-                    if (container) {
-                        const videoPlayer = this.createCustomVideoPlayer(
-                            videoUrl, 
-                            this.getVideoThumbnail(post), 
-                            post.videoDuration || 0
-                        );
-                        container.appendChild(videoPlayer.container);
-                    }
-                }, 50);
+                postContentHTML = `<div id="modal-video-container-${postId}" class="video-wrapper"></div>`;
             }
         } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
@@ -496,6 +518,22 @@ class SocialManager {
                 <div class="comments-list" id="modal-comments-list-${postId}"></div>
             </div>
         `;
+
+        // Initialize video if present
+        if (post.videoUrl || post.mediaType === 'video') {
+            setTimeout(() => {
+                const container = document.getElementById(`modal-video-container-${postId}`);
+                if (container) {
+                    const videoContainer = this.createVideoContainer(postId, post.videoUrl, this.getVideoThumbnail(post), post.videoDuration || 0, true);
+                    container.appendChild(videoContainer);
+                    
+                    // Observe for auto-play
+                    if (this.videoObserver) {
+                        this.videoObserver.observe(videoContainer);
+                    }
+                }
+            }, 100);
+        }
 
         // Add event listeners
         const likeBtn = postDiv.querySelector('.like-btn');
@@ -1002,22 +1040,28 @@ class SocialManager {
 
                 .post-image {
                     width: 100%;
-                    max-height: 400px;
+                    max-height: 500px;
                     object-fit: contain;
                     display: block;
+                }
+
+                /* ========== ENHANCED VIDEO STYLES ========== */
+                .video-wrapper {
+                    margin-top: 12px;
+                    width: 100%;
                 }
 
                 .video-thumbnail-container {
                     position: relative;
                     width: 100%;
                     height: 0;
-                    padding-bottom: 56.25%;
+                    padding-bottom: 75%; /* 4:3 aspect ratio - larger */
                     background: #000;
                     border-radius: 16px;
                     overflow: hidden;
                     cursor: pointer;
-                    margin-top: 12px;
                     border: 1px solid rgba(255, 255, 255, 0.1);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
                 }
 
                 .video-thumbnail-image {
@@ -1034,17 +1078,18 @@ class SocialManager {
                     top: 50%;
                     left: 50%;
                     transform: translate(-50%, -50%);
-                    width: 50px;
-                    height: 50px;
-                    background: rgba(0, 0, 0, 0.7);
+                    width: 70px;
+                    height: 70px;
+                    background: rgba(255, 75, 110, 0.95);
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     color: white;
-                    font-size: 20px;
+                    font-size: 28px;
                     transition: all 0.2s ease;
-                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    border: 3px solid rgba(255, 255, 255, 0.5);
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
                 }
 
                 .video-thumbnail-container:hover .video-play-button-center {
@@ -1059,12 +1104,178 @@ class SocialManager {
                     right: 12px;
                     background: rgba(0, 0, 0, 0.85);
                     color: white;
-                    padding: 4px 8px;
+                    padding: 6px 12px;
                     border-radius: 12px;
-                    font-size: 12px;
+                    font-size: 14px;
                     font-weight: 600;
                     z-index: 2;
                     letter-spacing: 0.5px;
+                }
+
+                /* Custom Video Player */
+                .custom-video-container {
+                    position: relative;
+                    width: 100%;
+                    height: 0;
+                    padding-bottom: 75%; /* 4:3 aspect ratio - larger */
+                    background: #000;
+                    border-radius: 16px;
+                    overflow: hidden;
+                    margin: 12px 0;
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                }
+
+                /* Larger video player for modal */
+                .post-modal .custom-video-container {
+                    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+                    max-height: 70vh;
+                }
+
+                .custom-video-player {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                    background: #000;
+                }
+
+                .custom-video-player::-webkit-media-controls {
+                    display: none !important;
+                }
+
+                .video-controls-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: linear-gradient(to top, rgba(0,0,0,0.7), transparent 50%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                }
+
+                .custom-video-container:hover .video-controls-overlay {
+                    opacity: 1;
+                }
+
+                .video-center-play-btn {
+                    width: 80px;
+                    height: 80px;
+                    background: rgba(255, 75, 110, 0.95);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 32px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    border: 3px solid rgba(255,255,255,0.5);
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+                }
+
+                .video-center-play-btn:hover {
+                    background: #ff4b6e;
+                    transform: scale(1.1);
+                    border-color: white;
+                }
+
+                .video-bottom-controls {
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+                    padding: 20px 15px 15px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                    pointer-events: none;
+                }
+
+                .custom-video-container:hover .video-bottom-controls {
+                    opacity: 1;
+                    pointer-events: auto;
+                }
+
+                .control-bar {
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                    color: white;
+                }
+
+                .control-btn {
+                    background: transparent;
+                    border: none;
+                    color: white;
+                    cursor: pointer;
+                    padding: 8px;
+                    border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s;
+                    font-size: 18px;
+                }
+
+                .control-btn:hover {
+                    background: rgba(255,255,255,0.2);
+                }
+
+                .progress-bar-container {
+                    flex: 1;
+                    height: 8px;
+                    background: rgba(255,255,255,0.3);
+                    border-radius: 4px;
+                    cursor: pointer;
+                    position: relative;
+                }
+
+                .progress-bar-fill {
+                    height: 100%;
+                    background: #ff4b6e;
+                    border-radius: 4px;
+                    width: 0%;
+                    position: relative;
+                    transition: width 0.1s linear;
+                }
+
+                .time-display {
+                    font-size: 14px;
+                    color: white;
+                    font-family: monospace;
+                    min-width: 100px;
+                }
+
+                .volume-control {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+
+                .volume-slider {
+                    width: 80px;
+                    height: 6px;
+                    background: rgba(255,255,255,0.3);
+                    border-radius: 3px;
+                    cursor: pointer;
+                    position: relative;
+                }
+
+                .volume-fill {
+                    height: 100%;
+                    background: white;
+                    border-radius: 3px;
+                    width: 100%;
                 }
 
                 /* ========== POST ACTIONS ========== */
@@ -2208,162 +2419,6 @@ class SocialManager {
                     background: rgba(255,255,255,0.1);
                 }
 
-                /* ========== CUSTOM VIDEO PLAYER STYLES ========== */
-                .custom-video-container {
-                    position: relative;
-                    width: 100%;
-                    height: 0;
-                    padding-bottom: 56.25%;
-                    background: #000;
-                    border-radius: 12px;
-                    overflow: hidden;
-                }
-
-                .custom-video-player {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    object-fit: contain;
-                    background: #000;
-                }
-
-                .custom-video-player::-webkit-media-controls {
-                    display: none !important;
-                }
-
-                .video-controls-overlay {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(0,0,0,0.3);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    opacity: 0;
-                    transition: opacity 0.3s ease;
-                }
-
-                .custom-video-container:hover .video-controls-overlay {
-                    opacity: 1;
-                }
-
-                .video-center-play-btn {
-                    width: 80px;
-                    height: 80px;
-                    background: rgba(255, 75, 110, 0.95);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    font-size: 32px;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    border: 3px solid rgba(255,255,255,0.5);
-                    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-                }
-
-                .video-center-play-btn:hover {
-                    background: #ff4b6e;
-                    transform: scale(1.1);
-                    border-color: white;
-                }
-
-                .video-bottom-controls {
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    right: 0;
-                    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
-                    padding: 20px 15px 15px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 8px;
-                    opacity: 0;
-                    transition: opacity 0.3s ease;
-                    pointer-events: none;
-                }
-
-                .custom-video-container:hover .video-bottom-controls {
-                    opacity: 1;
-                    pointer-events: auto;
-                }
-
-                .control-bar {
-                    display: flex;
-                    align-items: center;
-                    gap: 15px;
-                    color: white;
-                }
-
-                .control-btn {
-                    background: transparent;
-                    border: none;
-                    color: white;
-                    cursor: pointer;
-                    padding: 8px;
-                    border-radius: 6px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.2s;
-                }
-
-                .control-btn:hover {
-                    background: rgba(255,255,255,0.2);
-                }
-
-                .progress-bar-container {
-                    flex: 1;
-                    height: 6px;
-                    background: rgba(255,255,255,0.3);
-                    border-radius: 3px;
-                    cursor: pointer;
-                    position: relative;
-                }
-
-                .progress-bar-fill {
-                    height: 100%;
-                    background: #ff4b6e;
-                    border-radius: 3px;
-                    width: 0%;
-                    position: relative;
-                    transition: width 0.1s linear;
-                }
-
-                .time-display {
-                    font-size: 14px;
-                    color: white;
-                    font-family: monospace;
-                    min-width: 90px;
-                }
-
-                .volume-control {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-
-                .volume-slider {
-                    width: 80px;
-                    height: 4px;
-                    background: rgba(255,255,255,0.3);
-                    border-radius: 2px;
-                    cursor: pointer;
-                    position: relative;
-                }
-
-                .volume-fill {
-                    height: 100%;
-                    background: white;
-                    border-radius: 2px;
-                    width: 100%;
-                }
-
                 /* ========== MEDIA QUERIES ========== */
                 @media (max-width: 768px) {
                     .pymk-nav-btn.left {
@@ -2500,10 +2555,10 @@ class SocialManager {
 
             if (videoUrl.includes('/upload/')) {
                 if (videoUrl.includes('/upload/video/')) {
-                    return videoUrl.replace('/upload/video/', '/upload/w_600,h_338,c_fill,q_auto,f_jpg/')
+                    return videoUrl.replace('/upload/video/', '/upload/w_800,h_450,c_fill,q_auto,f_jpg/')
                                    .replace(/\.(mp4|mov|avi|mkv|webm|ogg|3gp|m4v)$/i, '.jpg');
                 } else {
-                    return videoUrl.replace('/upload/', '/upload/w_600,h_338,c_fill,q_auto,f_jpg/');
+                    return videoUrl.replace('/upload/', '/upload/w_800,h_450,c_fill,q_auto,f_jpg/');
                 }
             }
             
@@ -2519,6 +2574,8 @@ class SocialManager {
         container.className = 'video-thumbnail-container';
         container.setAttribute('data-video-url', videoUrl);
         container.setAttribute('data-post-id', postId);
+        container.setAttribute('data-thumbnail', thumbnailUrl);
+        container.setAttribute('data-duration', duration);
         
         const thumbUrl = thumbnailUrl || this.getVideoThumbnail(postData || { videoUrl });
         
@@ -2546,39 +2603,28 @@ class SocialManager {
         
         container.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.playVideo(postId, videoUrl, thumbUrl, duration);
+            this.initializeVideoPlayer(container, postId, videoUrl, thumbUrl, duration);
         });
         
         return container;
     }
     
-    playVideo(postId, videoUrl, thumbnailUrl, duration) {
-        const container = document.getElementById(`video-container-${postId}`);
-        if (!container) return;
-        
-        container.innerHTML = '';
-        const player = this.createCustomVideoPlayer(videoUrl, thumbnailUrl, duration);
-        container.appendChild(player.container);
-        
-        setTimeout(() => {
-            player.video.play().catch(e => console.log('Auto-play prevented:', e));
-        }, 100);
-    }
-
-    // ==================== CUSTOM VIDEO PLAYER ====================
-    
-    createCustomVideoPlayer(videoUrl, thumbnailUrl, duration) {
+    createVideoContainer(postId, videoUrl, thumbnailUrl, duration, autoPlay = false) {
         const container = document.createElement('div');
         container.className = 'custom-video-container';
+        container.dataset.videoId = postId;
+        container.dataset.videoUrl = videoUrl;
+        container.dataset.thumbnailUrl = thumbnailUrl;
+        container.dataset.duration = duration;
+        container.dataset.autoPlay = autoPlay;
         
+        // Create video element but don't set src yet - will be set when initialized
         const video = document.createElement('video');
         video.className = 'custom-video-player';
         video.preload = 'metadata';
-        video.poster = thumbnailUrl || this.generateCloudinaryThumbnail(videoUrl);
-        video.innerHTML = `<source src="${videoUrl}" type="video/mp4">Your browser does not support the video tag.`;
+        video.poster = thumbnailUrl;
         
-        video.controls = false;
-        
+        // Create controls overlay
         const controlsOverlay = document.createElement('div');
         controlsOverlay.className = 'video-controls-overlay';
         
@@ -2587,6 +2633,7 @@ class SocialManager {
         centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
         controlsOverlay.appendChild(centerPlayBtn);
         
+        // Create bottom controls
         const bottomControls = document.createElement('div');
         bottomControls.className = 'video-bottom-controls';
         
@@ -2636,16 +2683,41 @@ class SocialManager {
         container.appendChild(controlsOverlay);
         container.appendChild(bottomControls);
         
+        // Store video element reference
+        container.videoElement = video;
+        
+        return container;
+    }
+    
+    initializeVideoPlayer(container, postId, videoUrl, thumbnailUrl, duration) {
+        if (container.classList.contains('video-initialized')) {
+            // If already initialized, just toggle play/pause
+            const video = container.videoElement;
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
+            return;
+        }
+        
+        container.classList.add('video-initialized');
+        
+        const video = container.videoElement;
+        video.src = videoUrl;
+        
         let hideControlsTimeout;
         
         const showControls = () => {
-            controlsOverlay.style.opacity = '1';
-            bottomControls.style.opacity = '1';
+            const controlsOverlay = container.querySelector('.video-controls-overlay');
+            const bottomControls = container.querySelector('.video-bottom-controls');
+            if (controlsOverlay) controlsOverlay.style.opacity = '1';
+            if (bottomControls) bottomControls.style.opacity = '1';
             clearTimeout(hideControlsTimeout);
             hideControlsTimeout = setTimeout(() => {
                 if (!video.paused) {
-                    controlsOverlay.style.opacity = '0';
-                    bottomControls.style.opacity = '0';
+                    if (controlsOverlay) controlsOverlay.style.opacity = '0';
+                    if (bottomControls) bottomControls.style.opacity = '0';
                 }
             }, 3000);
         };
@@ -2653,11 +2725,17 @@ class SocialManager {
         const updateProgress = () => {
             if (video.duration) {
                 const percent = (video.currentTime / video.duration) * 100;
-                progressFill.style.width = percent + '%';
+                const progressFill = container.querySelector('.progress-bar-fill');
+                if (progressFill) {
+                    progressFill.style.width = percent + '%';
+                }
                 
                 const current = this.formatDuration(video.currentTime);
                 const total = this.formatDuration(video.duration);
-                timeDisplay.textContent = `${current} / ${total}`;
+                const timeDisplay = container.querySelector('.time-display');
+                if (timeDisplay) {
+                    timeDisplay.textContent = `${current} / ${total}`;
+                }
             }
         };
         
@@ -2669,103 +2747,138 @@ class SocialManager {
             }
         };
         
+        // Get control elements
+        const playPauseBtn = container.querySelector('.control-btn:first-child');
+        const centerPlayBtn = container.querySelector('.video-center-play-btn');
+        const progressContainer = container.querySelector('.progress-bar-container');
+        const volumeBtn = container.querySelector('.volume-control .control-btn');
+        const volumeSlider = container.querySelector('.volume-slider');
+        const volumeFill = container.querySelector('.volume-fill');
+        const fullscreenBtn = container.querySelector('.control-btn:last-child');
+        
         video.addEventListener('loadedmetadata', () => {
-            timeDisplay.textContent = `0:00 / ${this.formatDuration(video.duration)}`;
+            const timeDisplay = container.querySelector('.time-display');
+            if (timeDisplay) {
+                timeDisplay.textContent = `0:00 / ${this.formatDuration(video.duration)}`;
+            }
         });
         
         video.addEventListener('timeupdate', updateProgress);
         
         video.addEventListener('play', () => {
-            playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-            centerPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            if (centerPlayBtn) centerPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
             showControls();
         });
         
         video.addEventListener('pause', () => {
-            playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-            centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
-            controlsOverlay.style.opacity = '1';
-            bottomControls.style.opacity = '1';
+            if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            if (centerPlayBtn) centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+            const controlsOverlay = container.querySelector('.video-controls-overlay');
+            const bottomControls = container.querySelector('.video-bottom-controls');
+            if (controlsOverlay) controlsOverlay.style.opacity = '1';
+            if (bottomControls) bottomControls.style.opacity = '1';
             clearTimeout(hideControlsTimeout);
         });
         
         video.addEventListener('ended', () => {
-            playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-            centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
-            controlsOverlay.style.opacity = '1';
-            bottomControls.style.opacity = '1';
+            if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            if (centerPlayBtn) centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+            const controlsOverlay = container.querySelector('.video-controls-overlay');
+            const bottomControls = container.querySelector('.video-bottom-controls');
+            if (controlsOverlay) controlsOverlay.style.opacity = '1';
+            if (bottomControls) bottomControls.style.opacity = '1';
         });
         
         container.addEventListener('mouseenter', showControls);
         container.addEventListener('mouseleave', () => {
             if (!video.paused) {
-                controlsOverlay.style.opacity = '0';
-                bottomControls.style.opacity = '0';
+                const controlsOverlay = container.querySelector('.video-controls-overlay');
+                const bottomControls = container.querySelector('.video-bottom-controls');
+                if (controlsOverlay) controlsOverlay.style.opacity = '0';
+                if (bottomControls) bottomControls.style.opacity = '0';
             }
         });
         
-        centerPlayBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            togglePlay();
-        });
+        if (centerPlayBtn) {
+            centerPlayBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                togglePlay();
+            });
+        }
         
-        playPauseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            togglePlay();
-        });
+        if (playPauseBtn) {
+            playPauseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                togglePlay();
+            });
+        }
         
-        progressContainer.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const rect = progressContainer.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
-            video.currentTime = percent * video.duration;
-        });
+        if (progressContainer) {
+            progressContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const rect = progressContainer.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                video.currentTime = percent * video.duration;
+            });
+        }
         
-        volumeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            video.muted = !video.muted;
-            volumeBtn.innerHTML = video.muted ? 
-                '<i class="fas fa-volume-mute"></i>' : 
-                '<i class="fas fa-volume-up"></i>';
-            volumeFill.style.width = video.muted ? '0%' : (video.volume * 100) + '%';
-        });
+        if (volumeBtn && volumeSlider && volumeFill) {
+            volumeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                video.muted = !video.muted;
+                volumeBtn.innerHTML = video.muted ? 
+                    '<i class="fas fa-volume-mute"></i>' : 
+                    '<i class="fas fa-volume-up"></i>';
+                volumeFill.style.width = video.muted ? '0%' : (video.volume * 100) + '%';
+            });
+            
+            volumeSlider.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const rect = volumeSlider.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                video.volume = Math.max(0, Math.min(1, percent));
+                video.muted = false;
+                volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                volumeFill.style.width = (video.volume * 100) + '%';
+            });
+        }
         
-        volumeSlider.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const rect = volumeSlider.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
-            video.volume = Math.max(0, Math.min(1, percent));
-            video.muted = false;
-            volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-            volumeFill.style.width = (video.volume * 100) + '%';
-        });
-        
-        fullscreenBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!document.fullscreenElement) {
-                container.requestFullscreen();
-                fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
-            } else {
-                document.exitFullscreen();
-                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
-            }
-        });
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!document.fullscreenElement) {
+                    container.requestFullscreen();
+                    fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+                } else {
+                    document.exitFullscreen();
+                    fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+                }
+            });
+        }
         
         document.addEventListener('fullscreenchange', () => {
-            fullscreenBtn.innerHTML = document.fullscreenElement ? 
-                '<i class="fas fa-compress"></i>' : 
-                '<i class="fas fa-expand"></i>';
+            if (fullscreenBtn) {
+                fullscreenBtn.innerHTML = document.fullscreenElement ? 
+                    '<i class="fas fa-compress"></i>' : 
+                    '<i class="fas fa-expand"></i>';
+            }
         });
         
         video.addEventListener('dblclick', () => {
-            fullscreenBtn.click();
+            if (fullscreenBtn) fullscreenBtn.click();
         });
         
         container.addEventListener('click', (e) => {
             e.stopPropagation();
         });
         
-        return { container, video };
+        // Auto-play if requested
+        if (container.dataset.autoPlay === 'true') {
+            setTimeout(() => {
+                video.play().catch(e => console.log('Auto-play prevented:', e));
+            }, 100);
+        }
     }
 
     // ==================== VIDEO PLACEHOLDER METHODS ====================
@@ -3793,7 +3906,7 @@ class SocialManager {
                             <i class="fas fa-video"></i> Video Ready
                         </div>
                         <div style="position: relative;">
-                            <div class="video-thumbnail-container" style="cursor: default;">
+                            <div class="video-thumbnail-container" style="cursor: default; padding-bottom: 75%;">
                                 <img src="${thumbnailUrl}" class="video-thumbnail-image" alt="Video thumbnail">
                                 <div class="video-play-button-center" style="background: rgba(255,75,110,0.95);">
                                     <i class="fas fa-play"></i>
@@ -4373,28 +4486,14 @@ class SocialManager {
         } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl;
             if (videoUrl) {
-                postContentHTML = `<div id="video-container-${post.id}"></div>`;
-                
-                setTimeout(() => {
-                    const videoContainer = document.getElementById(`video-container-${post.id}`);
-                    if (videoContainer) {
-                        const thumbnail = this.createVideoThumbnail(
-                            videoUrl, 
-                            this.getVideoThumbnail(post), 
-                            post.videoDuration, 
-                            post.id,
-                            post
-                        );
-                        videoContainer.appendChild(thumbnail);
-                    }
-                }, 50);
+                postContentHTML = `<div id="video-container-${post.id}" class="video-wrapper"></div>`;
             }
         } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
                 postContentHTML += `
                     <div class="post-image-container">
-                        <img src="${imageUrl}" alt="Post image" class="post-image" style="width: 100%; max-height: 400px; object-fit: contain; border-radius: 16px;">
+                        <img src="${imageUrl}" alt="Post image" class="post-image" style="width: 100%; max-height: 500px; object-fit: contain; border-radius: 16px;">
                     </div>
                 `;
             }
@@ -4462,6 +4561,22 @@ class SocialManager {
                 </div>
             </div>
         `;
+
+        // Initialize video if present
+        if (post.videoUrl || post.mediaType === 'video') {
+            setTimeout(() => {
+                const container = document.getElementById(`video-container-${post.id}`);
+                if (container) {
+                    const videoContainer = this.createVideoContainer(post.id, post.videoUrl, this.getVideoThumbnail(post), post.videoDuration || 0, true);
+                    container.appendChild(videoContainer);
+                    
+                    // Observe for auto-play
+                    if (this.videoObserver) {
+                        this.videoObserver.observe(videoContainer);
+                    }
+                }
+            }, 100);
+        }
 
         // Add profile navigation
         const avatar = container.querySelector('.post-author-avatar');
@@ -4607,28 +4722,14 @@ class SocialManager {
         } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl;
             if (videoUrl) {
-                postContentHTML = `<div id="video-container-${postId}"></div>`;
-                
-                setTimeout(() => {
-                    const container = document.getElementById(`video-container-${postId}`);
-                    if (container) {
-                        const thumbnail = this.createVideoThumbnail(
-                            videoUrl, 
-                            this.getVideoThumbnail(post), 
-                            post.videoDuration, 
-                            postId,
-                            post
-                        );
-                        container.appendChild(thumbnail);
-                    }
-                }, 50);
+                postContentHTML = `<div id="video-container-${postId}" class="video-wrapper"></div>`;
             }
         } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
                 postContentHTML += `
                     <div class="post-image-container">
-                        <img src="${imageUrl}" alt="Post image" class="post-image" loading="lazy" style="width: 100%; max-height: 400px; object-fit: contain; border-radius: 16px;">
+                        <img src="${imageUrl}" alt="Post image" class="post-image" loading="lazy" style="width: 100%; max-height: 500px; object-fit: contain; border-radius: 16px;">
                     </div>
                 `;
             }
@@ -4712,6 +4813,22 @@ class SocialManager {
             </div>
         `;
 
+        // Initialize video if present
+        if (post.videoUrl || post.mediaType === 'video') {
+            setTimeout(() => {
+                const container = document.getElementById(`video-container-${postId}`);
+                if (container) {
+                    const videoContainer = this.createVideoContainer(postId, post.videoUrl, this.getVideoThumbnail(post), post.videoDuration || 0);
+                    container.appendChild(videoContainer);
+                    
+                    // Observe for auto-play
+                    if (this.videoObserver) {
+                        this.videoObserver.observe(videoContainer);
+                    }
+                }
+            }, 100);
+        }
+
         // Add profile navigation
         const avatar = postDiv.querySelector('.post-author-avatar');
         const name = postDiv.querySelector('.post-author-info h4');
@@ -4742,6 +4859,7 @@ class SocialManager {
                 target.closest('.view-replies-btn') ||
                 target.closest('.poll-option-content') ||
                 target.closest('.video-thumbnail-container') ||
+                target.closest('.custom-video-container') ||
                 target.closest('.post-author-avatar') ||
                 target.closest('.post-author-info h4');
             
@@ -5761,28 +5879,14 @@ class SocialManager {
         } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl;
             if (videoUrl) {
-                postContentHTML = `<div id="profile-video-container-${postId}"></div>`;
-                
-                setTimeout(() => {
-                    const container = document.getElementById(`profile-video-container-${postId}`);
-                    if (container) {
-                        const thumbnail = this.createVideoThumbnail(
-                            videoUrl, 
-                            this.getVideoThumbnail(post), 
-                            post.videoDuration, 
-                            postId,
-                            post
-                        );
-                        container.appendChild(thumbnail);
-                    }
-                }, 50);
+                postContentHTML = `<div id="profile-video-container-${postId}" class="video-wrapper"></div>`;
             }
         } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
             if (imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' && imageUrl.length > 10) {
                 postContentHTML += `
                     <div class="post-image-container">
-                        <img src="${imageUrl}" alt="Post image" class="post-image" style="width: 100%; max-height: 400px; object-fit: contain; border-radius: 16px;">
+                        <img src="${imageUrl}" alt="Post image" class="post-image" style="width: 100%; max-height: 500px; object-fit: contain; border-radius: 16px;">
                     </div>
                 `;
             }
@@ -5843,6 +5947,22 @@ class SocialManager {
                 <div class="comments-list" id="comments-list-${postId}"></div>
             </div>
         `;
+
+        // Initialize video if present
+        if (post.videoUrl || post.mediaType === 'video') {
+            setTimeout(() => {
+                const container = document.getElementById(`profile-video-container-${postId}`);
+                if (container) {
+                    const videoContainer = this.createVideoContainer(postId, post.videoUrl, this.getVideoThumbnail(post), post.videoDuration || 0);
+                    container.appendChild(videoContainer);
+                    
+                    // Observe for auto-play
+                    if (this.videoObserver) {
+                        this.videoObserver.observe(videoContainer);
+                    }
+                }
+            }, 100);
+        }
 
         // Add profile navigation
         const avatar = postDiv.querySelector('.post-author-avatar');
@@ -6084,21 +6204,7 @@ class SocialManager {
         } else if (post.videoUrl || post.mediaType === 'video') {
             const videoUrl = post.videoUrl;
             if (videoUrl) {
-                postContentHTML = `<div id="user-video-container-${postId}"></div>`;
-                
-                setTimeout(() => {
-                    const container = document.getElementById(`user-video-container-${postId}`);
-                    if (container) {
-                        const thumbnail = this.createVideoThumbnail(
-                            videoUrl, 
-                            this.getVideoThumbnail(post), 
-                            post.videoDuration, 
-                            postId,
-                            post
-                        );
-                        container.appendChild(thumbnail);
-                    }
-                }, 50);
+                postContentHTML = `<div id="user-video-container-${postId}" class="video-wrapper"></div>`;
             }
         } else if (post.imageUrl) {
             const imageUrl = String(post.imageUrl).trim();
@@ -6146,6 +6252,17 @@ class SocialManager {
                 </button>
             </div>
         `;
+
+        // Initialize video if present
+        if (post.videoUrl || post.mediaType === 'video') {
+            setTimeout(() => {
+                const container = document.getElementById(`user-video-container-${postId}`);
+                if (container) {
+                    const videoContainer = this.createVideoContainer(postId, post.videoUrl, this.getVideoThumbnail(post), post.videoDuration || 0);
+                    container.appendChild(videoContainer);
+                }
+            }, 100);
+        }
 
         const deleteBtn = postDiv.querySelector('.btn-delete-post');
         if (deleteBtn) {
