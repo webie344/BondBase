@@ -1,5 +1,3 @@
-
-
 <html lang="en">
 <head>
 <!-- Add this to your EXISTING index.html file -->
@@ -9,7 +7,7 @@
 <meta property="og:url" content="https://bond-base.vercel.app">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BondBase - Anonymous Social Gaming</title>
+    <title>BondBase - Connect & Build Together</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Add Firebase SDKs -->
     <script type="module">
@@ -49,144 +47,62 @@
         }
 
         body {
-            background-color: #0f0a0a;
-            color: #f0e6e6;
-            height: 100vh;
-            overflow: hidden;
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: #000000;
+            color: #ffffff;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            overflow-x: hidden;
         }
 
-        .background-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
         }
 
-        .floating-icons {
-            position: absolute;
-            width: 100%;
-            height: 100%;
+        ::-webkit-scrollbar-track {
+            background: #111111;
         }
 
-        .icon {
-            position: absolute;
-            font-size: 28px;
-            opacity: 0.4;
-            animation: float 20s infinite linear;
-            text-shadow: 0 0 10px rgba(220, 20, 60, 0.5);
-            transition: opacity 0.3s ease, transform 0.3s ease;
+        ::-webkit-scrollbar-thumb {
+            background: #333333;
+            border-radius: 4px;
         }
 
-        .icon:hover {
-            opacity: 1;
-            color: #FF3366;
-            transform: scale(1.3);
-            text-shadow: 0 0 20px rgba(255, 51, 102, 0.8);
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444444;
         }
 
-        .content {
+        /* Hero Section */
+        .hero {
             height: 100vh;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
             padding: 40px 20px;
+            position: relative;
+            z-index: 1;
         }
 
-        .app-info {
+        .hero-content {
             text-align: center;
-            max-width: 600px;
-            margin-top: 20vh;
+            max-width: 900px;
+            margin-bottom: 40px;
         }
 
         .app-name {
-            font-size: 64px;
+            font-size: 80px;
             font-weight: 800;
             margin-bottom: 20px;
-            letter-spacing: 3px;
-            background: linear-gradient(to right, #8B0000, #B22222, #DC143C);
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, #ffffff 0%, #a0a0a0 50%, #ffffff 100%);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            text-shadow: 0 0 20px rgba(139, 0, 0, 0.3);
+            animation: shimmer 3s infinite;
+            background-size: 200% auto;
         }
 
-        .app-tagline {
-            font-size: 22px;
-            color: #d8a7a7;
-            line-height: 1.4;
-            margin-bottom: 30px;
-        }
-
-        .button-container {
-            width: 100%;
-            padding: 20px;
-        }
-
-        .get-started-btn {
-            color: white;
-            border: none;
-            width: 100%;
-            max-width: 500px;
-            padding: 20px;
-            font-size: 22px;
-            font-weight: 600;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 25px rgba(139, 0, 0, 0.4);
-            display: block;
-            margin: 0 auto;
-            letter-spacing: 1.5px;
-            
-            /* Animated gradient background */
-            background: linear-gradient(
-                90deg,
-                #8B0000,
-                #A52A2A,
-                #B22222,
-                #8B0000
-            );
-            background-size: 300% 300%;
-            animation: gradientShift 3s ease-in-out infinite;
-        }
-
-        .get-started-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 30px rgba(139, 0, 0, 0.6);
-            animation-play-state: paused;
-        }
-
-        .get-started-btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            transform: none;
-            animation-play-state: paused;
-        }
-
-        /* Keyframe animations */
-        @keyframes float {
-            0% {
-                transform: translate(0, 0) rotate(0deg);
-            }
-            25% {
-                transform: translate(calc(100vw * 0.05), calc(100vh * 0.05)) rotate(90deg);
-            }
-            50% {
-                transform: translate(calc(100vw * -0.03), calc(100vh * 0.08)) rotate(180deg);
-            }
-            75% {
-                transform: translate(calc(100vw * 0.08), calc(100vh * -0.02)) rotate(270deg);
-            }
-            100% {
-                transform: translate(0, 0) rotate(360deg);
-            }
-        }
-
-        @keyframes gradientShift {
+        @keyframes shimmer {
             0% {
                 background-position: 0% 50%;
             }
@@ -198,35 +114,304 @@
             }
         }
 
-        /* Pulse animation for extra effect */
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 5px 25px rgba(139, 0, 0, 0.4);
-            }
-            50% {
-                box-shadow: 0 5px 30px rgba(220, 20, 60, 0.6);
-            }
-            100% {
-                box-shadow: 0 5px 25px rgba(139, 0, 0, 0.4);
-            }
+        .app-tagline {
+            font-size: 22px;
+            color: #cccccc;
+            line-height: 1.6;
+            margin-bottom: 40px;
+            font-weight: 300;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards 0.5s;
+        }
+
+        .button-container {
+            width: 100%;
+            padding: 20px;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards 0.8s;
         }
 
         .get-started-btn {
-            animation: gradientShift 3s ease-in-out infinite, pulse 2s ease-in-out infinite;
+            color: #000000;
+            background-color: #ffffff;
+            border: none;
+            width: 100%;
+            max-width: 400px;
+            padding: 18px 32px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: block;
+            margin: 0 auto;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15);
+            position: relative;
+            overflow: hidden;
         }
 
-        /* Glow effect for icons */
-        @keyframes glow {
+        .get-started-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .get-started-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .get-started-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(255, 255, 255, 0.25);
+        }
+
+        .get-started-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Features Section */
+        .features-section {
+            padding: 100px 40px;
+            background: linear-gradient(180deg, #000000 0%, #0a0a0a 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #ffffff 0%, #cccccc 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 18px;
+            color: #999999;
+            margin-bottom: 60px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 30px;
+            padding: 40px 30px;
+            text-align: center;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 25px;
+            display: inline-block;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            color: #ffffff;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .feature-card:nth-child(2) .feature-icon {
+            animation-delay: 0.2s;
+        }
+
+        .feature-card:nth-child(3) .feature-icon {
+            animation-delay: 0.4s;
+        }
+
+        .feature-card:nth-child(4) .feature-icon {
+            animation-delay: 0.6s;
+        }
+
+        @keyframes float {
             0%, 100% {
-                filter: drop-shadow(0 0 5px rgba(220, 20, 60, 0.6));
+                transform: translateY(0);
             }
             50% {
-                filter: drop-shadow(0 0 15px rgba(255, 51, 102, 0.8));
+                transform: translateY(-10px);
             }
         }
 
-        .icon {
-            animation: float 20s infinite linear, glow 3s infinite ease-in-out;
+        .feature-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #ffffff;
+        }
+
+        .feature-description {
+            color: #999999;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        /* Stats Section */
+        .stats-section {
+            padding: 80px 40px;
+            background: #000000;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .stat-item {
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s ease;
+        }
+
+        .stat-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .stat-number {
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #ffffff 0%, #cccccc 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .stat-label {
+            color: #999999;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            padding: 120px 40px;
+            text-align: center;
+            background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.03) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .cta-title {
+            font-size: 56px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-text {
+            font-size: 20px;
+            color: #cccccc;
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-button {
+            color: #ffffff;
+            background: transparent;
+            border: 2px solid #ffffff;
+            padding: 16px 40px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+        }
+
+        .cta-button:hover {
+            background: #ffffff;
+            color: #000000;
+            transform: scale(1.05);
         }
 
         /* Loading spinner */
@@ -235,9 +420,9 @@
             width: 20px;
             height: 20px;
             margin-right: 10px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(0, 0, 0, 0.1);
             border-radius: 50%;
-            border-top-color: white;
+            border-top-color: #000000;
             animation: spin 1s ease-in-out infinite;
         }
 
@@ -245,126 +430,193 @@
             to { transform: rotate(360deg); }
         }
 
+        /* Subtle background glow */
+        .subtle-glow {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.02) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Responsive Design */
         @media (max-width: 768px) {
             .app-name {
-                font-size: 48px;
+                font-size: 56px;
             }
             
             .app-tagline {
                 font-size: 20px;
             }
             
-            .get-started-btn {
-                font-size: 20px;
-                padding: 18px;
+            .section-title {
+                font-size: 36px;
             }
             
-            .icon {
-                font-size: 24px;
-                opacity: 0.5;
+            .cta-title {
+                font-size: 40px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                padding: 0 20px;
+            }
+            
+            .stat-number {
+                font-size: 36px;
             }
         }
 
         @media (max-width: 480px) {
             .app-name {
-                font-size: 36px;
+                font-size: 42px;
             }
             
             .app-tagline {
                 font-size: 18px;
             }
             
-            .get-started-btn {
-                font-size: 18px;
-                padding: 16px;
+            .section-title {
+                font-size: 30px;
             }
             
-            .icon {
-                font-size: 22px;
-                opacity: 0.6;
+            .cta-title {
+                font-size: 32px;
+            }
+            
+            .feature-card {
+                padding: 30px 20px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 30px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="background-container">
-        <div class="floating-icons" id="floatingIcons"></div>
-    </div>
+    <!-- Subtle radial gradient for depth -->
+    <div class="subtle-glow"></div>
 
-    <div class="content">
-        <div class="app-info">
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
             <h1 class="app-name">BondBase</h1>
-            <p class="app-tagline">Meet people around the world, express yourself, and build your own digital space — from conversations to online stores.
-Your community starts here.
-Get Started.</p>
+            <p class="app-tagline">Where connections turn into communities. Express yourself, build your digital space, and create together.</p>
         </div>
 
         <div class="button-container">
             <button class="get-started-btn" id="getStartedBtn">
-                <span id="buttonText">Logging in..</span>
+                <span id="buttonText">GET STARTED</span>
             </button>
         </div>
-    </div>
+        
+        <!-- Scroll indicator -->
+        <div style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); animation: bounce 2s infinite;">
+            <i class="fas fa-chevron-down" style="color: #666; font-size: 24px;"></i>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+        <h2 class="section-title fade-in">Everything You Need</h2>
+        <p class="section-subtitle fade-in">Build your digital empire with powerful features designed for connection and growth</p>
+        
+        <div class="features-grid">
+            <div class="feature-card fade-in">
+                <div class="feature-icon">
+                    <i class="fas fa-globe"></i>
+                </div>
+                <h3 class="feature-title">Global Community</h3>
+                <p class="feature-description">Connect with people from around the world. Share ideas, make friends, and build relationships across borders.</p>
+            </div>
+
+            <div class="feature-card fade-in">
+                <div class="feature-icon">
+                    <i class="fas fa-store"></i>
+                </div>
+                <h3 class="feature-title">Digital Storefront</h3>
+                <p class="feature-description">Open your own store and sell products or services. Turn your passion into profit with our integrated marketplace.</p>
+            </div>
+
+            <div class="feature-card fade-in">
+                <div class="feature-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <h3 class="feature-title">Real-time Chat</h3>
+                <p class="feature-description">Engage in meaningful conversations with instant messaging, voice chat, and community spaces.</p>
+            </div>
+
+            <div class="feature-card fade-in">
+                <div class="feature-icon">
+                    <i class="fas fa-palette"></i>
+                </div>
+                <h3 class="feature-title">Express Yourself</h3>
+                <p class="feature-description">Customize your profile, share your thoughts, and showcase your personality with creative tools.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats-section">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number" data-target="10000">0</div>
+                <div class="stat-label">Active Users</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-target="50">0</div>
+                <div class="stat-label">Countries</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-target="1000">0</div>
+                <div class="stat-label">Digital Stores</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-target="24">0</div>
+                <div class="stat-label">/7 Support</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <h2 class="cta-title fade-in">Ready to Join?</h2>
+        <p class="cta-text fade-in">Start your journey today and become part of a growing community of creators, entrepreneurs, and friends.</p>
+        <button class="cta-button fade-in" onclick="document.getElementById('getStartedBtn').click()">
+            Create Your Space
+        </button>
+    </section>
 
     <script>
-        // Icon options for the floating background
-        const iconClasses = [
-            'fas fa-dice', 'fas fa-gamepad', 'fas fa-headset', 'fas fa-mask',
-            'fas fa-user-secret', 'fas fa-ghost', 'fas fa-vr-cardboard', 'fas fa-key',
-            'fas fa-lock', 'fas fa-shield-alt', 'fas fa-comment-alt', 'fas fa-users',
-            'fas fa-wine-glass-alt', 'fas fa-gem', 'fas fa-fire', 'fas fa-heart',
-            'fas fa-crown', 'fas fa-trophy', 'fas fa-bolt', 'fas fa-star'
-        ];
-
-        // Create floating icons with increased visibility
-        function createFloatingIcons() {
-            const container = document.getElementById('floatingIcons');
-            const iconCount = 50; // Increased number of icons
-            
-            for (let i = 0; i < iconCount; i++) {
-                const icon = document.createElement('div');
-                icon.className = 'icon';
-                
-                // Random icon
-                const randomIcon = iconClasses[Math.floor(Math.random() * iconClasses.length)];
-                icon.innerHTML = `<i class="${randomIcon}"></i>`;
-                
-                // Random position
-                const posX = Math.random() * 100;
-                const posY = Math.random() * 100;
-                
-                // Random size - slightly larger
-                const size = Math.random() * 25 + 20;
-                
-                // Random animation
-                const duration = Math.random() * 30 + 20;
-                const delay = Math.random() * 5;
-                
-                icon.style.left = `${posX}%`;
-                icon.style.top = `${posY}%`;
-                icon.style.fontSize = `${size}px`;
-                icon.style.animation = `float ${duration}s linear ${delay}s infinite, glow ${Math.random() * 4 + 3}s infinite ease-in-out`;
-                
-                // More vibrant wine red colors
-                const colors = [
-                    '#DC143C', // Crimson - more vibrant
-                    '#FF3366', // Bright pink-red
-                    '#B22222', // Fire brick
-                    '#FF0033', // Bright red
-                    '#FF6B6B', // Coral red
-                    '#8B0000'  // Dark red
-                ];
-                const randomColor = colors[Math.floor(Math.random() * colors.length)];
-                icon.style.color = randomColor;
-                
-                // Vary opacity for depth
-                const opacity = Math.random() * 0.3 + 0.5; // 0.5 to 0.8 opacity
-                icon.style.opacity = opacity;
-                
-                container.appendChild(icon);
-            }
-        }
-
         // Handle button click - Automatic login
         document.getElementById('getStartedBtn').addEventListener('click', async function() {
             const button = this;
@@ -397,7 +649,7 @@ Get Started.</p>
                 console.error('Login error:', error);
                 
                 // Reset button state
-                buttonText.textContent = 'Logging you in';
+                buttonText.textContent = 'GET STARTED';
                 button.disabled = false;
                 
                 // Show error and redirect to login page as fallback
@@ -408,8 +660,6 @@ Get Started.</p>
 
         // Check if user is already logged in on page load
         document.addEventListener('DOMContentLoaded', async () => {
-            createFloatingIcons();
-            
             // Check for existing auth state
             if (window.onAuthStateChanged && window.auth) {
                 window.onAuthStateChanged(window.auth, (user) => {
@@ -420,49 +670,88 @@ Get Started.</p>
                         
                         // Update button click handler for logged-in users
                         const button = document.getElementById('getStartedBtn');
-                        button.addEventListener('click', () => {
+                        // Remove existing listeners and add new one
+                        button.replaceWith(button.cloneNode(true));
+                        document.getElementById('getStartedBtn').addEventListener('click', () => {
                             window.location.href = 'posts.html';
-                        }, { once: true });
+                        });
+                    } else {
+                        // No user, show default text
+                        document.getElementById('buttonText').textContent = 'GET STARTED';
                     }
                 });
+            } else {
+                // Fallback if Firebase not loaded
+                document.getElementById('buttonText').textContent = 'GET STARTED';
             }
+
+            // Intersection Observer for fade-in animations
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            // Observe all fade-in elements
+            document.querySelectorAll('.fade-in, .stat-item').forEach(el => {
+                observer.observe(el);
+            });
+
+            // Animate stats numbers
+            const statNumbers = document.querySelectorAll('.stat-number');
+            
+            const animateNumber = (element) => {
+                const target = parseInt(element.getAttribute('data-target'));
+                const duration = 2000; // 2 seconds
+                const step = target / (duration / 16); // 60fps
+                let current = 0;
+                
+                const updateNumber = () => {
+                    current += step;
+                    if (current < target) {
+                        element.textContent = Math.floor(current).toLocaleString();
+                        requestAnimationFrame(updateNumber);
+                    } else {
+                        element.textContent = target.toLocaleString() + '+';
+                    }
+                };
+                
+                updateNumber();
+            };
+
+            // Start animation when stats section is visible
+            const statsObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        statNumbers.forEach(animateNumber);
+                        statsObserver.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.5 });
+
+            statsObserver.observe(document.querySelector('.stats-section'));
+
+            // Smooth scroll for scroll indicator
+            document.querySelector('.fa-chevron-down').parentElement.addEventListener('click', () => {
+                window.scrollTo({
+                    top: window.innerHeight,
+                    behavior: 'smooth'
+                });
+            });
         });
 
-        // Add subtle color variation to button
-        function animateButtonColors() {
-            const button = document.getElementById('getStartedBtn');
-            const wineColors = [
-                '#8B0000',  // Dark Red
-                '#A52A2A',  // Brown Red
-                '#B22222',  // Fire Brick
-                '#DC143C',  // Crimson
-                '#FF0033'   // Bright Red
-            ];
-            
-            let colorIndex = 0;
-            
-            // Change gradient colors every 5 seconds
-            setInterval(() => {
-                const nextIndex = (colorIndex + 1) % wineColors.length;
-                const nextNextIndex = (colorIndex + 2) % wineColors.length;
-                
-                button.style.background = `linear-gradient(
-                    90deg,
-                    ${wineColors[colorIndex]},
-                    ${wineColors[nextIndex]},
-                    ${wineColors[nextNextIndex]},
-                    ${wineColors[colorIndex]}
-                )`;
-                
-                colorIndex = (colorIndex + 1) % wineColors.length;
-            }, 5000);
-        }
-
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            createFloatingIcons();
-            animateButtonColors();
-        });
+        // Add bounce animation for scroll indicator
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes bounce {
+                0%, 20%, 50%, 80%, 100% {transform: translateX(-50%) translateY(0);}
+                40% {transform: translateX(-50%) translateY(-20px);}
+                60% {transform: translateX(-50%) translateY(-10px);}
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
