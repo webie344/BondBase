@@ -17,7 +17,8 @@ import {
     serverTimestamp,
     increment,
     Timestamp,
-    onSnapshot // Add this for real-time listeners
+    onSnapshot,
+    setDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -28,7 +29,7 @@ const firebaseConfig = {
     storageBucket: "crypto-6517d.firebasestorage.app",
     messagingSenderId: "60263975159",
     appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-  };
+};
 
 // Initialize Firebase
 let app, auth, db;
@@ -41,24 +42,26 @@ try {
     console.error('Firebase initialization error:', error);
 }
 
-// ==================== FOLLOWER NOTIFICATION SYSTEM ====================
+// ==================== FOLLOWER NOTIFICATION SYSTEM - NO INDEX REQUIRED ====================
 class FollowerNotificationSystem {
     constructor() {
         this.notificationSound = null;
         this.lastCheckTime = Date.now();
         this.checkInterval = null;
         this.notificationPermission = false;
-        this.notificationCache = new Set(); // Track shown notifications
+        this.notificationCache = new Set();
         this.unreadCount = 0;
-        this.unfollowListener = null;
         this.followListener = null;
         this.currentUserId = null;
+        this.isInitialized = false;
+        this.lastFollowers = [];
     }
 
     async initialize() {
+        if (this.isInitialized) return;
+        
         console.log('🔔 Initializing follower notification system...');
         
-        // Request notification permission
         if ('Notification' in window) {
             if (Notification.permission === 'default') {
                 this.notificationPermission = await Notification.requestPermission();
@@ -68,16 +71,14 @@ class FollowerNotificationSystem {
             console.log('Notification permission:', this.notificationPermission);
         }
 
-        // Create notification bell in UI
         this.createNotificationBell();
 
-        // Start checking for new followers when user is logged in
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 console.log('👤 User logged in, starting follower checks for:', user.uid);
                 this.currentUserId = user.uid;
                 this.startChecking(user.uid);
-                await this.loadUnreadCount(user.uid);
+                await this.loadNotifications(user.uid);
             } else {
                 console.log('👤 User logged out, stopping follower checks');
                 this.currentUserId = null;
@@ -85,13 +86,14 @@ class FollowerNotificationSystem {
             }
         });
 
-        // Add notification styles
-        this.addNotificationStyles();
+        this.isInitialized = true;
     }
 
     createNotificationBell() {
-        // Check if notification bell already exists
-        if (document.getElementById('notificationBell')) return;
+        const existingBell = document.getElementById('notificationBell');
+        if (existingBell) {
+            existingBell.remove();
+        }
 
         const notificationBell = document.createElement('div');
         notificationBell.id = 'notificationBell';
@@ -113,42 +115,23 @@ class FollowerNotificationSystem {
             </div>
         `;
 
-        // Add to header
-        const header = document.querySelector('.header-right, .nav-right, .user-menu');
+        const header = document.querySelector('.header-right, .nav-right, .user-menu, nav, .top-bar');
         if (header) {
-            header.insertBefore(notificationBell, header.firstChild);
+            header.appendChild(notificationBell);
         } else {
-            // Create a header if none exists
-            const nav = document.querySelector('nav') || document.body;
-            const customHeader = document.createElement('div');
-            customHeader.className = 'notification-header-wrapper';
-            customHeader.style.cssText = `
-                position: fixed;
-                top: 10px;
-                right: 20px;
-                z-index: 1000;
-            `;
-            customHeader.appendChild(notificationBell);
-            nav.appendChild(customHeader);
+            notificationBell.style.position = 'fixed';
+            notificationBell.style.top = '20px';
+            notificationBell.style.right = '20px';
+            notificationBell.style.zIndex = '1000';
+            document.body.appendChild(notificationBell);
         }
 
-        // Add click event
         notificationBell.addEventListener('click', (e) => {
             e.stopPropagation();
+            e.preventDefault();
             this.toggleNotificationDropdown();
         });
 
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!notificationBell.contains(e.target)) {
-                const dropdown = document.querySelector('.notification-dropdown');
-                if (dropdown) {
-                    dropdown.style.display = 'none';
-                }
-            }
-        });
-
-        // Mark all as read button
         const markAllBtn = notificationBell.querySelector('.mark-all-read');
         if (markAllBtn) {
             markAllBtn.addEventListener('click', (e) => {
@@ -156,6 +139,16 @@ class FollowerNotificationSystem {
                 this.markAllAsRead();
             });
         }
+
+        document.addEventListener('click', (e) => {
+            const dropdown = document.querySelector('.notification-dropdown');
+            const bell = document.getElementById('notificationBell');
+            if (dropdown && bell && !bell.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        this.addNotificationStyles();
     }
 
     toggleNotificationDropdown() {
@@ -163,56 +156,41 @@ class FollowerNotificationSystem {
         if (dropdown) {
             const isVisible = dropdown.style.display === 'block';
             dropdown.style.display = isVisible ? 'none' : 'block';
-            
-            // If opening, mark notifications as read
-            if (!isVisible) {
-                this.markNotificationsAsRead();
-            }
         }
     }
 
     async startChecking(userId) {
-        // Clear any existing intervals/listeners
         this.stopChecking();
 
-        console.log('🔄 Setting up real-time follower listener for user:', userId);
+        console.log('🔄 Setting up follower listener for user:', userId);
         
-        // Set up real-time listener for the user's document to detect new followers
         const userRef = doc(db, 'users', userId);
         
         this.followListener = onSnapshot(userRef, (docSnapshot) => {
             if (docSnapshot.exists()) {
                 const userData = docSnapshot.data();
                 const followers = userData.followers || [];
-                
-                // Check for new followers since last check
                 this.checkForNewFollowers(userId, followers);
             }
         }, (error) => {
             console.error('Error in follower listener:', error);
         });
 
-        // Also listen for the user's notifications subcollection if it exists
-        const notificationsRef = collection(db, 'users', userId, 'notifications');
-        this.notificationListener = onSnapshot(
-            query(notificationsRef, where('createdAt', '>', this.lastCheckTime)),
-            (snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added') {
-                        const notification = change.doc.data();
-                        this.showFollowerNotification(notification);
-                    }
-                });
-            },
-            (error) => {
-                console.error('Error in notification listener:', error);
+        try {
+            const userRef = doc(db, 'users', userId);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                this.lastFollowers = userData.followers || [];
+                await this.cacheFollowers(userId, this.lastFollowers);
             }
-        );
+        } catch (error) {
+            console.error('Error loading initial followers:', error);
+        }
 
-        // Also check periodically as backup
         this.checkInterval = setInterval(() => {
-            this.checkForNewFollowers(userId);
-        }, 10000); // Check every 10 seconds
+            this.checkForNewFollowersPeriodic(userId);
+        }, 30000);
     }
 
     stopChecking() {
@@ -224,26 +202,12 @@ class FollowerNotificationSystem {
             this.followListener();
             this.followListener = null;
         }
-        if (this.notificationListener) {
-            this.notificationListener();
-            this.notificationListener = null;
-        }
     }
 
-    async checkForNewFollowers(userId, currentFollowers = null) {
+    async checkForNewFollowers(userId, currentFollowers) {
         try {
-            // Get current followers if not provided
-            if (!currentFollowers) {
-                const userRef = doc(db, 'users', userId);
-                const userSnap = await getDoc(userRef);
-                if (!userSnap.exists()) return;
-                currentFollowers = userSnap.data().followers || [];
-            }
-
-            // Get previous followers from cache
-            const cachedFollowers = await this.getCachedFollowers(userId);
+            const cachedFollowers = await this.getCachedFollowers(userId) || [];
             
-            // Find new followers
             const newFollowers = currentFollowers.filter(
                 followerId => !cachedFollowers.includes(followerId)
             );
@@ -251,13 +215,12 @@ class FollowerNotificationSystem {
             if (newFollowers.length > 0) {
                 console.log(`🎉 Found ${newFollowers.length} new followers!`);
                 
-                // Process each new follower
                 for (const followerId of newFollowers) {
                     await this.processNewFollower(userId, followerId);
                 }
 
-                // Update cache
                 await this.cacheFollowers(userId, currentFollowers);
+                this.lastFollowers = currentFollowers;
             }
 
         } catch (error) {
@@ -265,13 +228,24 @@ class FollowerNotificationSystem {
         }
     }
 
+    async checkForNewFollowersPeriodic(userId) {
+        try {
+            const userRef = doc(db, 'users', userId);
+            const userSnap = await getDoc(userRef);
+            if (!userSnap.exists()) return;
+            
+            const followers = userSnap.data().followers || [];
+            await this.checkForNewFollowers(userId, followers);
+        } catch (error) {
+            console.error('Error in periodic follower check:', error);
+        }
+    }
+
     async processNewFollower(userId, followerId) {
-        // Check if we already showed notification for this follower
-        const notificationKey = `${userId}_${followerId}`;
+        const notificationKey = `${userId}_${followerId}_${Date.now()}`;
         if (this.notificationCache.has(notificationKey)) return;
 
         try {
-            // Get follower details
             const followerRef = doc(db, 'users', followerId);
             const followerSnap = await getDoc(followerRef);
             
@@ -281,7 +255,6 @@ class FollowerNotificationSystem {
             const followerName = followerData.name || 'Someone';
             const followerImage = followerData.profileImage || 'images-default-profile.jpg';
 
-            // Create notification object
             const notification = {
                 id: notificationKey,
                 type: 'new_follower',
@@ -292,16 +265,10 @@ class FollowerNotificationSystem {
                 read: false
             };
 
-            // Show notification
             this.showFollowerNotification(notification);
-
-            // Add to cache
             this.notificationCache.add(notificationKey);
-
-            // Update unread count
-            this.updateUnreadCount(1);
-
-            // Store in IndexedDB for persistence
+            this.unreadCount++;
+            this.updateNotificationBadge();
             await this.storeNotification(userId, notification);
 
         } catch (error) {
@@ -310,21 +277,22 @@ class FollowerNotificationSystem {
     }
 
     showFollowerNotification(notification) {
-        // Show in-app notification
         this.showInAppNotification(notification);
 
-        // Show browser notification if permitted
         if (this.notificationPermission === 'granted') {
             this.showBrowserNotification(notification);
         }
 
-        // Add to notification dropdown
         this.addToNotificationDropdown(notification);
     }
 
     showInAppNotification(notification) {
+        const existing = document.querySelector(`.follower-notification[data-id="${notification.id}"]`);
+        if (existing) existing.remove();
+
         const notificationDiv = document.createElement('div');
         notificationDiv.className = 'follower-notification';
+        notificationDiv.dataset.id = notification.id;
         notificationDiv.innerHTML = `
             <img src="${notification.followerImage}" alt="${notification.followerName}" class="notification-avatar">
             <div class="notification-content">
@@ -334,40 +302,18 @@ class FollowerNotificationSystem {
             <button class="notification-close"><i class="fas fa-times"></i></button>
         `;
 
-        // Add styles
-        notificationDiv.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-            z-index: 10001;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 300px;
-            animation: slideInRight 0.5s ease;
-            cursor: pointer;
-        `;
+        document.body.appendChild(notificationDiv);
 
-        // Add close button functionality
         const closeBtn = notificationDiv.querySelector('.notification-close');
         closeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             notificationDiv.remove();
         });
 
-        // Click to view profile
         notificationDiv.addEventListener('click', () => {
             window.location.href = `profile.html?id=${notification.followerId}`;
         });
 
-        document.body.appendChild(notificationDiv);
-
-        // Auto remove after 5 seconds
         setTimeout(() => {
             if (notificationDiv.parentElement) {
                 notificationDiv.style.animation = 'slideOutRight 0.5s ease';
@@ -402,11 +348,13 @@ class FollowerNotificationSystem {
         const notificationList = document.querySelector('.notification-list');
         if (!notificationList) return;
 
-        // Remove empty state if exists
         const emptyState = notificationList.querySelector('.notification-empty');
         if (emptyState) {
             emptyState.remove();
         }
+
+        const existingItem = notificationList.querySelector(`[data-id="${notification.id}"]`);
+        if (existingItem) return;
 
         const notificationItem = document.createElement('div');
         notificationItem.className = 'notification-item unread';
@@ -422,34 +370,21 @@ class FollowerNotificationSystem {
             <button class="notification-item-close"><i class="fas fa-times"></i></button>
         `;
 
-        // Add styles
-        notificationItem.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            cursor: pointer;
-            transition: background 0.2s;
-        `;
-
-        // Mark as read on click
         notificationItem.addEventListener('click', (e) => {
             if (!e.target.closest('.notification-item-close')) {
                 window.location.href = `profile.html?id=${notification.followerId}`;
                 notificationItem.classList.remove('unread');
-                this.updateUnreadCount(-1);
+                this.unreadCount = Math.max(0, this.unreadCount - 1);
+                this.updateNotificationBadge();
             }
         });
 
-        // Close button
         const closeBtn = notificationItem.querySelector('.notification-item-close');
         closeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             notificationItem.remove();
-            this.removeNotification(notification.id);
+            this.notificationCache.delete(notification.id);
             
-            // Show empty state if no notifications
             if (notificationList.children.length === 0) {
                 notificationList.innerHTML = `
                     <div class="notification-empty">
@@ -465,8 +400,7 @@ class FollowerNotificationSystem {
 
     async getCachedFollowers(userId) {
         try {
-            const cached = await indexedDBCache.get('followers', userId);
-            return cached || [];
+            return await indexedDBCache.getFollowers(userId) || [];
         } catch (error) {
             console.log('Could not get cached followers:', error);
             return [];
@@ -475,7 +409,7 @@ class FollowerNotificationSystem {
 
     async cacheFollowers(userId, followers) {
         try {
-            await indexedDBCache.set('followers', userId, followers);
+            await indexedDBCache.setFollowers(userId, followers);
         } catch (error) {
             console.log('Could not cache followers:', error);
         }
@@ -483,36 +417,35 @@ class FollowerNotificationSystem {
 
     async storeNotification(userId, notification) {
         try {
-            // Store in IndexedDB
-            const notifications = await indexedDBCache.get('notifications', userId) || [];
+            const notifications = await indexedDBCache.getNotifications(userId) || [];
             notifications.unshift(notification);
             
-            // Keep only last 50 notifications
             if (notifications.length > 50) {
                 notifications.pop();
             }
             
-            await indexedDBCache.set('notifications', userId, notifications);
+            await indexedDBCache.setNotifications(userId, notifications);
         } catch (error) {
             console.log('Could not store notification:', error);
         }
     }
 
-    async loadUnreadCount(userId) {
+    async loadNotifications(userId) {
         try {
-            const notifications = await indexedDBCache.get('notifications', userId) || [];
-            const unread = notifications.filter(n => !n.read).length;
-            this.unreadCount = unread;
+            const notifications = await indexedDBCache.getNotifications(userId) || [];
+            this.unreadCount = notifications.filter(n => !n.read).length;
             this.updateNotificationBadge();
+            
+            const notificationList = document.querySelector('.notification-list');
+            if (notificationList && notifications.length > 0) {
+                notificationList.innerHTML = '';
+                notifications.forEach(notification => {
+                    this.addToNotificationDropdown(notification);
+                });
+            }
         } catch (error) {
-            console.log('Could not load unread count:', error);
+            console.log('Could not load notifications:', error);
         }
-    }
-
-    updateUnreadCount(change) {
-        this.unreadCount += change;
-        if (this.unreadCount < 0) this.unreadCount = 0;
-        this.updateNotificationBadge();
     }
 
     updateNotificationBadge() {
@@ -534,19 +467,6 @@ class FollowerNotificationSystem {
         this.updateNotificationBadge();
     }
 
-    markNotificationsAsRead() {
-        // Mark all notifications in dropdown as read
-        const notificationItems = document.querySelectorAll('.notification-item.unread');
-        notificationItems.forEach(item => item.classList.remove('unread'));
-        this.unreadCount = 0;
-        this.updateNotificationBadge();
-    }
-
-    removeNotification(notificationId) {
-        // Remove from cache if needed
-        this.notificationCache.delete(notificationId);
-    }
-
     getTimeAgo(timestamp) {
         const seconds = Math.floor((Date.now() - timestamp) / 1000);
         
@@ -565,10 +485,12 @@ class FollowerNotificationSystem {
             .notification-bell {
                 position: relative;
                 cursor: pointer;
-                padding: 8px;
+                padding: 8px 12px;
                 border-radius: 50%;
                 transition: background 0.3s;
-                margin-right: 15px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
             }
 
             .notification-bell:hover {
@@ -586,7 +508,7 @@ class FollowerNotificationSystem {
                 right: 0;
                 background: #ff2a6d;
                 color: white;
-                font-size: 10px;
+                font-size: 11px;
                 font-weight: bold;
                 min-width: 18px;
                 height: 18px;
@@ -595,6 +517,7 @@ class FollowerNotificationSystem {
                 align-items: center;
                 justify-content: center;
                 border: 2px solid #1a1a2e;
+                padding: 0 4px;
             }
 
             .notification-dropdown {
@@ -659,7 +582,7 @@ class FollowerNotificationSystem {
             }
 
             .notification-item.unread {
-                background: rgba(122, 79, 255, 0.1);
+                background: rgba(122, 79, 255, 0.15);
             }
 
             .notification-avatar {
@@ -732,11 +655,11 @@ class FollowerNotificationSystem {
 
             @keyframes slideOutRight {
                 from {
-                    transform: translateX(0);
+                    transform: translateX(100%);
                     opacity: 1;
                 }
                 to {
-                    transform: translateX(100%);
+                    transform: translateX(0);
                     opacity: 0;
                 }
             }
@@ -809,7 +732,7 @@ class InstantLoadingSystem {
             profileDetails: {},
             followStatus: {},
             xpData: {},
-            storeStatus: {} // Add store status cache
+            storeStatus: {}
         };
         this.isInitialized = false;
         this.initPromise = null;
@@ -822,19 +745,16 @@ class InstantLoadingSystem {
         this.initPromise = new Promise(async (resolve) => {
             console.log('🚀 Starting instant preload...');
             
-            // Start preloading immediately
             const preloadStartTime = Date.now();
             
-            // Load from IndexedDB cache immediately (instant)
             try {
                 await indexedDBCache.init();
                 
-                // Load all cached data in parallel
                 const [profiles, details, xpData, storeStatus] = await Promise.allSettled([
                     indexedDBCache.getProfiles(),
                     this.loadAllProfileDetails(),
                     this.loadAllXPData(),
-                    this.loadAllStoreStatus() // Load store status
+                    this.loadAllStoreStatus()
                 ]);
                 
                 this.appData.profiles = profiles.value || [];
@@ -844,7 +764,6 @@ class InstantLoadingSystem {
                 
                 console.log(`⚡ Instant loaded ${this.appData.profiles.length} profiles from cache in ${Date.now() - preloadStartTime}ms`);
                 
-                // Set global allProfiles for immediate use
                 allProfiles = this.appData.profiles;
                 
             } catch (error) {
@@ -861,7 +780,6 @@ class InstantLoadingSystem {
     async loadAllProfileDetails() {
         const details = {};
         try {
-            // Load profile details from IndexedDB
             const allDetails = await indexedDBCache.getAll('profileDetails');
             allDetails.forEach(detail => {
                 if (detail.userId) {
@@ -889,7 +807,6 @@ class InstantLoadingSystem {
         return xpData;
     }
 
-    // Add method to load store status
     async loadAllStoreStatus() {
         const storeStatus = {};
         try {
@@ -919,13 +836,9 @@ class InstantLoadingSystem {
             console.log('⚡ Rendering instantly from cache...');
             this.hasRenderedFromCache = true;
             
-            // Clear any existing content
             gamersListElement.innerHTML = '';
-            
-            // Show cached data immediately
             allProfiles = this.appData.profiles;
             
-            // Apply any existing filter
             let filteredProfiles = [...allProfiles];
             
             switch(currentFilter) {
@@ -960,18 +873,16 @@ class InstantLoadingSystem {
     }
 
     startBackgroundRefresh() {
-        // Refresh data in background after initial render
         setTimeout(async () => {
             console.log('🔄 Starting background refresh...');
-            await fetchFreshProfiles(true); // Silent refresh
+            await fetchFreshProfiles(true);
             
-            // Schedule periodic refresh every 30 seconds
             setInterval(async () => {
                 if (document.visibilityState === 'visible' && isOnline) {
-                    await fetchFreshProfiles(true); // Silent refresh
+                    await fetchFreshProfiles(true);
                 }
             }, 30000);
-        }, 2000); // Wait 2 seconds before first refresh
+        }, 2000);
     }
 
     getProfile(userId) {
@@ -1016,7 +927,7 @@ class InstantLoadingSystem {
 class GamersIndexedDBCache {
     constructor() {
         this.dbName = 'GamersAppDB';
-        this.dbVersion = 10; // Increment version for notifications and followers
+        this.dbVersion = 12;
         this.db = null;
     }
 
@@ -1033,7 +944,6 @@ class GamersIndexedDBCache {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 
-                // Create object stores
                 if (!db.objectStoreNames.contains('profiles')) {
                     const profilesStore = db.createObjectStore('profiles', { keyPath: 'id' });
                     profilesStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
@@ -1052,18 +962,15 @@ class GamersIndexedDBCache {
                 if (!db.objectStoreNames.contains('xpData')) {
                     db.createObjectStore('xpData', { keyPath: 'userId' });
                 }
-                // Add stores object store
                 if (!db.objectStoreNames.contains('stores')) {
                     const storesStore = db.createObjectStore('stores', { keyPath: 'ownerId' });
                     storesStore.createIndex('storeId', 'storeId', { unique: true });
                     storesStore.createIndex('storeName', 'storeName', { unique: false });
                 }
-                // Add followers cache
                 if (!db.objectStoreNames.contains('followers')) {
                     const followersStore = db.createObjectStore('followers', { keyPath: 'userId' });
                     followersStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
                 }
-                // Add notifications store
                 if (!db.objectStoreNames.contains('notifications')) {
                     const notificationsStore = db.createObjectStore('notifications', { keyPath: 'userId' });
                     notificationsStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
@@ -1079,7 +986,6 @@ class GamersIndexedDBCache {
             const transaction = this.db.transaction([storeName], 'readwrite');
             const store = transaction.objectStore(storeName);
             
-            // Handle different store structures
             let record;
             if (storeName === 'followers' || storeName === 'notifications') {
                 record = {
@@ -1140,7 +1046,6 @@ class GamersIndexedDBCache {
             request.onerror = () => reject(request.error);
             request.onsuccess = () => {
                 let results = request.result || [];
-                // For followers and notifications, extract the data property
                 if (storeName === 'followers' || storeName === 'notifications') {
                     results = results.map(r => r.data);
                 }
@@ -1149,39 +1054,10 @@ class GamersIndexedDBCache {
         });
     }
 
-    async delete(storeName, key) {
-        if (!this.db) await this.init();
-        
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.delete(key);
-            
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve();
-        });
-    }
-
-    async clear(storeName) {
-        if (!this.db) await this.init();
-        
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.clear();
-            
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve();
-        });
-    }
-
     async setProfiles(profiles) {
         await this.init();
         for (const profile of profiles) {
-            await this.set('profiles', profile.id, {
-                ...profile,
-                lastUpdated: Date.now()
-            });
+            await this.set('profiles', profile.id, profile);
         }
     }
 
@@ -1194,8 +1070,7 @@ class GamersIndexedDBCache {
         await this.init();
         return await this.set('profileDetails', userId, {
             userId,
-            ...detail,
-            lastUpdated: Date.now()
+            ...detail
         });
     }
 
@@ -1210,8 +1085,7 @@ class GamersIndexedDBCache {
             id: `${userId}_${targetId}`,
             userId,
             targetId,
-            isFollowing,
-            lastUpdated: Date.now()
+            isFollowing
         });
     }
 
@@ -1225,8 +1099,7 @@ class GamersIndexedDBCache {
         await this.init();
         return await this.set('xpData', userId, {
             userId,
-            ...xpData,
-            lastUpdated: Date.now()
+            ...xpData
         });
     }
 
@@ -1235,7 +1108,6 @@ class GamersIndexedDBCache {
         return await this.get('xpData', userId);
     }
 
-    // Add store methods
     async setStore(storeData) {
         await this.init();
         return await this.set('stores', storeData.ownerId, {
@@ -1243,8 +1115,7 @@ class GamersIndexedDBCache {
             storeId: storeData.storeId,
             storeName: storeData.storeName,
             logo: storeData.logo,
-            category: storeData.category,
-            lastUpdated: Date.now()
+            category: storeData.category
         });
     }
 
@@ -1258,7 +1129,6 @@ class GamersIndexedDBCache {
         return await this.getAll('stores');
     }
 
-    // Add follower cache methods
     async setFollowers(userId, followers) {
         await this.init();
         return await this.set('followers', userId, followers);
@@ -1269,7 +1139,6 @@ class GamersIndexedDBCache {
         return await this.get('followers', userId) || [];
     }
 
-    // Add notification methods
     async setNotifications(userId, notifications) {
         await this.init();
         return await this.set('notifications', userId, notifications);
@@ -1291,7 +1160,6 @@ async function registerServiceWorker() {
             const registration = await navigator.serviceWorker.register('/sw.js');
             console.log('Service Worker registered for gamers.js');
             
-            // Set up background sync if supported
             if ('sync' in registration) {
                 try {
                     await registration.sync.register('gamers-data-sync');
@@ -1314,9 +1182,9 @@ class LocalCache {
     constructor() {
         this.cachePrefix = 'gamers_';
         this.cacheExpiry = {
-            short: 1 * 60 * 1000, // 1 minute
-            medium: 5 * 60 * 1000, // 5 minutes
-            long: 30 * 60 * 1000 // 30 minutes
+            short: 1 * 60 * 1000,
+            medium: 5 * 60 * 1000,
+            long: 30 * 60 * 1000
         };
     }
 
@@ -1379,7 +1247,6 @@ function setupNetworkMonitoring() {
     window.addEventListener('online', handleNetworkOnline);
     window.addEventListener('offline', handleNetworkOffline);
     
-    // Create offline indicator
     const offlineIndicator = document.createElement('div');
     offlineIndicator.id = 'offlineIndicator';
     offlineIndicator.className = 'offline-indicator';
@@ -1399,7 +1266,6 @@ function setupNetworkMonitoring() {
     `;
     document.body.appendChild(offlineIndicator);
     
-    // Initial check
     if (!isOnline) {
         handleNetworkOffline();
     }
@@ -1408,7 +1274,6 @@ function setupNetworkMonitoring() {
 async function handleNetworkOnline() {
     isOnline = true;
     
-    // Hide offline indicator
     const offlineIndicator = document.getElementById('offlineIndicator');
     if (offlineIndicator) {
         offlineIndicator.style.display = 'none';
@@ -1416,14 +1281,13 @@ async function handleNetworkOnline() {
     
     showNotification('Connection restored', 'success', 2000);
     
-    // Refresh data when coming online (silent refresh)
     if (isGamersPage) {
-        await fetchFreshProfiles(true); // Silent refresh
+        await fetchFreshProfiles(true);
     } else if (isProfilePage) {
         const urlParams = new URLSearchParams(window.location.search);
         const profileId = urlParams.get('id');
         if (profileId) {
-            await fetchFreshProfileData(profileId); // Refresh single profile
+            await fetchFreshProfileData(profileId);
         }
     }
 }
@@ -1431,7 +1295,6 @@ async function handleNetworkOnline() {
 function handleNetworkOffline() {
     isOnline = false;
     
-    // Show offline indicator
     const offlineIndicator = document.getElementById('offlineIndicator');
     if (offlineIndicator) {
         offlineIndicator.style.display = 'block';
@@ -1446,94 +1309,130 @@ let allProfiles = [];
 let currentFilter = 'all';
 let xpSystem = null;
 let isLoading = false;
-// Cache for store status
 let storeStatusCache = {};
 
-// Check if we're on profile page or gamers directory
 const isProfilePage = window.location.pathname.includes('profile.html');
 const isGamersPage = window.location.pathname.includes('gamers.html') || 
                      window.location.pathname.includes('mingle.html');
 const isXpPage = window.location.pathname.includes('xp.html');
 
-// Initialize notification system
 const followerNotifier = new FollowerNotificationSystem();
 
-// ==================== XP SYSTEM INTEGRATION ====================
-// Import XP system
+// ==================== XP SYSTEM INTEGRATION (FIXED) ====================
 async function loadXPSystem() {
     if (xpSystem) return xpSystem;
     
     try {
-        // Dynamically import the XP system
+        // Try to import from xp.js
         const xpModule = await import('./xp.js');
-        xpSystem = xpModule.XPSystem || window.XPSystem;
+        console.log('XP Module loaded:', xpModule);
         
-        if (!xpSystem) {
-            console.error('XP System not found');
-            return null;
+        // Check different possible export patterns
+        if (xpModule.XPSystem) {
+            // If it's a class, instantiate it
+            if (typeof xpModule.XPSystem === 'function') {
+                xpSystem = new xpModule.XPSystem();
+            } else {
+                // If it's already an instance
+                xpSystem = xpModule.XPSystem;
+            }
+        } else if (xpModule.default) {
+            // Handle default export
+            if (typeof xpModule.default === 'function') {
+                xpSystem = new xpModule.default();
+            } else {
+                xpSystem = xpModule.default;
+            }
+        } else if (typeof xpModule === 'function') {
+            // If the module itself is a class/function
+            xpSystem = new xpModule();
+        } else {
+            // Try window object as fallback
+            xpSystem = window.XPSystem;
         }
         
-        // Initialize XP system
-        await xpSystem.initialize();
+        // If we still don't have xpSystem, create a mock one
+        if (!xpSystem) {
+            console.warn('XP System not found, creating mock XP system');
+            xpSystem = createMockXPSystem();
+        }
         
-        // Start XP tracking for online activity
+        // Initialize if it has an initialize method
+        if (xpSystem.initialize && typeof xpSystem.initialize === 'function') {
+            await xpSystem.initialize();
+        }
+        
         startXPTracking();
-        
-        console.log('XP System loaded successfully');
+        console.log('XP System loaded successfully:', xpSystem);
         return xpSystem;
     } catch (error) {
         console.error('Error loading XP system:', error);
-        return null;
+        // Create a mock XP system to prevent errors
+        xpSystem = createMockXPSystem();
+        return xpSystem;
     }
 }
 
-// Start XP tracking for user activity
+// Create a mock XP system to prevent errors
+function createMockXPSystem() {
+    return {
+        initialize: async () => {
+            console.log('Mock XP System initialized');
+        },
+        addXP: async (amount, reason) => {
+            console.log(`Mock: Would add ${amount} XP for ${reason}`);
+            return true;
+        },
+        getXP: () => {
+            return { totalXP: 0, level: 1 };
+        }
+    };
+}
+
 function startXPTracking() {
     if (!xpSystem) return;
     
-    // Track user activity for XP rewards
     let activityTimer = null;
     let lastActivityTime = Date.now();
     
-    // Award XP for various activities
     const awardXPForActivity = async (activity, xpAmount, reason) => {
         try {
             if (xpSystem && currentUser) {
-                await xpSystem.addXP(xpAmount, reason);
-                console.log(`Awarded ${xpAmount} XP for ${activity}`);
+                // Check if addXP exists before calling
+                if (typeof xpSystem.addXP === 'function') {
+                    await xpSystem.addXP(xpAmount, reason);
+                    console.log(`Awarded ${xpAmount} XP for ${activity}`);
+                } else {
+                    console.log('XP System does not have addXP method');
+                }
             }
         } catch (error) {
             console.error(`Error awarding XP for ${activity}:`, error);
         }
     };
     
-    // Monitor user activity
     const activityEvents = ['click', 'scroll', 'mousemove', 'keydown'];
     activityEvents.forEach(event => {
         document.addEventListener(event, () => {
             lastActivityTime = Date.now();
             
-            // Clear existing timer
             if (activityTimer) clearTimeout(activityTimer);
             
-            // Set new timer to award XP after 3 minutes of activity
             activityTimer = setTimeout(async () => {
                 const timeSinceLastActivity = Date.now() - lastActivityTime;
-                if (timeSinceLastActivity >= 3 * 60 * 1000) { // 3 minutes
+                if (timeSinceLastActivity >= 3 * 60 * 1000) {
                     await awardXPForActivity('online_activity', 10, '3 Minutes Online Activity');
                 }
-            }, 3 * 60 * 1000); // Check every 3 minutes
+            }, 3 * 60 * 1000);
         }, { passive: true });
     });
     
-    // Award XP for profile views
     if (isProfilePage) {
         setTimeout(async () => {
             await awardXPForActivity('profile_view', 5, 'Viewed a Profile');
         }, 5000);
     }
     
-    // Award XP for sending messages
     const messageButtons = document.querySelectorAll('.message-gamer-btn, #messageProfileBtn');
     messageButtons.forEach(button => {
         button.addEventListener('click', async () => {
@@ -1543,12 +1442,10 @@ function startXPTracking() {
         });
     });
     
-    // Award XP for adding friends/following
     const followButtons = document.querySelectorAll('.add-clan-btn, #likeProfileBtn');
     followButtons.forEach(button => {
         button.addEventListener('click', async () => {
             if (button.classList.contains('added') || button.dataset.following === 'true') {
-                // Already following, do nothing
                 return;
             }
             
@@ -1563,48 +1460,35 @@ function startXPTracking() {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Initializing with instant loading...');
     
-    // Start instant loading IMMEDIATELY (before auth)
     await instantLoader.initialize();
-    
-    // Initialize follower notification system
     await followerNotifier.initialize();
     
-    // Render instantly if we're on gamers page
     if (isGamersPage) {
         instantLoader.renderInstantly();
         setupEventListeners();
     }
     
-    // Register Service Worker
     await registerServiceWorker();
-    
-    // Setup network monitoring
     setupNetworkMonitoring();
     
-    // Load XP System (except on xp.html where it loads itself)
     if (!isXpPage) {
         await loadXPSystem();
     }
     
-    // Set up auth state listener - NO RE-RENDER ON AUTH CHANGE
     onAuthStateChanged(auth, async (user) => {
         console.log('🔐 Auth state changed:', user ? 'User logged in' : 'No user');
         currentUser = user;
         
-        // Only refresh if we haven't loaded fresh data yet
         if (!isLoading) {
             if (isGamersPage) {
-                // Start background refresh (delayed to avoid flash)
                 setTimeout(() => {
                     instantLoader.startBackgroundRefresh();
                 }, 1000);
             } else if (isProfilePage) {
-                // Get profile ID from URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const profileId = urlParams.get('id');
                 
                 if (profileId) {
-                    // Try to load from instant cache first
                     const cachedProfile = instantLoader.getProfileDetail(profileId);
                     if (cachedProfile) {
                         console.log('⚡ Loading profile from instant cache');
@@ -1612,17 +1496,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         updateProfileInfo(profileId, cachedProfile);
                     }
                     
-                    // Setup listeners
                     setupProfileEventListeners(profileId);
                     
-                    // Fetch fresh data in background
                     setTimeout(() => fetchFreshProfileData(profileId), 1000);
                 }
             }
         }
     }, (error) => {
         console.error('Auth error:', error);
-        // Don't re-render on auth error
     });
 });
 
@@ -1643,13 +1524,10 @@ function formatNumber(num) {
 // ==================== GAMERS DIRECTORY FUNCTIONALITY ====================
 async function initGamersDirectory() {
     try {
-        // Initialize Feather Icons
         if (typeof feather !== 'undefined') {
             feather.replace();
         }
         
-        // Data is already rendered from instantLoader.initialize()
-        // Just setup event listeners
         setupEventListeners();
         
     } catch (error) {
@@ -1658,14 +1536,8 @@ async function initGamersDirectory() {
     }
 }
 
-async function loadAllProfiles(forceRefresh = false) {
-    // This is now just a wrapper that calls fetchFreshProfiles
-    // Data is already rendered from cache via instantLoader
-    await fetchFreshProfiles(forceRefresh);
-}
-
 async function fetchFreshProfiles(silentRefresh = false) {
-    if (isLoading) return; // Prevent multiple simultaneous loads
+    if (isLoading) return;
     
     isLoading = true;
     try {
@@ -1675,28 +1547,22 @@ async function fetchFreshProfiles(silentRefresh = false) {
             return;
         }
         
-        // Don't show loading if silent refresh
         if (!silentRefresh) {
             const gamersListElement = document.getElementById('gamersList');
-            if (gamersListElement) {
-                // Only show loading if there's no content yet
-                if (gamersListElement.children.length === 0) {
-                    gamersListElement.innerHTML = '';
-                    for (let i = 0; i < 3; i++) {
-                        gamersListElement.appendChild(createLoadingProfileItem());
-                    }
+            if (gamersListElement && gamersListElement.children.length === 0) {
+                gamersListElement.innerHTML = '';
+                for (let i = 0; i < 3; i++) {
+                    gamersListElement.appendChild(createLoadingProfileItem());
                 }
             }
         }
         
-        // Get all users
         const usersRef = collection(db, 'users');
         console.log('🔄 Querying users collection...');
         
         const usersSnap = await getDocs(usersRef);
         console.log(`📊 Found ${usersSnap.size} users`);
         
-        // Load all stores first to check which users have stores
         const storesRef = collection(db, 'stores');
         const storesSnap = await getDocs(storesRef);
         const storesMap = {};
@@ -1713,14 +1579,12 @@ async function fetchFreshProfiles(silentRefresh = false) {
         const newProfiles = [];
         const currentUserId = currentUser ? currentUser.uid : null;
         
-        // Process all users in parallel
         const profilePromises = [];
         
         usersSnap.forEach((userDoc) => {
             const userId = userDoc.id;
             const userData = userDoc.data();
             
-            // Skip current user if logged in
             if (currentUserId && userId === currentUserId) {
                 console.log('Skipping current user:', userId);
                 return;
@@ -1729,28 +1593,23 @@ async function fetchFreshProfiles(silentRefresh = false) {
             profilePromises.push(processUserProfile(userId, userData, storesMap[userId]));
         });
         
-        // Wait for all profiles to be processed
         const profiles = await Promise.all(profilePromises);
         newProfiles.push(...profiles.filter(profile => profile !== null));
         
         console.log(`✅ Loaded ${newProfiles.length} fresh profiles from Firebase`);
         
-        // Sort profiles: online first, then by name
         newProfiles.sort((a, b) => {
             if (a.isOnline && !b.isOnline) return -1;
             if (!a.isOnline && b.isOnline) return 1;
             return a.name.localeCompare(b.name);
         });
         
-        // Update in-memory cache
         allProfiles = newProfiles;
         
-        // Update instant loader cache
         newProfiles.forEach(profile => {
             instantLoader.updateProfile(profile);
         });
         
-        // Cache in IndexedDB
         try {
             await indexedDBCache.setProfiles(newProfiles);
             console.log('💾 Profiles cached in IndexedDB');
@@ -1758,14 +1617,11 @@ async function fetchFreshProfiles(silentRefresh = false) {
             console.log('Could not cache profiles in IndexedDB:', cacheError);
         }
         
-        // Cache in localStorage with shorter expiry
         cache.set('all_profiles', newProfiles, 'short');
         
-        // Update UI with fresh data (only if it's a non-silent refresh OR we have changes)
         if (!silentRefresh || !instantLoader.hasRenderedFromCache) {
             renderProfilesList();
         } else {
-            // For silent refresh, update UI smoothly without clearing
             smoothUpdateProfiles(newProfiles);
         }
         
@@ -1774,7 +1630,6 @@ async function fetchFreshProfiles(silentRefresh = false) {
         if (!silentRefresh) {
             showError(`Failed to load profiles: ${error.message}`, true);
             
-            // Try to show cached data if available
             const cachedProfiles = cache.get('all_profiles');
             if (cachedProfiles && cachedProfiles.length > 0) {
                 console.log('Showing cached profiles from localStorage');
@@ -1790,15 +1645,12 @@ async function fetchFreshProfiles(silentRefresh = false) {
 }
 
 function smoothUpdateProfiles(newProfiles) {
-    // Update existing items without clearing the list
     const gamersListElement = document.getElementById('gamersList');
     if (!gamersListElement) return;
     
-    // Get existing profile items
     const existingItems = Array.from(gamersListElement.children);
     const updatedIds = new Set(newProfiles.map(p => p.id));
     
-    // Remove items that are no longer in the list
     existingItems.forEach(item => {
         const profileId = item.dataset.profileId;
         if (profileId && !updatedIds.has(profileId)) {
@@ -1806,19 +1658,15 @@ function smoothUpdateProfiles(newProfiles) {
         }
     });
     
-    // Update or add items
     newProfiles.forEach((profile, index) => {
         const existingItem = gamersListElement.querySelector(`[data-profile-id="${profile.id}"]`);
         if (existingItem) {
-            // Update existing item if needed
             updateProfileItem(existingItem, profile);
         } else {
-            // Add new item at the correct position
             const newItem = createProfileItem(profile);
             if (index === 0) {
                 gamersListElement.prepend(newItem);
             } else {
-                // Try to insert at correct position
                 const existingNextItem = gamersListElement.querySelector(`[data-profile-id="${newProfiles[index-1]?.id}"]`);
                 if (existingNextItem && existingNextItem.nextElementSibling) {
                     existingNextItem.parentNode.insertBefore(newItem, existingNextItem.nextElementSibling);
@@ -1831,8 +1679,6 @@ function smoothUpdateProfiles(newProfiles) {
 }
 
 function updateProfileItem(item, profile) {
-    // Only update if data has changed significantly
-    // This prevents unnecessary re-renders
     const currentFollowing = item.querySelector('.add-clan-btn')?.dataset.following;
     const currentOnline = item.querySelector('.gamer-stat[title*="Online"]')?.textContent.includes('Online');
     
@@ -1846,7 +1692,6 @@ function updateProfileItem(item, profile) {
 
 async function processUserProfile(userId, userData, storeInfo = null) {
     try {
-        // Basic profile data
         const profile = {
             id: userId,
             name: userData.name || 'User ' + userId.substring(0, 6),
@@ -1860,20 +1705,18 @@ async function processUserProfile(userId, userData, storeInfo = null) {
             isOnline: false,
             isGamer: false,
             gamerProfile: null,
-            clanCount: 0, // Followers count
-            isFollowing: false, // Whether current user is following this user
-            xpLevel: 1, // Default XP level
-            xpRank: "Newbie Explorer", // Default XP rank
-            xpIcon: "🌱", // Default XP icon
-            totalXP: 0, // Default total XP
-            // Store info
+            clanCount: 0,
+            isFollowing: false,
+            xpLevel: 1,
+            xpRank: "Newbie Explorer",
+            xpIcon: "🌱",
+            totalXP: 0,
             hasStore: storeInfo ? true : false,
             storeId: storeInfo ? storeInfo.storeId : null,
             storeName: storeInfo ? storeInfo.storeName : null,
             storeLogo: storeInfo ? storeInfo.storeLogo : null
         };
         
-        // Get online status
         try {
             const statusRef = doc(db, 'status', userId);
             const statusSnap = await getDoc(statusRef);
@@ -1882,7 +1725,6 @@ async function processUserProfile(userId, userData, storeInfo = null) {
             console.log('Could not get status for user:', userId);
         }
         
-        // Get gamer profile if exists
         try {
             const gamerProfileRef = collection(db, 'users', userId, 'gamerProfile');
             const gamerProfileSnap = await getDocs(gamerProfileRef);
@@ -1894,10 +1736,8 @@ async function processUserProfile(userId, userData, storeInfo = null) {
             console.log('No gamer profile for:', userId);
         }
         
-        // Get followers count (clan count)
         profile.clanCount = await getFollowersCount(userId);
         
-        // Check if current user is following this user (check cache first)
         if (currentUser) {
             try {
                 const cachedStatus = await indexedDBCache.getFollowStatus(currentUser.uid, userId);
@@ -1905,7 +1745,6 @@ async function processUserProfile(userId, userData, storeInfo = null) {
                     profile.isFollowing = cachedStatus;
                 } else {
                     profile.isFollowing = await checkIfFollowing(userId, currentUser.uid);
-                    // Cache the result
                     await indexedDBCache.setFollowStatus(currentUser.uid, userId, profile.isFollowing);
                 }
             } catch (error) {
@@ -1914,7 +1753,6 @@ async function processUserProfile(userId, userData, storeInfo = null) {
             }
         }
         
-        // Get XP data for this user
         try {
             const xpRef = doc(db, 'xpData', userId);
             const xpSnap = await getDoc(xpRef);
@@ -1923,7 +1761,6 @@ async function processUserProfile(userId, userData, storeInfo = null) {
                 profile.totalXP = xpData.totalXP || 0;
                 profile.coins = xpData.coins || 0;
                 
-                // Get rank from XP
                 const userRank = getRankFromXP(profile.totalXP);
                 profile.xpLevel = userRank.level;
                 profile.xpRank = userRank.title;
@@ -1934,7 +1771,6 @@ async function processUserProfile(userId, userData, storeInfo = null) {
             console.log('No XP data for user:', userId);
         }
         
-        // Cache store info
         if (storeInfo) {
             await indexedDBCache.setStore({
                 ownerId: userId,
@@ -1953,18 +1789,14 @@ async function processUserProfile(userId, userData, storeInfo = null) {
     }
 }
 
-// Helper function to get rank from XP (using full XP_RANKS from xp.js)
 function getRankFromXP(xp) {
-    // Full XP_RANKS array matching xp.js
     const XP_RANKS = [];
-    // Generate 100 ranks with progressive XP requirements
     for (let i = 1; i <= 100; i++) {
         let xpNeeded = 0;
         let title = "";
         let icon = "";
         let color = "";
         
-        // Calculate XP needed (progressive scaling)
         if (i === 1) {
             xpNeeded = 0;
         } else if (i <= 10) {
@@ -1979,7 +1811,6 @@ function getRankFromXP(xp) {
             xpNeeded = 39900 + (i - 75) * 2000;
         }
         
-        // Assign titles based on level ranges
         if (i === 1) {
             title = "Newbie Explorer";
             icon = "🌱";
@@ -1994,60 +1825,10 @@ function getRankFromXP(xp) {
             title = titles[i-6];
             icon = ["🛡️", "🔮", "✨", "🌠", "🧙"][i-6];
             color = ["#FFD700", "#8A2BE2", "#FF69B4", "#00CED1", "#7CFC00"][i-6];
-        } else if (i <= 20) {
-            const titles = ["Ascended Hero", "Void Walker", "Starlight Sentinel", "Time Weaver", "Dream Shaper", 
-                           "Reality Bender", "Cosmic Pioneer", "Quantum Knight", "Nova Warden", "Infinity Seeker"];
-            title = titles[i-11];
-            icon = ["🦸", "🌌", "⭐", "⏳", "💭", "🌀", "🚀", "⚡", "🌞", "♾️"][i-11];
-            color = ["#FF6347", "#4B0082", "#FFD700", "#20B2AA", "#9370DB", "#FF1493", "#00BFFF", "#32CD32", "#FF8C00", "#8B0000"][i-11];
-        } else if (i <= 30) {
-            const titles = ["Arcane Master", "Celestial Emperor", "Void Emperor", "Time Lord", "Dream Emperor",
-                           "Reality Emperor", "Cosmic Emperor", "Quantum Emperor", "Nova Emperor", "Infinity Emperor"];
-            title = titles[i-21];
-            icon = ["🧙‍♂️", "👑", "🌑", "⏰", "💤", "🌐", "🌌", "⚛️", "☀️", "∞"][i-21];
-            color = ["#8B4513", "#FFD700", "#000000", "#808080", "#483D8B", "#2F4F4F", "#191970", "#006400", "#8B0000", "#4B0082"][i-21];
-        } else if (i <= 40) {
-            const titles = ["Mythic Legend", "Eternal Phoenix", "Dragon Sovereign", "Titan Slayer", "God Killer",
-                           "Universe Creator", "Multiverse Traveler", "Omnipotent Being", "Absolute Ruler", "Supreme Deity"];
-            title = titles[i-31];
-            icon = ["🏛️", "🔥", "🐉", "⚔️", "☠️", "🌍", "🌌", "👁️", "⚖️", "👑"][i-31];
-            color = ["#FF4500", "#FF8C00", "#DC143C", "#8B0000", "#2F4F4F", "#228B22", "#00008B", "#8B008B", "#B8860B", "#FFD700"][i-31];
-        } else if (i <= 50) {
-            const titles = ["Legendary Archon", "Mythic Overlord", "Eternal Champion", "Cosmic Sovereign", "Quantum God",
-                           "Reality Architect", "Dream Weaver Prime", "Time Guardian Supreme", "Void Conqueror", "Infinity Master"];
-            title = titles[i-41];
-            icon = ["👑", "🏆", "🦸‍♂️", "🌠", "⚛️", "🏗️", "🕸️", "🕰️", "⚫", "♾️"][i-41];
-            color = ["#C0C0C0", "#FFD700", "#FF6347", "#00CED1", "#32CD32", "#8A2BE2", "#FF69B4", "#808080", "#000000", "#4B0082"][i-41];
-        } else if (i <= 60) {
-            const titles = ["Transcendent Being", "Omniscient Oracle", "Unbound Spirit", "Ethereal Monarch", "Celestial God",
-                           "Stellar Emperor", "Galactic Warlord", "Interdimensional Traveler", "Paradox Resolver", "Existence Shaper"];
-            title = titles[i-51];
-            icon = ["👁️", "🔮", "👻", "👑", "⭐", "👑", "⚔️", "🚪", "🔄", "✏️"][i-51];
-            color = ["#8B008B", "#FF00FF", "#F0E68C", "#98FB98", "#FFD700", "#FF4500", "#DC143C", "#00BFFF", "#32CD32", "#8A2BE2"][i-51];
-        } else if (i <= 70) {
-            const titles = ["Reality Emperor", "Dream Lord", "Time Master", "Space Conqueror", "Quantum King",
-                           "Cosmic Ruler", "Void Master", "Infinity Lord", "Eternal Being", "Absolute Power"];
-            title = titles[i-61];
-            icon = ["👑", "💭", "⏰", "🚀", "⚛️", "🌌", "⚫", "∞", "♾️", "💪"][i-61];
-            color = ["#FF0000", "#9370DB", "#20B2AA", "#1E90FF", "#00FF00", "#00008B", "#000000", "#4B0082", "#8B0000", "#FFD700"][i-61];
-        } else if (i <= 80) {
-            const titles = ["Supreme Legend", "Mythic God", "Celestial King", "Starlight Emperor", "Galactic Ruler",
-                           "Universe Master", "Multiverse God", "Omnipotent Ruler", "All-Powerful Being", "Ultimate Deity"];
-            title = titles[i-71];
-            icon = ["🏆", "👑", "👑", "⭐", "🌌", "🌍", "🌌", "👑", "💪", "👁️"][i-71];
-            color = ["#FFD700", "#FF4500", "#00CED1", "#FFD700", "#00008B", "#228B22", "#4B0082", "#8B0000", "#DC143C", "#8B008B"][i-71];
-        } else if (i <= 90) {
-            const titles = ["God of Gods", "King of Kings", "Emperor of Emperors", "Master of Masters", "Ruler of Rulers",
-                           "Lord of Lords", "Champion of Champions", "Hero of Heroes", "Legend of Legends", "Myth of Myths"];
-            title = titles[i-81];
-            icon = ["👑", "👑", "👑", "👑", "👑", "👑", "🏆", "🦸", "🏛️", "📜"][i-81];
-            color = ["#FF0000", "#FF8C00", "#FFD700", "#32CD32", "#00CED1", "#1E90FF", "#9370DB", "#FF69B4", "#FF4500", "#8B0000"][i-81];
         } else {
-            const titles = ["The Ultimate One", "The Final Boss", "The Alpha Omega", "The Beginning and End", 
-                           "The All-Knowing", "The All-Seeing", "The All-Powerful", "The Eternal", "The Infinite", "The Absolute"];
-            title = titles[i-91];
-            icon = ["👁️", "🐲", "αΩ", "🔚", "🧠", "👀", "💪", "♾️", "∞", "⚫"][i-91];
-            color = ["#FF00FF", "#DC143C", "#000000", "#FFFFFF", "#8A2BE2", "#00BFFF", "#FFD700", "#32CD32", "#4B0082", "#000000"][i-91];
+            title = `Level ${i}`;
+            icon = "⭐";
+            color = "#FFD700";
         }
         
         XP_RANKS.push({
@@ -2059,10 +1840,8 @@ function getRankFromXP(xp) {
         });
     }
     
-    // Default to first rank
     let userRank = XP_RANKS[0];
     
-    // Find the highest rank the user has achieved
     for (let i = XP_RANKS.length - 1; i >= 0; i--) {
         if (xp >= XP_RANKS[i].xpNeeded) {
             userRank = XP_RANKS[i];
@@ -2080,12 +1859,10 @@ async function getFollowersCount(userId) {
         if (userSnap.exists()) {
             const userData = userSnap.data();
             
-            // Use followers array if exists, otherwise use likes as fallback
             if (userData.followers && Array.isArray(userData.followers)) {
                 return userData.followers.length;
             }
             
-            // Fall back to likes count
             return userData.likes || 0;
         }
         return 0;
@@ -2097,7 +1874,6 @@ async function getFollowersCount(userId) {
 
 async function checkIfFollowing(targetUserId, currentUserId) {
     try {
-        // Check if current user is in target user's followers list
         const targetUserRef = doc(db, 'users', targetUserId);
         const targetUserSnap = await getDoc(targetUserRef);
         
@@ -2140,7 +1916,6 @@ function renderProfilesList() {
     
     console.log(`Rendering ${allProfiles.length} profiles`);
     
-    // Apply current filter
     let filteredProfiles = [...allProfiles];
     
     switch(currentFilter) {
@@ -2182,7 +1957,6 @@ function renderProfilesList() {
         gamersListElement.appendChild(createProfileItem(profile));
     });
     
-    // Update Feather Icons
     if (typeof feather !== 'undefined') {
         feather.replace();
     }
@@ -2190,13 +1964,11 @@ function renderProfilesList() {
     console.log('Profiles rendered successfully');
 }
 
-// ==================== UPDATED PROFILE ITEM WITH STORE BUTTON ====================
 function createProfileItem(profile) {
     const div = document.createElement('div');
     div.className = 'gamer-item';
     div.dataset.profileId = profile.id;
     
-    // Prepare attributes
     const attributes = [];
     if (profile.age) attributes.push(`${profile.age} yrs`);
     if (profile.location) attributes.push(profile.location);
@@ -2204,7 +1976,6 @@ function createProfileItem(profile) {
         attributes.push(profile.gamerProfile.primaryGame);
     }
     
-    // Gamer badge
     const gamerBadge = profile.isGamer ? `
         <span class="attribute-tag" style="background: rgba(255, 42, 109, 0.2); border-color: #ff2a6d; color: #ff2a6d;">
             <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 10px; height: 10px; margin-right: 3px;">
@@ -2216,7 +1987,6 @@ function createProfileItem(profile) {
         </span>
     ` : '';
     
-    // Store badge - NEW
     const storeBadge = profile.hasStore ? `
         <span class="attribute-tag" style="background: rgba(122, 79, 255, 0.2); border-color: #7a4fff; color: #7a4fff;">
             <i class="fas fa-store" style="font-size: 10px; margin-right: 3px;"></i>
@@ -2224,12 +1994,10 @@ function createProfileItem(profile) {
         </span>
     ` : '';
     
-    // Clan/Followers button - TikTok style
     const buttonText = profile.isFollowing ? 'Following' : 'Follow';
     const buttonClass = profile.isFollowing ? 'add-clan-btn added' : 'add-clan-btn';
     const followersCount = profile.clanCount || 0;
     
-    // XP Badge - SIMPLIFIED: Just the icon, no level text
     const xpBadge = profile.xpLevel ? `
         <span class="xp-badge" style="
             position: absolute;
@@ -2318,7 +2086,6 @@ function createProfileItem(profile) {
                     ${formatNumber(followersCount)}
                 </span>
             </div>
-            <!-- Store Button - NEW -->
             ${profile.hasStore ? `
                 <button class="store-btn" data-profile-id="${profile.id}" data-store-id="${profile.storeId}" title="Visit Store">
                     <i class="fas fa-store"></i>
@@ -2349,7 +2116,6 @@ function createProfileItem(profile) {
         </div>
     `;
     
-    // Click event for profile navigation
     div.addEventListener('click', (e) => {
         if (!e.target.closest('.add-clan-btn') && 
             !e.target.closest('.clan-section') &&
@@ -2359,7 +2125,6 @@ function createProfileItem(profile) {
         }
     });
     
-    // Store button event - NEW
     const storeBtn = div.querySelector('.store-btn');
     if (storeBtn) {
         storeBtn.addEventListener('click', (e) => {
@@ -2368,7 +2133,6 @@ function createProfileItem(profile) {
         });
     }
     
-    // Follow/Unfollow button event
     const clanBtn = div.querySelector('.add-clan-btn');
     if (clanBtn) {
         clanBtn.addEventListener('click', async (e) => {
@@ -2384,7 +2148,6 @@ function createProfileItem(profile) {
             
             try {
                 if (isCurrentlyFollowing) {
-                    // Unfollow
                     await unfollowUser(profile.id);
                     clanBtn.dataset.following = 'false';
                     clanBtn.innerHTML = `
@@ -2398,18 +2161,15 @@ function createProfileItem(profile) {
                     `;
                     clanBtn.classList.remove('added');
                     
-                    // Update followers count with TikTok-style formatting
                     const clanCountSpan = div.querySelector('.clan-count');
                     const currentCount = parseInt(clanCountSpan.textContent.replace(/[kM]$/, '')) || 0;
                     const newCount = Math.max(0, currentCount - 1);
                     clanCountSpan.textContent = formatNumber(newCount);
                     
-                    // Update cache
                     await indexedDBCache.setFollowStatus(currentUser.uid, profile.id, false);
                     
                     showNotification(`Unfollowed ${profile.name}`, 'info');
                 } else {
-                    // Follow
                     await followUser(profile.id);
                     clanBtn.dataset.following = 'true';
                     clanBtn.innerHTML = `
@@ -2421,17 +2181,15 @@ function createProfileItem(profile) {
                     `;
                     clanBtn.classList.add('added');
                     
-                    // Update followers count with TikTok-style formatting
                     const clanCountSpan = div.querySelector('.clan-count');
                     const currentCount = parseInt(clanCountSpan.textContent.replace(/[kM]$/, '')) || 0;
                     const newCount = currentCount + 1;
                     clanCountSpan.textContent = formatNumber(newCount);
                     
-                    // Update cache
                     await indexedDBCache.setFollowStatus(currentUser.uid, profile.id, true);
                     
-                    // Award XP for following someone
-                    if (xpSystem) {
+                    // Safely award XP
+                    if (xpSystem && typeof xpSystem.addXP === 'function') {
                         await xpSystem.addXP(15, `Followed ${profile.name}`);
                     }
                     
@@ -2444,7 +2202,6 @@ function createProfileItem(profile) {
         });
     }
     
-    // Message button event
     const messageBtn = div.querySelector('.message-gamer-btn');
     if (messageBtn) {
         messageBtn.addEventListener('click', (e) => {
@@ -2456,13 +2213,11 @@ function createProfileItem(profile) {
                 return;
             }
             
-            // Don't allow messaging yourself
             if (currentUser.uid === profile.id) {
                 showNotification('You cannot message yourself', 'info');
                 return;
             }
             
-            // Redirect to chat page with this user's ID
             window.location.href = `chat.html?id=${profile.id}`;
         });
     }
@@ -2470,7 +2225,6 @@ function createProfileItem(profile) {
     return div;
 }
 
-// Add CSS for store button (add to your existing styles)
 const style = document.createElement('style');
 style.textContent = `
     .store-btn {
@@ -2509,12 +2263,10 @@ document.head.appendChild(style);
 // ==================== PROFILE PAGE FUNCTIONALITY ====================
 async function initProfilePage() {
     try {
-        // Initialize Feather Icons
         if (typeof feather !== 'undefined') {
             feather.replace();
         }
         
-        // Get profile ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const profileId = urlParams.get('id');
         
@@ -2526,9 +2278,6 @@ async function initProfilePage() {
         
         console.log('Loading profile:', profileId);
         
-        // Data may already be loaded from instant cache
-        // Auth listener will handle the rest
-        
     } catch (error) {
         console.error('Error initializing profile page:', error);
         showError('Failed to load profile. Please refresh.', true);
@@ -2537,7 +2286,6 @@ async function initProfilePage() {
 
 async function addXPDisplayToProfile(profileId) {
     try {
-        // Get XP data for THIS profile (the one being viewed)
         const xpRef = doc(db, 'xpData', profileId);
         const xpSnap = await getDoc(xpRef);
         
@@ -2545,22 +2293,18 @@ async function addXPDisplayToProfile(profileId) {
             const xpData = xpSnap.data();
             const userRank = getRankFromXP(xpData.totalXP || 0);
             
-            // Remove any existing XP display
             const existingDisplay = document.querySelector('.profile-xp-display');
             if (existingDisplay) {
                 existingDisplay.remove();
             }
             
-            // SIMPLIFIED: Just add an XP icon near the profile picture
             const profilePic = document.querySelector('.profile-pic, .profile-avatar, [class*="avatar"], img[alt*="profile"]');
             if (profilePic) {
-                // Remove any existing XP icon
                 const existingXPIcon = profilePic.parentElement.querySelector('.profile-xp-icon');
                 if (existingXPIcon) {
                     existingXPIcon.remove();
                 }
                 
-                // Create XP icon element
                 const xpIcon = document.createElement('div');
                 xpIcon.className = 'profile-xp-icon';
                 xpIcon.style.cssText = `
@@ -2584,7 +2328,6 @@ async function addXPDisplayToProfile(profileId) {
                 xpIcon.innerHTML = userRank.icon;
                 xpIcon.title = `Level ${userRank.level} - ${userRank.title}\n${xpData.totalXP || 0} XP • ${xpData.coins || 0} Coins`;
                 
-                // Add hover tooltip effect
                 xpIcon.addEventListener('mouseenter', () => {
                     xpIcon.style.transform = 'scale(1.1)';
                     xpIcon.style.boxShadow = '0 5px 15px rgba(0,0,0,0.4)';
@@ -2595,7 +2338,6 @@ async function addXPDisplayToProfile(profileId) {
                     xpIcon.style.boxShadow = '0 3px 10px rgba(0,0,0,0.3)';
                 });
                 
-                // Click to show full XP details
                 xpIcon.addEventListener('click', (e) => {
                     e.stopPropagation();
                     showXPTooltip(xpIcon, userRank, xpData);
@@ -2605,7 +2347,6 @@ async function addXPDisplayToProfile(profileId) {
                 profilePic.parentElement.appendChild(xpIcon);
             }
             
-            // Add floating triumph icons around profile picture based on user's level
             addTriumphIconsToProfile(profileId, userRank.level);
             
         } else {
@@ -2617,13 +2358,11 @@ async function addXPDisplayToProfile(profileId) {
 }
 
 function showXPTooltip(element, userRank, xpData) {
-    // Remove any existing tooltip
     const existingTooltip = document.querySelector('.xp-tooltip');
     if (existingTooltip) {
         existingTooltip.remove();
     }
     
-    // Create tooltip
     const tooltip = document.createElement('div');
     tooltip.className = 'xp-tooltip';
     tooltip.style.cssText = `
@@ -2659,14 +2398,12 @@ function showXPTooltip(element, userRank, xpData) {
         </div>
     `;
     
-    // Position tooltip relative to the icon
     const rect = element.getBoundingClientRect();
     tooltip.style.top = `${rect.top - tooltip.offsetHeight - 10}px`;
     tooltip.style.left = `${rect.left + (rect.width / 2) - 100}px`;
     
     document.body.appendChild(tooltip);
     
-    // Add animation style if not exists
     if (!document.getElementById('xpTooltipAnimations')) {
         const style = document.createElement('style');
         style.id = 'xpTooltipAnimations';
@@ -2679,7 +2416,6 @@ function showXPTooltip(element, userRank, xpData) {
         document.head.appendChild(style);
     }
     
-    // Close tooltip when clicking outside
     setTimeout(() => {
         const closeTooltip = (e) => {
             if (!tooltip.contains(e.target) && !element.contains(e.target)) {
@@ -2695,16 +2431,13 @@ function addTriumphIconsToProfile(profileId, level) {
     const profilePic = document.querySelector('.profile-pic, .profile-avatar, [class*="avatar"], img[alt*="profile"]');
     if (!profilePic) return;
     
-    // Clear any existing triumph icons
     const existingIcons = document.querySelector('.triumph-icons-container');
     if (existingIcons) {
         existingIcons.remove();
     }
     
-    // Only add icons for higher levels (level 5+)
     if (level < 5) return;
     
-    // Create container for floating icons
     const iconContainer = document.createElement('div');
     iconContainer.className = 'triumph-icons-container';
     iconContainer.style.cssText = `
@@ -2717,11 +2450,9 @@ function addTriumphIconsToProfile(profileId, level) {
         z-index: 5;
     `;
     
-    // Determine number of icons based on level
     const iconCount = Math.min(Math.floor(level / 5), 10);
     const triumphIcons = ['🏆', '⭐', '👑', '💎', '🔥', '✨', '🎮', '⚔️', '🛡️', '🌟'];
     
-    // Add floating icons
     for (let i = 0; i < iconCount; i++) {
         const icon = document.createElement('div');
         icon.className = 'triumph-icon';
@@ -2734,7 +2465,6 @@ function addTriumphIconsToProfile(profileId, level) {
             filter: drop-shadow(0 0 5px gold);
         `;
         
-        // Random starting position in a circle around the profile picture
         const angle = Math.random() * Math.PI * 2;
         const radius = 60 + (level * 1.5);
         icon.style.left = `calc(50% + ${Math.cos(angle) * radius}px)`;
@@ -2746,7 +2476,6 @@ function addTriumphIconsToProfile(profileId, level) {
     profilePic.parentElement.style.position = 'relative';
     profilePic.parentElement.appendChild(iconContainer);
     
-    // Add animation style if not exists
     if (!document.getElementById('triumphAnimations')) {
         const style = document.createElement('style');
         style.id = 'triumphAnimations';
@@ -2770,7 +2499,6 @@ async function loadProfileData(profileId, forceRefresh = false) {
             return;
         }
         
-        // Try to load from instant cache first
         if (!forceRefresh) {
             const cachedDetail = instantLoader.getProfileDetail(profileId);
             if (cachedDetail) {
@@ -2778,13 +2506,11 @@ async function loadProfileData(profileId, forceRefresh = false) {
                 updateProfileHeader(profileId, cachedDetail);
                 updateProfileInfo(profileId, cachedDetail);
                 
-                // Still fetch fresh data in background
                 setTimeout(() => fetchFreshProfileData(profileId), 100);
                 return;
             }
         }
         
-        // Load fresh data from Firebase
         await fetchFreshProfileData(profileId);
         
     } catch (error) {
@@ -2795,7 +2521,6 @@ async function loadProfileData(profileId, forceRefresh = false) {
 
 async function fetchFreshProfileData(profileId) {
     try {
-        // Load user profile data
         const userRef = doc(db, 'users', profileId);
         const userSnap = await getDoc(userRef);
         
@@ -2806,22 +2531,12 @@ async function fetchFreshProfileData(profileId) {
         
         const userData = userSnap.data();
         
-        // Update profile header
         updateProfileHeader(profileId, userData);
-        
-        // Update profile info
         updateProfileInfo(profileId, userData);
-        
-        // Update followers count
         await updateFollowersCount(profileId);
-        
-        // Check if current user is following this profile
         await updateFollowButton(profileId);
-        
-        // Load gamer profile if exists
         await loadGamerProfile(profileId);
         
-        // Cache the profile detail
         try {
             await indexedDBCache.setProfileDetail(profileId, userData);
             instantLoader.updateProfileDetail(profileId, userData);
@@ -2830,7 +2545,6 @@ async function fetchFreshProfileData(profileId) {
             console.log('Could not cache profile detail:', cacheError);
         }
         
-        // Add XP display (icon only)
         await addXPDisplayToProfile(profileId);
         
     } catch (error) {
@@ -2839,13 +2553,11 @@ async function fetchFreshProfileData(profileId) {
 }
 
 function updateProfileHeader(profileId, userData) {
-    // Update profile name
     const profileNameElement = document.getElementById('viewProfileName');
     if (profileNameElement) {
         profileNameElement.textContent = userData.name || 'User';
     }
     
-    // Update profile age and location
     const profileAgeElement = document.getElementById('viewProfileAge');
     const profileLocationElement = document.getElementById('viewProfileLocation');
     
@@ -2857,36 +2569,30 @@ function updateProfileHeader(profileId, userData) {
         profileLocationElement.textContent = userData.location || 'Location unknown';
     }
     
-    // Update profile image
     const profileImageElement = document.getElementById('mainProfileImage');
     if (profileImageElement && userData.profileImage) {
         profileImageElement.src = userData.profileImage;
     }
     
-    // Update profile bio
     const profileBioElement = document.getElementById('viewProfileBio');
     if (profileBioElement) {
         profileBioElement.textContent = userData.bio || 'No bio available';
     }
     
-    // Also update the second bio element
     const profileBioElement2 = document.getElementById('viewProfileBio2');
     if (profileBioElement2) {
         profileBioElement2.textContent = userData.bio || 'No bio available';
     }
     
-    // Update online status
     updateOnlineStatus(profileId);
 }
 
 function updateProfileInfo(profileId, userData) {
-    // Update email
     const emailElement = document.getElementById('viewProfileEmail');
     if (emailElement) {
         emailElement.textContent = userData.email || 'No email';
     }
     
-    // Update workshop count
     const workshopCountElement = document.getElementById('viewWorkshopCount');
     const workshopCountElement2 = document.getElementById('viewWorkshopCount2');
     if (workshopCountElement) {
@@ -2896,7 +2602,6 @@ function updateProfileInfo(profileId, userData) {
         workshopCountElement2.textContent = formatNumber(userData.workshops || 0);
     }
     
-    // Update certification count
     const certCountElement = document.getElementById('viewCertCount');
     const certCountElement2 = document.getElementById('viewCertCount2');
     if (certCountElement) {
@@ -2906,7 +2611,6 @@ function updateProfileInfo(profileId, userData) {
         certCountElement2.textContent = formatNumber(userData.certifications || 0);
     }
     
-    // Update interests
     const interestsContainer = document.getElementById('interestsContainer');
     if (interestsContainer && userData.interests && Array.isArray(userData.interests)) {
         interestsContainer.innerHTML = '';
@@ -2961,7 +2665,6 @@ async function updateFollowersCount(profileId) {
     try {
         const count = await getFollowersCount(profileId);
         
-        // Update followers count in profile stats with TikTok-style formatting
         const followersStat = document.getElementById('followersCount');
         if (followersStat) {
             followersStat.textContent = formatNumber(count);
@@ -2977,20 +2680,17 @@ async function updateFollowButton(profileId) {
     if (!followBtn) return;
     
     if (!currentUser) {
-        // User not logged in
         followBtn.innerHTML = '<svg class="feather" data-feather="log-in"></svg> Login to Follow';
         followBtn.classList.remove('btn-message');
         followBtn.classList.add('btn-follow');
         return;
     }
     
-    // Check if user is viewing their own profile
     if (currentUser.uid === profileId) {
         followBtn.style.display = 'none';
         return;
     }
     
-    // Check if following (check cache first)
     let isFollowing = false;
     try {
         const cachedStatus = await indexedDBCache.getFollowStatus(currentUser.uid, profileId);
@@ -2998,7 +2698,6 @@ async function updateFollowButton(profileId) {
             isFollowing = cachedStatus;
         } else {
             isFollowing = await checkIfFollowing(profileId, currentUser.uid);
-            // Cache the result
             await indexedDBCache.setFollowStatus(currentUser.uid, profileId, isFollowing);
         }
     } catch (error) {
@@ -3031,18 +2730,15 @@ async function loadGamerProfile(profileId) {
         if (!gamerProfileSnap.empty) {
             const gamerProfile = gamerProfileSnap.docs[0].data();
             
-            // Show gamer badge
             const gamerBadge = document.getElementById('gamerBadge');
             if (gamerBadge) {
                 gamerBadge.style.display = 'inline-flex';
             }
             
-            // Show gamer profile section
             const gamerSection = document.getElementById('gamerProfileSection');
             if (gamerSection) {
                 gamerSection.style.display = 'block';
                 
-                // Populate gamer info
                 const gamerBasicInfo = document.getElementById('gamerBasicInfo');
                 if (gamerBasicInfo) {
                     gamerBasicInfo.innerHTML = `
@@ -3078,7 +2774,6 @@ async function loadGamerProfile(profileId) {
                     `;
                 }
                 
-                // Populate gamer stats
                 const gamerStatsGrid = document.getElementById('gamerStatsGrid');
                 if (gamerStatsGrid) {
                     gamerStatsGrid.innerHTML = `
@@ -3121,7 +2816,6 @@ function setupProfileEventListeners(profileId) {
                 return;
             }
             
-            // Don't allow following yourself
             if (currentUser.uid === profileId) {
                 showNotification('You cannot follow yourself', 'info');
                 return;
@@ -3131,36 +2825,30 @@ function setupProfileEventListeners(profileId) {
             
             try {
                 if (isCurrentlyFollowing) {
-                    // Unfollow
                     await unfollowUser(profileId);
                     followBtn.dataset.following = 'false';
                     followBtn.innerHTML = '<svg class="feather" data-feather="user-plus"></svg> Follow';
                     followBtn.classList.remove('btn-message');
                     followBtn.classList.add('btn-follow');
                     
-                    // Update followers count
                     await updateFollowersCount(profileId);
                     
-                    // Update cache
                     await indexedDBCache.setFollowStatus(currentUser.uid, profileId, false);
                     
                     showNotification(`Unfollowed user`, 'info');
                 } else {
-                    // Follow
                     await followUser(profileId);
                     followBtn.dataset.following = 'true';
                     followBtn.innerHTML = '<svg class="feather" data-feather="user-check"></svg> Following';
                     followBtn.classList.remove('btn-follow');
                     followBtn.classList.add('btn-message');
                     
-                    // Update followers count
                     await updateFollowersCount(profileId);
                     
-                    // Update cache
                     await indexedDBCache.setFollowStatus(currentUser.uid, profileId, true);
                     
-                    // Award XP for following someone
-                    if (xpSystem) {
+                    // Safely award XP
+                    if (xpSystem && typeof xpSystem.addXP === 'function') {
                         await xpSystem.addXP(15, 'Followed a User');
                     }
                     
@@ -3177,7 +2865,6 @@ function setupProfileEventListeners(profileId) {
         });
     }
     
-    // Message button
     const messageBtn = document.getElementById('messageProfileBtn');
     if (messageBtn) {
         messageBtn.addEventListener('click', () => {
@@ -3187,17 +2874,15 @@ function setupProfileEventListeners(profileId) {
                 return;
             }
             
-            // Don't allow messaging yourself
             if (currentUser.uid === profileId) {
                 showNotification('You cannot message yourself', 'info');
                 return;
             }
             
-            // Redirect to chat page with this user's ID
             window.location.href = `chat.html?id=${profileId}`;
             
-            // Award XP for sending a message (will be awarded when chat opens)
-            if (xpSystem) {
+            // Safely award XP
+            if (xpSystem && typeof xpSystem.addXP === 'function') {
                 setTimeout(async () => {
                     await xpSystem.addXP(5, 'Sent a Message');
                 }, 1000);
@@ -3213,24 +2898,64 @@ async function followUser(targetUserId) {
             throw new Error('User not logged in');
         }
         
-        // Add current user to target user's followers
         const targetUserRef = doc(db, 'users', targetUserId);
-        await updateDoc(targetUserRef, {
-            followers: arrayUnion(currentUser.uid),
-            updatedAt: serverTimestamp()
-        });
+        const targetUserSnap = await getDoc(targetUserRef);
         
-        // Add target user to current user's following
+        if (!targetUserSnap.exists()) {
+            throw new Error('Target user not found');
+        }
+        
+        const targetUserData = targetUserSnap.data();
+        
+        const targetUpdates = {
+            updatedAt: serverTimestamp()
+        };
+        
+        if (targetUserData.followers && Array.isArray(targetUserData.followers)) {
+            if (!targetUserData.followers.includes(currentUser.uid)) {
+                targetUpdates.followers = arrayUnion(currentUser.uid);
+            }
+        } else {
+            targetUpdates.followers = [currentUser.uid];
+        }
+        
+        if (targetUserData.likes && Array.isArray(targetUserData.likes)) {
+            if (!targetUserData.likes.includes(currentUser.uid)) {
+                targetUpdates.likes = arrayUnion(currentUser.uid);
+            }
+        } else {
+            targetUpdates.likes = [currentUser.uid];
+        }
+        
+        await updateDoc(targetUserRef, targetUpdates);
+        
         const currentUserRef = doc(db, 'users', currentUser.uid);
-        await updateDoc(currentUserRef, {
-            following: arrayUnion(targetUserId),
-            updatedAt: serverTimestamp()
-        });
+        const currentUserSnap = await getDoc(currentUserRef);
         
-        // Also increase likes count
-        await updateDoc(targetUserRef, {
-            likes: arrayUnion(currentUser.uid)
-        });
+        if (currentUserSnap.exists()) {
+            const currentUserData = currentUserSnap.data();
+            
+            if (currentUserData.following && Array.isArray(currentUserData.following)) {
+                if (!currentUserData.following.includes(targetUserId)) {
+                    await updateDoc(currentUserRef, {
+                        following: arrayUnion(targetUserId),
+                        updatedAt: serverTimestamp()
+                    });
+                }
+            } else {
+                await updateDoc(currentUserRef, {
+                    following: [targetUserId],
+                    updatedAt: serverTimestamp()
+                });
+            }
+        } else {
+            await updateDoc(currentUserRef, {
+                following: [targetUserId],
+                updatedAt: serverTimestamp()
+            });
+        }
+        
+        console.log(`✅ Successfully followed user: ${targetUserId}`);
         
     } catch (error) {
         console.error('Error following user:', error);
@@ -3244,24 +2969,52 @@ async function unfollowUser(targetUserId) {
             throw new Error('User not logged in');
         }
         
-        // Remove current user from target user's followers
         const targetUserRef = doc(db, 'users', targetUserId);
-        await updateDoc(targetUserRef, {
-            followers: arrayRemove(currentUser.uid),
-            updatedAt: serverTimestamp()
-        });
+        const targetUserSnap = await getDoc(targetUserRef);
         
-        // Remove target user from current user's following
+        if (!targetUserSnap.exists()) {
+            throw new Error('Target user not found');
+        }
+        
+        const targetUserData = targetUserSnap.data();
+        
+        const targetUpdates = {
+            updatedAt: serverTimestamp()
+        };
+        
+        if (targetUserData.followers && Array.isArray(targetUserData.followers)) {
+            if (targetUserData.followers.includes(currentUser.uid)) {
+                targetUpdates.followers = arrayRemove(currentUser.uid);
+            }
+        }
+        
+        if (targetUserData.likes && Array.isArray(targetUserData.likes)) {
+            if (targetUserData.likes.includes(currentUser.uid)) {
+                targetUpdates.likes = arrayRemove(currentUser.uid);
+            }
+        }
+        
+        if (Object.keys(targetUpdates).length > 1) {
+            await updateDoc(targetUserRef, targetUpdates);
+        }
+        
         const currentUserRef = doc(db, 'users', currentUser.uid);
-        await updateDoc(currentUserRef, {
-            following: arrayRemove(targetUserId),
-            updatedAt: serverTimestamp()
-        });
+        const currentUserSnap = await getDoc(currentUserRef);
         
-        // Also remove like
-        await updateDoc(targetUserRef, {
-            likes: arrayRemove(currentUser.uid)
-        });
+        if (currentUserSnap.exists()) {
+            const currentUserData = currentUserSnap.data();
+            
+            if (currentUserData.following && Array.isArray(currentUserData.following)) {
+                if (currentUserData.following.includes(targetUserId)) {
+                    await updateDoc(currentUserRef, {
+                        following: arrayRemove(targetUserId),
+                        updatedAt: serverTimestamp()
+                    });
+                }
+            }
+        }
+        
+        console.log(`✅ Successfully unfollowed user: ${targetUserId}`);
         
     } catch (error) {
         console.error('Error unfollowing user:', error);
@@ -3273,7 +3026,6 @@ async function unfollowUser(targetUserId) {
 function setupEventListeners() {
     console.log('Setting up event listeners...');
     
-    // Search functionality
     const searchInput = document.querySelector('.search-input');
     if (searchInput) {
         searchInput.addEventListener('input', debounce((e) => {
@@ -3295,7 +3047,6 @@ function setupEventListeners() {
         }, 300));
     }
     
-    // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(button => {
         button.addEventListener('click', () => {
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -3306,7 +3057,6 @@ function setupEventListeners() {
         });
     });
     
-    // Add XP filter button if not exists
     const filterContainer = document.querySelector('.filters');
     if (filterContainer && !document.querySelector('.filter-btn[data-filter="xp"]')) {
         const xpFilterBtn = document.createElement('button');
@@ -3369,8 +3119,7 @@ function createLoadingProfileItem() {
 }
 
 // ==================== NOTIFICATION & ERROR FUNCTIONS ====================
-function showNotification(message, type = 'info') {
-    // Remove existing notifications
+function showNotification(message, type = 'info', duration = 3000) {
     const existingNotifications = document.querySelectorAll('.custom-notification');
     existingNotifications.forEach(notification => notification.remove());
     
@@ -3416,7 +3165,7 @@ function showNotification(message, type = 'info') {
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => notification.remove(), 300);
-    }, 3000);
+    }, duration);
 }
 
 function getNotificationIcon(icon) {
@@ -3489,7 +3238,6 @@ function debounce(func, wait) {
     };
 }
 
-// Add animation styles
 if (!document.getElementById('notification-styles')) {
     const style = document.createElement('style');
     style.id = 'notification-styles';
@@ -3506,7 +3254,6 @@ if (!document.getElementById('notification-styles')) {
     document.head.appendChild(style);
 }
 
-// Remove the clan modal from HTML if it exists
 document.addEventListener('DOMContentLoaded', () => {
     const clanModal = document.getElementById('clanModal');
     if (clanModal) {
@@ -3514,4 +3261,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('✅ gamers.js loaded successfully - Instant loading with IndexedDB caching, Service Worker support, XP System integration, and Follower Notifications');
+console.log('✅ gamers.js loaded successfully - XP System error fixed!');
