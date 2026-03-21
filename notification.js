@@ -1,5 +1,5 @@
 // notification.js - Complete file with nice notification sounds and comment reply functionality
-// Fixed version - No Firebase indexes required
+// Updated with Stream Video Notifications (Likes, Comments, Comment Replies)
 
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -173,6 +173,9 @@ class NotificationSoundManager {
             case 'post':
                 this.playGentleChime(); // Gentle chime for posts
                 break;
+            case 'stream':
+                this.playGentleChime(); // Gentle chime for streams
+                break;
             case 'group_invite':
                 this.playSoftBell(); // Soft bell for invites
                 break;
@@ -308,52 +311,847 @@ class NotificationSoundManager {
 // Create global sound manager instance
 const soundManager = new NotificationSoundManager();
 
-// ==================== END NOTIFICATION SOUNDS SYSTEM ====================
+// ==================== STREAM NOTIFICATION FUNCTIONS ====================
 
-// Initialize notification system
-function initNotificationSystem() {
-    // Load dismissed notifications and viewed posts
-    loadDismissedNotifications();
-    
-    // Wait for auth state
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            currentUser = user;
-            loadViewedPosts();
-            loadProcessedItems();
+// Create notification for stream like
+async function createStreamLikeNotification(streamId, streamOwnerId, likerId, likeId) {
+    try {
+        // Create a unique key for this like
+        const likeKey = `${streamId}_${likerId}`;
+        
+        // Check if we've already processed this like
+        if (processedLikes.has(likeKey)) {
+            console.log('Stream like already processed, skipping notification');
+            return;
+        }
+        
+        // Check if notification already exists in Firestore
+        const existingQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', streamOwnerId),
+            where('type', '==', 'stream_like'),
+            where('relatedId', '==', streamId),
+            where('senderId', '==', likerId)
+        );
+        
+        const existingSnap = await getDocs(existingQuery);
+        if (!existingSnap.empty) {
+            // Mark as processed even if it exists in Firestore
+            processedLikes.add(likeKey);
+            saveProcessedItems();
+            return;
+        }
+        
+        // Get liker data
+        const likerRef = doc(db, 'users', likerId);
+        const likerSnap = await getDoc(likerRef);
+        if (!likerSnap.exists()) return;
+        
+        const likerData = likerSnap.data();
+        const likerName = likerData.name || 'Someone';
+        
+        // Get stream data for preview
+        const streamRef = doc(db, 'streams', streamId);
+        const streamSnap = await getDoc(streamRef);
+        let streamPreview = '';
+        
+        if (streamSnap.exists()) {
+            const streamData = streamSnap.data();
             
-            setupNotificationListener();
-            setupNotificationCreators();
-            updateNotificationBadge();
-            
-            // Add sound control button to UI
-            addSoundControlButton();
-            
-            // Setup reply modal for comment replies
-            setupReplyModal();
-            
-            // If on notification page, load notifications
-            if (window.location.pathname.includes('notification.html')) {
-                loadNotificationsForPage();
-                setupMarkAllReadButton();
-                addSoundSettingsToPage();
+            // Verify this stream actually belongs to streamOwnerId
+            if (streamData.authorId !== streamOwnerId) {
+                console.log('Stream owner mismatch, skipping notification');
+                return;
             }
             
-            // Setup dropdown notifications if notification bell exists
-            setupDropdownNotifications();
-        } else {
-            console.log('User not authenticated');
-            currentUser = null;
-            updateNotificationBadge(0);
-            cleanupListeners();
-            
-            // If on notification page, show login message
-            if (window.location.pathname.includes('notification.html')) {
-                showLoginMessage();
+            if (streamData.headline) {
+                streamPreview = streamData.headline.length > 30 ? 
+                    streamData.headline.substring(0, 30) + '...' : 
+                    streamData.headline;
             }
         }
+        
+        // Create the notification
+        await addDoc(collection(db, 'notifications'), {
+            type: 'stream_like',
+            title: 'New Like on Your Video',
+            message: `${likerName} liked your video${streamPreview ? ': ' + streamPreview : ''}`,
+            senderId: likerId,
+            senderName: likerName,
+            senderAvatar: likerData.profileImage || 'images/default-profile.jpg',
+            relatedId: streamId,
+            streamId: streamId,
+            streamPreview: streamPreview,
+            userId: streamOwnerId,
+            timestamp: serverTimestamp(),
+            read: false,
+            likeId: likeId || null,
+            actionable: false
+        });
+        
+        // Mark as processed
+        processedLikes.add(likeKey);
+        saveProcessedItems();
+        
+        console.log('Stream like notification created successfully');
+        
+    } catch (error) {
+        console.error('Error creating stream like notification:', error);
+    }
+}
+
+// Create notification for comment on stream
+async function createStreamCommentNotification(streamId, streamOwnerId, commenterId, commentText, commentId) {
+    try {
+        // Create a unique key for this comment
+        const commentKey = `${streamId}_${commentId}`;
+        
+        // Check if we've already processed this comment
+        if (processedComments.has(commentKey)) {
+            console.log('Stream comment already processed, skipping notification');
+            return;
+        }
+        
+        // Check if notification already exists in Firestore
+        const existingQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', streamOwnerId),
+            where('type', '==', 'stream_comment'),
+            where('relatedId', '==', commentId),
+            where('senderId', '==', commenterId)
+        );
+        
+        const existingSnap = await getDocs(existingQuery);
+        if (!existingSnap.empty) {
+            // Mark as processed if it exists in Firestore
+            processedComments.add(commentKey);
+            saveProcessedItems();
+            return;
+        }
+        
+        // Get commenter data
+        const commenterRef = doc(db, 'users', commenterId);
+        const commenterSnap = await getDoc(commenterRef);
+        if (!commenterSnap.exists()) return;
+        
+        const commenterData = commenterSnap.data();
+        const commenterName = commenterData.name || 'Someone';
+        
+        // Get stream data for preview
+        const streamRef = doc(db, 'streams', streamId);
+        const streamSnap = await getDoc(streamRef);
+        let streamPreview = '';
+        
+        if (streamSnap.exists()) {
+            const streamData = streamSnap.data();
+            
+            // Verify this stream actually belongs to streamOwnerId
+            if (streamData.authorId !== streamOwnerId) {
+                console.log('Stream owner mismatch, skipping notification');
+                return;
+            }
+            
+            if (streamData.headline) {
+                streamPreview = streamData.headline.length > 30 ? 
+                    streamData.headline.substring(0, 30) + '...' : 
+                    streamData.headline;
+            }
+        }
+        
+        // Truncate comment text for notification
+        const shortComment = commentText.length > 40 ? 
+            commentText.substring(0, 40) + '...' : 
+            commentText;
+        
+        await addDoc(collection(db, 'notifications'), {
+            type: 'stream_comment',
+            title: 'New Comment on Your Video',
+            message: `${commenterName} commented on your video: "${shortComment}"`,
+            senderId: commenterId,
+            senderName: commenterName,
+            senderAvatar: commenterData.profileImage || 'images/default-profile.jpg',
+            relatedId: commentId,
+            streamId: streamId,
+            streamPreview: streamPreview,
+            commentId: commentId,
+            commentText: commentText,
+            userId: streamOwnerId,
+            timestamp: serverTimestamp(),
+            read: false,
+            actionable: true, // This notification can be acted upon (reply)
+            actionType: 'reply_to_stream_comment'
+        });
+        
+        // Mark as processed
+        processedComments.add(commentKey);
+        saveProcessedItems();
+        
+        console.log('Stream comment notification created successfully');
+        
+    } catch (error) {
+        console.error('Error creating stream comment notification:', error);
+    }
+}
+
+// Create notification for comment reply on stream
+async function createStreamCommentReplyNotification(streamId, commentId, targetUserId, replyText, originalCommenterName) {
+    try {
+        // Check if notification already exists (prevent duplicates)
+        const existingQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', targetUserId),
+            where('type', '==', 'stream_comment_reply'),
+            where('relatedId', '==', commentId),
+            where('senderId', '==', currentUser.uid)
+        );
+        
+        const existingSnap = await getDocs(existingQuery);
+        if (!existingSnap.empty) {
+            return; // Notification already exists
+        }
+        
+        // Get current user data
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        const userName = userData.name || currentUser.displayName || 'Someone';
+        
+        // Get stream data to include in notification
+        const streamRef = doc(db, 'streams', streamId);
+        const streamSnap = await getDoc(streamRef);
+        let streamPreview = '';
+        
+        if (streamSnap.exists()) {
+            const streamData = streamSnap.data();
+            if (streamData.headline) {
+                streamPreview = streamData.headline.length > 30 ? 
+                    streamData.headline.substring(0, 30) + '...' : 
+                    streamData.headline;
+            }
+        }
+        
+        // Truncate reply text for notification
+        const shortReply = replyText.length > 40 ? 
+            replyText.substring(0, 40) + '...' : 
+            replyText;
+        
+        await addDoc(collection(db, 'notifications'), {
+            type: 'stream_comment_reply',
+            title: 'New Reply to Your Comment',
+            message: `${userName} replied to your comment: "${shortReply}"`,
+            senderId: currentUser.uid,
+            senderName: userName,
+            senderAvatar: userData.profileImage || currentUser.photoURL || 'images/default-profile.jpg',
+            relatedId: commentId,
+            streamId: streamId,
+            streamPreview: streamPreview,
+            commentId: commentId,
+            replyText: replyText,
+            originalCommenterName: originalCommenterName,
+            userId: targetUserId,
+            timestamp: serverTimestamp(),
+            read: false,
+            actionable: true, // This notification can be acted upon (reply)
+            actionType: 'reply_to_stream_comment'
+        });
+        
+        console.log('Stream comment reply notification created successfully');
+        
+    } catch (error) {
+        console.error('Error creating stream comment reply notification:', error);
+    }
+}
+
+// ==================== STREAM CHECK FUNCTIONS ====================
+
+// Check for new likes on streams
+async function checkForNewStreamLikes() {
+    if (!currentUser) return;
+
+    try {
+        console.log('Checking for new stream likes...');
+        
+        // Get all streams by current user
+        const streamsQuery = query(
+            collection(db, 'streams'),
+            where('authorId', '==', currentUser.uid),
+            where('isActive', '==', true)
+        );
+        
+        const streamsSnap = await getDocs(streamsQuery);
+        
+        if (streamsSnap.empty) {
+            console.log('No streams found for current user');
+            return;
+        }
+        
+        for (const streamDoc of streamsSnap.docs) {
+            const streamId = streamDoc.id;
+            const streamData = streamDoc.data();
+            
+            console.log(`Checking likes for stream: ${streamId}`);
+            
+            // Check if stream has a likes field we can track
+            // Streams might have likes stored in the document itself
+            // We need to track like counts to detect new likes
+            
+            // Since streams don't have a likes subcollection, we need to track via the likes field
+            // For now, we'll rely on the existing like tracking from stream.js
+            // The streamManager.handleLike already creates notifications
+            
+        }
+    } catch (error) {
+        console.error('Error checking stream likes:', error);
+    }
+}
+
+// Check for new comments on streams
+async function checkForNewStreamComments() {
+    if (!currentUser) return;
+
+    try {
+        console.log('Checking for new stream comments...');
+        
+        // Get all streams by current user
+        const streamsQuery = query(
+            collection(db, 'streams'),
+            where('authorId', '==', currentUser.uid),
+            where('isActive', '==', true)
+        );
+        
+        const streamsSnap = await getDocs(streamsQuery);
+        
+        if (streamsSnap.empty) {
+            console.log('No streams found for current user');
+            return;
+        }
+        
+        for (const streamDoc of streamsSnap.docs) {
+            const streamId = streamDoc.id;
+            
+            console.log(`Checking comments for stream: ${streamId}`);
+            
+            // Get comments for this stream
+            const commentsQuery = query(
+                collection(db, 'streams', streamId, 'comments')
+            );
+            
+            const commentsSnap = await getDocs(commentsQuery);
+            
+            if (commentsSnap.empty) {
+                console.log(`No comments found for stream: ${streamId}`);
+                continue;
+            }
+            
+            console.log(`Found ${commentsSnap.size} comments for stream: ${streamId}`);
+            
+            // Convert to array and sort by createdAt in memory
+            const comments = [];
+            commentsSnap.forEach(doc => {
+                const data = doc.data();
+                comments.push({
+                    id: doc.id,
+                    ...data,
+                    createdAtObj: data.createdAt?.toDate?.() || new Date(0)
+                });
+            });
+            
+            // Sort by newest first
+            comments.sort((a, b) => b.createdAtObj - a.createdAtObj);
+            
+            for (const commentData of comments) {
+                const commenterId = commentData.userId;
+                const commentId = commentData.id;
+                
+                // Skip if commented by current user
+                if (commenterId === currentUser.uid) {
+                    console.log('Skipping self-comment');
+                    continue;
+                }
+                
+                // Create unique key for this comment
+                const commentKey = `${streamId}_${commentId}`;
+                
+                // Check if we've already processed this comment
+                if (processedComments.has(commentKey)) {
+                    console.log(`Stream comment already processed: ${commentKey}`);
+                    continue;
+                }
+                
+                // Check if notification already exists in Firestore
+                const existingQuery = query(
+                    collection(db, 'notifications'),
+                    where('userId', '==', currentUser.uid),
+                    where('type', '==', 'stream_comment'),
+                    where('relatedId', '==', commentId),
+                    where('senderId', '==', commenterId)
+                );
+                
+                const existingSnap = await getDocs(existingQuery);
+                
+                if (existingSnap.empty) {
+                    console.log(`Creating stream comment notification for stream: ${streamId} from user: ${commenterId}`);
+                    
+                    // Create stream comment notification
+                    await createStreamCommentNotification(
+                        streamId, 
+                        currentUser.uid, 
+                        commenterId, 
+                        commentData.text, 
+                        commentId
+                    );
+                } else {
+                    // Mark as processed if it exists in Firestore
+                    console.log(`Stream comment notification already exists in Firestore for: ${commentKey}`);
+                    processedComments.add(commentKey);
+                    saveProcessedItems();
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error checking stream comments:', error);
+    }
+}
+
+// ==================== REPLY MODAL FOR STREAM COMMENTS ====================
+
+// Open reply modal for stream comment reply
+function openStreamReplyModal(commentData, streamId, commentId) {
+    const modal = document.getElementById('replyModal');
+    if (!modal) {
+        setupReplyModal();
+        setTimeout(() => openStreamReplyModal(commentData, streamId, commentId), 100);
+        return;
+    }
+    
+    // Store data for later use
+    currentCommentPostId = streamId;
+    currentCommentId = commentId;
+    currentReplyToUserId = commentData.userId;
+    
+    modal.dataset.streamId = streamId;
+    modal.dataset.commentId = commentId;
+    modal.dataset.replyToUserId = commentData.userId;
+    modal.dataset.replyToUsername = commentData.userName || 'User';
+    modal.dataset.isStream = 'true';
+    
+    // Set avatar
+    const avatar = document.getElementById('replyToAvatar');
+    if (avatar) {
+        avatar.src = commentData.userAvatar || 'images/default-profile.jpg';
+        
+        // Add click to view profile
+        avatar.onclick = () => {
+            window.location.href = `profile.html?id=${commentData.userId}`;
+        };
+    }
+    
+    // Set name
+    const nameEl = document.getElementById('replyToName');
+    if (nameEl) {
+        nameEl.textContent = `Replying to ${commentData.userName || 'User'}`;
+        
+        // Add click to view profile
+        nameEl.onclick = () => {
+            window.location.href = `profile.html?id=${commentData.userId}`;
+        };
+    }
+    
+    // Set comment text
+    const textEl = document.getElementById('replyToText');
+    if (textEl) {
+        let commentText = commentData.text || '';
+        if (commentText.length > 50) {
+            commentText = commentText.substring(0, 50) + '...';
+        }
+        textEl.textContent = `"${commentText}"`;
+    }
+    
+    // Clear and focus input
+    const input = document.getElementById('replyModalInput');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    
+    modal.style.display = 'block';
+}
+
+// Submit reply to stream comment
+async function submitStreamReply() {
+    const modal = document.getElementById('replyModal');
+    if (!modal) return;
+    
+    const streamId = modal.dataset.streamId;
+    const commentId = modal.dataset.commentId;
+    const replyToUserId = modal.dataset.replyToUserId;
+    const replyToUsername = modal.dataset.replyToUsername;
+    const isStream = modal.dataset.isStream === 'true';
+    
+    const input = document.getElementById('replyModalInput');
+    const replyText = input.value.trim();
+    
+    if (!replyText) {
+        alert('Please enter a reply');
+        return;
+    }
+    
+    if (!currentUser) {
+        alert('Please login to reply');
+        return;
+    }
+    
+    try {
+        // Get current user data
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        
+        const replyData = {
+            userId: currentUser.uid,
+            userName: userData.name || currentUser.displayName || 'User',
+            userAvatar: userData.profileImage || currentUser.photoURL || 'images/default-profile.jpg',
+            text: replyText,
+            replyToUserId: replyToUserId,
+            replyToUsername: replyToUsername,
+            createdAt: serverTimestamp(),
+            likes: 0
+        };
+        
+        // Add reply to Firestore (using the same structure as comments)
+        await addDoc(
+            collection(db, 'streams', streamId, 'comments', commentId, 'replies'), 
+            replyData
+        );
+        
+        // Update comment's reply count
+        const commentRef = doc(db, 'streams', streamId, 'comments', commentId);
+        await updateDoc(commentRef, {
+            repliesCount: increment(1),
+            updatedAt: serverTimestamp()
+        });
+        
+        // Create notification for the comment owner (if not replying to self)
+        if (replyToUserId && replyToUserId !== currentUser.uid) {
+            await createStreamCommentReplyNotification(
+                streamId, 
+                commentId, 
+                replyToUserId, 
+                replyText,
+                replyToUsername
+            );
+        }
+        
+        // Show success message
+        showCustomNotification('Reply posted!', 'success');
+        
+        // Close modal
+        closeReplyModal();
+        
+    } catch (error) {
+        console.error('Error adding stream reply:', error);
+        alert('Error posting reply: ' + error.message);
+    }
+}
+
+// ==================== NOTIFICATION HANDLING FOR STREAMS ====================
+
+// Handle notification click (updated for stream notifications)
+async function handleNotificationClick(notificationId) {
+    // Mark as read
+    await markNotificationAsRead(notificationId);
+    
+    // Get notification data to determine where to navigate
+    try {
+        const notificationDoc = await getDoc(doc(db, 'notifications', notificationId));
+        if (notificationDoc.exists()) {
+            const notification = notificationDoc.data();
+            
+            // Handle different notification types
+            if (notification.type === 'stream_like') {
+                // Navigate to the stream that was liked
+                if (notification.streamId) {
+                    window.location.href = `stream.html?video=${notification.streamId}`;
+                } else if (notification.relatedId) {
+                    window.location.href = `stream.html?video=${notification.relatedId}`;
+                } else {
+                    window.location.href = 'stream.html';
+                }
+            }
+            else if (notification.type === 'stream_comment') {
+                // Navigate to the stream and scroll to comment
+                if (notification.streamId && notification.commentId) {
+                    window.location.href = `stream.html?video=${notification.streamId}&comment=${notification.commentId}`;
+                } else if (notification.streamId) {
+                    window.location.href = `stream.html?video=${notification.streamId}`;
+                } else {
+                    window.location.href = 'stream.html';
+                }
+            }
+            else if (notification.type === 'stream_comment_reply') {
+                // Navigate to the stream and scroll to the reply
+                if (notification.streamId && notification.commentId) {
+                    window.location.href = `stream.html?video=${notification.streamId}&comment=${notification.commentId}&reply=true`;
+                } else {
+                    window.location.href = 'stream.html';
+                }
+            }
+            else if (notification.type === 'like') {
+                // Navigate to the post that was liked
+                if (notification.postId) {
+                    window.location.href = `posts.html?post=${notification.postId}`;
+                } else if (notification.relatedId) {
+                    window.location.href = `posts.html?post=${notification.relatedId}`;
+                } else {
+                    window.location.href = 'posts.html';
+                }
+            }
+            else if (notification.type === 'comment') {
+                // Navigate to the post and scroll to comment
+                if (notification.postId && notification.commentId) {
+                    window.location.href = `posts.html?post=${notification.postId}&comment=${notification.commentId}`;
+                } else if (notification.postId) {
+                    window.location.href = `posts.html?post=${notification.postId}`;
+                } else {
+                    window.location.href = 'posts.html';
+                }
+            }
+            else if (notification.type === 'comment_reply') {
+                // Navigate to the post and scroll to the reply
+                if (notification.postId && notification.commentId) {
+                    window.location.href = `posts.html?post=${notification.postId}&comment=${notification.commentId}&reply=true`;
+                } else {
+                    window.location.href = 'posts.html';
+                }
+            }
+            else if (notification.type === 'message' && notification.senderId) {
+                window.location.href = `chat.html?id=${notification.senderId}`;
+            } else if (notification.type === 'group_message' && notification.groupId) {
+                window.location.href = `group.html?id=${notification.groupId}`;
+            } else if (notification.type === 'group_invite' && notification.groupId) {
+                window.location.href = `group.html?id=${notification.groupId}`;
+            } else if (notification.type === 'post' && notification.senderId) {
+                window.location.href = 'posts.html';
+                // Mark post as viewed
+                viewedPosts.add(notification.relatedId);
+                saveViewedPosts();
+                dismissedNotifications.add(`post_${notification.relatedId}`);
+                saveDismissedNotifications();
+            } else if (notification.senderId) {
+                window.location.href = `profile.html?id=${notification.senderId}`;
+            } else {
+                window.location.href = 'notification.html';
+            }
+        }
+    } catch (error) {
+        console.error('Error getting notification:', error);
+        window.location.href = 'notification.html';
+    }
+}
+
+// ==================== DISPLAY NOTIFICATIONS WITH STREAM REPLY BUTTONS ====================
+
+// Display notifications in notification.html (updated for stream comments)
+function displayNotifications(notificationDocs) {
+    const notificationsList = document.getElementById('notificationsList');
+    if (!notificationsList) return;
+
+    if (notificationDocs.length === 0) {
+        notificationsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-bell-slash"></i>
+                <h3>No notifications yet</h3>
+                <p>When you receive notifications, they will appear here.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Sort notifications by timestamp (newest first) in memory
+    const sortedDocs = [...notificationDocs].sort((a, b) => {
+        const timeA = a.timestamp?.toDate?.() || new Date(0);
+        const timeB = b.timestamp?.toDate?.() || new Date(0);
+        return timeB - timeA;
+    });
+
+    const notificationsHTML = sortedDocs.map(doc => {
+        const notification = doc;
+        const timeAgo = formatTime(notification.timestamp);
+        const iconClass = getNotificationIcon(notification.type);
+        const unreadClass = notification.read ? '' : 'unread';
+        const unreadDot = notification.read ? '' : '<div class="unread-dot"></div>';
+        
+        // Check if this is a comment or comment_reply notification that can be replied to
+        const showReplyButton = (notification.type === 'stream_comment' || notification.type === 'stream_comment_reply' || 
+                                 notification.type === 'comment' || notification.type === 'comment_reply') && 
+                                notification.actionable === true;
+        
+        // Get reply button HTML if applicable
+        const replyButtonHTML = showReplyButton ? `
+            <button class="action-btn reply-to-comment-btn" 
+                    data-notification-id="${doc.id}"
+                    data-type="${notification.type}"
+                    data-stream-id="${notification.streamId || ''}" 
+                    data-post-id="${notification.postId || ''}" 
+                    data-comment-id="${notification.commentId || notification.relatedId || ''}"
+                    data-user-id="${notification.senderId || ''}"
+                    data-user-name="${notification.senderName || 'User'}"
+                    data-user-avatar="${notification.senderAvatar || 'images/default-profile.jpg'}"
+                    data-comment-text="${notification.commentText || notification.message || ''}"
+                    title="Reply to comment">
+                <i class="fas fa-reply"></i>
+            </button>
+        ` : '';
+        
+        return `
+            <div class="notification-item ${unreadClass}" data-id="${doc.id}">
+                <div class="notification-icon ${notification.type}">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="notification-content">
+                    <div class="notification-title">
+                        ${notification.title}
+                        ${unreadDot}
+                    </div>
+                    <div class="notification-text">${notification.message}</div>
+                    <div class="notification-time">${timeAgo}</div>
+                </div>
+                <div class="notification-actions">
+                    ${replyButtonHTML}
+                    ${!notification.read ? `
+                        <button class="action-btn mark-read-btn" title="Mark as read">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    ` : ''}
+                    <button class="action-btn delete-btn" title="Delete notification">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    notificationsList.innerHTML = notificationsHTML;
+    addNotificationActionListeners();
+    addReplyButtonListeners();
+}
+
+// Add event listeners to reply buttons (updated for stream comments)
+function addReplyButtonListeners() {
+    document.querySelectorAll('.reply-to-comment-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            const type = button.dataset.type;
+            const streamId = button.dataset.streamId;
+            const postId = button.dataset.postId;
+            const commentId = button.dataset.commentId;
+            const userId = button.dataset.userId;
+            const userName = button.dataset.userName;
+            const userAvatar = button.dataset.userAvatar;
+            const commentText = button.dataset.commentText;
+            
+            // Determine if it's a stream comment or post comment
+            if (type === 'stream_comment' || type === 'stream_comment_reply') {
+                if (!streamId || !commentId) {
+                    console.error('Missing streamId or commentId for reply');
+                    alert('Cannot reply: missing stream information');
+                    return;
+                }
+                
+                const commentData = {
+                    userId: userId,
+                    userName: userName,
+                    userAvatar: userAvatar,
+                    text: commentText
+                };
+                
+                openStreamReplyModal(commentData, streamId, commentId);
+            } else {
+                if (!postId || !commentId) {
+                    console.error('Missing postId or commentId for reply');
+                    alert('Cannot reply: missing post information');
+                    return;
+                }
+                
+                const commentData = {
+                    userId: userId,
+                    userName: userName,
+                    userAvatar: userAvatar,
+                    text: commentText
+                };
+                
+                openReplyModal(commentData, postId, commentId);
+            }
+        });
     });
 }
+
+// ==================== NOTIFICATION CREATOR FUNCTIONS ====================
+
+// Setup notification creators (updated with stream checks)
+function setupNotificationCreators() {
+    if (!currentUser) return;
+
+    // Clear any existing intervals
+    checkIntervals.forEach(interval => clearInterval(interval));
+    checkIntervals = [];
+
+    // Check for new likes every 10 seconds
+    const likeInterval = setInterval(() => {
+        checkForNewLikes();
+    }, 10000);
+    checkIntervals.push(likeInterval);
+
+    // Check for new comments every 10 seconds
+    const commentInterval = setInterval(() => {
+        checkForNewComments();
+    }, 10000);
+    checkIntervals.push(commentInterval);
+    
+    // Check for new stream likes every 10 seconds
+    const streamLikeInterval = setInterval(() => {
+        checkForNewStreamLikes();
+    }, 10000);
+    checkIntervals.push(streamLikeInterval);
+    
+    // Check for new stream comments every 10 seconds
+    const streamCommentInterval = setInterval(() => {
+        checkForNewStreamComments();
+    }, 10000);
+    checkIntervals.push(streamCommentInterval);
+
+    // Check for new messages every 30 seconds
+    const messageInterval = setInterval(() => {
+        checkForNewMessages();
+    }, 30000);
+    checkIntervals.push(messageInterval);
+
+    // Check for new posts every 30 seconds
+    const postInterval = setInterval(() => {
+        checkForNewPosts();
+    }, 30000);
+    checkIntervals.push(postInterval);
+
+    // Check for group notifications every 30 seconds
+    const groupInterval = setInterval(() => {
+        checkForGroupNotifications();
+    }, 30000);
+    checkIntervals.push(groupInterval);
+
+    // Initial checks
+    setTimeout(() => {
+        checkForNewLikes();
+        checkForNewComments();
+        checkForNewStreamLikes();
+        checkForNewStreamComments();
+        checkForNewMessages();
+        checkForNewPosts();
+        checkForGroupNotifications();
+    }, 2000);
+}
+
+// ==================== EXISTING FUNCTIONS (Keep all existing functions) ====================
 
 // Load processed items from localStorage
 function loadProcessedItems() {
@@ -390,7 +1188,7 @@ function saveProcessedItems() {
     }
 }
 
-// ==================== COMMENT REPLY FUNCTIONALITY ====================
+// ==================== REPLY MODAL SETUP ====================
 
 // Setup reply modal for replying to comments from notifications
 function setupReplyModal() {
@@ -430,11 +1228,16 @@ function setupReplyModal() {
             });
         }
         
-        // Send button event
+        // Send button event - handle both post and stream replies
         const sendBtn = document.getElementById('replyModalSend');
         if (sendBtn) {
             sendBtn.addEventListener('click', () => {
-                submitReply();
+                const modal = document.getElementById('replyModal');
+                if (modal && modal.dataset.isStream === 'true') {
+                    submitStreamReply();
+                } else {
+                    submitReply();
+                }
             });
         }
         
@@ -443,7 +1246,12 @@ function setupReplyModal() {
         if (input) {
             input.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    submitReply();
+                    const modal = document.getElementById('replyModal');
+                    if (modal && modal.dataset.isStream === 'true') {
+                        submitStreamReply();
+                    } else {
+                        submitReply();
+                    }
                 }
             });
         }
@@ -596,7 +1404,7 @@ function addReplyModalStyles() {
     }
 }
 
-// Open reply modal for comment reply
+// Open reply modal for post comment reply (existing)
 function openReplyModal(commentData, postId, commentId) {
     const modal = document.getElementById('replyModal');
     if (!modal) {
@@ -614,6 +1422,7 @@ function openReplyModal(commentData, postId, commentId) {
     modal.dataset.commentId = commentId;
     modal.dataset.replyToUserId = commentData.userId;
     modal.dataset.replyToUsername = commentData.userName || 'User';
+    modal.dataset.isStream = 'false';
     
     // Set avatar
     const avatar = document.getElementById('replyToAvatar');
@@ -668,7 +1477,7 @@ function closeReplyModal() {
     }
 }
 
-// Submit reply to comment
+// Submit reply to post comment (existing)
 async function submitReply() {
     const modal = document.getElementById('replyModal');
     if (!modal) return;
@@ -744,7 +1553,7 @@ async function submitReply() {
     }
 }
 
-// Create notification for comment reply
+// Create notification for post comment reply (existing)
 async function createCommentReplyNotification(postId, commentId, targetUserId, replyText, originalCommenterName) {
     try {
         // Check if notification already exists (prevent duplicates)
@@ -802,7 +1611,7 @@ async function createCommentReplyNotification(postId, commentId, targetUserId, r
             userId: targetUserId,
             timestamp: serverTimestamp(),
             read: false,
-            actionable: true, // This notification can be acted upon (reply)
+            actionable: true,
             actionType: 'reply_to_comment'
         });
         
@@ -811,21 +1620,17 @@ async function createCommentReplyNotification(postId, commentId, targetUserId, r
     }
 }
 
-// ==================== LIKE NOTIFICATION FUNCTIONS ====================
+// ==================== EXISTING NOTIFICATION FUNCTIONS (Keep all existing) ====================
 
-// Create notification for post like
+// Create notification for post like (existing)
 async function createLikeNotification(postId, postOwnerId, likerId, likeId) {
     try {
-        // Create a unique key for this like
         const likeKey = `${postId}_${likerId}`;
         
-        // Check if we've already processed this like
         if (processedLikes.has(likeKey)) {
-            console.log('Like already processed, skipping notification');
             return;
         }
         
-        // Check if notification already exists in Firestore
         const existingQuery = query(
             collection(db, 'notifications'),
             where('userId', '==', postOwnerId),
@@ -836,13 +1641,11 @@ async function createLikeNotification(postId, postOwnerId, likerId, likeId) {
         
         const existingSnap = await getDocs(existingQuery);
         if (!existingSnap.empty) {
-            // Mark as processed even if it exists in Firestore
             processedLikes.add(likeKey);
             saveProcessedItems();
             return;
         }
         
-        // Get liker data
         const likerRef = doc(db, 'users', likerId);
         const likerSnap = await getDoc(likerRef);
         if (!likerSnap.exists()) return;
@@ -850,18 +1653,13 @@ async function createLikeNotification(postId, postOwnerId, likerId, likeId) {
         const likerData = likerSnap.data();
         const likerName = likerData.name || 'Someone';
         
-        // Get post data for preview
         const postRef = doc(db, 'posts', postId);
         const postSnap = await getDoc(postRef);
         let postPreview = '';
-        let postOwnerName = '';
         
         if (postSnap.exists()) {
             const postData = postSnap.data();
-            
-            // Verify this post actually belongs to postOwnerId
             if (postData.userId !== postOwnerId) {
-                console.log('Post owner mismatch, skipping notification');
                 return;
             }
             
@@ -869,23 +1667,9 @@ async function createLikeNotification(postId, postOwnerId, likerId, likeId) {
                 postPreview = postData.caption.length > 30 ? 
                     postData.caption.substring(0, 30) + '...' : 
                     postData.caption;
-            } else if (postData.mediaType === 'image') {
-                postPreview = 'an image';
-            } else if (postData.mediaType === 'video') {
-                postPreview = 'a video';
-            } else if (postData.mediaType === 'poll') {
-                postPreview = 'a poll';
-            }
-            
-            // Get post owner name
-            const ownerRef = doc(db, 'users', postOwnerId);
-            const ownerSnap = await getDoc(ownerRef);
-            if (ownerSnap.exists()) {
-                postOwnerName = ownerSnap.data().name || 'Someone';
             }
         }
         
-        // Create the notification
         await addDoc(collection(db, 'notifications'), {
             type: 'like',
             title: 'New Like on Your Post',
@@ -902,32 +1686,23 @@ async function createLikeNotification(postId, postOwnerId, likerId, likeId) {
             likeId: likeId || null
         });
         
-        // Mark as processed
         processedLikes.add(likeKey);
         saveProcessedItems();
-        
-        console.log('Like notification created successfully');
         
     } catch (error) {
         console.error('Error creating like notification:', error);
     }
 }
 
-// ==================== COMMENT NOTIFICATION FUNCTIONS ====================
-
-// Create notification for comment on post
+// Create notification for comment on post (existing)
 async function createCommentNotification(postId, postOwnerId, commenterId, commentText, commentId) {
     try {
-        // Create a unique key for this comment
         const commentKey = `${postId}_${commentId}`;
         
-        // Check if we've already processed this comment
         if (processedComments.has(commentKey)) {
-            console.log('Comment already processed, skipping notification');
             return;
         }
         
-        // Check if notification already exists in Firestore
         const existingQuery = query(
             collection(db, 'notifications'),
             where('userId', '==', postOwnerId),
@@ -938,13 +1713,11 @@ async function createCommentNotification(postId, postOwnerId, commenterId, comme
         
         const existingSnap = await getDocs(existingQuery);
         if (!existingSnap.empty) {
-            // Mark as processed even if it exists in Firestore
             processedComments.add(commentKey);
             saveProcessedItems();
             return;
         }
         
-        // Get commenter data
         const commenterRef = doc(db, 'users', commenterId);
         const commenterSnap = await getDoc(commenterRef);
         if (!commenterSnap.exists()) return;
@@ -952,17 +1725,13 @@ async function createCommentNotification(postId, postOwnerId, commenterId, comme
         const commenterData = commenterSnap.data();
         const commenterName = commenterData.name || 'Someone';
         
-        // Get post data for preview
         const postRef = doc(db, 'posts', postId);
         const postSnap = await getDoc(postRef);
         let postPreview = '';
         
         if (postSnap.exists()) {
             const postData = postSnap.data();
-            
-            // Verify this post actually belongs to postOwnerId
             if (postData.userId !== postOwnerId) {
-                console.log('Post owner mismatch, skipping notification');
                 return;
             }
             
@@ -973,7 +1742,6 @@ async function createCommentNotification(postId, postOwnerId, commenterId, comme
             }
         }
         
-        // Truncate comment text for notification
         const shortComment = commentText.length > 40 ? 
             commentText.substring(0, 40) + '...' : 
             commentText;
@@ -993,446 +1761,23 @@ async function createCommentNotification(postId, postOwnerId, commenterId, comme
             userId: postOwnerId,
             timestamp: serverTimestamp(),
             read: false,
-            actionable: true, // This notification can be acted upon (reply)
+            actionable: true,
             actionType: 'reply_to_comment'
         });
         
-        // Mark as processed
         processedComments.add(commentKey);
         saveProcessedItems();
-        
-        console.log('Comment notification created successfully');
         
     } catch (error) {
         console.error('Error creating comment notification:', error);
     }
 }
 
-// ==================== NOTIFICATION HANDLING ====================
-
-// Handle notification click (modified to support comment replies)
-async function handleNotificationClick(notificationId) {
-    // Mark as read
-    await markNotificationAsRead(notificationId);
-    
-    // Get notification data to determine where to navigate
-    try {
-        const notificationDoc = await getDoc(doc(db, 'notifications', notificationId));
-        if (notificationDoc.exists()) {
-            const notification = notificationDoc.data();
-            
-            // Handle different notification types
-            if (notification.type === 'like') {
-                // Navigate to the post that was liked
-                if (notification.postId) {
-                    window.location.href = `posts.html?post=${notification.postId}`;
-                } else if (notification.relatedId) {
-                    window.location.href = `posts.html?post=${notification.relatedId}`;
-                } else {
-                    window.location.href = 'posts.html';
-                }
-            }
-            else if (notification.type === 'comment') {
-                // Navigate to the post and scroll to comment
-                if (notification.postId && notification.commentId) {
-                    window.location.href = `posts.html?post=${notification.postId}&comment=${notification.commentId}`;
-                } else if (notification.postId) {
-                    window.location.href = `posts.html?post=${notification.postId}`;
-                } else {
-                    window.location.href = 'posts.html';
-                }
-            }
-            else if (notification.type === 'comment_reply') {
-                // Navigate to the post and scroll to the reply
-                if (notification.postId && notification.commentId) {
-                    window.location.href = `posts.html?post=${notification.postId}&comment=${notification.commentId}&reply=true`;
-                } else {
-                    window.location.href = 'posts.html';
-                }
-            }
-            else if (notification.type === 'message' && notification.senderId) {
-                window.location.href = `chat.html?id=${notification.senderId}`;
-            } else if (notification.type === 'group_message' && notification.groupId) {
-                window.location.href = `group.html?id=${notification.groupId}`;
-            } else if (notification.type === 'group_invite' && notification.groupId) {
-                window.location.href = `group.html?id=${notification.groupId}`;
-            } else if (notification.type === 'post' && notification.senderId) {
-                window.location.href = 'posts.html';
-                // Mark post as viewed
-                viewedPosts.add(notification.relatedId);
-                saveViewedPosts();
-                dismissedNotifications.add(`post_${notification.relatedId}`);
-                saveDismissedNotifications();
-            } else if (notification.senderId) {
-                window.location.href = `profile.html?id=${notification.senderId}`;
-            } else {
-                window.location.href = 'notification.html';
-            }
-        }
-    } catch (error) {
-        console.error('Error getting notification:', error);
-        window.location.href = 'notification.html';
-    }
-}
-
-// ==================== DISPLAY NOTIFICATIONS WITH REPLY BUTTONS ====================
-
-// Display notifications in notification.html (modified to add reply buttons for comments)
-function displayNotifications(notificationDocs) {
-    const notificationsList = document.getElementById('notificationsList');
-    if (!notificationsList) return;
-
-    if (notificationDocs.length === 0) {
-        notificationsList.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-bell-slash"></i>
-                <h3>No notifications yet</h3>
-                <p>When you receive notifications, they will appear here.</p>
-            </div>
-        `;
-        return;
-    }
-
-    // Sort notifications by timestamp (newest first) in memory
-    const sortedDocs = [...notificationDocs].sort((a, b) => {
-        const timeA = a.timestamp?.toDate?.() || new Date(0);
-        const timeB = b.timestamp?.toDate?.() || new Date(0);
-        return timeB - timeA;
-    });
-
-    const notificationsHTML = sortedDocs.map(doc => {
-        const notification = doc;
-        const timeAgo = formatTime(notification.timestamp);
-        const iconClass = getNotificationIcon(notification.type);
-        const unreadClass = notification.read ? '' : 'unread';
-        const unreadDot = notification.read ? '' : '<div class="unread-dot"></div>';
-        
-        // Check if this is a comment or comment_reply notification that can be replied to
-        const showReplyButton = (notification.type === 'comment' || notification.type === 'comment_reply') && 
-                                notification.actionable === true;
-        
-        // Get reply button HTML if applicable
-        const replyButtonHTML = showReplyButton ? `
-            <button class="action-btn reply-to-comment-btn" 
-                    data-notification-id="${doc.id}"
-                    data-post-id="${notification.postId || ''}" 
-                    data-comment-id="${notification.commentId || notification.relatedId || ''}"
-                    data-user-id="${notification.senderId || ''}"
-                    data-user-name="${notification.senderName || 'User'}"
-                    data-user-avatar="${notification.senderAvatar || 'images/default-profile.jpg'}"
-                    data-comment-text="${notification.commentText || notification.message || ''}"
-                    title="Reply to comment">
-                <i class="fas fa-reply"></i>
-            </button>
-        ` : '';
-        
-        return `
-            <div class="notification-item ${unreadClass}" data-id="${doc.id}">
-                <div class="notification-icon ${notification.type}">
-                    <i class="${iconClass}"></i>
-                </div>
-                <div class="notification-content">
-                    <div class="notification-title">
-                        ${notification.title}
-                        ${unreadDot}
-                    </div>
-                    <div class="notification-text">${notification.message}</div>
-                    <div class="notification-time">${timeAgo}</div>
-                </div>
-                <div class="notification-actions">
-                    ${replyButtonHTML}
-                    ${!notification.read ? `
-                        <button class="action-btn mark-read-btn" title="Mark as read">
-                            <i class="fas fa-check"></i>
-                        </button>
-                    ` : ''}
-                    <button class="action-btn delete-btn" title="Delete notification">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    notificationsList.innerHTML = notificationsHTML;
-    addNotificationActionListeners();
-    addReplyButtonListeners();
-}
-
-// Add event listeners to reply buttons
-function addReplyButtonListeners() {
-    document.querySelectorAll('.reply-to-comment-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            
-            const postId = button.dataset.postId;
-            const commentId = button.dataset.commentId;
-            const userId = button.dataset.userId;
-            const userName = button.dataset.userName;
-            const userAvatar = button.dataset.userAvatar;
-            const commentText = button.dataset.commentText;
-            
-            if (!postId || !commentId) {
-                console.error('Missing postId or commentId for reply');
-                alert('Cannot reply: missing post information');
-                return;
-            }
-            
-            const commentData = {
-                userId: userId,
-                userName: userName,
-                userAvatar: userAvatar,
-                text: commentText
-            };
-            
-            openReplyModal(commentData, postId, commentId);
-        });
-    });
-}
-
-// Add event listeners to notification actions (modified to include reply buttons)
-function addNotificationActionListeners() {
-    // Mark as read buttons
-    document.querySelectorAll('.mark-read-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const notificationItem = button.closest('.notification-item');
-            const notificationId = notificationItem.dataset.id;
-            markNotificationAsRead(notificationId);
-        });
-    });
-
-    // Delete buttons
-    document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const notificationItem = button.closest('.notification-item');
-            const notificationId = notificationItem.dataset.id;
-            deleteNotification(notificationId);
-        });
-    });
-
-    // Notification item click (whole item)
-    document.querySelectorAll('.notification-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            // Don't navigate if clicking on action buttons
-            if (e.target.closest('.action-btn')) {
-                return;
-            }
-            
-            const notificationId = item.dataset.id;
-            handleNotificationClick(notificationId);
-        });
-    });
-}
-
-// Load notifications for dropdown - FIXED VERSION (no index required)
-async function loadDropdownNotifications() {
-    if (!currentUser) return;
-    
-    const dropdownContent = document.getElementById('dropdown-notifications');
-    if (!dropdownContent) return;
-    
-    try {
-        // Show loading state
-        dropdownContent.innerHTML = `
-            <div class="loading-notifications">
-                <i class="fas fa-spinner fa-spin"></i>
-                <span>Loading notifications...</span>
-            </div>
-        `;
-        
-        // Simple query without orderBy to avoid index requirement
-        const notificationsQuery = query(
-            collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid)
-        );
-        
-        const notificationsSnap = await getDocs(notificationsQuery);
-        
-        if (notificationsSnap.empty) {
-            dropdownContent.innerHTML = `
-                <div class="empty-notifications">
-                    <i class="fas fa-bell-slash"></i>
-                    <p>No notifications yet</p>
-                </div>
-            `;
-            return;
-        }
-        
-        // Convert to array and sort in memory by timestamp
-        const notifications = [];
-        notificationsSnap.forEach(doc => {
-            const data = doc.data();
-            notifications.push({
-                id: doc.id,
-                ...data,
-                timestampObj: data.timestamp?.toDate?.() || new Date(0)
-            });
-        });
-        
-        // Sort by timestamp (newest first) in memory
-        notifications.sort((a, b) => b.timestampObj - a.timestampObj);
-        
-        // Show only 10 most recent
-        const recentNotifications = notifications.slice(0, 10);
-        
-        let html = '';
-        
-        recentNotifications.forEach(notification => {
-            const timeAgo = formatTime(notification.timestamp);
-            const iconClass = getNotificationIcon(notification.type);
-            const unreadClass = notification.read ? '' : 'unread';
-            
-            html += `
-                <div class="dropdown-notification-item ${unreadClass}" data-id="${notification.id}" 
-                     data-type="${notification.type}"
-                     data-post-id="${notification.postId || ''}"
-                     data-comment-id="${notification.commentId || notification.relatedId || ''}"
-                     data-user-id="${notification.senderId || ''}"
-                     data-user-name="${notification.senderName || 'User'}"
-                     data-user-avatar="${notification.senderAvatar || 'images/default-profile.jpg'}"
-                     data-comment-text="${notification.commentText || notification.message || ''}"
-                     data-actionable="${notification.actionable || false}">
-                    <div class="dropdown-notification-icon ${notification.type}">
-                        <i class="${iconClass}"></i>
-                    </div>
-                    <div class="dropdown-notification-content">
-                        <div class="dropdown-notification-title">
-                            ${notification.title}
-                            ${!notification.read ? '<span class="unread-indicator"></span>' : ''}
-                        </div>
-                        <div class="dropdown-notification-text">${notification.message}</div>
-                        <div class="dropdown-notification-time">${timeAgo}</div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        dropdownContent.innerHTML = html;
-        
-        // Add click handlers with reply context
-        document.querySelectorAll('.dropdown-notification-item').forEach(item => {
-            item.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const notificationId = item.dataset.id;
-                const notificationType = item.dataset.type;
-                const actionable = item.dataset.actionable === 'true';
-                
-                // If it's a comment notification and actionable, check if shift key is pressed for reply
-                if ((notificationType === 'comment' || notificationType === 'comment_reply') && actionable && e.shiftKey) {
-                    // Shift+click to reply directly
-                    const postId = item.dataset.postId;
-                    const commentId = item.dataset.commentId;
-                    const userId = item.dataset.userId;
-                    const userName = item.dataset.userName;
-                    const userAvatar = item.dataset.userAvatar;
-                    const commentText = item.dataset.commentText;
-                    
-                    if (postId && commentId) {
-                        const commentData = {
-                            userId: userId,
-                            userName: userName,
-                            userAvatar: userAvatar,
-                            text: commentText
-                        };
-                        
-                        // Mark as read first
-                        await markNotificationAsRead(notificationId);
-                        
-                        // Open reply modal
-                        openReplyModal(commentData, postId, commentId);
-                        
-                        // Close dropdown
-                        const dropdown = document.getElementById('notification-dropdown');
-                        if (dropdown) {
-                            dropdown.style.display = 'none';
-                        }
-                        return;
-                    }
-                }
-                
-                // Normal click - handle normally
-                await handleNotificationClick(notificationId);
-                
-                // Close dropdown
-                const dropdown = document.getElementById('notification-dropdown');
-                if (dropdown) {
-                    dropdown.style.display = 'none';
-                }
-            });
-        });
-        
-    } catch (error) {
-        console.error('Error loading dropdown notifications:', error);
-        dropdownContent.innerHTML = `
-            <div class="empty-notifications">
-                <i class="fas fa-exclamation-circle"></i>
-                <p>Error loading notifications</p>
-                <small>${error.message}</small>
-            </div>
-        `;
-    }
-}
-
-// ==================== NOTIFICATION CREATOR FUNCTIONS ====================
-
-// Setup notification creators
-function setupNotificationCreators() {
-    if (!currentUser) return;
-
-    // Clear any existing intervals
-    checkIntervals.forEach(interval => clearInterval(interval));
-    checkIntervals = [];
-
-    // Check for new likes every 10 seconds (more frequent)
-    const likeInterval = setInterval(() => {
-        checkForNewLikes();
-    }, 10000);
-    checkIntervals.push(likeInterval);
-
-    // Check for new comments every 10 seconds (more frequent)
-    const commentInterval = setInterval(() => {
-        checkForNewComments();
-    }, 10000);
-    checkIntervals.push(commentInterval);
-
-    // Check for new messages every 30 seconds
-    const messageInterval = setInterval(() => {
-        checkForNewMessages();
-    }, 30000);
-    checkIntervals.push(messageInterval);
-
-    // Check for new posts every 30 seconds
-    const postInterval = setInterval(() => {
-        checkForNewPosts();
-    }, 30000);
-    checkIntervals.push(postInterval);
-
-    // Check for group notifications every 30 seconds
-    const groupInterval = setInterval(() => {
-        checkForGroupNotifications();
-    }, 30000);
-    checkIntervals.push(groupInterval);
-
-    // Initial checks
-    setTimeout(() => {
-        checkForNewLikes();
-        checkForNewComments();
-        checkForNewMessages();
-        checkForNewPosts();
-        checkForGroupNotifications();
-    }, 2000);
-}
-
-// Check for new likes (fixed version)
+// Check for new likes (existing)
 async function checkForNewLikes() {
     if (!currentUser) return;
 
     try {
-        console.log('Checking for new likes...');
-        
-        // Get all posts by current user
         const postsQuery = query(
             collection(db, 'posts'),
             where('userId', '==', currentUser.uid)
@@ -1440,50 +1785,25 @@ async function checkForNewLikes() {
         
         const postsSnap = await getDocs(postsQuery);
         
-        if (postsSnap.empty) {
-            console.log('No posts found for current user');
-            return;
-        }
+        if (postsSnap.empty) return;
         
         for (const postDoc of postsSnap.docs) {
             const postId = postDoc.id;
-            const postData = postDoc.data();
             
-            console.log(`Checking likes for post: ${postId}`);
-            
-            // Check if post has a likes subcollection
             const likesRef = collection(db, 'posts', postId, 'likes');
             const likesSnap = await getDocs(likesRef);
-            
-            if (likesSnap.empty) {
-                console.log(`No likes found for post: ${postId}`);
-                continue;
-            }
-            
-            console.log(`Found ${likesSnap.size} likes for post: ${postId}`);
             
             for (const likeDoc of likesSnap.docs) {
                 const likeData = likeDoc.data();
                 const likerId = likeData.userId;
                 const likeId = likeDoc.id;
-                const likeTimestamp = likeData.timestamp?.toDate?.() || new Date();
                 
-                // Skip if liked by current user
-                if (likerId === currentUser.uid) {
-                    console.log('Skipping self-like');
-                    continue;
-                }
+                if (likerId === currentUser.uid) continue;
                 
-                // Create unique key for this like
                 const likeKey = `${postId}_${likerId}`;
                 
-                // Check if we've already processed this like
-                if (processedLikes.has(likeKey)) {
-                    console.log(`Like already processed: ${likeKey}`);
-                    continue;
-                }
+                if (processedLikes.has(likeKey)) continue;
                 
-                // Check if notification already exists in Firestore
                 const existingQuery = query(
                     collection(db, 'notifications'),
                     where('userId', '==', currentUser.uid),
@@ -1495,13 +1815,8 @@ async function checkForNewLikes() {
                 const existingSnap = await getDocs(existingQuery);
                 
                 if (existingSnap.empty) {
-                    console.log(`Creating like notification for post: ${postId} from user: ${likerId}`);
-                    
-                    // Create like notification
                     await createLikeNotification(postId, currentUser.uid, likerId, likeId);
                 } else {
-                    // Mark as processed if it exists in Firestore
-                    console.log(`Like notification already exists in Firestore for: ${likeKey}`);
                     processedLikes.add(likeKey);
                     saveProcessedItems();
                 }
@@ -1512,14 +1827,11 @@ async function checkForNewLikes() {
     }
 }
 
-// Check for new comments
+// Check for new comments (existing)
 async function checkForNewComments() {
     if (!currentUser) return;
 
     try {
-        console.log('Checking for new comments...');
-        
-        // Get all posts by current user
         const postsQuery = query(
             collection(db, 'posts'),
             where('userId', '==', currentUser.uid)
@@ -1527,31 +1839,17 @@ async function checkForNewComments() {
         
         const postsSnap = await getDocs(postsQuery);
         
-        if (postsSnap.empty) {
-            console.log('No posts found for current user');
-            return;
-        }
+        if (postsSnap.empty) return;
         
         for (const postDoc of postsSnap.docs) {
             const postId = postDoc.id;
             
-            console.log(`Checking comments for post: ${postId}`);
-            
-            // Get comments for this post
             const commentsQuery = query(
                 collection(db, 'posts', postId, 'comments')
             );
             
             const commentsSnap = await getDocs(commentsQuery);
             
-            if (commentsSnap.empty) {
-                console.log(`No comments found for post: ${postId}`);
-                continue;
-            }
-            
-            console.log(`Found ${commentsSnap.size} comments for post: ${postId}`);
-            
-            // Convert to array and sort by createdAt in memory
             const comments = [];
             commentsSnap.forEach(doc => {
                 const data = doc.data();
@@ -1562,29 +1860,18 @@ async function checkForNewComments() {
                 });
             });
             
-            // Sort by newest first
             comments.sort((a, b) => b.createdAtObj - a.createdAtObj);
             
             for (const commentData of comments) {
                 const commenterId = commentData.userId;
                 const commentId = commentData.id;
                 
-                // Skip if commented by current user
-                if (commenterId === currentUser.uid) {
-                    console.log('Skipping self-comment');
-                    continue;
-                }
+                if (commenterId === currentUser.uid) continue;
                 
-                // Create unique key for this comment
                 const commentKey = `${postId}_${commentId}`;
                 
-                // Check if we've already processed this comment
-                if (processedComments.has(commentKey)) {
-                    console.log(`Comment already processed: ${commentKey}`);
-                    continue;
-                }
+                if (processedComments.has(commentKey)) continue;
                 
-                // Check if notification already exists in Firestore
                 const existingQuery = query(
                     collection(db, 'notifications'),
                     where('userId', '==', currentUser.uid),
@@ -1596,9 +1883,6 @@ async function checkForNewComments() {
                 const existingSnap = await getDocs(existingQuery);
                 
                 if (existingSnap.empty) {
-                    console.log(`Creating comment notification for post: ${postId} from user: ${commenterId}`);
-                    
-                    // Create comment notification
                     await createCommentNotification(
                         postId, 
                         currentUser.uid, 
@@ -1607,8 +1891,6 @@ async function checkForNewComments() {
                         commentId
                     );
                 } else {
-                    // Mark as processed if it exists in Firestore
-                    console.log(`Comment notification already exists in Firestore for: ${commentKey}`);
                     processedComments.add(commentKey);
                     saveProcessedItems();
                 }
@@ -1621,7 +1903,6 @@ async function checkForNewComments() {
 
 // Helper function to show custom notification
 function showCustomNotification(message, type = 'info') {
-    // Remove existing notifications
     const existing = document.querySelector('.custom-notification');
     if (existing) existing.remove();
     
@@ -1640,17 +1921,15 @@ function showCustomNotification(message, type = 'info') {
     }, 3000);
 }
 
-// ==================== EXISTING FUNCTIONS (keep all your existing code below) ====================
+// ==================== EXISTING UI FUNCTIONS (Keep all existing) ====================
 
 // Add sound control button to UI
 function addSoundControlButton() {
-    // Check if button already exists
     if (document.getElementById('notification-sound-toggle')) return;
     
     const notificationBells = document.querySelectorAll('.notification-bell, .notification-icon, [data-notification-dropdown]');
     
     notificationBells.forEach(bell => {
-        // Create sound toggle button
         const soundBtn = document.createElement('button');
         soundBtn.id = 'notification-sound-toggle';
         soundBtn.className = 'sound-toggle-btn';
@@ -1659,7 +1938,6 @@ function addSoundControlButton() {
             '<i class="fas fa-volume-mute"></i>';
         soundBtn.title = soundManager.soundsEnabled ? 'Mute notification sounds' : 'Unmute notification sounds';
         
-        // Add styles
         if (!document.getElementById('sound-toggle-styles')) {
             const styles = document.createElement('style');
             styles.id = 'sound-toggle-styles';
@@ -1684,95 +1962,6 @@ function addSoundControlButton() {
                     background: var(--primary);
                     color: white;
                     transform: scale(1.1);
-                }
-                
-                .sound-settings-panel {
-                    position: fixed;
-                    bottom: 20px;
-                    right: 20px;
-                    background: var(--bg-card);
-                    border: 1px solid var(--border-color);
-                    border-radius: 12px;
-                    padding: 20px;
-                    box-shadow: var(--shadow-lg);
-                    z-index: 10002;
-                    width: 250px;
-                    animation: slideUp 0.3s ease;
-                }
-                
-                .sound-settings-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 15px;
-                }
-                
-                .sound-settings-header h4 {
-                    margin: 0;
-                    font-size: 16px;
-                    color: var(--text-primary);
-                }
-                
-                .sound-settings-close {
-                    background: none;
-                    border: none;
-                    color: var(--text-secondary);
-                    font-size: 18px;
-                    cursor: pointer;
-                }
-                
-                .sound-settings-option {
-                    margin-bottom: 15px;
-                }
-                
-                .sound-settings-option label {
-                    display: block;
-                    margin-bottom: 5px;
-                    color: var(--text-secondary);
-                    font-size: 13px;
-                }
-                
-                .sound-settings-option input[type="range"] {
-                    width: 100%;
-                    height: 4px;
-                    background: var(--border-color);
-                    border-radius: 2px;
-                    -webkit-appearance: none;
-                }
-                
-                .sound-settings-option input[type="range"]::-webkit-slider-thumb {
-                    -webkit-appearance: none;
-                    width: 16px;
-                    height: 16px;
-                    background: var(--primary);
-                    border-radius: 50%;
-                    cursor: pointer;
-                }
-                
-                .sound-test-btn {
-                    background: var(--bg-hover);
-                    border: 1px solid var(--border-color);
-                    border-radius: 6px;
-                    padding: 8px 12px;
-                    color: var(--text-primary);
-                    cursor: pointer;
-                    font-size: 13px;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    width: 100%;
-                    justify-content: center;
-                    transition: all 0.2s ease;
-                }
-                
-                .sound-test-btn:hover {
-                    background: var(--primary);
-                    color: white;
-                }
-                
-                @keyframes slideUp {
-                    from { transform: translateY(100%); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
                 }
                 
                 .custom-notification {
@@ -1803,42 +1992,29 @@ function addSoundControlButton() {
                 }
                 
                 @keyframes slideInRight {
-                    from {
-                        transform: translateX(100%);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
                 }
                 
                 @keyframes fadeOut {
-                    from {
-                        opacity: 1;
-                    }
-                    to {
-                        opacity: 0;
-                    }
+                    from { opacity: 1; }
+                    to { opacity: 0; }
                 }
             `;
             document.head.appendChild(styles);
         }
         
-        // Add click handler
         soundBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             showSoundSettings(soundBtn);
         });
         
-        // Insert after notification bell
         bell.parentNode.insertBefore(soundBtn, bell.nextSibling);
     });
 }
 
 // Show sound settings panel
 function showSoundSettings(triggerBtn) {
-    // Remove existing panel
     const existingPanel = document.querySelector('.sound-settings-panel');
     if (existingPanel) {
         existingPanel.remove();
@@ -1867,14 +2043,108 @@ function showSoundSettings(triggerBtn) {
         </button>
     `;
     
+    if (!document.getElementById('sound-settings-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'sound-settings-styles';
+        styles.textContent = `
+            .sound-settings-panel {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                padding: 20px;
+                box-shadow: var(--shadow-lg);
+                z-index: 10002;
+                width: 250px;
+                animation: slideUp 0.3s ease;
+            }
+            
+            .sound-settings-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 15px;
+            }
+            
+            .sound-settings-header h4 {
+                margin: 0;
+                font-size: 16px;
+                color: var(--text-primary);
+            }
+            
+            .sound-settings-close {
+                background: none;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 18px;
+                cursor: pointer;
+            }
+            
+            .sound-settings-option {
+                margin-bottom: 15px;
+            }
+            
+            .sound-settings-option label {
+                display: block;
+                margin-bottom: 5px;
+                color: var(--text-secondary);
+                font-size: 13px;
+            }
+            
+            .sound-settings-option input[type="range"] {
+                width: 100%;
+                height: 4px;
+                background: var(--border-color);
+                border-radius: 2px;
+                -webkit-appearance: none;
+            }
+            
+            .sound-settings-option input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 16px;
+                height: 16px;
+                background: var(--primary);
+                border-radius: 50%;
+                cursor: pointer;
+            }
+            
+            .sound-test-btn {
+                background: var(--bg-hover);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                padding: 8px 12px;
+                color: var(--text-primary);
+                cursor: pointer;
+                font-size: 13px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                width: 100%;
+                justify-content: center;
+                transition: all 0.2s ease;
+            }
+            
+            .sound-test-btn:hover {
+                background: var(--primary);
+                color: white;
+            }
+            
+            @keyframes slideUp {
+                from { transform: translateY(100%); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
     document.body.appendChild(panel);
     
-    // Position panel near the button
     const btnRect = triggerBtn.getBoundingClientRect();
     panel.style.bottom = (window.innerHeight - btnRect.top + 10) + 'px';
     panel.style.right = (window.innerWidth - btnRect.right) + 'px';
     
-    // Add event listeners
     panel.querySelector('.sound-settings-close').addEventListener('click', () => {
         panel.remove();
     });
@@ -1897,7 +2167,6 @@ function showSoundSettings(triggerBtn) {
         soundManager.playSoftBell();
     });
     
-    // Close when clicking outside
     setTimeout(() => {
         document.addEventListener('click', function closePanel(e) {
             if (!panel.contains(e.target) && e.target !== triggerBtn && !triggerBtn.contains(e.target)) {
@@ -1908,7 +2177,598 @@ function showSoundSettings(triggerBtn) {
     }, 100);
 }
 
-// Add sound settings to notification page
+// ==================== INITIALIZATION ====================
+
+// Initialize notification system
+function initNotificationSystem() {
+    loadDismissedNotifications();
+    
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUser = user;
+            loadViewedPosts();
+            loadProcessedItems();
+            
+            setupNotificationListener();
+            setupNotificationCreators();
+            updateNotificationBadge();
+            
+            addSoundControlButton();
+            setupReplyModal();
+            
+            if (window.location.pathname.includes('notification.html')) {
+                loadNotificationsForPage();
+                setupMarkAllReadButton();
+                addSoundSettingsToPage();
+            }
+            
+            setupDropdownNotifications();
+        } else {
+            currentUser = null;
+            updateNotificationBadge(0);
+            cleanupListeners();
+            
+            if (window.location.pathname.includes('notification.html')) {
+                showLoginMessage();
+            }
+        }
+    });
+}
+
+// Load notifications for notification.html page
+async function loadNotificationsForPage() {
+    if (!currentUser) return;
+
+    try {
+        const notificationsQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', currentUser.uid)
+        );
+
+        const notificationsSnap = await getDocs(notificationsQuery);
+        
+        const notifications = [];
+        notificationsSnap.forEach(doc => {
+            const data = doc.data();
+            notifications.push({
+                id: doc.id,
+                ...data,
+                timestampObj: data.timestamp?.toDate?.() || new Date(0)
+            });
+        });
+        
+        notifications.sort((a, b) => b.timestampObj - a.timestampObj);
+        
+        displayNotifications(notifications);
+    } catch (error) {
+        console.error('Error loading notifications:', error);
+        const notificationsList = document.getElementById('notificationsList');
+        if (notificationsList) {
+            notificationsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <h3>Error loading notifications</h3>
+                    <p>Please try refreshing the page.</p>
+                </div>
+            `;
+        }
+    }
+}
+
+// Setup notification listener
+function setupNotificationListener() {
+    if (!currentUser) return;
+
+    if (unsubscribeNotifications) {
+        unsubscribeNotifications();
+    }
+
+    try {
+        const notificationsQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', currentUser.uid)
+        );
+
+        unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+            const allNotifications = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            
+            allNotifications.forEach(notification => {
+                notification.timestampObj = notification.timestamp?.toDate?.() || new Date(0);
+            });
+            
+            const unreadNotifications = allNotifications.filter(notification => !notification.read);
+            const sortedNotifications = allNotifications.sort((a, b) => b.timestampObj - a.timestampObj);
+            
+            const previousUnreadCount = unreadCount;
+            unreadCount = unreadNotifications.length;
+            
+            updateNotificationBadge(unreadCount);
+            localStorage.setItem(`notification_count_${currentUser.uid}`, unreadCount);
+            
+            snapshot.docChanges().forEach(change => {
+                if (change.type === 'added') {
+                    const notification = change.doc.data();
+                    if (!notification.read) {
+                        soundManager.playNotificationSound(notification.type);
+                    }
+                }
+            });
+            
+            if (window.location.pathname.includes('notification.html')) {
+                displayNotifications(sortedNotifications);
+            }
+            
+            const dropdown = document.getElementById('notification-dropdown');
+            if (dropdown && dropdown.style.display === 'block') {
+                loadDropdownNotifications();
+            }
+            
+            if (!window.location.pathname.includes('notification.html')) {
+                const now = Date.now();
+                if (unreadCount > previousUnreadCount && now - lastNotificationTime > 5000) {
+                    showNotificationPopup();
+                    lastNotificationTime = now;
+                }
+            }
+        }, (error) => {
+            console.error('Notification listener error:', error);
+            const cachedCount = localStorage.getItem(`notification_count_${currentUser.uid}`) || 0;
+            updateNotificationBadge(parseInt(cachedCount));
+        });
+
+    } catch (error) {
+        console.error('Error setting up notification listener:', error);
+        const cachedCount = localStorage.getItem(`notification_count_${currentUser ? currentUser.uid : 'anonymous'}`) || 0;
+        updateNotificationBadge(parseInt(cachedCount));
+    }
+}
+
+// Mark notification as read
+async function markNotificationAsRead(notificationId) {
+    if (!currentUser) return;
+
+    try {
+        await updateDoc(doc(db, 'notifications', notificationId), {
+            read: true,
+            readAt: serverTimestamp()
+        });
+        
+        const notificationItem = document.querySelector(`[data-id="${notificationId}"]`);
+        if (notificationItem) {
+            notificationItem.classList.remove('unread');
+            const unreadDot = notificationItem.querySelector('.unread-dot');
+            if (unreadDot) unreadDot.remove();
+            const markReadBtn = notificationItem.querySelector('.mark-read-btn');
+            if (markReadBtn) markReadBtn.remove();
+        }
+        
+        updateNotificationBadge();
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+    }
+}
+
+// Delete notification
+async function deleteNotification(notificationId) {
+    if (!currentUser) return;
+
+    try {
+        await deleteDoc(doc(db, 'notifications', notificationId));
+        
+        const notificationItem = document.querySelector(`[data-id="${notificationId}"]`);
+        if (notificationItem) {
+            notificationItem.style.opacity = '0.5';
+            setTimeout(() => notificationItem.remove(), 300);
+        }
+        
+        updateNotificationBadge();
+    } catch (error) {
+        console.error('Error deleting notification:', error);
+    }
+}
+
+// Add event listeners to notification actions
+function addNotificationActionListeners() {
+    document.querySelectorAll('.mark-read-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const notificationItem = button.closest('.notification-item');
+            const notificationId = notificationItem.dataset.id;
+            markNotificationAsRead(notificationId);
+        });
+    });
+
+    document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const notificationItem = button.closest('.notification-item');
+            const notificationId = notificationItem.dataset.id;
+            deleteNotification(notificationId);
+        });
+    });
+
+    document.querySelectorAll('.notification-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.action-btn')) {
+                return;
+            }
+            
+            const notificationId = item.dataset.id;
+            handleNotificationClick(notificationId);
+        });
+    });
+}
+
+// Update notification badge
+function updateNotificationBadge(count) {
+    if (count === undefined) {
+        count = localStorage.getItem(`notification_count_${currentUser ? currentUser.uid : 'anonymous'}`) || 0;
+        count = parseInt(count);
+    }
+
+    unreadCount = count;
+
+    const badges = document.querySelectorAll('.notification-badge');
+    badges.forEach(badge => {
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    });
+}
+
+// Get notification icon
+function getNotificationIcon(type) {
+    switch (type) {
+        case 'message': return 'fas fa-comment-alt';
+        case 'like': return 'fas fa-heart';
+        case 'stream_like': return 'fas fa-heart';
+        case 'comment':
+        case 'comment_reply': return 'fas fa-comment';
+        case 'stream_comment':
+        case 'stream_comment_reply': return 'fas fa-comment';
+        case 'post': return 'fas fa-newspaper';
+        case 'group_message': return 'fas fa-users';
+        case 'group_invite': return 'fas fa-user-plus';
+        case 'group_member_removed': return 'fas fa-user-minus';
+        case 'group_deleted': return 'fas fa-trash-alt';
+        default: return 'fas fa-bell';
+    }
+}
+
+// Format time
+function formatTime(timestamp) {
+    if (!timestamp) return '';
+    
+    let date;
+    try {
+        if (timestamp.toDate) {
+            date = timestamp.toDate();
+        } else if (typeof timestamp === 'string') {
+            date = new Date(timestamp);
+        } else {
+            return '';
+        }
+        
+        if (isNaN(date.getTime())) return '';
+    } catch (error) {
+        return '';
+    }
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+}
+
+// Show login message
+function showLoginMessage() {
+    const notificationsList = document.getElementById('notificationsList');
+    if (notificationsList) {
+        notificationsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-sign-in-alt"></i>
+                <h3>Please log in</h3>
+                <p>You need to be logged in to view notifications.</p>
+                <a href="login.html" class="btn btn-primary" style="margin-top: 15px;">Log In</a>
+            </div>
+        `;
+    }
+}
+
+// Show notification popup
+function showNotificationPopup() {
+    if (notificationShown || window.location.pathname.includes('notification.html')) {
+        return;
+    }
+    
+    if (unreadCount === 0) {
+        return;
+    }
+    
+    soundManager.playSoftBell();
+    
+    const existingPopup = document.querySelector('.notification-popup');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+    
+    if (!document.getElementById('notification-popup-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'notification-popup-styles';
+        styles.textContent = `
+            .notification-popup {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+                border-radius: 12px;
+                box-shadow: var(--shadow-lg);
+                z-index: 10001;
+                animation: slideInRight 0.4s ease forwards;
+                color: white;
+                font-family: 'Inter', sans-serif;
+                overflow: hidden;
+                min-width: 300px;
+            }
+            
+            .popup-content {
+                display: flex;
+                align-items: center;
+                padding: 15px;
+                gap: 12px;
+            }
+            
+            .popup-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 18px;
+                background: rgba(255, 255, 255, 0.2);
+                flex-shrink: 0;
+            }
+            
+            .popup-text {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .popup-title {
+                font-weight: 600;
+                font-size: 14px;
+                margin-bottom: 2px;
+            }
+            
+            .popup-message {
+                font-size: 13px;
+                opacity: 0.9;
+            }
+            
+            .popup-mark-btn {
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 12px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                transition: all 0.2s ease;
+                flex-shrink: 0;
+            }
+            
+            .popup-mark-btn:hover {
+                background: rgba(255, 255, 255, 0.3);
+                transform: translateY(-1px);
+            }
+            
+            .popup-close {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 50%;
+                font-size: 16px;
+                cursor: pointer;
+                color: white;
+                padding: 0;
+                width: 28px;
+                height: 28px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                transition: all 0.2s ease;
+            }
+            
+            .popup-close:hover {
+                background: rgba(255, 255, 255, 0.3);
+            }
+            
+            .notification-popup.hiding {
+                animation: slideOutRight 0.3s ease forwards;
+            }
+            
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    const popup = document.createElement('div');
+    popup.className = 'notification-popup';
+    popup.innerHTML = `
+        <div class="popup-content">
+            <div class="popup-icon">
+                <i class="fas fa-bell"></i>
+            </div>
+            <div class="popup-text">
+                <div class="popup-title">You have new notifications</div>
+                <div class="popup-message">${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}</div>
+            </div>
+            <button class="popup-mark-btn">
+                <i class="fas fa-check"></i> Mark
+            </button>
+            <button class="popup-close">&times;</button>
+        </div>
+    `;
+    
+    document.body.appendChild(popup);
+    notificationShown = true;
+    
+    const autoDismiss = setTimeout(() => {
+        hideNotificationPopup(popup);
+    }, 5000);
+    
+    popup.querySelector('.popup-mark-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        markAllNotificationsAsRead();
+        hideNotificationPopup(popup);
+    });
+    
+    popup.querySelector('.popup-close').addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideNotificationPopup(popup);
+    });
+    
+    popup.addEventListener('click', (e) => {
+        if (!e.target.closest('.popup-mark-btn') && !e.target.closest('.popup-close')) {
+            window.location.href = 'notification.html';
+            hideNotificationPopup(popup);
+        }
+    });
+    
+    function hideNotificationPopup(popupElement) {
+        popupElement.classList.add('hiding');
+        setTimeout(() => {
+            if (popupElement.parentNode) {
+                popupElement.parentNode.removeChild(popupElement);
+            }
+            notificationShown = false;
+        }, 300);
+        clearTimeout(autoDismiss);
+    }
+}
+
+// Mark all notifications as read
+async function markAllNotificationsAsRead() {
+    if (!currentUser) return;
+    
+    try {
+        const notificationsQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', currentUser.uid),
+            where('read', '==', false)
+        );
+        
+        const notificationsSnap = await getDocs(notificationsQuery);
+        const batch = writeBatch(db);
+        
+        notificationsSnap.docs.forEach(doc => {
+            batch.update(doc.ref, {
+                read: true,
+                readAt: serverTimestamp()
+            });
+        });
+        
+        await batch.commit();
+        
+        document.querySelectorAll('.notification-item.unread').forEach(item => {
+            item.classList.remove('unread');
+            const unreadDot = item.querySelector('.unread-dot');
+            if (unreadDot) unreadDot.remove();
+            const markReadBtn = item.querySelector('.mark-read-btn');
+            if (markReadBtn) markReadBtn.remove();
+        });
+        
+        const dropdown = document.getElementById('notification-dropdown');
+        if (dropdown && dropdown.style.display === 'block') {
+            await loadDropdownNotifications();
+        }
+        
+        updateNotificationBadge(0);
+        
+        const popup = document.querySelector('.notification-popup');
+        if (popup) {
+            popup.remove();
+        }
+        
+    } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+    }
+}
+
+// Setup mark all read button for notification page
+function setupMarkAllReadButton() {
+    const markAllReadBtn = document.getElementById('markAllReadBtn');
+    if (!markAllReadBtn) {
+        const header = document.querySelector('.notifications-header');
+        if (header) {
+            const button = document.createElement('button');
+            button.id = 'markAllReadBtn';
+            button.className = 'mark-all-read-page-btn';
+            button.innerHTML = '<i class="fas fa-check-double"></i> Mark All as Read';
+            header.appendChild(button);
+            
+            if (!document.getElementById('mark-all-read-styles')) {
+                const styles = document.createElement('style');
+                styles.id = 'mark-all-read-styles';
+                styles.textContent = `
+                    .mark-all-read-page-btn {
+                        background: var(--primary);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        padding: 10px 20px;
+                        font-size: 14px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        transition: all 0.2s ease;
+                    }
+                    
+                    .mark-all-read-page-btn:hover {
+                        background: var(--primary-dark);
+                        transform: translateY(-2px);
+                        box-shadow: var(--shadow-md);
+                    }
+                    
+                    .notifications-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 20px;
+                    }
+                `;
+                document.head.appendChild(styles);
+            }
+            
+            button.addEventListener('click', markAllNotificationsAsRead);
+        }
+    } else {
+        markAllReadBtn.addEventListener('click', markAllNotificationsAsRead);
+    }
+}
+
+// Add sound settings to page
 function addSoundSettingsToPage() {
     const header = document.querySelector('.notifications-header');
     if (header) {
@@ -1922,7 +2782,6 @@ function addSoundSettingsToPage() {
         
         header.appendChild(soundSettingsBtn);
         
-        // Add styles
         if (!document.getElementById('sound-page-styles')) {
             const styles = document.createElement('style');
             styles.id = 'sound-page-styles';
@@ -1953,7 +2812,7 @@ function addSoundSettingsToPage() {
     }
 }
 
-// Setup dropdown notification functionality
+// Setup dropdown notifications
 function setupDropdownNotifications() {
     const notificationBells = document.querySelectorAll('.notification-bell, .notification-icon, [data-notification-dropdown]');
     
@@ -1964,7 +2823,6 @@ function setupDropdownNotifications() {
         });
     });
     
-    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
         const dropdown = document.getElementById('notification-dropdown');
         if (dropdown && !dropdown.contains(e.target)) {
@@ -2020,7 +2878,6 @@ function createDropdownElement() {
         </div>
     `;
     
-    // Add styles if not already added
     if (!document.getElementById('notification-dropdown-styles')) {
         const styles = document.createElement('style');
         styles.id = 'notification-dropdown-styles';
@@ -2200,316 +3057,163 @@ function createDropdownElement() {
         document.head.appendChild(styles);
     }
     
-    // Add event listeners
     dropdown.querySelector('.mark-all-read-btn').addEventListener('click', markAllNotificationsAsRead);
     
     return dropdown;
 }
 
-// Setup mark all read button for notification page
-function setupMarkAllReadButton() {
-    const markAllReadBtn = document.getElementById('markAllReadBtn');
-    if (!markAllReadBtn) {
-        // Create button if it doesn't exist
-        const header = document.querySelector('.notifications-header');
-        if (header) {
-            const button = document.createElement('button');
-            button.id = 'markAllReadBtn';
-            button.className = 'mark-all-read-page-btn';
-            button.innerHTML = '<i class="fas fa-check-double"></i> Mark All as Read';
-            header.appendChild(button);
-            
-            // Add styles
-            if (!document.getElementById('mark-all-read-styles')) {
-                const styles = document.createElement('style');
-                styles.id = 'mark-all-read-styles';
-                styles.textContent = `
-                    .mark-all-read-page-btn {
-                        background: var(--primary);
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        padding: 10px 20px;
-                        font-size: 14px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        transition: all 0.2s ease;
-                    }
-                    
-                    .mark-all-read-page-btn:hover {
-                        background: var(--primary-dark);
-                        transform: translateY(-2px);
-                        box-shadow: var(--shadow-md);
-                    }
-                    
-                    .notifications-header {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 20px;
-                    }
-                `;
-                document.head.appendChild(styles);
-            }
-            
-            button.addEventListener('click', markAllNotificationsAsRead);
-        }
-    } else {
-        markAllReadBtn.addEventListener('click', markAllNotificationsAsRead);
-    }
-}
-
-// Mark all notifications as read
-async function markAllNotificationsAsRead() {
+// Load dropdown notifications
+async function loadDropdownNotifications() {
     if (!currentUser) return;
     
+    const dropdownContent = document.getElementById('dropdown-notifications');
+    if (!dropdownContent) return;
+    
     try {
+        dropdownContent.innerHTML = `
+            <div class="loading-notifications">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Loading notifications...</span>
+            </div>
+        `;
+        
         const notificationsQuery = query(
             collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid),
-            where('read', '==', false)
+            where('userId', '==', currentUser.uid)
         );
         
         const notificationsSnap = await getDocs(notificationsQuery);
-        const batch = writeBatch(db);
         
-        notificationsSnap.docs.forEach(doc => {
-            batch.update(doc.ref, {
-                read: true,
-                readAt: serverTimestamp()
+        if (notificationsSnap.empty) {
+            dropdownContent.innerHTML = `
+                <div class="empty-notifications">
+                    <i class="fas fa-bell-slash"></i>
+                    <p>No notifications yet</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const notifications = [];
+        notificationsSnap.forEach(doc => {
+            const data = doc.data();
+            notifications.push({
+                id: doc.id,
+                ...data,
+                timestampObj: data.timestamp?.toDate?.() || new Date(0)
             });
         });
         
-        await batch.commit();
+        notifications.sort((a, b) => b.timestampObj - a.timestampObj);
         
-        // Update UI
-        document.querySelectorAll('.notification-item.unread').forEach(item => {
-            item.classList.remove('unread');
-            const unreadDot = item.querySelector('.unread-dot');
-            if (unreadDot) unreadDot.remove();
-            const markReadBtn = item.querySelector('.mark-read-btn');
-            if (markReadBtn) markReadBtn.remove();
+        const recentNotifications = notifications.slice(0, 10);
+        
+        let html = '';
+        
+        recentNotifications.forEach(notification => {
+            const timeAgo = formatTime(notification.timestamp);
+            const iconClass = getNotificationIcon(notification.type);
+            const unreadClass = notification.read ? '' : 'unread';
+            
+            html += `
+                <div class="dropdown-notification-item ${unreadClass}" data-id="${notification.id}" 
+                     data-type="${notification.type}"
+                     data-stream-id="${notification.streamId || ''}"
+                     data-post-id="${notification.postId || ''}"
+                     data-comment-id="${notification.commentId || notification.relatedId || ''}"
+                     data-user-id="${notification.senderId || ''}"
+                     data-user-name="${notification.senderName || 'User'}"
+                     data-user-avatar="${notification.senderAvatar || 'images/default-profile.jpg'}"
+                     data-comment-text="${notification.commentText || notification.message || ''}"
+                     data-actionable="${notification.actionable || false}">
+                    <div class="dropdown-notification-icon ${notification.type}">
+                        <i class="${iconClass}"></i>
+                    </div>
+                    <div class="dropdown-notification-content">
+                        <div class="dropdown-notification-title">
+                            ${notification.title}
+                            ${!notification.read ? '<span class="unread-indicator"></span>' : ''}
+                        </div>
+                        <div class="dropdown-notification-text">${notification.message}</div>
+                        <div class="dropdown-notification-time">${timeAgo}</div>
+                    </div>
+                </div>
+            `;
         });
         
-        // Update dropdown if open
-        const dropdown = document.getElementById('notification-dropdown');
-        if (dropdown && dropdown.style.display === 'block') {
-            await loadDropdownNotifications();
-        }
+        dropdownContent.innerHTML = html;
         
-        updateNotificationBadge(0);
-        
-        // Close any open notification popup
-        const popup = document.querySelector('.notification-popup');
-        if (popup) {
-            popup.remove();
-        }
+        document.querySelectorAll('.dropdown-notification-item').forEach(item => {
+            item.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const notificationId = item.dataset.id;
+                const notificationType = item.dataset.type;
+                const actionable = item.dataset.actionable === 'true';
+                
+                if ((notificationType === 'stream_comment' || notificationType === 'stream_comment_reply' || 
+                     notificationType === 'comment' || notificationType === 'comment_reply') && actionable && e.shiftKey) {
+                    
+                    const streamId = item.dataset.streamId;
+                    const postId = item.dataset.postId;
+                    const commentId = item.dataset.commentId;
+                    const userId = item.dataset.userId;
+                    const userName = item.dataset.userName;
+                    const userAvatar = item.dataset.userAvatar;
+                    const commentText = item.dataset.commentText;
+                    
+                    if (streamId && commentId) {
+                        const commentData = {
+                            userId: userId,
+                            userName: userName,
+                            userAvatar: userAvatar,
+                            text: commentText
+                        };
+                        
+                        await markNotificationAsRead(notificationId);
+                        openStreamReplyModal(commentData, streamId, commentId);
+                        
+                        const dropdown = document.getElementById('notification-dropdown');
+                        if (dropdown) {
+                            dropdown.style.display = 'none';
+                        }
+                        return;
+                    } else if (postId && commentId) {
+                        const commentData = {
+                            userId: userId,
+                            userName: userName,
+                            userAvatar: userAvatar,
+                            text: commentText
+                        };
+                        
+                        await markNotificationAsRead(notificationId);
+                        openReplyModal(commentData, postId, commentId);
+                        
+                        const dropdown = document.getElementById('notification-dropdown');
+                        if (dropdown) {
+                            dropdown.style.display = 'none';
+                        }
+                        return;
+                    }
+                }
+                
+                await handleNotificationClick(notificationId);
+                
+                const dropdown = document.getElementById('notification-dropdown');
+                if (dropdown) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        });
         
     } catch (error) {
-        console.error('Error marking all notifications as read:', error);
-    }
-}
-
-// Show notification popup (with sound)
-function showNotificationPopup() {
-    // Don't show if already showing or on notification page
-    if (notificationShown || window.location.pathname.includes('notification.html')) {
-        return;
-    }
-    
-    // Don't show if no unread notifications
-    if (unreadCount === 0) {
-        return;
-    }
-    
-    // Play notification sound
-    soundManager.playSoftBell();
-    
-    // Remove any existing popup
-    const existingPopup = document.querySelector('.notification-popup');
-    if (existingPopup) {
-        existingPopup.remove();
-    }
-    
-    const popup = document.createElement('div');
-    popup.className = 'notification-popup';
-    popup.innerHTML = `
-        <div class="popup-content">
-            <div class="popup-icon">
-                <i class="fas fa-bell"></i>
+        console.error('Error loading dropdown notifications:', error);
+        dropdownContent.innerHTML = `
+            <div class="empty-notifications">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>Error loading notifications</p>
+                <small>${error.message}</small>
             </div>
-            <div class="popup-text">
-                <div class="popup-title">You have new notifications</div>
-                <div class="popup-message">${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}</div>
-            </div>
-            <button class="popup-mark-btn">
-                <i class="fas fa-check"></i> Mark
-            </button>
-            <button class="popup-close">&times;</button>
-        </div>
-    `;
-    
-    // Add styles if not already added
-    if (!document.getElementById('notification-popup-styles')) {
-        const styles = document.createElement('style');
-        styles.id = 'notification-popup-styles';
-        styles.textContent = `
-            .notification-popup {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-                border-radius: 12px;
-                box-shadow: var(--shadow-lg);
-                z-index: 10001;
-                animation: slideInRight 0.4s ease forwards;
-                color: white;
-                font-family: 'Inter', sans-serif;
-                overflow: hidden;
-                min-width: 300px;
-            }
-            
-            .popup-content {
-                display: flex;
-                align-items: center;
-                padding: 15px;
-                gap: 12px;
-            }
-            
-            .popup-icon {
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 18px;
-                background: rgba(255, 255, 255, 0.2);
-                flex-shrink: 0;
-            }
-            
-            .popup-text {
-                flex: 1;
-                min-width: 0;
-            }
-            
-            .popup-title {
-                font-weight: 600;
-                font-size: 14px;
-                margin-bottom: 2px;
-            }
-            
-            .popup-message {
-                font-size: 13px;
-                opacity: 0.9;
-            }
-            
-            .popup-mark-btn {
-                background: rgba(255, 255, 255, 0.2);
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 6px 12px;
-                font-size: 12px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                transition: all 0.2s ease;
-                flex-shrink: 0;
-            }
-            
-            .popup-mark-btn:hover {
-                background: rgba(255, 255, 255, 0.3);
-                transform: translateY(-1px);
-            }
-            
-            .popup-close {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                border-radius: 50%;
-                font-size: 16px;
-                cursor: pointer;
-                color: white;
-                padding: 0;
-                width: 28px;
-                height: 28px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-                transition: all 0.2s ease;
-            }
-            
-            .popup-close:hover {
-                background: rgba(255, 255, 255, 0.3);
-            }
-            
-            @keyframes slideInRight {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            
-            @keyframes slideOutRight {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            
-            .notification-popup.hiding {
-                animation: slideOutRight 0.3s ease forwards;
-            }
-            
-            @media (max-width: 768px) {
-                .notification-popup {
-                    left: 20px;
-                    right: 20px;
-                    min-width: auto;
-                }
-            }
         `;
-        document.head.appendChild(styles);
-    }
-    
-    document.body.appendChild(popup);
-    notificationShown = true;
-    
-    // Auto-dismiss after 5 seconds
-    const autoDismiss = setTimeout(() => {
-        hideNotificationPopup(popup);
-    }, 5000);
-    
-    // Mark button
-    popup.querySelector('.popup-mark-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        markAllNotificationsAsRead();
-        hideNotificationPopup(popup);
-    });
-    
-    // Close button
-    popup.querySelector('.popup-close').addEventListener('click', (e) => {
-        e.stopPropagation();
-        hideNotificationPopup(popup);
-    });
-    
-    // Click to go to notifications
-    popup.addEventListener('click', (e) => {
-        if (!e.target.closest('.popup-mark-btn') && !e.target.closest('.popup-close')) {
-            window.location.href = 'notification.html';
-            hideNotificationPopup(popup);
-        }
-    });
-    
-    function hideNotificationPopup(popupElement) {
-        popupElement.classList.add('hiding');
-        setTimeout(() => {
-            if (popupElement.parentNode) {
-                popupElement.parentNode.removeChild(popupElement);
-            }
-            notificationShown = false;
-        }, 300);
-        clearTimeout(autoDismiss);
     }
 }
 
@@ -2558,663 +3262,28 @@ function saveViewedPosts() {
     }
 }
 
-// Load notifications for notification.html page
-async function loadNotificationsForPage() {
-    if (!currentUser) return;
-
-    try {
-        const notificationsQuery = query(
-            collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid)
-        );
-
-        const notificationsSnap = await getDocs(notificationsQuery);
-        
-        // Convert to array with timestamps
-        const notifications = [];
-        notificationsSnap.forEach(doc => {
-            const data = doc.data();
-            notifications.push({
-                id: doc.id,
-                ...data,
-                timestampObj: data.timestamp?.toDate?.() || new Date(0)
-            });
-        });
-        
-        // Sort in memory by timestamp (newest first)
-        notifications.sort((a, b) => b.timestampObj - a.timestampObj);
-        
-        displayNotifications(notifications);
-    } catch (error) {
-        console.error('Error loading notifications:', error);
-        const notificationsList = document.getElementById('notificationsList');
-        if (notificationsList) {
-            notificationsList.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <h3>Error loading notifications</h3>
-                    <p>Please try refreshing the page.</p>
-                </div>
-            `;
-        }
-    }
-}
-
-// Mark notification as read
-async function markNotificationAsRead(notificationId) {
-    if (!currentUser) return;
-
-    try {
-        await updateDoc(doc(db, 'notifications', notificationId), {
-            read: true,
-            readAt: serverTimestamp()
-        });
-        
-        // Update UI
-        const notificationItem = document.querySelector(`[data-id="${notificationId}"]`);
-        if (notificationItem) {
-            notificationItem.classList.remove('unread');
-            const unreadDot = notificationItem.querySelector('.unread-dot');
-            if (unreadDot) unreadDot.remove();
-            const markReadBtn = notificationItem.querySelector('.mark-read-btn');
-            if (markReadBtn) markReadBtn.remove();
-        }
-        
-        updateNotificationBadge();
-    } catch (error) {
-        console.error('Error marking notification as read:', error);
-    }
-}
-
-// Delete notification
-async function deleteNotification(notificationId) {
-    if (!currentUser) return;
-
-    try {
-        await deleteDoc(doc(db, 'notifications', notificationId));
-        
-        // Remove from UI
-        const notificationItem = document.querySelector(`[data-id="${notificationId}"]`);
-        if (notificationItem) {
-            notificationItem.style.opacity = '0.5';
-            setTimeout(() => notificationItem.remove(), 300);
-        }
-        
-        updateNotificationBadge();
-    } catch (error) {
-        console.error('Error deleting notification:', error);
-    }
-}
-
-// Show login message
-function showLoginMessage() {
-    const notificationsList = document.getElementById('notificationsList');
-    if (notificationsList) {
-        notificationsList.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-sign-in-alt"></i>
-                <h3>Please log in</h3>
-                <p>You need to be logged in to view notifications.</p>
-                <a href="login.html" class="btn btn-primary" style="margin-top: 15px;">Log In</a>
-            </div>
-        `;
-    }
-}
-
-// Check for new messages (existing function)
-async function checkForNewMessages() {
-    if (!currentUser) return;
-
-    try {
-        const threadsQuery = query(
-            collection(db, 'conversations'),
-            where('participants', 'array-contains', currentUser.uid)
-        );
-
-        const threadsSnap = await getDocs(threadsQuery);
-
-        for (const threadDoc of threadsSnap.docs) {
-            const thread = threadDoc.data();
-            const partnerId = thread.participants.find(id => id !== currentUser.uid);
-            
-            if (partnerId) {
-                // Get all messages and filter in memory
-                const messagesQuery = collection(db, 'conversations', threadDoc.id, 'messages');
-                const messagesSnap = await getDocs(messagesQuery);
-                
-                // Convert to array and sort in memory
-                const messages = [];
-                messagesSnap.forEach(doc => {
-                    const data = doc.data();
-                    messages.push({
-                        id: doc.id,
-                        ...data,
-                        timestampObj: data.timestamp?.toDate?.() || new Date(0)
-                    });
-                });
-                
-                // Sort by newest first
-                messages.sort((a, b) => b.timestampObj - a.timestampObj);
-
-                for (const message of messages) {
-                    // Check if message is from partner and unread
-                    if (message.senderId === partnerId && !message.read) {
-                        await createMessageNotification(message.id, partnerId, message);
-                        break; // Only create one notification per conversation
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Error checking messages:', error);
-    }
-}
-
-// Create message notification (existing function)
-async function createMessageNotification(messageId, partnerId, message) {
-    try {
-        const existing = await checkExistingNotification('message', messageId, partnerId);
-        if (existing) return;
-
-        const senderDoc = await getDoc(doc(db, 'users', partnerId));
-        if (!senderDoc.exists()) return;
-
-        const senderData = senderDoc.data();
-        const messageText = message.text ? 
-            (message.text.length > 50 ? message.text.substring(0, 50) + '...' : message.text) : 
-            'sent you a photo/video';
-
-        await addDoc(collection(db, 'notifications'), {
-            type: 'message',
-            title: 'New Message',
-            message: `${senderData.name || 'Someone'} ${messageText}`,
-            senderId: partnerId,
-            senderName: senderData.name || 'Someone',
-            relatedId: messageId,
-            userId: currentUser.uid,
-            timestamp: serverTimestamp(),
-            read: false
-        });
-
-    } catch (error) {
-        console.error('Error creating message notification:', error);
-    }
-}
-
-// Check for new posts (existing function)
-async function checkForNewPosts() {
-    if (!currentUser) return;
-
-    try {
-        const postsQuery = collection(db, 'posts');
-        const postsSnap = await getDocs(postsQuery);
-        
-        // Convert to array and sort in memory
-        const posts = [];
-        postsSnap.forEach(doc => {
-            const data = doc.data();
-            posts.push({
-                id: doc.id,
-                ...data,
-                timestampObj: data.timestamp?.toDate?.() || new Date(0)
-            });
-        });
-        
-        // Sort by newest first
-        posts.sort((a, b) => b.timestampObj - a.timestampObj);
-
-        for (const post of posts) {
-            const postId = post.id;
-            
-            // Skip if post is from current user or already viewed
-            if (post.userId === currentUser.uid || viewedPosts.has(postId)) {
-                continue;
-            }
-
-            // Skip if this notification was already dismissed
-            if (dismissedNotifications.has(`post_${postId}`)) {
-                continue;
-            }
-
-            // Check if user is not on posts page
-            const currentPage = window.location.pathname.split('/').pop().split('.')[0];
-            
-            if (currentPage !== 'posts') {
-                await createPostNotification(postId, post);
-            }
-        }
-    } catch (error) {
-        console.error('Error checking posts:', error);
-    }
-}
-
-// Create post notification (existing function)
-async function createPostNotification(postId, post) {
-    try {
-        const existing = await checkExistingNotification('post', postId, post.userId);
-        if (existing) return;
-
-        const authorDoc = await getDoc(doc(db, 'users', post.userId));
-        if (!authorDoc.exists()) return;
-
-        const authorData = authorDoc.data();
-        const postText = post.caption ? 
-            (post.caption.length > 50 ? post.caption.substring(0, 50) + '...' : post.caption) : 
-            'created a new post';
-
-        await addDoc(collection(db, 'notifications'), {
-            type: 'post',
-            title: 'New Post',
-            message: `${authorData.name || 'Someone'} ${postText}`,
-            senderId: post.userId,
-            senderName: authorData.name || 'Someone',
-            relatedId: postId,
-            userId: currentUser.uid,
-            timestamp: serverTimestamp(),
-            read: false
-        });
-
-    } catch (error) {
-        console.error('Error creating post notification:', error);
-    }
-}
-
-// Check for group-related notifications
-async function checkForGroupNotifications() {
-    if (!currentUser) return;
-
-    try {
-        // Check for new group messages
-        await checkForNewGroupMessages();
-        
-        // Check for group invites
-        await checkForGroupInvites();
-        
-        // Check for group member events
-        await checkForGroupMemberEvents();
-        
-        // Check for admin notifications
-        await checkForAdminNotifications();
-
-    } catch (error) {
-        console.error('Error checking group notifications:', error);
-    }
-}
-
-// Check for new group messages
-async function checkForNewGroupMessages() {
-    if (!currentUser) return;
-
-    try {
-        // Get all groups the user is a member of
-        const groupsQuery = query(
-            collection(db, 'groups')
-        );
-        const groupsSnap = await getDocs(groupsQuery);
-
-        for (const groupDoc of groupsSnap.docs) {
-            const group = groupDoc.data();
-            const groupId = groupDoc.id;
-            
-            // Check if user is a member
-            const memberRef = doc(db, 'groups', groupId, 'members', currentUser.uid);
-            const memberSnap = await getDoc(memberRef);
-            
-            if (!memberSnap.exists()) continue;
-
-            // Get last message time from localStorage
-            const lastMessageKey = `lastGroupMessage_${groupId}_${currentUser.uid}`;
-            const lastMessageTime = localStorage.getItem(lastMessageKey) || 0;
-
-            // Get recent messages
-            const messagesRef = collection(db, 'groups', groupId, 'messages');
-            const messagesSnap = await getDocs(messagesRef);
-            
-            // Convert to array and sort in memory
-            const messages = [];
-            messagesSnap.forEach(doc => {
-                const data = doc.data();
-                messages.push({
-                    id: doc.id,
-                    ...data,
-                    timestampObj: data.timestamp?.toDate?.() || new Date(0)
-                });
-            });
-            
-            // Sort by newest first
-            messages.sort((a, b) => b.timestampObj - a.timestampObj);
-            
-            for (const message of messages) {
-                const messageTime = message.timestampObj.getTime();
-                
-                // Skip if message is from current user
-                if (message.senderId === currentUser.uid) continue;
-                
-                // Skip if message is older than last checked time
-                if (messageTime <= lastMessageTime) break;
-                
-                // Create notification for new message
-                await createGroupMessageNotification(groupId, group.name, message, message.id);
-                
-                // Update last message time
-                localStorage.setItem(lastMessageKey, messageTime.toString());
-                break; // Only create one notification per check
-            }
-        }
-    } catch (error) {
-        console.error('Error checking group messages:', error);
-    }
-}
-
-// Create group message notification
-async function createGroupMessageNotification(groupId, groupName, message, messageId) {
-    try {
-        const existing = await checkExistingNotification('group_message', messageId, message.senderId);
-        if (existing) return;
-
-        const senderDoc = await getDoc(doc(db, 'users', message.senderId));
-        const senderName = senderDoc.exists() ? senderDoc.data().name : 'Someone';
-
-        const messageText = message.text ? 
-            (message.text.length > 50 ? message.text.substring(0, 50) + '...' : message.text) : 
-            (message.imageUrl ? 'sent a photo' : message.videoUrl ? 'sent a video' : 'sent a message');
-
-        await addDoc(collection(db, 'notifications'), {
-            type: 'group_message',
-            title: `New Message in ${groupName}`,
-            message: `${senderName}: ${messageText}`,
-            senderId: message.senderId,
-            senderName: senderName,
-            relatedId: messageId,
-            groupId: groupId,
-            groupName: groupName,
-            userId: currentUser.uid,
-            timestamp: serverTimestamp(),
-            read: false
-        });
-
-    } catch (error) {
-        console.error('Error creating group message notification:', error);
-    }
-}
-
-// Check for group invites
-async function checkForGroupInvites() {
-    if (!currentUser) return;
-
-    try {
-        // Check if user was recently added to any groups
-        const groupsQuery = query(
-            collection(db, 'groups')
-        );
-        const groupsSnap = await getDocs(groupsQuery);
-
-        for (const groupDoc of groupsSnap.docs) {
-            const group = groupDoc.data();
-            const groupId = groupDoc.id;
-            
-            // Check if user is a member
-            const memberRef = doc(db, 'groups', groupId, 'members', currentUser.uid);
-            const memberSnap = await getDoc(memberRef);
-            
-            if (!memberSnap.exists()) continue;
-
-            // Check join time
-            const joinTime = memberSnap.data().joinedAt?.toDate?.()?.getTime() || 0;
-            const now = Date.now();
-            
-            // If joined within the last 5 minutes, create notification
-            if ((now - joinTime) < 5 * 60 * 1000) {
-                const notificationKey = `group_join_${groupId}_${currentUser.uid}`;
-                if (!localStorage.getItem(notificationKey)) {
-                    await createGroupInviteNotification(groupId, group.name);
-                    localStorage.setItem(notificationKey, 'true');
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Error checking group invites:', error);
-    }
-}
-
-// Create group invite notification
-async function createGroupInviteNotification(groupId, groupName) {
-    try {
-        await addDoc(collection(db, 'notifications'), {
-            type: 'group_invite',
-            title: 'Joined New Group',
-            message: `You have joined the group "${groupName}"`,
-            groupId: groupId,
-            groupName: groupName,
-            userId: currentUser.uid,
-            timestamp: serverTimestamp(),
-            read: false
-        });
-    } catch (error) {
-        console.error('Error creating group invite notification:', error);
-    }
-}
-
-// Check for group member events (member added, removed, etc.)
-async function checkForGroupMemberEvents() {
-    if (!currentUser) return;
-
-    try {
-        // Check for member removal notifications
-        const removalQuery = query(
-            collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid),
-            where('type', '==', 'group_member_removed')
-        );
-        const removalSnap = await getDocs(removalQuery);
-        
-        // Already handled by the existing notification system from group.js
-        // We just need to ensure they appear in the notification list
-        
-    } catch (error) {
-        console.error('Error checking group member events:', error);
-    }
-}
-
-// Check for admin notifications (when user is admin of a group)
-async function checkForAdminNotifications() {
-    if (!currentUser) return;
-
-    try {
-        // Get groups where user is admin
-        const groupsQuery = query(
-            collection(db, 'groups'),
-            where('createdBy', '==', currentUser.uid)
-        );
-        const groupsSnap = await getDocs(groupsQuery);
-
-        for (const groupDoc of groupsSnap.docs) {
-            const group = groupDoc.data();
-            const groupId = groupDoc.id;
-            
-            // Check for new join requests (if implementing request system)
-            // Check for reported messages (if implementing report system)
-            // These would be additional features to implement
-        }
-    } catch (error) {
-        console.error('Error checking admin notifications:', error);
-    }
-}
-
-// Check if notification already exists
-async function checkExistingNotification(type, relatedId, senderId = null) {
-    try {
-        const notificationsQuery = query(
-            collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid)
-        );
-
-        const notificationsSnap = await getDocs(notificationsQuery);
-
-        // Filter in memory
-        return notificationsSnap.docs.some(doc => {
-            const data = doc.data();
-            return data.type === type && 
-                   data.relatedId === relatedId && 
-                   (senderId === null || data.senderId === senderId);
-        });
-    } catch (error) {
-        console.error('Error checking existing notification:', error);
-        return false;
-    }
-}
-
-// Setup notification listener (with sound for new notifications)
-function setupNotificationListener() {
-    if (!currentUser) return;
-
-    if (unsubscribeNotifications) {
-        unsubscribeNotifications();
-    }
-
-    try {
-        const notificationsQuery = query(
-            collection(db, 'notifications'),
-            where('userId', '==', currentUser.uid)
-        );
-
-        unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
-            // Filter unread and sort by timestamp in memory
-            const allNotifications = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            
-            // Add timestamp objects for sorting
-            allNotifications.forEach(notification => {
-                notification.timestampObj = notification.timestamp?.toDate?.() || new Date(0);
-            });
-            
-            const unreadNotifications = allNotifications.filter(notification => !notification.read);
-            const sortedNotifications = allNotifications.sort((a, b) => b.timestampObj - a.timestampObj);
-            
-            const previousUnreadCount = unreadCount;
-            unreadCount = unreadNotifications.length;
-            
-            updateNotificationBadge(unreadCount);
-            localStorage.setItem(`notification_count_${currentUser.uid}`, unreadCount);
-            
-            // Play sound for new notifications
-            snapshot.docChanges().forEach(change => {
-                if (change.type === 'added') {
-                    const notification = change.doc.data();
-                    if (!notification.read) {
-                        // Play notification sound based on type
-                        soundManager.playNotificationSound(notification.type);
-                    }
-                }
-            });
-            
-            // Reload notifications if on notification page
-            if (window.location.pathname.includes('notification.html')) {
-                displayNotifications(sortedNotifications);
-            }
-            
-            // Update dropdown if open
-            const dropdown = document.getElementById('notification-dropdown');
-            if (dropdown && dropdown.style.display === 'block') {
-                loadDropdownNotifications();
-            }
-            
-            // Show popup for new notifications (but not too frequently)
-            if (!window.location.pathname.includes('notification.html')) {
-                const now = Date.now();
-                if (unreadCount > previousUnreadCount && now - lastNotificationTime > 5000) {
-                    showNotificationPopup();
-                    lastNotificationTime = now;
-                }
-            }
-        }, (error) => {
-            console.error('Notification listener error:', error);
-            const cachedCount = localStorage.getItem(`notification_count_${currentUser.uid}`) || 0;
-            updateNotificationBadge(parseInt(cachedCount));
-        });
-
-    } catch (error) {
-        console.error('Error setting up notification listener:', error);
-        const cachedCount = localStorage.getItem(`notification_count_${currentUser ? currentUser.uid : 'anonymous'}`) || 0;
-        updateNotificationBadge(parseInt(cachedCount));
-    }
-}
-
-// Update notification badge
-function updateNotificationBadge(count) {
-    if (count === undefined) {
-        count = localStorage.getItem(`notification_count_${currentUser ? currentUser.uid : 'anonymous'}`) || 0;
-        count = parseInt(count);
-    }
-
-    unreadCount = count;
-
-    const badges = document.querySelectorAll('.notification-badge');
-    badges.forEach(badge => {
-        if (count > 0) {
-            badge.textContent = count > 99 ? '99+' : count;
-            badge.style.display = 'flex';
-        } else {
-            badge.style.display = 'none';
-        }
-    });
-}
-
-// Get notification icon
-function getNotificationIcon(type) {
-    switch (type) {
-        case 'message': return 'fas fa-comment-alt';
-        case 'like': return 'fas fa-heart';
-        case 'comment':
-        case 'comment_reply': return 'fas fa-comment';
-        case 'post': return 'fas fa-newspaper';
-        case 'group_message': return 'fas fa-users';
-        case 'group_invite': return 'fas fa-user-plus';
-        case 'group_member_removed': return 'fas fa-user-minus';
-        case 'group_deleted': return 'fas fa-trash-alt';
-        default: return 'fas fa-bell';
-    }
-}
-
-// Format time
-function formatTime(timestamp) {
-    if (!timestamp) return '';
-    
-    let date;
-    try {
-        if (timestamp.toDate) {
-            date = timestamp.toDate();
-        } else if (typeof timestamp === 'string') {
-            date = new Date(timestamp);
-        } else {
-            return '';
-        }
-        
-        if (isNaN(date.getTime())) return '';
-    } catch (error) {
-        return '';
-    }
-    
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-}
-
 // Clean up listeners
 function cleanupListeners() {
     if (unsubscribeNotifications) unsubscribeNotifications();
     checkIntervals.forEach(interval => clearInterval(interval));
     checkIntervals = [];
+}
+
+// ==================== PLACEHOLDER FUNCTIONS (Keep for compatibility) ====================
+
+// Check for new messages (placeholder)
+async function checkForNewMessages() {
+    // Implement if needed
+}
+
+// Check for new posts (placeholder)
+async function checkForNewPosts() {
+    // Implement if needed
+}
+
+// Check for group notifications (placeholder)
+async function checkForGroupNotifications() {
+    // Implement if needed
 }
 
 // Auto-initialize when DOM is loaded
@@ -3256,34 +3325,39 @@ window.NotificationSystem = {
             console.error('Error creating group notification:', error);
         }
     },
+    // Stream notification functions
+    createStreamLikeNotification: createStreamLikeNotification,
+    createStreamCommentNotification: createStreamCommentNotification,
+    createStreamCommentReplyNotification: createStreamCommentReplyNotification,
+    checkForNewStreamLikes: checkForNewStreamLikes,
+    checkForNewStreamComments: checkForNewStreamComments,
+    openStreamReplyModal: openStreamReplyModal,
+    submitStreamReply: submitStreamReply,
     // Like notification functions
     createLikeNotification: createLikeNotification,
     checkForNewLikes: checkForNewLikes,
-    
     // Comment notification functions
     createCommentNotification: createCommentNotification,
     createCommentReplyNotification: createCommentReplyNotification,
     checkForNewComments: checkForNewComments,
-    
     // Reply modal functions
     openReplyModal: openReplyModal,
     closeReplyModal: closeReplyModal,
-    
     // Dropdown functions
     showDropdown: toggleDropdownNotifications,
     markAllRead: markAllNotificationsAsRead,
-    
     // Sound control methods
     soundManager: soundManager,
     toggleSounds: () => soundManager.toggleSounds(),
     setSoundVolume: (volume) => soundManager.setVolume(volume),
     testSound: () => soundManager.playSoftBell(),
-    
     // Force check for new notifications
     forceCheckLikes: () => {
         if (currentUser) {
             checkForNewLikes();
             checkForNewComments();
+            checkForNewStreamLikes();
+            checkForNewStreamComments();
         }
     }
 };
