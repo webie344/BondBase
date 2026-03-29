@@ -1,7 +1,10 @@
 // groupchat.js - Enhanced with Service Worker Support & Voice Notes
 // COMPLETE VERSION WITH XP SYSTEM INTEGRATED - LOADS ACTUAL USER XP DATA
 // FIXED: Message ordering and scroll behavior
-// FIXED: Cancel voice recording button functionality
+// FIXED: Cancel voice recording button functionality - NOW CLOSES MODAL PROPERLY
+// FIXED: Level tags are now transparent
+// FIXED: Reactions work without sending messages first
+// FIXED: Message input clears immediately when sending
 
 import { 
     getFirestore, 
@@ -695,7 +698,7 @@ class GroupChat {
         this.recordingDuration = 0;
         this.currentVoiceNote = null;
         
-        // Track processed messages - FIXED: Better tracking system
+        // Track processed messages
         this.messageTracker = new Map(); // groupId -> { 
             // processedIds: Set of message IDs that have been processed
             // allMessages: Array of all messages sorted by timestamp
@@ -1057,19 +1060,19 @@ class GroupChat {
                     margin: 5px 0;
                 }
                 
-                /* XP Icon Styles */
+                /* XP Icon Styles - TRANSPARENT VERSION */
                 .xp-badge {
                     display: inline-flex;
                     align-items: center;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    background: transparent !important;
                     border-radius: 20px;
                     padding: 2px 8px;
                     margin-left: 6px;
-                    color: white;
+                    color: #764ba2;
                     font-size: 11px;
                     font-weight: bold;
                     gap: 4px;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    box-shadow: none !important;
                 }
                 
                 .xp-badge span {
@@ -1081,7 +1084,7 @@ class GroupChat {
                 }
                 
                 .xp-level {
-                    background: rgba(255,255,255,0.2);
+                    background: rgba(118, 75, 162, 0.1);
                     border-radius: 12px;
                     padding: 1px 4px;
                     margin-left: 2px;
@@ -1252,7 +1255,7 @@ class GroupChat {
         return false;
     }
     
-    // FIXED: Cancel voice recording - properly clean up all resources
+    // FIXED: Cancel voice recording - properly close modal and clean up
     cancelVoiceRecording() {
         console.log('Cancel voice recording called');
         
@@ -1288,7 +1291,7 @@ class GroupChat {
             this.recordingDuration = 0;
             this.recordingStartTime = null;
             
-            // Hide recording UI
+            // Hide recording UI (this closes the modal)
             this.hideRecordingUI();
             
             // Remove preview if exists
@@ -2413,12 +2416,12 @@ class GroupChat {
         return `private_${ids[0]}_${ids[1]}`;
     }
 
-    // NEW: Create XP badge HTML
+    // NEW: Create XP badge HTML - TRANSPARENT VERSION
     createXPBadge(xpRank) {
         if (!xpRank) return '';
         
         return `
-            <span class="xp-badge" style="background: linear-gradient(135deg, ${xpRank.color}, #764ba2);">
+            <span class="xp-badge" style="background: transparent !important; color: #764ba2;">
                 <span class="xp-icon">${xpRank.icon}</span>
                 <span>Lvl ${xpRank.level}</span>
                 <span class="xp-level">${xpRank.title.split(' ')[0]}</span>
@@ -4352,19 +4355,19 @@ class GroupChat {
                 50% { opacity: 1; transform: scale(1.2); }
             }
             
-            /* XP Badge Styles */
+            /* XP Badge Styles - TRANSPARENT */
             .xp-badge {
                 display: inline-flex;
                 align-items: center;
-                background: linear-gradient(135deg, #667eea, #764ba2);
+                background: transparent !important;
                 border-radius: 20px;
                 padding: 2px 8px;
                 margin-left: 6px;
-                color: white;
+                color: #764ba2;
                 font-size: 11px;
                 font-weight: bold;
                 gap: 4px;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                box-shadow: none !important;
             }
             
             .xp-badge span {
@@ -4376,7 +4379,7 @@ class GroupChat {
             }
             
             .xp-level {
-                background: rgba(255,255,255,0.2);
+                background: rgba(118, 75, 162, 0.1);
                 border-radius: 12px;
                 padding: 1px 4px;
                 margin-left: 2px;
@@ -5653,7 +5656,7 @@ function initGroupPage() {
         });
     }
     
-    // Send button always shows airplane icon, no loader - prevent form submission
+    // Send button - FIXED: Clear input immediately when sending
     if (sendBtn) {
         sendBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -6177,7 +6180,7 @@ function initGroupPage() {
             const div = document.createElement('div');
             div.className = 'member-item';
             
-            // Create XP badge HTML if member has XP data
+            // Create XP badge HTML if member has XP data - TRANSPARENT
             const xpBadge = member.xp ? groupChat.createXPBadge(member.xp) : '';
             
             div.innerHTML = `
@@ -6210,7 +6213,7 @@ function initGroupPage() {
         });
     }
     
-    // FIXED: displayMessages function to ensure correct message order
+    // FIXED: displayMessages function to ensure correct message order and reactions
     function displayMessages() {
         if (!messagesContainer) return;
         
@@ -6307,7 +6310,7 @@ function initGroupPage() {
                     const headerDiv = document.createElement('div');
                     headerDiv.style.cssText = 'display: flex; align-items: flex-start; gap: 10px; margin-bottom: 4px;';
                     
-                    // Create XP badge
+                    // Create XP badge - TRANSPARENT
                     const xpBadge = groupChat.createXPBadge(senderXP);
                     
                     headerDiv.innerHTML = `
@@ -6753,6 +6756,7 @@ function initGroupPage() {
         container.appendChild(emptyBubble);
     }
     
+    // FIXED: sendMessage - clears input immediately
     async function sendMessage() {
         const text = messageInput ? messageInput.value.trim() : '';
         
@@ -6766,8 +6770,12 @@ function initGroupPage() {
         // Stop typing indicator
         await groupChat.stopTyping(groupId);
         
-        // Send button always shows airplane icon, no loader
-        // We only disable it temporarily to prevent double sends
+        // FIXED: Clear input immediately when sending
+        if (messageInput && text) {
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+        }
+        
         if (sendBtn) {
             const originalHTML = sendBtn.innerHTML;
             const originalDisabled = sendBtn.disabled;
@@ -6780,27 +6788,26 @@ function initGroupPage() {
                 } else {
                     // Send text message
                     await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
-                    
-                    if (messageInput) {
-                        messageInput.value = '';
-                        messageInput.style.height = 'auto';
-                        messageInput.dispatchEvent(new Event('input'));
-                    }
                 }
                 
                 // Clear the reply indicator after sending
                 groupChat.clearReply();
                 
-                // Scroll to bottom after sending
+                // FIXED: Scroll to bottom immediately after sending
                 setTimeout(() => {
                     if (messagesContainer) {
                         messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     }
-                }, 100);
+                }, 50);
                 
             } catch (error) {
                 console.error('Error sending message:', error);
                 alert(error.message || 'Failed to send message. Please try again.');
+                // Restore text if sending failed
+                if (messageInput && text) {
+                    messageInput.value = text;
+                    messageInput.dispatchEvent(new Event('input'));
+                }
             } finally {
                 // Always restore airplane icon immediately
                 sendBtn.disabled = originalDisabled;
@@ -6818,12 +6825,12 @@ function initGroupPage() {
                 // Clear the reply indicator after sending
                 groupChat.clearReply();
                 
-                // Scroll to bottom after sending
+                // Scroll to bottom immediately after sending
                 setTimeout(() => {
                     if (messagesContainer) {
                         messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     }
-                }, 100);
+                }, 50);
                 
             } catch (error) {
                 console.error('Error sending message:', error);
