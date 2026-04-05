@@ -146,7 +146,6 @@ class SocialManager {
 
     // Add loader overlay to page (only for posts.html)
     addLoader() {
-        // Check if loader already exists
         if (document.getElementById('initialLoader')) return;
         
         const loader = document.createElement('div');
@@ -211,6 +210,7 @@ class SocialManager {
                 this.loadViewedPYMKProfiles();
                 this.setupPollEventListeners();
                 this.setupPostModal();
+                this.setupReplyModal();
             } else {
                 if (!window.location.pathname.includes('login.html') && 
                     !window.location.pathname.includes('signup.html') &&
@@ -224,7 +224,6 @@ class SocialManager {
     // ==================== POST MODAL FOR FULL PAGE VIEW ====================
     
     setupPostModal() {
-        // Create modal if it doesn't exist
         if (!document.getElementById('postModal')) {
             const modal = document.createElement('div');
             modal.id = 'postModal';
@@ -241,10 +240,8 @@ class SocialManager {
             `;
             document.body.appendChild(modal);
             
-            // Add modal styles
             this.addModalStyles();
             
-            // Close modal events
             const closeBtn = modal.querySelector('.post-modal-close');
             closeBtn.addEventListener('click', () => this.closePostModal());
             
@@ -254,7 +251,6 @@ class SocialManager {
                 }
             });
             
-            // ESC key to close
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && modal.style.display === 'flex') {
                     this.closePostModal();
@@ -277,7 +273,6 @@ class SocialManager {
                 z-index: 100000;
                 align-items: center;
                 justify-content: center;
-                padding: ;
                 backdrop-filter: blur(10px);
             }
             
@@ -388,7 +383,6 @@ class SocialManager {
         modalBody.innerHTML = '<div class="loading">Loading post...</div>';
         
         try {
-            // Fetch post data
             const postRef = doc(db, 'posts', postId);
             const postSnap = await getDoc(postRef);
             
@@ -399,17 +393,14 @@ class SocialManager {
             
             const post = { id: postSnap.id, ...postSnap.data() };
             
-            // Fetch user data
             const userRef = doc(db, 'users', post.userId);
             const userSnap = await getDoc(userRef);
             const user = userSnap.exists() ? userSnap.data() : {};
             
-            // Create enhanced post element for modal
             const postElement = await this.createModalPostElement(post, user, postId);
             modalBody.innerHTML = '';
             modalBody.appendChild(postElement);
             
-            // Load comments
             await this.loadModalComments(postId);
             
         } catch (error) {
@@ -423,7 +414,6 @@ class SocialManager {
         if (modal) {
             modal.style.display = 'none';
             
-            // Pause all videos in modal
             const videos = modal.querySelectorAll('video');
             videos.forEach(video => {
                 video.pause();
@@ -441,7 +431,6 @@ class SocialManager {
         
         let postContentHTML = '';
         
-        // Handle different media types
         if (post.mediaType === 'poll' && post.poll) {
             const pollContainer = this.createPollElement(post, postId);
             postContentHTML = pollContainer.outerHTML;
@@ -519,7 +508,6 @@ class SocialManager {
             </div>
         `;
 
-        // Initialize video if present
         if (post.videoUrl || post.mediaType === 'video') {
             setTimeout(() => {
                 const container = document.getElementById(`modal-video-container-${postId}`);
@@ -527,7 +515,6 @@ class SocialManager {
                     const videoContainer = this.createVideoContainer(postId, post.videoUrl, this.getVideoThumbnail(post), post.videoDuration || 0, true);
                     container.appendChild(videoContainer);
                     
-                    // Observe for auto-play
                     if (this.videoObserver) {
                         this.videoObserver.observe(videoContainer);
                     }
@@ -535,7 +522,6 @@ class SocialManager {
             }, 100);
         }
 
-        // Add event listeners
         const likeBtn = postDiv.querySelector('.like-btn');
         const sendCommentBtn = postDiv.querySelector('.send-comment-btn');
         const commentInput = postDiv.querySelector('.comment-input');
@@ -568,7 +554,6 @@ class SocialManager {
             downvoteBtn.addEventListener('click', () => this.handleVote(postId, 'down', downvoteBtn));
         }
 
-        // Navigate to profile
         const navigateToProfile = () => {
             window.location.href = `profile.html?id=${post.userId}`;
         };
@@ -637,9 +622,14 @@ class SocialManager {
                 </div>
             </div>
             <div class="comment-text">${this.escapeHTML(comment.text)}</div>
+            <div class="comment-actions">
+                <button class="comment-action-btn reply-btn" data-comment-id="${comment.id}" data-post-id="${postId}">
+                    <i class="fas fa-reply"></i> Reply
+                </button>
+            </div>
+            <div id="modal-replies-${comment.id}" class="replies-container" style="display: none;"></div>
         `;
 
-        // Add profile navigation to avatar and name
         const avatar = commentDiv.querySelector('.comment-avatar');
         const name = commentDiv.querySelector('.comment-info strong');
         
@@ -653,6 +643,22 @@ class SocialManager {
         
         if (name) {
             name.addEventListener('click', navigateToProfile);
+        }
+
+        const replyBtn = commentDiv.querySelector('.reply-btn');
+        if (replyBtn) {
+            replyBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentData = {
+                    id: comment.id,
+                    userId: comment.userId,
+                    userName: user.name || 'User',
+                    userAvatar: user.profileImage || 'images/default-profile.jpg',
+                    text: comment.text
+                };
+                this.openReplyModal(commentData, postId, comment.id);
+            });
         }
 
         return commentDiv;
@@ -693,10 +699,8 @@ class SocialManager {
 
             commentInput.value = '';
             
-            // Reload comments
             await this.loadModalComments(postId);
             
-            // Update comment count in modal
             const commentCount = document.querySelector(`.comment-btn[data-post-id="${postId}"] .comment-count`);
             if (commentCount) {
                 const currentCount = parseInt(commentCount.textContent) || 0;
@@ -735,7 +739,7 @@ class SocialManager {
     }
 
     getUserVoteForPost(postId) {
-        return this.votedPosts.get(postId) || null; // Returns 'up', 'down', or null
+        return this.votedPosts.get(postId) || null;
     }
 
     async handleVote(postId, voteType, voteButton) {
@@ -744,7 +748,6 @@ class SocialManager {
             return;
         }
 
-        // Prevent multiple rapid clicks
         if (voteButton.classList.contains('voting')) {
             return;
         }
@@ -764,13 +767,11 @@ class SocialManager {
             const post = postSnap.data();
             const currentVote = this.getUserVoteForPost(postId);
             
-            // Initialize vote counts if they don't exist
             let upvotes = post.upvotes || 0;
             let downvotes = post.downvotes || 0;
             
             let newVoteType = voteType;
             
-            // If user clicked the same button, remove their vote
             if (currentVote === voteType) {
                 if (voteType === 'up') {
                     upvotes = Math.max(0, upvotes - 1);
@@ -780,7 +781,6 @@ class SocialManager {
                 this.votedPosts.delete(postId);
                 newVoteType = null;
             } 
-            // If user had opposite vote, switch their vote
             else if (currentVote === 'up' && voteType === 'down') {
                 upvotes = Math.max(0, upvotes - 1);
                 downvotes += 1;
@@ -791,7 +791,6 @@ class SocialManager {
                 upvotes += 1;
                 this.votedPosts.set(postId, 'up');
             }
-            // If user had no vote, add their vote
             else if (!currentVote) {
                 if (voteType === 'up') {
                     upvotes += 1;
@@ -801,17 +800,14 @@ class SocialManager {
                 this.votedPosts.set(postId, voteType);
             }
             
-            // Update Firestore
             await updateDoc(postRef, {
                 upvotes: upvotes,
                 downvotes: downvotes,
                 updatedAt: serverTimestamp()
             });
             
-            // Save to localStorage
             this.saveVotedPosts();
             
-            // Update UI
             this.updateVoteUI(postId, upvotes, downvotes, this.votedPosts.get(postId) || null);
             
         } catch (error) {
@@ -834,7 +830,6 @@ class SocialManager {
         if (upvoteCount) upvoteCount.textContent = this.formatCount(upvotes);
         if (downvoteCount) downvoteCount.textContent = this.formatCount(downvotes);
         
-        // Update active states
         if (upvoteBtn) {
             upvoteBtn.classList.toggle('active', userVote === 'up');
         }
@@ -1055,7 +1050,7 @@ class SocialManager {
                     position: relative;
                     width: 100%;
                     height: 0;
-                    padding-bottom: 75%; /* 4:3 aspect ratio - larger */
+                    padding-bottom: 75%;
                     background: #000;
                     border-radius: 16px;
                     overflow: hidden;
@@ -1112,12 +1107,11 @@ class SocialManager {
                     letter-spacing: 0.5px;
                 }
 
-                /* Custom Video Player */
                 .custom-video-container {
                     position: relative;
                     width: 100%;
                     height: 0;
-                    padding-bottom: 75%; /* 4:3 aspect ratio - larger */
+                    padding-bottom: 75%;
                     background: #000;
                     border-radius: 16px;
                     overflow: hidden;
@@ -1126,9 +1120,8 @@ class SocialManager {
                     border: 1px solid rgba(255, 255, 255, 0.1);
                 }
 
-                /* Larger video player for modal */
                 .post-modal .custom-video-container {
-                    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+                    padding-bottom: 56.25%;
                     max-height: 70vh;
                 }
 
@@ -2618,13 +2611,11 @@ class SocialManager {
         container.dataset.duration = duration;
         container.dataset.autoPlay = autoPlay;
         
-        // Create video element but don't set src yet - will be set when initialized
         const video = document.createElement('video');
         video.className = 'custom-video-player';
         video.preload = 'metadata';
         video.poster = thumbnailUrl;
         
-        // Create controls overlay
         const controlsOverlay = document.createElement('div');
         controlsOverlay.className = 'video-controls-overlay';
         
@@ -2633,7 +2624,6 @@ class SocialManager {
         centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
         controlsOverlay.appendChild(centerPlayBtn);
         
-        // Create bottom controls
         const bottomControls = document.createElement('div');
         bottomControls.className = 'video-bottom-controls';
         
@@ -2683,7 +2673,6 @@ class SocialManager {
         container.appendChild(controlsOverlay);
         container.appendChild(bottomControls);
         
-        // Store video element reference
         container.videoElement = video;
         
         return container;
@@ -2691,7 +2680,6 @@ class SocialManager {
     
     initializeVideoPlayer(container, postId, videoUrl, thumbnailUrl, duration) {
         if (container.classList.contains('video-initialized')) {
-            // If already initialized, just toggle play/pause
             const video = container.videoElement;
             if (video.paused) {
                 video.play();
@@ -2747,7 +2735,6 @@ class SocialManager {
             }
         };
         
-        // Get control elements
         const playPauseBtn = container.querySelector('.control-btn:first-child');
         const centerPlayBtn = container.querySelector('.video-center-play-btn');
         const progressContainer = container.querySelector('.progress-bar-container');
@@ -2873,7 +2860,6 @@ class SocialManager {
             e.stopPropagation();
         });
         
-        // Auto-play if requested
         if (container.dataset.autoPlay === 'true') {
             setTimeout(() => {
                 video.play().catch(e => console.log('Auto-play prevented:', e));
@@ -3482,7 +3468,6 @@ class SocialManager {
                 }
             });
             
-            // Add profile navigation to reply modal
             const replyToName = document.getElementById('replyToName');
             if (replyToName) {
                 replyToName.addEventListener('click', () => {
@@ -3599,9 +3584,16 @@ class SocialManager {
             this.showNotification('Reply posted!', 'success');
             this.closeReplyModal();
             
+            // Refresh comments to show the new reply
             const commentsSection = document.getElementById(`comments-${postId}`);
             if (commentsSection && commentsSection.style.display !== 'none') {
                 await this.loadComments(postId);
+            }
+            
+            // Also refresh modal comments if open
+            const modalComments = document.getElementById(`modal-comments-list-${postId}`);
+            if (modalComments) {
+                await this.loadModalComments(postId);
             }
             
         } catch (error) {
@@ -3641,7 +3633,6 @@ class SocialManager {
             <div id="replies-${comment.id}" class="replies-container" style="display: none;"></div>
         `;
         
-        // Add profile navigation to avatar and name
         const avatar = commentDiv.querySelector('.comment-avatar');
         const name = commentDiv.querySelector('.comment-info strong');
         
@@ -3771,7 +3762,6 @@ class SocialManager {
             </div>
         `;
         
-        // Add profile navigation
         const avatar = replyDiv.querySelector('.reply-avatar');
         const name = replyDiv.querySelector('.reply-info strong');
         
@@ -4097,7 +4087,6 @@ class SocialManager {
             
             const postsSnap = await getDocs(postsQuery);
             
-            // Remove loader when data is loaded (only on first page load)
             if (lastVisible === null) {
                 this.removeLoader();
             }
@@ -4343,7 +4332,6 @@ class SocialManager {
     }
 
     showNotification(message, type = 'info') {
-        // Remove vote notifications
         if (message.includes('Voted') || message.includes('Vote')) {
             return;
         }
@@ -4562,7 +4550,6 @@ class SocialManager {
             </div>
         `;
 
-        // Initialize video if present
         if (post.videoUrl || post.mediaType === 'video') {
             setTimeout(() => {
                 const container = document.getElementById(`video-container-${post.id}`);
@@ -4570,7 +4557,6 @@ class SocialManager {
                     const videoContainer = this.createVideoContainer(post.id, post.videoUrl, this.getVideoThumbnail(post), post.videoDuration || 0, true);
                     container.appendChild(videoContainer);
                     
-                    // Observe for auto-play
                     if (this.videoObserver) {
                         this.videoObserver.observe(videoContainer);
                     }
@@ -4578,7 +4564,6 @@ class SocialManager {
             }, 100);
         }
 
-        // Add profile navigation
         const avatar = container.querySelector('.post-author-avatar');
         const name = container.querySelector('.post-author-info h4');
         
@@ -4813,7 +4798,6 @@ class SocialManager {
             </div>
         `;
 
-        // Initialize video if present
         if (post.videoUrl || post.mediaType === 'video') {
             setTimeout(() => {
                 const container = document.getElementById(`video-container-${postId}`);
@@ -4821,7 +4805,6 @@ class SocialManager {
                     const videoContainer = this.createVideoContainer(postId, post.videoUrl, this.getVideoThumbnail(post), post.videoDuration || 0);
                     container.appendChild(videoContainer);
                     
-                    // Observe for auto-play
                     if (this.videoObserver) {
                         this.videoObserver.observe(videoContainer);
                     }
@@ -4829,7 +4812,6 @@ class SocialManager {
             }, 100);
         }
 
-        // Add profile navigation
         const avatar = postDiv.querySelector('.post-author-avatar');
         const name = postDiv.querySelector('.post-author-info h4');
         
@@ -4845,9 +4827,7 @@ class SocialManager {
             name.addEventListener('click', navigateToProfile);
         }
 
-        // Add click to open modal (except on interactive elements)
         postDiv.addEventListener('click', (e) => {
-            // Don't open modal if clicking on buttons, inputs, or links
             const target = e.target;
             const isInteractive = 
                 target.closest('.vote-btn') ||
@@ -4929,7 +4909,6 @@ class SocialManager {
         return postDiv;
     }
 
-    // COMMENT FUNCTIONALITY
     async toggleComments(postId) {
         const commentsSection = document.getElementById(`comments-${postId}`);
         const commentBtn = document.querySelector(`.comment-btn[data-post-id="${postId}"]`);
@@ -5313,7 +5292,6 @@ class SocialManager {
             </button>
         `;
 
-        // Add profile navigation
         const avatar = card.querySelector('.pymk-profile-avatar');
         const name = card.querySelector('.pymk-profile-name');
         
@@ -5719,14 +5697,11 @@ class SocialManager {
             this.loadProfileSocialLinks(profileId);
             this.loadAllProfilePosts(profileId);
             this.setupProfileButtons(profileId);
-            
-            // Fix for profile page reactions
             this.setupProfileReactions();
         }
     }
     
     setupProfileReactions() {
-        // Add event delegation for reactions on profile page
         document.addEventListener('click', (e) => {
             const likeBtn = e.target.closest('.like-btn');
             const voteBtn = e.target.closest('.vote-btn');
@@ -5948,7 +5923,6 @@ class SocialManager {
             </div>
         `;
 
-        // Initialize video if present
         if (post.videoUrl || post.mediaType === 'video') {
             setTimeout(() => {
                 const container = document.getElementById(`profile-video-container-${postId}`);
@@ -5956,7 +5930,6 @@ class SocialManager {
                     const videoContainer = this.createVideoContainer(postId, post.videoUrl, this.getVideoThumbnail(post), post.videoDuration || 0);
                     container.appendChild(videoContainer);
                     
-                    // Observe for auto-play
                     if (this.videoObserver) {
                         this.videoObserver.observe(videoContainer);
                     }
@@ -5964,11 +5937,9 @@ class SocialManager {
             }, 100);
         }
 
-        // Add profile navigation
         const avatar = postDiv.querySelector('.post-author-avatar');
         const name = postDiv.querySelector('.post-author-info h4');
         
-        // Don't navigate if already on profile page
         if (window.location.pathname.includes('profile.html')) {
             if (avatar) avatar.style.cursor = 'default';
             if (name) name.style.cursor = 'default';
@@ -6253,7 +6224,6 @@ class SocialManager {
             </div>
         `;
 
-        // Initialize video if present
         if (post.videoUrl || post.mediaType === 'video') {
             setTimeout(() => {
                 const container = document.getElementById(`user-video-container-${postId}`);
