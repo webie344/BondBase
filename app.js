@@ -34,7 +34,7 @@ const firebaseConfig = {
     storageBucket: "crypto-6517d.firebasestorage.app",
     messagingSenderId: "60263975159",
     appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-  };
+};
 
 
 // Initialize Firebase
@@ -3702,12 +3702,13 @@ function loadChatMessages(userId, partnerId) {
     
     const threadId = [userId, partnerId].sort().join('_');
     
+    // Only one loading indicator — showChatLoadingMessage is enough.
+    // showInstantLoading() was also being called here which caused a double-spinner
+    // and a full-screen overlay that blocked the cached messages we're about to render.
+    // REMOVED: showInstantLoading() — it's redundant and fights with displayCachedMessages.
     showChatLoadingMessage();
     
-    // NEW: Show instant loading for background sync
-    showInstantLoading();
-    
-    // Try to load cached messages first
+    // Try localStorage cache first (sync, instant)
     const cacheKey = `messages_${userId}_${partnerId}`;
     const cachedMessages = cache.get(cacheKey);
     
@@ -3715,7 +3716,7 @@ function loadChatMessages(userId, partnerId) {
         displayCachedMessages(cachedMessages);
     }
     
-    // Also try IndexedDB
+    // Then try IndexedDB (async, may have more messages than localStorage 5min cache)
     cache.getMessages(threadId).then(messages => {
         if (messages && messages.length > 0 && (!cachedMessages || messages.length > cachedMessages.length)) {
             displayCachedMessages(messages);
@@ -3760,16 +3761,19 @@ function loadChatMessages(userId, partnerId) {
                     await markMessagesAsRead(threadId, partnerId, userId);
                 }
                 
-                setTimeout(() => {
+                // requestAnimationFrame scrolls on the next actual paint frame
+                // instead of a blind 100ms setTimeout guess — faster and no janky timing
+                // REMOVED: setTimeout(..., 100) — rAF is the right tool for post-render scroll
+                requestAnimationFrame(() => {
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                }, 100);
+                });
                 
                 if (document.querySelector('#chatMessages .loading-message')) {
                     hideChatLoadingMessage();
                 }
                 
-                // NEW: Hide instant loading after data is loaded
-                hideInstantLoading();
+                // REMOVED: hideInstantLoading() — we removed showInstantLoading() above,
+                // calling hide without show would be a no-op but it's dead code now.
                 
                 refreshUnreadMessageCount();
             },
@@ -3779,13 +3783,13 @@ function loadChatMessages(userId, partnerId) {
                     displayCachedMessages(cachedMessages);
                 }
                 hideChatLoadingMessage();
-                hideInstantLoading();
+                // REMOVED: hideInstantLoading() — no longer called on this path either
             }
         );
     } catch (error) {
         logError(error, 'setting up chat messages listener');
         hideChatLoadingMessage();
-        hideInstantLoading();
+        // REMOVED: hideInstantLoading() — ditto
     }
 }
 
@@ -4977,26 +4981,30 @@ function initChatPage() {
 
     async function sendMessage() {
         const message = messageInput.value.trim();
-        if (message) {
-            const hasPoints = await deductChatPoint();
-            if (!hasPoints) {
-                return;
-            }
-            
-            sendMessageBtn.disabled = true;
-            
-            messageInput.value = '';
-            
-            try {
-                await addMessage(message);
-                cancelReply();
-            } catch (error) {
-                logError(error, 'sending message');
-                showNotification('Error sending message. Please try again.', 'error');
-            } finally {
-                sendMessageBtn.disabled = false;
-                sendMessageBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
-            }
+        if (!message) return;
+
+        // Check points FIRST before touching UI — no points, no send, no confusion
+        const hasPoints = await deductChatPoint();
+        if (!hasPoints) return;
+
+        // Grab text and clear input IMMEDIATELY so user can keep typing
+        // while the network call happens in the background
+        messageInput.value = '';
+
+        // Disable only AFTER clearing so the input doesn't feel stuck
+        // addMessage() will show the bubble optimistically before hitting Firestore
+        sendMessageBtn.disabled = true;
+
+        try {
+            await addMessage(message);
+            cancelReply();
+        } catch (error) {
+            logError(error, 'sending message');
+            showNotification('Error sending message. Please try again.', 'error');
+        } finally {
+            // Always re-enable so the user isn't stuck even on failure
+            sendMessageBtn.disabled = false;
+            sendMessageBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         }
     }
 
@@ -5406,43 +5414,47 @@ async function loadMessageThreads(forceRefresh = false) {
                 return (timeB || 0) - (timeA || 0);
             });
             
-            const threadsWithData = [];
-            let totalUnread = 0;
-            
-            for (const thread of threads) {
+            // FIX: The old code used a sequential for loop with multiple awaits per thread.
+            // On 10 conversations that's ~20 serial Firestore round-trips before anything renders.
+            // Promise.all fires ALL partner fetches and unread counts in parallel,
+            // so the total wait time is max(single_request) instead of sum(all_requests).
+            const threadPromises = threads.map(async (thread) => {
                 const partnerId = thread.participants.find(id => id !== currentUser.uid);
-                if (!partnerId) continue;
+                if (!partnerId) return null;
                 
                 try {
-                    const partnerRef = doc(db, 'users', partnerId);
-                    const partnerSnap = await getDoc(partnerRef);
-                    
-                    if (!partnerSnap.exists()) continue;
-                    
-                    let unreadCount = 0;
-                    try {
-                        const messagesQuery = query(
+                    // Both fetches run in parallel per thread
+                    const [partnerSnap, messagesSnap] = await Promise.all([
+                        getDoc(doc(db, 'users', partnerId)),
+                        getDocs(query(
                             collection(db, 'conversations', thread.id, 'messages'),
                             where('senderId', '==', partnerId),
                             where('read', '==', false)
-                        );
-                        const messagesSnap = await getDocs(messagesQuery);
-                        unreadCount = messagesSnap.size;
-                    } catch (error) {
-                        logError(error, 'getting unread count');
-                    }
+                        )).catch(error => {
+                            // Unread count failing shouldn't kill the whole thread
+                            logError(error, 'getting unread count');
+                            return { size: 0 };
+                        })
+                    ]);
                     
-                    totalUnread += unreadCount;
+                    if (!partnerSnap.exists()) return null;
                     
-                    threadsWithData.push({
+                    return {
                         ...thread,
                         partnerData: partnerSnap.data(),
-                        unreadCount
-                    });
+                        unreadCount: messagesSnap.size
+                    };
                 } catch (error) {
                     logError(error, 'loading thread data');
+                    return null;
                 }
-            }
+            });
+            
+            // Run all thread enrichments in parallel, filter out nulls
+            const results = await Promise.all(threadPromises);
+            const threadsWithData = results.filter(Boolean);
+            
+            const totalUnread = threadsWithData.reduce((sum, t) => sum + (t.unreadCount || 0), 0);
             
             cache.set(`threads_${currentUser.uid}`, threadsWithData, 'short');
             await cache.setConversations(threadsWithData);
