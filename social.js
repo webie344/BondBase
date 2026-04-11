@@ -2062,20 +2062,21 @@ class SocialManager {
                 /* ========== NOTIFICATION STYLES ========== */
                 .custom-notification {
                     position: fixed;
-                    top: 80px;
-                    right: 20px;
+                    top: 70px;
+                    right: 16px;
                     color: white;
-                    padding: 12px 20px;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    padding: 7px 12px;
+                    border-radius: 6px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
                     z-index: 10000;
                     animation: slideIn 0.3s ease;
                     display: flex;
                     align-items: center;
-                    gap: 10px;
-                    max-width: 400px;
-                    backdrop-filter: blur(10px);
+                    gap: 6px;
+                    max-width: 220px;
                     font-family: 'Inter', sans-serif;
+                    font-size: 12px;
+                    line-height: 1.3;
                 }
 
                 .custom-notification.success {
@@ -2440,9 +2441,9 @@ class SocialManager {
                     }
                     
                     .custom-notification {
-                        top: 70px;
-                        right: 15px;
-                        left: 15px;
+                        top: 65px;
+                        right: 12px;
+                        left: 12px;
                         max-width: none;
                     }
                 }
@@ -2501,10 +2502,10 @@ class SocialManager {
                     
                     .custom-notification {
                         top: 60px;
-                        right: 10px;
-                        left: 10px;
-                        padding: 10px 15px;
-                        font-size: 13px;
+                        right: 8px;
+                        left: 8px;
+                        padding: 6px 10px;
+                        font-size: 11px;
                     }
                 }
             `;
@@ -4143,6 +4144,7 @@ class SocialManager {
             
         } catch (error) {
             console.error('Error loading posts:', error);
+            this.removeLoader();
             if (lastVisible === null) {
                 container.innerHTML = '<div class="error">Error loading posts</div>';
             }
@@ -4348,21 +4350,22 @@ class SocialManager {
         
         notification.style.cssText = `
             position: fixed;
-            top: 80px;
-            right: 20px;
+            top: 70px;
+            right: 16px;
             background: ${bgColor};
             color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 7px 12px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             z-index: 10000;
             animation: slideIn 0.3s ease;
             display: flex;
             align-items: center;
-            gap: 10px;
-            max-width: 400px;
-            backdrop-filter: blur(10px);
+            gap: 6px;
+            max-width: 220px;
             font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            line-height: 1.3;
         `;
         
         const icon = type === 'error' ? 'alert-circle' : 
@@ -4370,7 +4373,7 @@ class SocialManager {
                     type === 'warning' ? 'alert-triangle' : 'info';
         
         notification.innerHTML = `
-            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2" width="14" height="14" fill="none" style="flex-shrink:0;">
                 ${this.getNotificationIcon(icon)}
             </svg>
             <span>${message}</span>
@@ -4670,7 +4673,7 @@ class SocialManager {
     async getUsersData(userIds) {
         const usersData = {};
         
-        for (const userId of userIds) {
+        await Promise.all(userIds.map(async (userId) => {
             try {
                 const userRef = doc(db, 'users', userId);
                 const userSnap = await getDoc(userRef);
@@ -4680,7 +4683,7 @@ class SocialManager {
             } catch (error) {
                 console.error('Error fetching user data:', error);
             }
-        }
+        }));
         
         return usersData;
     }
