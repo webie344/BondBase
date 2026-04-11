@@ -17,15 +17,15 @@
     <style>
         :root {
             /* Dark, Leather, Steel Theme */
-            --primary: #b3004b; /* deep crimson */
+            --primary: #b3004b;
             --primary-dark: #7a0034;
             --primary-light: #e63986;
-            --secondary: #8b0000; /* dark red for alerts/badges */
-            --accent: #444; /* metal/steel tone */
+            --secondary: #8b0000;
+            --accent: #444;
             --text-primary: #ffffff;
             --text-secondary: #d1d5db;
             --text-light: #9ca3af;
-            --bg-primary: #0b0b0b; /* deep black */
+            --bg-primary: #0b0b0b;
             --bg-secondary: #141414;
             --bg-card: #1a1a1a;
             --border: #2e2e2e;
@@ -52,247 +52,17 @@
             line-height: 1.5;
             overflow-x: hidden;
             min-height: 100vh;
-            position: relative;
-            cursor: default;
             padding-bottom: 70px;
         }
 
-        /* Icon Styling - THICKER STROKES */
+        /* Icon Styling */
         .feather {
             width: 20px;
             height: 20px;
-            stroke-width: 2.5; /* Increased from 2 */
+            stroke-width: 2.5;
             stroke-linecap: round;
             stroke-linejoin: round;
             fill: none;
-        }
-
-        /* Message button styling for gamers directory */
-        .message-gamer-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-            flex-shrink: 0;
-            margin-left: 8px;
-        }
-
-        .message-gamer-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-            background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
-        }
-
-        .message-gamer-btn:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
-        }
-
-        .message-gamer-btn .feather {
-            width: 16px;
-            height: 16px;
-            stroke: white;
-            stroke-width: 2.5;
-        }
-
-        /* Tooltip for message button */
-        .message-gamer-btn::after {
-            content: attr(title);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            white-space: nowrap;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-            pointer-events: none;
-            z-index: 1000;
-            margin-bottom: 8px;
-        }
-
-        .message-gamer-btn:hover::after {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .gamer-actions {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            position: relative;
-            z-index: 2;
-        }
-
-        .clan-section {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 4px;
-        }
-
-        .clan-count {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 12px;
-            color: var(--text-light);
-            background: var(--bg-secondary);
-            padding: 4px 8px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-        }
-
-        .clan-count .feather {
-            width: 12px;
-            height: 12px;
-            stroke: var(--text-light);
-            stroke-width: 2.5;
-        }
-
-        .gamer-actions {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-        }
-
-        @media (min-width: 768px) {
-            .gamer-actions {
-                flex-direction: row;
-                gap: 12px;
-            }
-            
-            .message-gamer-btn {
-                margin-left: 0;
-            }
-        }
-
-        .add-clan-btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 8px 16px;
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            white-space: nowrap;
-            box-shadow: 0 2px 8px rgba(255, 42, 109, 0.2);
-        }
-
-        .add-clan-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(255, 42, 109, 0.3);
-        }
-
-        .add-clan-btn.added {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-        }
-
-        .add-clan-btn.added:hover {
-            background: var(--bg-primary);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .add-clan-btn .feather {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-            stroke-width: 2.5;
-        }
-
-        .gamer-item.loading .message-gamer-btn,
-        .gamer-item.loading .add-clan-btn {
-            background: var(--bg-secondary);
-            cursor: default;
-        }
-
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
-            }
-            70% {
-                box-shadow: 0 0 0 6px rgba(102, 126, 234, 0);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
-            }
-        }
-
-        .message-gamer-btn.has-unread {
-            animation: pulse 2s infinite;
-            position: relative;
-        }
-
-        .message-gamer-btn.has-unread::before {
-            content: '';
-            position: absolute;
-            top: -2px;
-            right: -2px;
-            width: 8px;
-            height: 8px;
-            background: #ff2a6d;
-            border-radius: 50%;
-            border: 2px solid white;
-            z-index: 1;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            .message-gamer-btn {
-                background: linear-gradient(135deg, #5a6fd8 0%, #6b4090 100%);
-            }
-            
-            .message-gamer-btn:hover {
-                background: linear-gradient(135deg, #4a5fc7 0%, #5a307f 100%);
-            }
-            
-            .message-gamer-btn::after {
-                background: rgba(255, 255, 255, 0.9);
-                color: #333;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .gamer-actions {
-                flex-direction: column;
-                gap: 6px;
-            }
-            
-            .message-gamer-btn {
-                width: 32px;
-                height: 32px;
-            }
-            
-            .message-gamer-btn .feather {
-                width: 14px;
-                height: 14px;
-            }
-            
-            .add-clan-btn {
-                padding: 6px 12px;
-                font-size: 11px;
-            }
         }
 
         /* Top Navigation */
@@ -428,6 +198,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
+            padding: 10px;
         }
 
         .products-title {
@@ -437,10 +208,6 @@
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-
-        .products-title .feather {
-            color: var(--primary-light);
         }
 
         .see-more-btn {
@@ -464,12 +231,6 @@
             border-color: var(--primary);
         }
 
-        .see-more-btn .feather {
-            width: 16px;
-            height: 16px;
-            stroke-width: 2.5;
-        }
-
         /* Horizontal Scrollable Products Grid */
         .products-scroll {
             display: flex;
@@ -477,7 +238,6 @@
             gap: 15px;
             padding: 5px 5px 15px 5px;
             scrollbar-width: thin;
-            scrollbar-color: var(--primary) var(--border);
             -webkit-overflow-scrolling: touch;
         }
 
@@ -493,10 +253,6 @@
         .products-scroll::-webkit-scrollbar-thumb {
             background: var(--primary);
             border-radius: 10px;
-        }
-
-        .products-scroll::-webkit-scrollbar-thumb:hover {
-            background: var(--primary-light);
         }
 
         /* Product Card */
@@ -545,11 +301,6 @@
             border-radius: 12px;
             font-size: 10px;
             font-weight: 600;
-            z-index: 1;
-        }
-
-        .product-badge.discount {
-            background: var(--secondary);
         }
 
         .product-info {
@@ -585,83 +336,7 @@
             text-decoration: line-through;
         }
 
-        .product-stats {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 11px;
-            color: var(--text-light);
-        }
-
-        .product-stat {
-            display: flex;
-            align-items: center;
-            gap: 3px;
-        }
-
-        .product-stat .feather {
-            width: 12px;
-            height: 12px;
-            stroke-width: 2.5;
-        }
-
-        /* Loading State for Products */
-        .products-loading {
-            display: flex;
-            gap: 15px;
-            padding: 10px 0;
-        }
-
-        .product-card.loading {
-            flex: 0 0 180px;
-            height: 250px;
-            background: var(--bg-primary);
-        }
-
-        .loading-image {
-            width: 100%;
-            height: 150px;
-            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-
-        .loading-content {
-            padding: 12px;
-        }
-
-        .loading-line {
-            height: 12px;
-            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-            border-radius: 6px;
-            margin-bottom: 6px;
-        }
-
-        .loading-line.short {
-            width: 60%;
-        }
-
-        .empty-products {
-            text-align: center;
-            padding: 30px;
-            color: var(--text-light);
-            width: 100%;
-        }
-
-        .empty-products .feather {
-            width: 48px;
-            height: 48px;
-            margin-bottom: 10px;
-            color: var(--primary-light);
-        }
-
-        .empty-products p {
-            font-size: 14px;
-        }
-
-        /* Gamers List Container */
+        /* Gamers Container */
         .gamers-container {
             max-width: 1200px;
             margin: 20px auto;
@@ -690,7 +365,6 @@
         .search-bar .feather {
             color: var(--text-light);
             margin-right: 10px;
-            stroke-width: 2.5;
         }
 
         .search-input {
@@ -728,12 +402,6 @@
             gap: 5px;
         }
 
-        .filter-btn .feather {
-            width: 14px;
-            height: 14px;
-            stroke-width: 2.5;
-        }
-
         .filter-btn.active {
             background: var(--primary);
             color: white;
@@ -743,291 +411,350 @@
         .filter-btn:hover {
             background: var(--primary-light);
             color: white;
-            border-color: var(--primary-light);
         }
 
-        /* Gamers List */
-        .gamers-list {
-            padding: 0;
-        }
-
-        /* Gamer Item */
-        .gamer-item {
+        /* ===== LIVELY MASONRY GRID STYLES ===== */
+        .gamers-grid {
             display: flex;
-            align-items: center;
-            padding: 12px 15px;
-            border-bottom: 1px solid var(--border);
-            transition: background 0.3s ease;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        /* Wide Card - Full Width */
+        .gamer-card.card-wide {
+            display: flex;
+            flex-direction: row;
+            background: linear-gradient(135deg, rgba(30, 30, 46, 0.95) 0%, rgba(22, 22, 35, 0.95) 100%);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            overflow: hidden;
             cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            animation: fadeInUp 0.4s ease backwards;
+        }
+
+        /* Double Card - 2 in a row */
+        .gamer-card.card-double {
+            background: linear-gradient(135deg, rgba(30, 30, 46, 0.95) 0%, rgba(22, 22, 35, 0.95) 100%);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.4s ease backwards;
+        }
+
+        /* Double row container */
+        .double-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .gamer-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(122, 79, 255, 0.4);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Wide Card Layout */
+        .card-wide .card-avatar-section {
+            width: 140px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(122, 79, 255, 0.1), rgba(255, 42, 109, 0.05));
+        }
+
+        .card-wide .gamer-avatar-large {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #7a4fff;
+            margin-bottom: 12px;
+        }
+
+        .card-wide .rank-percent {
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+
+        .card-wide .card-info-section {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .card-wide .card-stats-section {
+            width: 200px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
             gap: 15px;
         }
 
-        .gamer-item:hover {
-            background: var(--bg-light);
+        .card-wide .card-actions-section {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 12px;
+            min-width: 120px;
         }
 
-        .gamer-avatar {
-            width: 50px;
-            height: 50px;
+        /* Double Card Layout */
+        .card-double {
+            padding: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .card-double .gamer-avatar-medium {
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             object-fit: cover;
-            border: 2px solid var(--primary);
+            border: 2px solid #7a4fff;
         }
 
-        .gamer-info {
+        .card-double .card-info-section {
             flex: 1;
-            min-width: 0;
         }
 
-        .gamer-header {
+        .card-double .card-stats-row {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .card-double .card-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        /* Common Elements */
+        .gamer-name {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff, #aaa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 4px;
-        }
-
-        .gamer-name {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            flex-wrap: wrap;
         }
 
         .gamer-tag {
-            font-size: 13px;
-            color: var(--primary-light);
-            background: rgba(255, 42, 109, 0.1);
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-weight: 500;
+            font-size: 12px;
+            color: #7a4fff;
+            background: rgba(122, 79, 255, 0.15);
+            padding: 2px 10px;
+            border-radius: 20px;
         }
 
-        .gamer-stats {
+        .online-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .online-dot.online {
+            background: #00ff88;
+            box-shadow: 0 0 5px #00ff88;
+            animation: pulse 1.5s infinite;
+        }
+
+        .online-dot.offline {
+            background: #ff4444;
+        }
+
+        .location-age {
+            display: flex;
+            gap: 15px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+            margin: 8px 0;
+        }
+
+        .interest-badge {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .bio-text {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            font-style: italic;
+            padding: 8px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            margin: 8px 0;
+        }
+
+        .stat-block {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #7a4fff;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .level-badge {
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            padding: 6px 12px;
+            border-radius: 30px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #1a1a2e;
+            margin-top: 8px;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 4px;
+            justify-content: center;
+            gap: 8px;
         }
 
-        .gamer-stat {
+        .action-btn.follow {
+            background: linear-gradient(135deg, #7a4fff, #ff2a6d);
+            color: white;
+        }
+
+        .action-btn.following {
+            background: rgba(0, 255, 136, 0.2);
+            border: 1px solid #00ff88;
+            color: #00ff88;
+        }
+
+        .action-btn.message {
+            background: rgba(122, 79, 255, 0.2);
+            border: 1px solid rgba(122, 79, 255, 0.5);
+            color: white;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        .stats-mini {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .stats-mini-item {
             display: flex;
             align-items: center;
             gap: 4px;
             font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        .gamer-stat .feather {
-            width: 14px;
-            height: 14px;
-            stroke-width: 2.5;
-        }
-
-        .gamer-rank {
-            color: #FFD700;
-            font-weight: 600;
-        }
-
-        .gamer-level {
-            color: #00ff88;
-        }
-
-        .gamer-kd {
-            color: #ff2a6d;
-        }
-
-        .gamer-attributes {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 4px;
-        }
-
-        .attribute-tag {
-            font-size: 11px;
-            color: var(--text-light);
-            background: rgba(255, 255, 255, 0.05);
-            padding: 2px 6px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }
-
-        .gamer-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .clan-section {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            margin-right: 10px;
-        }
-
-        .clan-count {
-            font-size: 12px;
-            color: var(--text-secondary);
-            background: rgba(0, 255, 136, 0.1);
-            padding: 2px 6px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            gap: 3px;
-        }
-
-        .clan-count .feather {
-            width: 12px;
-            height: 12px;
-            color: #00ff88;
-            stroke-width: 2.5;
-        }
-
-        .add-clan-btn {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border: none;
-            border-radius: 15px;
-            padding: 6px 12px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            min-width: 85px;
-            justify-content: center;
-        }
-
-        .add-clan-btn .feather {
-            stroke-width: 2.5;
-        }
-
-        .add-clan-btn:hover {
-            background: linear-gradient(135deg, var(--primary-light), var(--primary));
-            transform: translateY(-1px);
-        }
-
-        .add-clan-btn.added {
-            background: var(--secondary);
-            padding: 6px 8px;
-        }
-
-        .add-clan-btn.added:hover {
-            background: #a30000;
+            color: rgba(255, 255, 255, 0.7);
         }
 
         /* Empty State */
-        .empty-state {
+        .empty-state-lively {
             text-align: center;
-            padding: 40px 20px;
-            color: var(--text-light);
+            padding: 60px 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 30px;
         }
 
-        .empty-state .feather {
-            width: 48px;
-            height: 48px;
-            margin-bottom: 15px;
-            color: var(--primary-light);
-            stroke-width: 2.5;
+        .empty-state-lively i {
+            font-size: 60px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-bottom: 20px;
         }
 
-        .empty-title {
-            font-size: 1.2rem;
-            margin-bottom: 10px;
-            color: var(--text-secondary);
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
-        /* Loading State */
-        .gamer-item.loading {
-            padding: 12px 15px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .loading-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-
-        .loading-info {
-            flex: 1;
-        }
-
-        .loading-line {
-            height: 12px;
-            background: linear-gradient(90deg, var(--bg-light) 25%, var(--border) 50%, var(--bg-light) 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-            border-radius: 6px;
-            margin-bottom: 6px;
-        }
-
-        .loading-line.short {
-            width: 40%;
-        }
-
-        .loading-line.medium {
-            width: 60%;
-        }
-
-        @keyframes loading {
-            0% {
-                background-position: 200% 0;
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
             }
-            100% {
-                background-position: -200% 0;
+            to {
+                opacity: 1;
+                transform: translateY(0);
             }
         }
 
-        /* ===== SCROLLABLE BOTTOM NAVIGATION ===== */
+        /* Bottom Navigation */
         .bottom-nav-wrapper {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             z-index: 1000;
-            pointer-events: auto;
             background: rgba(0,0,0,0.95);
             backdrop-filter: blur(20px);
             border-top: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 -5px 10px rgba(0,0,0,0.5);
         }
 
-        /* Scroll indicator container */
         .nav-scroll-container {
             position: relative;
             width: 100%;
             overflow: hidden;
         }
 
-        /* The actual scrollable nav */
         .bottom-nav {
             display: flex;
             overflow-x: auto;
-            overflow-y: hidden;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
-            scrollbar-width: none; /* Hide scrollbar Firefox */
+            scrollbar-width: none;
             padding: 8px 0 12px 0;
-            gap: 0;
-            white-space: nowrap;
         }
 
-        /* Hide scrollbar for Chrome/Safari */
         .bottom-nav::-webkit-scrollbar {
             display: none;
         }
 
-        /* Nav items - fixed width to show 4 items */
         .nav-item {
             display: flex;
             flex-direction: column;
@@ -1039,17 +766,12 @@
             opacity: 0.7;
             transition: opacity 0.2s ease;
             padding: 5px 0;
-            min-width: 25vw; /* Exactly 4 items per view (100vw/4) */
+            min-width: 25vw;
             max-width: 25vw;
-            height: auto;
-            flex: 0 0 auto; /* Prevent shrinking/flexing */
+            flex: 0 0 auto;
         }
 
-        .nav-item:hover {
-            opacity: 1;
-        }
-
-        .nav-item.active {
+        .nav-item:hover, .nav-item.active {
             opacity: 1;
             color: #ff2d55;
         }
@@ -1058,40 +780,22 @@
             stroke: #ff2d55;
         }
 
-        .nav-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-        }
-
         .nav-icon .feather {
             width: 24px;
             height: 24px;
-            stroke: currentColor;
-            stroke-width: 2.8; /* Thicker icons */
+            stroke-width: 2.8;
         }
 
         .nav-label {
             font-size: 10px;
             font-weight: 600;
             text-align: center;
-            line-height: 1.2;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
-            padding: 0 2px;
-            color: rgba(255,255,255,0.9);
         }
 
         .nav-item.active .nav-label {
             color: #ff2d55;
-            font-weight: 700;
         }
 
-        /* SCROLL INDICATORS */
         .scroll-indicator {
             position: absolute;
             right: 0;
@@ -1105,8 +809,6 @@
             padding-right: 8px;
             pointer-events: none;
             z-index: 5;
-            opacity: 1;
-            transition: opacity 0.3s ease;
         }
 
         .scroll-indicator.hidden {
@@ -1118,7 +820,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
             gap: 4px;
             background: rgba(255,45,85,0.8);
             border-radius: 12px;
@@ -1130,22 +831,8 @@
             height: 4px;
             background: white;
             border-radius: 50%;
-            display: block;
         }
 
-        .scroll-indicator-dots span:nth-child(2) {
-            opacity: 0.7;
-            width: 4px;
-            height: 4px;
-        }
-
-        .scroll-indicator-dots span:nth-child(3) {
-            opacity: 0.4;
-            width: 4px;
-            height: 4px;
-        }
-
-        /* Pulsing arrow indicator (shows initially) */
         .scroll-arrow {
             position: absolute;
             right: 15px;
@@ -1161,7 +848,6 @@
             z-index: 6;
             pointer-events: none;
             animation: pulseSlide 2s infinite;
-            box-shadow: 0 0 10px rgba(255,45,85,0.5);
         }
 
         .scroll-arrow.hidden {
@@ -1174,193 +860,41 @@
         }
 
         @keyframes pulseSlide {
-            0% {
-                opacity: 0.7;
-                transform: translateY(-50%) translateX(0);
-            }
-            50% {
-                opacity: 1;
-                transform: translateY(-50%) translateX(5px);
-            }
-            100% {
-                opacity: 0.7;
-                transform: translateY(-50%) translateX(0);
-            }
-        }
-
-        /* Clan Modal */
-        .clan-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            padding: 20px;
-        }
-
-        .clan-modal-content {
-            background: var(--bg-card);
-            border-radius: var(--radius-lg);
-            width: 100%;
-            max-width: 500px;
-            max-height: 80vh;
-            overflow-y: auto;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .clan-modal-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .clan-modal-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .close-modal {
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            padding: 5px;
-            border-radius: 50%;
-            transition: all 0.3s ease;
-        }
-
-        .close-modal .feather {
-            stroke-width: 2.5;
-        }
-
-        .close-modal:hover {
-            background: rgba(255,255,255,0.1);
-            color: var(--text-primary);
-        }
-
-        .clan-modal-body {
-            padding: 20px;
-        }
-
-        .clan-input-group {
-            margin-bottom: 15px;
-        }
-
-        .clan-input-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-
-        .clan-input {
-            width: 100%;
-            padding: 12px;
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 14px;
-            transition: border-color 0.3s ease;
-        }
-
-        .clan-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .clan-modal-footer {
-            padding: 20px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        .btn-secondary {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-secondary:hover {
-            background: var(--bg-light);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            0% { opacity: 0.7; transform: translateY(-50%) translateX(0); }
+            50% { opacity: 1; transform: translateY(-50%) translateX(5px); }
+            100% { opacity: 0.7; transform: translateY(-50%) translateX(0); }
         }
 
         /* Responsive */
         @media (max-width: 768px) {
             .main-content {
                 padding: 10px;
-                margin-top: 60px;
-                min-height: calc(100vh - 130px);
             }
 
-            .page-header {
-                margin: 10px;
-                padding: 12px 10px;
+            .double-row {
+                grid-template-columns: 1fr;
+                gap: 15px;
             }
 
-            .page-title {
-                font-size: 1.4rem;
+            .card-wide {
+                flex-direction: column !important;
             }
 
-            .gamer-item {
-                padding: 10px;
-                gap: 10px;
+            .card-wide .card-avatar-section,
+            .card-wide .card-stats-section,
+            .card-wide .card-actions-section {
+                width: 100% !important;
+                flex-direction: row !important;
+                flex-wrap: wrap;
             }
 
-            .gamer-avatar {
-                width: 45px;
-                height: 45px;
+            .card-double {
+                flex-direction: column;
+                text-align: center;
             }
 
-            .gamer-name {
-                font-size: 14px;
-            }
-
-            .gamer-tag {
-                font-size: 12px;
-            }
-
-            .gamer-stats {
-                gap: 8px;
-            }
-
-            .gamer-stat {
-                font-size: 11px;
-            }
-
-            .add-clan-btn {
-                padding: 5px 10px;
-                font-size: 11px;
-                min-width: 75px;
+            .card-double .card-actions {
+                flex-direction: row;
             }
 
             .product-card {
@@ -1370,96 +904,20 @@
             .product-image-container {
                 height: 120px;
             }
-            
-            .bottom-nav {
-                padding: 6px 0 10px 0;
-            }
-            
-            .nav-label {
-                font-size: 9px;
-            }
-            
-            .nav-icon .feather {
-                width: 22px;
-                height: 22px;
-                stroke-width: 2.8;
-            }
         }
 
         @media (max-width: 480px) {
-            .gamer-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 4px;
-            }
-
-            .gamer-stats {
-                flex-wrap: wrap;
-                gap: 6px;
-            }
-
-            .gamer-actions {
-                flex-direction: column;
-                gap: 5px;
-                align-items: flex-end;
-            }
-
-            .clan-section {
-                margin-right: 0;
-            }
-
-            .gamer-info {
-                min-width: 0;
-                overflow: hidden;
-            }
-
-            .gamer-name, .gamer-tag {
-                max-width: 100%;
-                overflow: hidden;
-                text-overflow: ellipsis;
+            .gamer-name {
+                font-size: 16px;
             }
             
-            .bottom-nav {
-                padding: 4px 0 8px 0;
+            .stat-number {
+                font-size: 18px;
             }
             
-            .nav-label {
-                font-size: 8px;
-            }
-            
-            .nav-icon .feather {
-                width: 20px;
-                height: 20px;
-                stroke-width: 2.8;
-            }
-            
-            .scroll-arrow {
-                width: 26px;
-                height: 26px;
-                right: 10px;
-            }
-            
-            .scroll-arrow i {
-                font-size: 14px;
-            }
-        }
-
-        /* Extra small screens */
-        @media (max-width: 360px) {
-            .nav-label {
-                font-size: 7px;
-            }
-            
-            .nav-icon .feather {
-                width: 18px;
-                height: 18px;
-            }
-        }
-
-        /* Fix for iOS Safari */
-        @supports (-webkit-touch-callout: none) {
-            .bottom-nav {
-                padding-bottom: 12px;
+            .card-wide .gamer-avatar-large {
+                width: 70px;
+                height: 70px;
             }
         }
     </style>
@@ -1473,11 +931,11 @@
                     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                 </svg>
-                BondBase 
+                BondBase
             </a>
             <div class="notification-top">
                 <a href="notification.html" class="notification-link">
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                         <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                     </svg>
@@ -1489,7 +947,6 @@
 
     <!-- Main Content -->
     <div class="main-content">
-        
         <!-- Products Section -->
         <div class="products-section">
             <div class="products-header">
@@ -1503,31 +960,8 @@
                 </a>
             </div>
             
-            <!-- Products Scrollable Container -->
             <div id="productsScroll" class="products-scroll">
-                <!-- Loading State -->
                 <div class="products-loading">
-                    <div class="product-card loading">
-                        <div class="loading-image"></div>
-                        <div class="loading-content">
-                            <div class="loading-line"></div>
-                            <div class="loading-line short"></div>
-                        </div>
-                    </div>
-                    <div class="product-card loading">
-                        <div class="loading-image"></div>
-                        <div class="loading-content">
-                            <div class="loading-line"></div>
-                            <div class="loading-line short"></div>
-                        </div>
-                    </div>
-                    <div class="product-card loading">
-                        <div class="loading-image"></div>
-                        <div class="loading-content">
-                            <div class="loading-line"></div>
-                            <div class="loading-line short"></div>
-                        </div>
-                    </div>
                     <div class="product-card loading">
                         <div class="loading-image"></div>
                         <div class="loading-content">
@@ -1541,21 +975,18 @@
 
         <!-- Gamers Container -->
         <div class="gamers-container">
-            <!-- Search and Filter -->
             <div class="search-container">
                 <div class="search-bar">
                     <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <input type="text" class="search-input" placeholder="Search by name, tag, or id...">
+                    <input type="text" class="search-input" placeholder="Search gamers by name, tag, or game...">
                 </div>
                 <div class="filter-buttons">
                     <button class="filter-btn active" data-filter="all">
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="16"></line>
-                            <line x1="8" y1="12" x2="16" y2="12"></line>
                         </svg>
                         All
                     </button>
@@ -1575,84 +1006,38 @@
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                             <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                         </svg>
                         In Clan
                     </button>
                 </div>
             </div>
 
-            <!-- Gamers List -->
-            <div id="gamersList" class="gamers-list">
-                <!-- Loading State -->
-                <div class="gamer-item loading">
-                    <div class="loading-avatar"></div>
-                    <div class="loading-info">
-                        <div class="loading-line" style="width: 60%"></div>
-                        <div class="loading-line short"></div>
-                        <div class="loading-line medium"></div>
+            <!-- Gamers List - Will be populated by gamers.js -->
+            <div id="gamersList" class="gamers-grid">
+                <!-- Loading States -->
+                <div class="gamer-card loading" style="animation: none;">
+                    <div style="padding: 20px; display: flex; gap: 15px;">
+                        <div style="width: 70px; height: 70px; border-radius: 50%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e);"></div>
+                        <div style="flex: 1;">
+                            <div style="height: 20px; width: 60%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e); border-radius: 8px; margin-bottom: 10px;"></div>
+                            <div style="height: 14px; width: 40%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e); border-radius: 8px;"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="gamer-item loading">
-                    <div class="loading-avatar"></div>
-                    <div class="loading-info">
-                        <div class="loading-line" style="width: 60%"></div>
-                        <div class="loading-line short"></div>
-                        <div class="loading-line medium"></div>
-                    </div>
-                </div>
-                <div class="gamer-item loading">
-                    <div class="loading-avatar"></div>
-                    <div class="loading-info">
-                        <div class="loading-line" style="width: 60%"></div>
-                        <div class="loading-line short"></div>
-                        <div class="loading-line medium"></div>
+                <div class="gamer-card loading" style="animation: none;">
+                    <div style="padding: 20px; display: flex; gap: 15px;">
+                        <div style="width: 70px; height: 70px; border-radius: 50%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e);"></div>
+                        <div style="flex: 1;">
+                            <div style="height: 20px; width: 60%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e); border-radius: 8px; margin-bottom: 10px;"></div>
+                            <div style="height: 14px; width: 40%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e); border-radius: 8px;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Clan Modal -->
-    <div id="clanModal" class="clan-modal">
-        <div class="clan-modal-content">
-            <div class="clan-modal-header">
-                <h3 class="clan-modal-title">Join Clan</h3>
-                <button class="close-modal">
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-            <div class="clan-modal-body">
-                <div class="clan-input-group">
-                    <label>Clan Name</label>
-                    <input type="text" id="clanName" class="clan-input" placeholder="Enter clan name">
-                </div>
-                <div class="clan-input-group">
-                    <label>Role</label>
-                    <select id="clanRole" class="clan-input">
-                        <option value="member">Member</option>
-                        <option value="officer">Officer</option>
-                        <option value="leader">Leader</option>
-                        <option value="recruit">Recruit</option>
-                    </select>
-                </div>
-                <div class="clan-input-group">
-                    <label>Message (Optional)</label>
-                    <textarea id="clanMessage" class="clan-input" rows="3" placeholder="Add a message to the clan leader..."></textarea>
-                </div>
-            </div>
-            <div class="clan-modal-footer">
-                <button class="btn-secondary" id="cancelClan">Cancel</button>
-                <button class="btn-primary" id="submitClan">Send Request</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- SCROLLABLE BOTTOM NAVIGATION WITH INDICATOR -->
+    <!-- Bottom Navigation -->
     <div class="bottom-nav-wrapper">
         <div class="nav-scroll-container">
             <div class="bottom-nav" id="scrollableNav">
@@ -1689,10 +1074,6 @@
                         <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path>
                             <path d="M12 6v6l4 2"></path>
-                            <circle cx="12" cy="12" r="2"></circle>
-                            <path d="M12 22v-4"></path>
-                            <path d="M8 9.5c.5-1 1.5-2 3-2s2.5 1 3 2"></path>
-                            <path d="M6 15c1.5 1 4 1 6 0"></path>
                         </svg>
                     </div>
                     <span class="nav-label">Anonymous</span>
@@ -1726,8 +1107,6 @@
                     <span class="nav-label">Groups</span>
                 </a>
             </div>
-            
-            <!-- Scroll Indicator (gradient + dots) -->
             <div class="scroll-indicator" id="scrollIndicator">
                 <div class="scroll-indicator-dots">
                     <span></span>
@@ -1735,8 +1114,6 @@
                     <span></span>
                 </div>
             </div>
-            
-            <!-- Pulsing arrow (shows initially) -->
             <div class="scroll-arrow" id="scrollArrow">
                 <i class="fas fa-chevron-right"></i>
             </div>
@@ -1748,23 +1125,13 @@
     <script type="module" src="gamers.js"></script>
     <script type="module" src="notification.js"></script>
 
-    <!-- Initialize Feather Icons and Scroll Indicator -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             if (typeof feather !== 'undefined') {
                 feather.replace();
             }
             
-            // Make all icons thicker by default
-            const style = document.createElement('style');
-            style.textContent = `
-                .feather {
-                    stroke-width: 2.5 !important;
-                }
-            `;
-            document.head.appendChild(style);
-            
-            // Set active nav item based on current page
+            // Set active nav item
             const currentPage = window.location.pathname.split('/').pop() || 'mingle.html';
             const navItems = document.querySelectorAll('.nav-item');
             
@@ -1777,50 +1144,34 @@
                 }
             });
             
-            // Initialize scroll indicator for bottom nav
-            initScrollIndicator();
-        });
-
-        // Scroll indicator functionality
-        function initScrollIndicator() {
+            // Scroll indicator functionality
             const nav = document.getElementById('scrollableNav');
             const indicator = document.getElementById('scrollIndicator');
             const arrow = document.getElementById('scrollArrow');
             
-            if (!nav) return;
-            
-            // Check if scrollable
-            function checkScroll() {
-                const hasScroll = nav.scrollWidth > nav.clientWidth;
-                const atEnd = nav.scrollLeft + nav.clientWidth >= nav.scrollWidth - 10;
-                
-                if (!hasScroll) {
-                    indicator.classList.add('hidden');
-                    arrow.classList.add('hidden');
-                } else if (atEnd) {
-                    indicator.classList.add('hidden');
-                    arrow.classList.add('hidden');
-                } else {
-                    indicator.classList.remove('hidden');
-                    // Keep arrow visible only for first 3 seconds or until first scroll
+            if (nav) {
+                function checkScroll() {
+                    const hasScroll = nav.scrollWidth > nav.clientWidth;
+                    const atEnd = nav.scrollLeft + nav.clientWidth >= nav.scrollWidth - 10;
+                    
+                    if (!hasScroll || atEnd) {
+                        indicator?.classList.add('hidden');
+                        arrow?.classList.add('hidden');
+                    } else {
+                        indicator?.classList.remove('hidden');
+                    }
                 }
+                
+                setTimeout(checkScroll, 500);
+                nav.addEventListener('scroll', function() {
+                    checkScroll();
+                    arrow?.classList.add('hidden');
+                });
+                window.addEventListener('resize', checkScroll);
+                
+                setTimeout(() => arrow?.classList.add('hidden'), 5000);
             }
-            
-            // Hide arrow after first scroll or after 5 seconds
-            let arrowTimer = setTimeout(() => {
-                arrow.classList.add('hidden');
-            }, 5000);
-            
-            nav.addEventListener('scroll', function() {
-                checkScroll();
-                arrow.classList.add('hidden'); // Hide arrow on first scroll
-                clearTimeout(arrowTimer);
-            });
-            
-            // Initial check
-            setTimeout(checkScroll, 500);
-            window.addEventListener('resize', checkScroll);
-        }
+        });
     </script>
 </body>
 </html>
