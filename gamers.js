@@ -42,7 +42,408 @@ try {
     console.error('Firebase initialization error:', error);
 }
 
-// ==================== FOLLOWER NOTIFICATION SYSTEM - NO INDEX REQUIRED ====================
+// ==================== LIVELY GAMERS CARD CSS ====================
+const livelyGamersCSS = `
+    /* Gamers Grid Layout - Wide Spread Cards */
+    .gamers-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .gamers-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 28px;
+        padding: 20px 0;
+    }
+    
+    /* Lively Gamer Card */
+    .gamer-card {
+        background: linear-gradient(135deg, rgba(30, 30, 46, 0.95) 0%, rgba(22, 22, 35, 0.95) 100%);
+        backdrop-filter: blur(10px);
+        border-radius: 28px;
+        padding: 0;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+    
+    .gamer-card:hover {
+        transform: translateY(-10px) scale(1.02);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        border-color: rgba(122, 79, 255, 0.3);
+    }
+    
+    .gamer-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+        transition: left 0.5s;
+        pointer-events: none;
+    }
+    
+    .gamer-card:hover::before {
+        left: 100%;
+    }
+    
+    /* Card Header with Profile Pic */
+    .card-header {
+        position: relative;
+        padding: 20px 20px 0 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    
+    .profile-pic-wrapper {
+        position: relative;
+    }
+    
+    .gamer-avatar-large {
+        width: 85px;
+        height: 85px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid rgba(122, 79, 255, 0.5);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .gamer-card:hover .gamer-avatar-large {
+        border-color: #7a4fff;
+        transform: scale(1.05);
+    }
+    
+    /* Status Badge */
+    .status-badge {
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .status-badge.online {
+        background: #00ff88;
+        box-shadow: 0 0 8px #00ff88;
+        animation: pulse-green 2s infinite;
+    }
+    
+    .status-badge.offline {
+        background: #ff4444;
+    }
+    
+    @keyframes pulse-green {
+        0% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4); }
+        70% { box-shadow: 0 0 0 6px rgba(0, 255, 136, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+    }
+    
+    /* Rank Badge */
+    .rank-badge {
+        background: linear-gradient(135deg, #ff2a6d, #7a4fff);
+        border-radius: 20px;
+        padding: 6px 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: bold;
+        color: white;
+        box-shadow: 0 4px 12px rgba(255, 42, 109, 0.3);
+    }
+    
+    .rank-badge i {
+        font-size: 12px;
+    }
+    
+    /* Card Body */
+    .card-body {
+        padding: 15px 20px;
+    }
+    
+    .gamer-name-section {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+    }
+    
+    .gamer-name {
+        font-size: 20px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #fff, #aaa);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+    
+    .gamer-tag {
+        font-size: 12px;
+        color: #7a4fff;
+        background: rgba(122, 79, 255, 0.15);
+        padding: 2px 8px;
+        border-radius: 12px;
+    }
+    
+    .location-age {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+    }
+    
+    .location-age span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .bio-preview {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.7);
+        font-style: italic;
+        padding: 10px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 12px;
+    }
+    
+    /* Interests Tags */
+    .interests-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 15px;
+    }
+    
+    .interest-chip {
+        background: rgba(255, 255, 255, 0.08);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.2s;
+    }
+    
+    .interest-chip:hover {
+        background: rgba(122, 79, 255, 0.3);
+        transform: scale(1.05);
+    }
+    
+    /* Stats Row */
+    .stats-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding: 10px 0;
+    }
+    
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .stat-item .count {
+        font-weight: bold;
+        color: #7a4fff;
+        font-size: 16px;
+    }
+    
+    /* XP Badge on Card */
+    .xp-level-badge {
+        background: linear-gradient(135deg, #ffd700, #ff8c00);
+        border-radius: 30px;
+        padding: 4px 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: bold;
+        color: #1a1a2e;
+    }
+    
+    /* Card Actions */
+    .card-actions {
+        display: flex;
+        gap: 10px;
+        padding: 15px 20px 20px 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .action-btn {
+        flex: 1;
+        padding: 10px;
+        border-radius: 30px;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: none;
+        background: rgba(255, 255, 255, 0.05);
+        color: white;
+    }
+    
+    .action-btn.follow {
+        background: linear-gradient(135deg, #7a4fff, #ff2a6d);
+    }
+    
+    .action-btn.following {
+        background: rgba(0, 255, 136, 0.2);
+        border: 1px solid #00ff88;
+        color: #00ff88;
+    }
+    
+    .action-btn.message {
+        background: rgba(122, 79, 255, 0.2);
+        border: 1px solid rgba(122, 79, 255, 0.5);
+    }
+    
+    .action-btn.store {
+        background: linear-gradient(135deg, #ff8c00, #ff2a6d);
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.1);
+    }
+    
+    /* Search and Filters */
+    .search-section {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 60px;
+        padding: 5px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 20px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .search-section input {
+        background: transparent;
+        border: none;
+        padding: 15px 0;
+        color: white;
+        font-size: 16px;
+        flex: 1;
+        outline: none;
+    }
+    
+    .search-section input::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .filters-row {
+        display: flex;
+        gap: 12px;
+        padding: 0 20px;
+        flex-wrap: wrap;
+    }
+    
+    .filter-pill {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 8px 20px;
+        border-radius: 30px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.3s;
+        color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .filter-pill:hover, .filter-pill.active {
+        background: linear-gradient(135deg, #7a4fff, #ff2a6d);
+        border-color: transparent;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    /* Empty State */
+    .empty-state-lively {
+        text-align: center;
+        padding: 60px 20px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 30px;
+        margin: 20px;
+    }
+    
+    .empty-state-lively i {
+        font-size: 60px;
+        color: rgba(255, 255, 255, 0.3);
+        margin-bottom: 20px;
+    }
+    
+    /* Animations */
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+    }
+    
+    .gamer-card {
+        animation: fadeInUp 0.5s ease backwards;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .gamers-grid {
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        .gamer-avatar-large {
+            width: 65px;
+            height: 65px;
+        }
+        
+        .gamer-name {
+            font-size: 18px;
+        }
+    }
+`;
+
+// Inject the lively CSS
+const styleSheet = document.createElement("style");
+styleSheet.textContent = livelyGamersCSS;
+document.head.appendChild(styleSheet);
+
+// ==================== FOLLOWER NOTIFICATION SYSTEM ====================
 class FollowerNotificationSystem {
     constructor() {
         this.notificationSound = null;
@@ -861,7 +1262,7 @@ class InstantLoadingSystem {
             }
             
             filteredProfiles.forEach(profile => {
-                gamersListElement.appendChild(createProfileItem(profile));
+                gamersListElement.appendChild(createLivelyProfileCard(profile));
             });
             
             if (typeof feather !== 'undefined') {
@@ -1318,46 +1719,226 @@ const isXpPage = window.location.pathname.includes('xp.html');
 
 const followerNotifier = new FollowerNotificationSystem();
 
-// ==================== XP SYSTEM INTEGRATION (FIXED) ====================
+// ==================== LIVELY PROFILE CARD CREATION ====================
+function createLivelyProfileCard(profile) {
+    const card = document.createElement('div');
+    card.className = 'gamer-card';
+    card.dataset.profileId = profile.id;
+    
+    // Determine rank display
+    const rankDisplay = profile.gamerProfile?.rank 
+        ? `<div class="rank-badge">
+            <i class="fas fa-trophy"></i>
+            <span>${profile.gamerProfile.rank}</span>
+           </div>`
+        : profile.xpLevel >= 5
+        ? `<div class="rank-badge" style="background: linear-gradient(135deg, #ffd700, #ff8c00);">
+            <span>🏆</span>
+            <span>Level ${profile.xpLevel}</span>
+           </div>`
+        : '';
+    
+    // Status dot
+    const statusDot = profile.isOnline 
+        ? '<div class="status-badge online"></div>' 
+        : '<div class="status-badge offline"></div>';
+    
+    // XP Level Badge
+    const xpBadge = profile.xpLevel && profile.xpLevel >= 3
+        ? `<div class="xp-level-badge">
+            ${profile.xpIcon || '⭐'} Level ${profile.xpLevel}
+           </div>`
+        : '';
+    
+    // Interests chips (max 3)
+    const interests = profile.interests?.slice(0, 3).map(interest => 
+        `<span class="interest-chip">
+            <i class="fas fa-hashtag" style="font-size: 8px;"></i>
+            ${interest}
+         </span>`
+    ).join('') || '';
+    
+    // Bio preview
+    const bioPreview = profile.bio && profile.bio !== 'No bio available'
+        ? `<div class="bio-preview">
+            <i class="fas fa-quote-left" style="font-size: 10px; opacity: 0.5; margin-right: 5px;"></i>
+            "${profile.bio.length > 60 ? profile.bio.substring(0, 60) + '...' : profile.bio}"
+           </div>`
+        : '';
+    
+    // Button states
+    const isFollowing = profile.isFollowing;
+    const followButtonClass = isFollowing ? 'action-btn following' : 'action-btn follow';
+    const followButtonText = isFollowing ? '✓ Following' : '+ Follow';
+    const followIcon = isFollowing ? '' : '<i class="fas fa-user-plus"></i>';
+    
+    card.innerHTML = `
+        <div class="card-header">
+            <div class="profile-pic-wrapper">
+                <img src="${profile.profileImage}" alt="${profile.name}" class="gamer-avatar-large"
+                     onerror="this.onerror=null; this.src='images-default-profile.jpg';">
+                ${statusDot}
+            </div>
+            ${rankDisplay}
+        </div>
+        <div class="card-body">
+            <div class="gamer-name-section">
+                <span class="gamer-name">${profile.name}</span>
+                ${profile.isGamer && profile.gamerProfile?.gamerTag ? 
+                    `<span class="gamer-tag">@${profile.gamerProfile.gamerTag}</span>` : ''}
+            </div>
+            <div class="location-age">
+                ${profile.age ? `<span><i class="fas fa-birthday-cake"></i> ${profile.age} yrs</span>` : ''}
+                ${profile.location && profile.location !== 'Unknown' ? 
+                    `<span><i class="fas fa-map-marker-alt"></i> ${profile.location}</span>` : ''}
+                ${xpBadge}
+            </div>
+            ${bioPreview}
+            ${interests ? `<div class="interests-row">${interests}</div>` : ''}
+            <div class="stats-row">
+                <div class="stat-item">
+                    <i class="fas fa-users"></i>
+                    <span class="count">${formatNumber(profile.clanCount || 0)}</span>
+                    <span>followers</span>
+                </div>
+                ${profile.isGamer && profile.gamerProfile?.primaryGame ? `
+                    <div class="stat-item">
+                        <i class="fas fa-gamepad"></i>
+                        <span>${profile.gamerProfile.primaryGame}</span>
+                    </div>
+                ` : ''}
+                ${profile.likes > 0 ? `
+                    <div class="stat-item">
+                        <i class="fas fa-heart" style="color: #ff2a6d;"></i>
+                        <span class="count">${formatNumber(profile.likes)}</span>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+        <div class="card-actions">
+            <button class="${followButtonClass}" data-following="${isFollowing}">
+                ${followIcon} ${followButtonText}
+            </button>
+            <button class="action-btn message">
+                <i class="fas fa-comment"></i> Message
+            </button>
+            ${profile.hasStore ? `
+                <button class="action-btn store">
+                    <i class="fas fa-store"></i> Shop
+                </button>
+            ` : ''}
+        </div>
+    `;
+    
+    // Add click handler for card navigation
+    card.addEventListener('click', (e) => {
+        if (!e.target.closest('.action-btn')) {
+            window.location.href = `profile.html?id=${profile.id}`;
+        }
+    });
+    
+    // Follow button handler
+    const followBtn = card.querySelector('.follow, .following');
+    if (followBtn) {
+        followBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            
+            if (!currentUser) {
+                showNotification('Please log in to follow users', 'warning');
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            const isCurrentlyFollowing = followBtn.dataset.following === 'true';
+            
+            try {
+                if (isCurrentlyFollowing) {
+                    await unfollowUser(profile.id);
+                    followBtn.dataset.following = 'false';
+                    followBtn.className = 'action-btn follow';
+                    followBtn.innerHTML = '<i class="fas fa-user-plus"></i> + Follow';
+                    await indexedDBCache.setFollowStatus(currentUser.uid, profile.id, false);
+                    showNotification(`Unfollowed ${profile.name}`, 'info');
+                } else {
+                    await followUser(profile.id);
+                    followBtn.dataset.following = 'true';
+                    followBtn.className = 'action-btn following';
+                    followBtn.innerHTML = '✓ Following';
+                    await indexedDBCache.setFollowStatus(currentUser.uid, profile.id, true);
+                    
+                    if (xpSystem && typeof xpSystem.addXP === 'function') {
+                        await xpSystem.addXP(15, `Followed ${profile.name}`);
+                    }
+                    showNotification(`Now following ${profile.name} 🎉`, 'success');
+                }
+            } catch (error) {
+                console.error('Error toggling follow:', error);
+                showNotification('Failed to update follow status', 'error');
+            }
+        });
+    }
+    
+    // Message button handler
+    const messageBtn = card.querySelector('.action-btn.message');
+    if (messageBtn) {
+        messageBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!currentUser) {
+                showNotification('Please log in to send messages', 'warning');
+                window.location.href = 'login.html';
+                return;
+            }
+            window.location.href = `chat.html?id=${profile.id}`;
+        });
+    }
+    
+    // Store button handler
+    const storeBtn = card.querySelector('.action-btn.store');
+    if (storeBtn) {
+        storeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.location.href = `store.html?id=${profile.storeId}`;
+        });
+    }
+    
+    // Add animation delay based on index
+    const cards = document.querySelectorAll('.gamer-card');
+    card.style.animationDelay = `${cards.length * 0.05}s`;
+    
+    return card;
+}
+
+// ==================== XP SYSTEM INTEGRATION ====================
 async function loadXPSystem() {
     if (xpSystem) return xpSystem;
     
     try {
-        // Try to import from xp.js
         const xpModule = await import('./xp.js');
         console.log('XP Module loaded:', xpModule);
         
-        // Check different possible export patterns
         if (xpModule.XPSystem) {
-            // If it's a class, instantiate it
             if (typeof xpModule.XPSystem === 'function') {
                 xpSystem = new xpModule.XPSystem();
             } else {
-                // If it's already an instance
                 xpSystem = xpModule.XPSystem;
             }
         } else if (xpModule.default) {
-            // Handle default export
             if (typeof xpModule.default === 'function') {
                 xpSystem = new xpModule.default();
             } else {
                 xpSystem = xpModule.default;
             }
         } else if (typeof xpModule === 'function') {
-            // If the module itself is a class/function
             xpSystem = new xpModule();
         } else {
-            // Try window object as fallback
             xpSystem = window.XPSystem;
         }
         
-        // If we still don't have xpSystem, create a mock one
         if (!xpSystem) {
             console.warn('XP System not found, creating mock XP system');
             xpSystem = createMockXPSystem();
         }
         
-        // Initialize if it has an initialize method
         if (xpSystem.initialize && typeof xpSystem.initialize === 'function') {
             await xpSystem.initialize();
         }
@@ -1367,13 +1948,11 @@ async function loadXPSystem() {
         return xpSystem;
     } catch (error) {
         console.error('Error loading XP system:', error);
-        // Create a mock XP system to prevent errors
         xpSystem = createMockXPSystem();
         return xpSystem;
     }
 }
 
-// Create a mock XP system to prevent errors
 function createMockXPSystem() {
     return {
         initialize: async () => {
@@ -1398,7 +1977,6 @@ function startXPTracking() {
     const awardXPForActivity = async (activity, xpAmount, reason) => {
         try {
             if (xpSystem && currentUser) {
-                // Check if addXP exists before calling
                 if (typeof xpSystem.addXP === 'function') {
                     await xpSystem.addXP(xpAmount, reason);
                     console.log(`Awarded ${xpAmount} XP for ${activity}`);
@@ -1459,6 +2037,20 @@ function startXPTracking() {
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Initializing with instant loading...');
+    
+    // Update the container structure for lively grid
+    const gamersListElement = document.getElementById('gamersList');
+    if (gamersListElement) {
+        gamersListElement.className = 'gamers-grid';
+        
+        // Wrap in container if needed
+        if (!gamersListElement.parentElement.classList.contains('gamers-container')) {
+            const container = document.createElement('div');
+            container.className = 'gamers-container';
+            gamersListElement.parentNode.insertBefore(container, gamersListElement);
+            container.appendChild(gamersListElement);
+        }
+    }
     
     await instantLoader.initialize();
     await followerNotifier.initialize();
@@ -1661,33 +2253,14 @@ function smoothUpdateProfiles(newProfiles) {
     newProfiles.forEach((profile, index) => {
         const existingItem = gamersListElement.querySelector(`[data-profile-id="${profile.id}"]`);
         if (existingItem) {
-            updateProfileItem(existingItem, profile);
+            const newCard = createLivelyProfileCard(profile);
+            existingItem.replaceWith(newCard);
         } else {
-            const newItem = createProfileItem(profile);
-            if (index === 0) {
-                gamersListElement.prepend(newItem);
-            } else {
-                const existingNextItem = gamersListElement.querySelector(`[data-profile-id="${newProfiles[index-1]?.id}"]`);
-                if (existingNextItem && existingNextItem.nextElementSibling) {
-                    existingNextItem.parentNode.insertBefore(newItem, existingNextItem.nextElementSibling);
-                } else {
-                    gamersListElement.appendChild(newItem);
-                }
-            }
+            const newCard = createLivelyProfileCard(profile);
+            newCard.style.animationDelay = `${index * 0.05}s`;
+            gamersListElement.appendChild(newCard);
         }
     });
-}
-
-function updateProfileItem(item, profile) {
-    const currentFollowing = item.querySelector('.add-clan-btn')?.dataset.following;
-    const currentOnline = item.querySelector('.gamer-stat[title*="Online"]')?.textContent.includes('Online');
-    
-    if (currentFollowing !== String(profile.isFollowing) || 
-        currentOnline !== profile.isOnline) {
-        
-        const newItem = createProfileItem(profile);
-        item.replaceWith(newItem);
-    }
 }
 
 async function processUserProfile(userId, userData, storeInfo = null) {
@@ -1901,14 +2474,10 @@ function renderProfilesList() {
     if (allProfiles.length === 0) {
         console.log('No profiles found');
         gamersListElement.innerHTML = `
-            <div class="empty-state">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <h3 class="empty-title">No profiles yet</h3>
-                <p>Be the first to create a profile!</p>
+            <div class="empty-state-lively">
+                <i class="fas fa-users"></i>
+                <h3>No profiles yet</h3>
+                <p>Be the first to create a profile and join the community!</p>
             </div>
         `;
         return;
@@ -1939,22 +2508,20 @@ function renderProfilesList() {
     
     if (filteredProfiles.length === 0) {
         gamersListElement.innerHTML = `
-            <div class="empty-state">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <h3 class="empty-title">No matching profiles</h3>
-                <p>Try a different filter</p>
+            <div class="empty-state-lively">
+                <i class="fas fa-filter"></i>
+                <h3>No matching profiles</h3>
+                <p>Try a different filter or search term</p>
             </div>
         `;
         return;
     }
     
     gamersListElement.innerHTML = '';
-    filteredProfiles.forEach(profile => {
-        gamersListElement.appendChild(createProfileItem(profile));
+    filteredProfiles.forEach((profile, index) => {
+        const card = createLivelyProfileCard(profile);
+        card.style.animationDelay = `${index * 0.05}s`;
+        gamersListElement.appendChild(card);
     });
     
     if (typeof feather !== 'undefined') {
@@ -1964,301 +2531,10 @@ function renderProfilesList() {
     console.log('Profiles rendered successfully');
 }
 
+// Keep the original createProfileItem for compatibility but use the lively one
 function createProfileItem(profile) {
-    const div = document.createElement('div');
-    div.className = 'gamer-item';
-    div.dataset.profileId = profile.id;
-    
-    const attributes = [];
-    if (profile.age) attributes.push(`${profile.age} yrs`);
-    if (profile.location) attributes.push(profile.location);
-    if (profile.isGamer && profile.gamerProfile?.primaryGame) {
-        attributes.push(profile.gamerProfile.primaryGame);
-    }
-    
-    const gamerBadge = profile.isGamer ? `
-        <span class="attribute-tag" style="background: rgba(255, 42, 109, 0.2); border-color: #ff2a6d; color: #ff2a6d;">
-            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 10px; height: 10px; margin-right: 3px;">
-                <rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect>
-                <path d="M12 6v12"></path>
-                <path d="M2 12h20"></path>
-            </svg>
-            Gamer
-        </span>
-    ` : '';
-    
-    const storeBadge = profile.hasStore ? `
-        <span class="attribute-tag" style="background: rgba(122, 79, 255, 0.2); border-color: #7a4fff; color: #7a4fff;">
-            <i class="fas fa-store" style="font-size: 10px; margin-right: 3px;"></i>
-            Store
-        </span>
-    ` : '';
-    
-    const buttonText = profile.isFollowing ? 'Following' : 'Follow';
-    const buttonClass = profile.isFollowing ? 'add-clan-btn added' : 'add-clan-btn';
-    const followersCount = profile.clanCount || 0;
-    
-    const xpBadge = profile.xpLevel ? `
-        <span class="xp-badge" style="
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background: ${profile.xpColor || '#667eea'};
-            color: white;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            z-index: 2;
-            border: 2px solid white;
-        " title="Level ${profile.xpLevel} - ${profile.xpRank}">
-            ${profile.xpIcon || '🌱'}
-        </span>
-    ` : '';
-    
-    div.innerHTML = `
-        <div style="position: relative;">
-            <img src="${profile.profileImage}" alt="${profile.name}" class="gamer-avatar" 
-                 onerror="this.onerror=null; this.src='images-default-profile.jpg';"
-                 style="width: 70px; height: 70px; object-fit: cover; border-radius: 50%;">
-            ${xpBadge}
-        </div>
-        <div class="gamer-info">
-            <div class="gamer-header">
-                <span class="gamer-name">${profile.name}</span>
-                ${profile.isGamer && profile.gamerProfile?.gamerTag ? `
-                    <span class="gamer-tag">${profile.gamerProfile.gamerTag}</span>
-                ` : ''}
-            </div>
-            <div class="gamer-stats">
-                ${profile.isGamer && profile.gamerProfile?.rank ? `
-                    <span class="gamer-stat gamer-rank">
-                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                        </svg>
-                        ${profile.gamerProfile.rank}
-                    </span>
-                ` : ''}
-                <span class="gamer-stat" title="${profile.isOnline ? 'Online' : 'Offline'}">
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10"></circle>
-                    </svg>
-                    ${profile.isOnline ? 'Online' : 'Offline'}
-                </span>
-                ${profile.likes > 0 ? `
-                    <span class="gamer-stat">
-                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                        </svg>
-                        ${formatNumber(profile.likes)}
-                    </span>
-                ` : ''}
-            </div>
-            <div class="gamer-attributes">
-                ${gamerBadge}
-                ${storeBadge}
-                ${attributes.slice(0, 2).map(attr => `
-                    <span class="attribute-tag">${attr}</span>
-                `).join('')}
-                ${profile.interests && profile.interests.length > 0 ? `
-                    <span class="attribute-tag">${profile.interests[0]}</span>
-                ` : ''}
-            </div>
-            ${profile.bio && profile.bio.length > 40 ? `
-                <div style="font-size: 11px; color: var(--text-light); margin-top: 4px; font-style: italic;">
-                    "${profile.bio.substring(0, 40)}..."
-                </div>
-            ` : ''}
-        </div>
-        <div class="gamer-actions">
-            <div class="clan-section">
-                <span class="clan-count">
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                    ${formatNumber(followersCount)}
-                </span>
-            </div>
-            ${profile.hasStore ? `
-                <button class="store-btn" data-profile-id="${profile.id}" data-store-id="${profile.storeId}" title="Visit Store">
-                    <i class="fas fa-store"></i>
-                    Store
-                </button>
-            ` : ''}
-            <button class="${buttonClass}" data-profile-id="${profile.id}" data-following="${profile.isFollowing}">
-                ${profile.isFollowing ? `
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                ` : `
-                    <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="8.5" cy="7" r="4"></circle>
-                        <line x1="20" y1="8" x2="20" y2="14"></line>
-                        <line x1="23" y1="11" x2="17" y2="11"></line>
-                    </svg>
-                `}
-                ${buttonText}
-            </button>
-            <button class="message-gamer-btn" data-profile-id="${profile.id}" title="Message ${profile.name}">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
-            </button>
-        </div>
-    `;
-    
-    div.addEventListener('click', (e) => {
-        if (!e.target.closest('.add-clan-btn') && 
-            !e.target.closest('.clan-section') &&
-            !e.target.closest('.message-gamer-btn') &&
-            !e.target.closest('.store-btn')) {
-            window.location.href = `profile.html?id=${profile.id}`;
-        }
-    });
-    
-    const storeBtn = div.querySelector('.store-btn');
-    if (storeBtn) {
-        storeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            window.location.href = `store.html?id=${profile.storeId}`;
-        });
-    }
-    
-    const clanBtn = div.querySelector('.add-clan-btn');
-    if (clanBtn) {
-        clanBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            
-            if (!currentUser) {
-                showNotification('Please log in to follow users', 'warning');
-                window.location.href = 'login.html';
-                return;
-            }
-            
-            const isCurrentlyFollowing = clanBtn.dataset.following === 'true';
-            
-            try {
-                if (isCurrentlyFollowing) {
-                    await unfollowUser(profile.id);
-                    clanBtn.dataset.following = 'false';
-                    clanBtn.innerHTML = `
-                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="8.5" cy="7" r="4"></circle>
-                            <line x1="20" y1="8" x2="20" y2="14"></line>
-                            <line x1="23" y1="11" x2="17" y2="11"></line>
-                        </svg>
-                        Follow
-                    `;
-                    clanBtn.classList.remove('added');
-                    
-                    const clanCountSpan = div.querySelector('.clan-count');
-                    const currentCount = parseInt(clanCountSpan.textContent.replace(/[kM]$/, '')) || 0;
-                    const newCount = Math.max(0, currentCount - 1);
-                    clanCountSpan.textContent = formatNumber(newCount);
-                    
-                    await indexedDBCache.setFollowStatus(currentUser.uid, profile.id, false);
-                    
-                    showNotification(`Unfollowed ${profile.name}`, 'info');
-                } else {
-                    await followUser(profile.id);
-                    clanBtn.dataset.following = 'true';
-                    clanBtn.innerHTML = `
-                        <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                        </svg>
-                        Following
-                    `;
-                    clanBtn.classList.add('added');
-                    
-                    const clanCountSpan = div.querySelector('.clan-count');
-                    const currentCount = parseInt(clanCountSpan.textContent.replace(/[kM]$/, '')) || 0;
-                    const newCount = currentCount + 1;
-                    clanCountSpan.textContent = formatNumber(newCount);
-                    
-                    await indexedDBCache.setFollowStatus(currentUser.uid, profile.id, true);
-                    
-                    // Safely award XP
-                    if (xpSystem && typeof xpSystem.addXP === 'function') {
-                        await xpSystem.addXP(15, `Followed ${profile.name}`);
-                    }
-                    
-                    showNotification(`Now following ${profile.name}`, 'success');
-                }
-            } catch (error) {
-                console.error('Error toggling follow:', error);
-                showNotification('Failed to update follow status', 'error');
-            }
-        });
-    }
-    
-    const messageBtn = div.querySelector('.message-gamer-btn');
-    if (messageBtn) {
-        messageBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            
-            if (!currentUser) {
-                showNotification('Please log in to send messages', 'warning');
-                window.location.href = 'login.html';
-                return;
-            }
-            
-            if (currentUser.uid === profile.id) {
-                showNotification('You cannot message yourself', 'info');
-                return;
-            }
-            
-            window.location.href = `chat.html?id=${profile.id}`;
-        });
-    }
-    
-    return div;
+    return createLivelyProfileCard(profile);
 }
-
-const style = document.createElement('style');
-style.textContent = `
-    .store-btn {
-        background: linear-gradient(135deg, #7a4fff, #ff2a6d);
-        color: white;
-        border: none;
-        border-radius: 20px;
-        padding: 6px 12px;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        transition: all 0.3s ease;
-        margin-right: 5px;
-    }
-    
-    .store-btn i {
-        font-size: 12px;
-    }
-    
-    .store-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 5px 15px rgba(122, 79, 255, 0.3);
-    }
-    
-    .gamer-actions {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-    }
-`;
-document.head.appendChild(style);
 
 // ==================== PROFILE PAGE FUNCTIONALITY ====================
 async function initProfilePage() {
@@ -2847,7 +3123,6 @@ function setupProfileEventListeners(profileId) {
                     
                     await indexedDBCache.setFollowStatus(currentUser.uid, profileId, true);
                     
-                    // Safely award XP
                     if (xpSystem && typeof xpSystem.addXP === 'function') {
                         await xpSystem.addXP(15, 'Followed a User');
                     }
@@ -2881,7 +3156,6 @@ function setupProfileEventListeners(profileId) {
             
             window.location.href = `chat.html?id=${profileId}`;
             
-            // Safely award XP
             if (xpSystem && typeof xpSystem.addXP === 'function') {
                 setTimeout(async () => {
                     await xpSystem.addXP(5, 'Sent a Message');
@@ -3047,9 +3321,9 @@ function setupEventListeners() {
         }, 300));
     }
     
-    document.querySelectorAll('.filter-btn').forEach(button => {
+    document.querySelectorAll('.filter-btn, .filter-pill').forEach(button => {
         button.addEventListener('click', () => {
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.filter-btn, .filter-pill').forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
             
             currentFilter = button.dataset.filter;
@@ -3058,13 +3332,13 @@ function setupEventListeners() {
     });
     
     const filterContainer = document.querySelector('.filters');
-    if (filterContainer && !document.querySelector('.filter-btn[data-filter="xp"]')) {
+    if (filterContainer && !document.querySelector('.filter-btn[data-filter="xp"], .filter-pill[data-filter="xp"]')) {
         const xpFilterBtn = document.createElement('button');
-        xpFilterBtn.className = 'filter-btn';
+        xpFilterBtn.className = 'filter-pill';
         xpFilterBtn.dataset.filter = 'xp';
         xpFilterBtn.innerHTML = '<i class="fas fa-trophy"></i> High XP';
         xpFilterBtn.addEventListener('click', () => {
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.filter-pill, .filter-btn').forEach(btn => btn.classList.remove('active'));
             xpFilterBtn.classList.add('active');
             currentFilter = 'xp';
             renderProfilesList();
@@ -3081,13 +3355,9 @@ function displayFilteredProfiles(filteredProfiles) {
     
     if (filteredProfiles.length === 0) {
         gamersListElement.innerHTML = `
-            <div class="empty-state">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <h3 class="empty-title">No matching profiles</h3>
+            <div class="empty-state-lively">
+                <i class="fas fa-search"></i>
+                <h3>No matching profiles</h3>
                 <p>Try a different search term</p>
             </div>
         `;
@@ -3095,8 +3365,10 @@ function displayFilteredProfiles(filteredProfiles) {
     }
     
     gamersListElement.innerHTML = '';
-    filteredProfiles.forEach(profile => {
-        gamersListElement.appendChild(createProfileItem(profile));
+    filteredProfiles.forEach((profile, index) => {
+        const card = createLivelyProfileCard(profile);
+        card.style.animationDelay = `${index * 0.05}s`;
+        gamersListElement.appendChild(card);
     });
     
     if (typeof feather !== 'undefined') {
@@ -3106,13 +3378,18 @@ function displayFilteredProfiles(filteredProfiles) {
 
 function createLoadingProfileItem() {
     const div = document.createElement('div');
-    div.className = 'gamer-item loading';
+    div.className = 'gamer-card loading';
+    div.style.animation = 'none';
     div.innerHTML = `
-        <div class="loading-avatar"></div>
-        <div class="loading-info">
-            <div class="loading-line" style="width: 60%"></div>
-            <div class="loading-line short"></div>
-            <div class="loading-line medium"></div>
+        <div class="card-header">
+            <div class="profile-pic-wrapper">
+                <div style="width: 85px; height: 85px; border-radius: 50%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e);"></div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div style="height: 24px; width: 60%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e); border-radius: 8px; margin-bottom: 10px;"></div>
+            <div style="height: 16px; width: 40%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e); border-radius: 8px; margin-bottom: 15px;"></div>
+            <div style="height: 40px; width: 100%; background: linear-gradient(90deg, #2a2a3e, #1a1a2e); border-radius: 8px;"></div>
         </div>
     `;
     return div;
@@ -3187,35 +3464,30 @@ function showError(message, showRefresh = true) {
     
     if (targetElement) {
         targetElement.innerHTML = `
-            <div class="empty-state">
-                <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <h3 class="empty-title">Error Loading</h3>
+            <div class="empty-state-lively">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Error Loading</h3>
                 <p>${message}</p>
                 ${showRefresh ? `
-                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
                         <button onclick="location.reload()" style="
-                            background: var(--primary);
+                            background: linear-gradient(135deg, #7a4fff, #ff2a6d);
                             color: white;
                             border: none;
-                            padding: 8px 16px;
-                            border-radius: 20px;
+                            padding: 10px 20px;
+                            border-radius: 30px;
                             cursor: pointer;
-                            font-family: 'Inter', sans-serif;
+                            font-weight: 600;
                         ">
                             Refresh Page
                         </button>
                         <button onclick="window.location.href='index.html'" style="
-                            background: var(--bg-primary);
-                            color: var(--text-primary);
-                            border: 1px solid var(--border);
-                            padding: 8px 16px;
-                            border-radius: 20px;
+                            background: rgba(255,255,255,0.1);
+                            color: white;
+                            border: 1px solid rgba(255,255,255,0.2);
+                            padding: 10px 20px;
+                            border-radius: 30px;
                             cursor: pointer;
-                            font-family: 'Inter', sans-serif;
                         ">
                             Go Home
                         </button>
@@ -3261,4 +3533,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('✅ gamers.js loaded successfully - XP System error fixed!');
+console.log('✅ gamers.js loaded successfully - Lively card design activated!');
