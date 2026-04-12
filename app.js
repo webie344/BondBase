@@ -5275,7 +5275,7 @@ async function loadProfileData(profileId) {
 
 function displayProfileData(profileData) {
     document.getElementById('mainProfileImage').src = profileData.profileImage || 'images-default-profile.jpg';
-    document.querySelectorAll('.thumbnail')[0].src = profileData.profileImage || 'images-default-profile.jpg';
+    
     document.getElementById('viewProfileName').textContent = profileData.name || 'Unknown';
     
     let ageText = '';

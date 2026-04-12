@@ -1368,8 +1368,8 @@
                 <div class="about-item">
                     <div class="about-icon"><i data-feather="mail"></i></div>
                     <div>
-                        <div class="about-item-label">Email</div>
-                        <div class="about-item-value" id="viewProfileEmail">—</div>
+                        
+
                     </div>
                 </div>
                 <div class="about-item">
@@ -1539,17 +1539,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Init Feather Icons
     if (typeof feather !== 'undefined') feather.replace();
 
-    // ── Mobile nav toggle ──
-    const toggle = document.getElementById('mobile-menu');
-    const navMenu = document.querySelector('.nav-menu');
-    if (toggle && navMenu) {
-        toggle.addEventListener('click', () => navMenu.classList.toggle('active'));
-        document.addEventListener('click', (e) => {
-            if (!toggle.contains(e.target) && !navMenu.contains(e.target)) {
-                navMenu.classList.remove('active');
-            }
-        });
-    }
+
 
     // ── Tab switching ──
     const tabs = document.querySelectorAll('.profile-tab');
