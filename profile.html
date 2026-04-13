@@ -148,23 +148,38 @@
             overflow: hidden;
         }
 
+        /* thumbnail1 becomes the full cover background photo */
+        .cover-bg-img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center top;
+            filter: blur(18px) brightness(0.45) saturate(1.2);
+            transform: scale(1.08);
+            z-index: 0;
+        }
+
         .cover-section::before {
             content: '';
             position: absolute;
             inset: 0;
-            background: radial-gradient(ellipse at 30% 50%, rgba(255,75,110,0.2), transparent 60%),
-                        radial-gradient(ellipse at 80% 30%, rgba(100,80,255,0.12), transparent 60%);
+            background: radial-gradient(ellipse at 30% 50%, rgba(255,75,110,0.18), transparent 60%),
+                        radial-gradient(ellipse at 80% 30%, rgba(100,80,255,0.1), transparent 60%);
+            z-index: 1;
         }
 
         .cover-pattern {
             position: absolute;
             inset: 0;
-            opacity: 0.04;
+            opacity: 0.03;
             background-image: repeating-linear-gradient(
                 45deg,
                 white 0px, white 1px,
                 transparent 1px, transparent 40px
             );
+            z-index: 2;
         }
 
         /* ── AVATAR WRAPPER ── */
@@ -1127,6 +1142,199 @@
         ::-webkit-scrollbar-thumb { background:rgba(255,75,110,0.3); border-radius:10px; }
 
         /* ─────────────────────────────────────────
+           VIDEO PLAYER (used by social.js & stream.js)
+        ───────────────────────────────────────── */
+        .video-wrapper { margin-top:12px; width:100%; }
+
+        .video-thumbnail-container {
+            position:relative; width:100%; height:0; padding-bottom:75%;
+            background:#000; border-radius:16px; overflow:hidden;
+            cursor:pointer; border:1px solid rgba(255,255,255,0.1);
+            box-shadow:0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .video-thumbnail-image {
+            position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover;
+        }
+
+        .video-play-button-center {
+            position:absolute; top:50%; left:50%;
+            transform:translate(-50%,-50%);
+            width:70px; height:70px;
+            background:rgba(255,75,110,0.95); border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            color:white; font-size:28px;
+            transition:all 0.2s ease;
+            border:3px solid rgba(255,255,255,0.5);
+            box-shadow:0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        .video-thumbnail-container:hover .video-play-button-center {
+            background:#ff4b6e; border-color:white;
+            transform:translate(-50%,-50%) scale(1.1);
+        }
+
+        .video-duration-overlay {
+            position:absolute; bottom:12px; right:12px;
+            background:rgba(0,0,0,0.85); color:white;
+            padding:6px 12px; border-radius:12px;
+            font-size:14px; font-weight:600; z-index:2; letter-spacing:0.5px;
+        }
+
+        .custom-video-container {
+            position:relative; width:100%; height:0; padding-bottom:75%;
+            background:#000; border-radius:16px; overflow:hidden;
+            margin:12px 0; box-shadow:0 8px 24px rgba(0,0,0,0.3);
+            border:1px solid rgba(255,255,255,0.1);
+        }
+
+        .custom-video-player {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            object-fit:contain; background:#000;
+        }
+
+        .custom-video-player::-webkit-media-controls { display:none !important; }
+
+        .video-controls-overlay {
+            position:absolute; inset:0;
+            background:linear-gradient(to top,rgba(0,0,0,0.7),transparent 50%);
+            display:flex; align-items:center; justify-content:center;
+            opacity:0; transition:opacity 0.3s ease;
+        }
+
+        .custom-video-container:hover .video-controls-overlay { opacity:1; }
+
+        .video-center-play-btn {
+            width:80px; height:80px;
+            background:rgba(255,75,110,0.95); border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            color:white; font-size:32px; cursor:pointer;
+            transition:all 0.2s ease;
+            border:3px solid rgba(255,255,255,0.5);
+            box-shadow:0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        .video-center-play-btn:hover { background:#ff4b6e; transform:scale(1.1); border-color:white; }
+
+        .video-bottom-controls {
+            position:absolute; bottom:0; left:0; right:0;
+            background:linear-gradient(to top,rgba(0,0,0,0.9),transparent);
+            padding:20px 15px 15px;
+            display:flex; flex-direction:column; gap:8px;
+            opacity:0; transition:opacity 0.3s ease; pointer-events:none;
+        }
+
+        .custom-video-container:hover .video-bottom-controls { opacity:1; pointer-events:auto; }
+
+        .control-bar {
+            display:flex; align-items:center; gap:15px; color:white;
+        }
+
+        .control-btn {
+            background:transparent; border:none; color:white;
+            cursor:pointer; padding:8px; border-radius:6px;
+            display:flex; align-items:center; justify-content:center;
+            transition:all 0.2s; font-size:18px;
+        }
+
+        .control-btn:hover { background:rgba(255,255,255,0.2); }
+
+        .progress-bar-container {
+            flex:1; height:8px; background:rgba(255,255,255,0.3);
+            border-radius:4px; cursor:pointer; position:relative;
+        }
+
+        .progress-bar-fill {
+            height:100%; background:#ff4b6e; border-radius:4px;
+            width:0%; position:relative; transition:width 0.1s linear;
+        }
+
+        .time-display {
+            font-size:14px; color:white; font-family:monospace; min-width:100px;
+        }
+
+        .volume-control { display:flex; align-items:center; gap:8px; }
+
+        .volume-slider {
+            width:80px; height:6px; background:rgba(255,255,255,0.3);
+            border-radius:3px; cursor:pointer; position:relative;
+        }
+
+        .volume-fill { height:100%; background:white; border-radius:3px; width:100%; }
+
+        /* profile video card (stream.js) */
+        .profile-video-card {
+            background:var(--bg3); border-radius:var(--radius);
+            overflow:hidden; cursor:pointer;
+            border:1px solid var(--border);
+            transition:all 0.2s;
+        }
+
+        .profile-video-card:hover { transform:translateY(-3px); border-color:rgba(255,75,110,0.3); }
+
+        .profile-video-thumbnail {
+            position:relative; width:100%; height:200px; background:#000; overflow:hidden;
+        }
+
+        .profile-video-image {
+            width:100%; height:100%; object-fit:cover; transition:transform 0.3s;
+        }
+
+        .profile-video-card:hover .profile-video-image { transform:scale(1.05); }
+
+        .profile-video-overlay {
+            position:absolute; inset:0;
+            background:linear-gradient(0deg,rgba(0,0,0,0.8) 0%,rgba(0,0,0,0.2) 50%,transparent 100%);
+            display:flex; flex-direction:column; justify-content:space-between;
+            padding:1rem; opacity:0; transition:opacity 0.3s;
+        }
+
+        .profile-video-card:hover .profile-video-overlay { opacity:1; }
+
+        .profile-video-stats {
+            display:flex; justify-content:space-between;
+            color:white; font-size:0.82rem; font-weight:500;
+        }
+
+        .video-stat {
+            display:flex; align-items:center; gap:4px;
+            background:rgba(0,0,0,0.6); padding:3px 8px;
+            border-radius:12px; backdrop-filter:blur(4px);
+        }
+
+        .video-stat .feather { width:11px; height:11px; stroke:white; }
+
+        .profile-video-play {
+            display:flex; justify-content:center; align-items:center;
+        }
+
+        .profile-video-play .feather {
+            width:40px; height:40px; stroke:white;
+            background:rgba(255,75,110,0.85); padding:8px;
+            border-radius:50%; border:3px solid white;
+            box-shadow:0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .profile-video-info { padding:0.75rem; }
+
+        .profile-video-title {
+            font-size:0.85rem; font-weight:600; color:var(--text);
+            margin-bottom:4px; white-space:nowrap;
+            overflow:hidden; text-overflow:ellipsis;
+        }
+
+        .profile-video-time { font-size:0.75rem; color:var(--muted); }
+
+        .videos-loading, .videos-error, .no-videos {
+            text-align:center; padding:2.5rem 1.5rem; color:var(--muted);
+        }
+
+        .videos-loading .feather, .videos-error .feather, .no-videos .feather {
+            width:32px; height:32px; display:block;
+            margin:0 auto 12px; stroke:var(--pink);
+        }
+
+        /* ─────────────────────────────────────────
            RESPONSIVE
         ───────────────────────────────────────── */
         @media (max-width: 768px) {
@@ -1249,7 +1457,9 @@
 
 <!-- ── COVER ── -->
 <div class="cover-section">
+    <img src="images-default-profile.jpg" alt="" class="cover-bg-img" id="thumbnail1">
     <div class="cover-pattern"></div>
+    <img src="images-default-profile.jpg" alt="" id="thumbnail2" style="display:none;">
 </div>
 
 <!-- ── AVATAR ANCHOR (floats over cover) ── -->
@@ -1368,8 +1578,8 @@
                 <div class="about-item">
                     <div class="about-icon"><i data-feather="mail"></i></div>
                     <div>
-                        
-
+                        <div class="about-item-label">Email</div>
+                        <div class="about-item-value" id="viewProfileEmail">—</div>
                     </div>
                 </div>
                 <div class="about-item">
@@ -1539,8 +1749,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // Init Feather Icons
     if (typeof feather !== 'undefined') feather.replace();
 
-
-
     // ── Tab switching ──
     const tabs = document.querySelectorAll('.profile-tab');
     const sections = document.querySelectorAll('.content-section');
@@ -1577,7 +1785,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (loc && aboutLoc) aboutLoc.textContent = loc.textContent || '—';
     };
 
-    // observe changes to age/location spans and sync
     ['viewProfileAge','viewProfileLocation'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -1585,7 +1792,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // run once after slight delay (JS may populate these)
     setTimeout(syncAbout, 1500);
     setTimeout(() => { if (typeof feather !== 'undefined') feather.replace(); }, 500);
     setTimeout(() => { if (typeof feather !== 'undefined') feather.replace(); }, 2000);
