@@ -4,81 +4,62 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Account - BondBase</title>
-    
-    <!-- Fonts -->
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Feather Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
-    <!-- Font Awesome for store icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <style>
         :root {
-            --primary: #b3004b;
-            --primary-dark: #7a0034;
-            --primary-light: #e63986;
-            --secondary: #8b0000;
-            --accent: #444;
-            --text-primary: #ffffff;
-            --text-secondary: #d1d5db;
-            --text-light: #9ca3af;
-            --bg-primary: #0b0b0b;
-            --bg-secondary: #141414;
-            --bg-card: #1a1a1a;
-            --border: #2e2e2e;
-            --border-color: #2e2e2e;
-            --bg-light: #1b1b1b;
-            --accent-color: #b3004b;
-            --accent-dark: #7a0034;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.7);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.7);
-            --radius: 12px;
-            --radius-lg: 16px;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
+            --primary:        #ff4b6e;
+            --primary-dark:   #cc2a4a;
+            --primary-light:  #ff4b6e;
+            --secondary:      #cc2a4a;
+            --accent:         #444;
+            --text-primary:   #f0f2f5;
+            --text-secondary: #c8cdd6;
+            --text-light:     #7a8090;
+            --bg-primary:     #0e1014;
+            --bg-secondary:   #14171c;
+            --bg-card:        #1c2028;
+            --border:         rgba(255,255,255,0.07);
+            --border-color:   rgba(255,255,255,0.07);
+            --bg-light:       #1c2028;
+            --accent-color:   #ff4b6e;
+            --accent-dark:    #cc2a4a;
+            --shadow:         0 4px 20px rgba(0,0,0,0.5);
+            --shadow-lg:      0 10px 40px rgba(0,0,0,0.6);
+            --radius:         12px;
+            --radius-lg:      16px;
+            --success:        #10b981;
+            --warning:        #f59e0b;
+            --danger:         #ef4444;
+            --store:          #00b341;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--bg-secondary);
+            background: var(--bg-secondary);
             color: var(--text-primary);
             line-height: 1.5;
             overflow-x: hidden;
-            cursor: default;
             min-height: 100vh;
         }
 
-        /* Icon Styling - Consistent with mingle.html */
-        .feather {
-            width: 20px;
-            height: 20px;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-            fill: none;
-        }
+        .feather { width:18px; height:18px; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none; }
 
-        /* Navigation Styles */
+        /* ── NAV ── */
         .navbar {
-            background: rgba(255, 255, 255, 0.06);
-            backdrop-filter: blur(6px);
+            background: rgba(14,16,20,0.85);
+            backdrop-filter: blur(20px);
             position: sticky;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-            padding: 0.75rem 0;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            top: 0; z-index: 200;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
         }
 
         .navbar-container {
@@ -91,85 +72,50 @@
         }
 
         .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-light);
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--text-primary);
             text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            letter-spacing: -0.5px;
         }
 
-        .logo::before {
-            content: "🔗";
-        }
+        .logo span { color: var(--primary); }
 
-        .nav-menu {
-            display: flex;
-            list-style: none;
-            gap: 1.5rem;
-        }
-
-        .nav-item {
-            position: relative;
-        }
+        .nav-menu { display:flex; list-style:none; gap:0.25rem; }
+        .nav-item { position:relative; }
 
         .nav-links {
             display: flex;
             flex-direction: column;
             align-items: center;
             text-decoration: none;
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-            gap: 0.25rem;
-            transition: color 0.2s ease;
-            padding: 0.5rem;
-            border-radius: var(--radius);
+            color: var(--text-light);
+            font-size: 0.7rem;
+            gap: 0.2rem;
+            padding: 0.4rem 0.6rem;
+            border-radius: 10px;
+            transition: color 0.2s;
         }
 
-        .nav-links:hover {
-            color: var(--primary-light);
-            background-color: rgba(255, 255, 255, 0.02);
-        }
-
-        .nav-links .feather {
-            width: 18px;
-            height: 18px;
-            stroke: currentColor;
-        }
+        .nav-links:hover, .nav-links.active { color: var(--primary); }
+        .nav-links .feather { width:16px; height:16px; stroke:currentColor; }
 
         .message-count, .notification-badge {
             position: absolute;
-            top: -2px;
-            right: -2px;
-            background-color: var(--secondary);
+            top: -4px; right: -4px;
+            background: var(--primary);
             color: white;
             border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            font-size: 0.7rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
+            width: 16px; height: 16px;
+            font-size: 10px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            border: 2px solid var(--bg-secondary);
         }
 
-        .nav-toggle {
-            display: none;
-            flex-direction: column;
-            cursor: pointer;
-        }
+        .nav-toggle { display:none; flex-direction:column; cursor:pointer; gap:4px; }
+        .bar { width:22px; height:2px; background:var(--text-primary); border-radius:2px; transition:0.3s; }
 
-        .bar {
-            width: 25px;
-            height: 3px;
-            background-color: var(--text-primary);
-            margin: 3px 0;
-            transition: 0.3s;
-            border-radius: 2px;
-        }
-
-        /* Account Container */
+        /* ── PAGE LAYOUT ── */
         .account-container {
             max-width: 1200px;
             margin: 2rem auto;
@@ -177,217 +123,197 @@
         }
 
         .account-header {
-            text-align: center;
-            margin-bottom: 3rem;
+            margin-bottom: 2rem;
         }
 
         .account-header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
+            font-size: 1.75rem;
+            font-weight: 800;
             color: var(--text-primary);
-            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+            margin-bottom: 4px;
         }
 
         .account-header p {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
+            color: var(--text-light);
+            font-size: 0.9rem;
         }
 
         .back-btn {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-secondary);
+            gap: 6px;
+            padding: 7px 14px;
+            background: rgba(255,255,255,0.04);
+            color: var(--text-light);
             text-decoration: none;
             border-radius: var(--radius);
             border: 1px solid var(--border);
-            transition: all 0.2s ease;
-            margin-top: 1rem;
+            transition: all 0.2s;
+            margin-top: 12px;
+            font-size: 0.85rem;
         }
 
-        .back-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--primary-light);
-        }
+        .back-btn:hover { background:rgba(255,255,255,0.08); color:var(--primary); border-color:rgba(255,75,110,0.3); }
+        .back-btn .feather { width:14px; height:14px; stroke:currentColor; }
 
-        .back-btn .feather {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-        }
-
-        /* Account Content Layout */
         .account-content {
             display: grid;
-            grid-template-columns: 300px 1fr;
-            gap: 2rem;
+            grid-template-columns: 280px 1fr;
+            gap: 1.5rem;
+            align-items: start;
         }
 
-        /* Account Sidebar */
+        /* ── SIDEBAR ── */
         .account-sidebar {
             background: var(--bg-card);
             border-radius: var(--radius-lg);
-            padding: 2rem;
-            box-shadow: var(--shadow);
-            height: fit-content;
-            position: sticky;
-            top: 100px;
+            padding: 1.5rem;
             border: 1px solid var(--border);
+            position: sticky;
+            top: 80px;
         }
 
         .profile-picture-upload {
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
         }
 
         .profile-picture-upload img {
-            width: 120px;
-            height: 120px;
+            width: 90px;
+            height: 90px;
             border-radius: 50%;
             object-fit: cover;
-            margin-bottom: 1rem;
-            border: 4px solid var(--primary);
+            margin-bottom: 12px;
+            border: 3px solid var(--primary);
+            box-shadow: 0 0 0 3px rgba(255,75,110,0.15), 0 4px 16px rgba(0,0,0,0.4);
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .upload-btn {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
+            gap: 6px;
+            padding: 7px 16px;
             background: var(--primary);
             color: white;
             border: none;
             border-radius: var(--radius);
             cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.82rem;
+            transition: all 0.2s;
+            margin-bottom: 8px;
         }
 
-        .upload-btn:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-        }
-
-        .upload-btn .feather {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-        }
+        .upload-btn:hover { background:var(--primary-dark); transform:translateY(-1px); }
+        .upload-btn .feather { width:14px; height:14px; stroke:currentColor; }
 
         .btn-secondary {
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-secondary);
+            background: rgba(255,255,255,0.04);
+            color: var(--text-light);
             border: 1px solid var(--border);
-            padding: 0.5rem 1rem;
+            padding: 6px 14px;
             border-radius: var(--radius);
             cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 0.9rem;
+            transition: all 0.2s;
+            font-size: 0.82rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.08);
-        }
+        .btn-secondary:hover { background:rgba(255,255,255,0.08); color:var(--text-primary); }
 
-        .account-menu {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
+        .account-menu { display:flex; flex-direction:column; gap:3px; }
 
         .menu-item {
-            padding: 1rem 1.25rem;
+            padding: 10px 14px;
             border: none;
             background: none;
             text-align: left;
             cursor: pointer;
             border-radius: var(--radius);
-            transition: all 0.2s ease;
+            transition: all 0.2s;
             font-weight: 500;
-            color: var(--text-secondary);
+            font-size: 0.88rem;
+            color: var(--text-light);
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 10px;
+            width: 100%;
         }
 
-        .menu-item:hover,
-        .menu-item.active {
-            background-color: rgba(179, 0, 75, 0.2);
-            color: var(--primary-light);
+        .menu-item:hover, .menu-item.active {
+            background: rgba(255,75,110,0.1);
+            color: var(--primary);
         }
 
-        .menu-item .feather,
-        .menu-item i {
-            width: 18px;
-            height: 18px;
-            stroke: currentColor;
-            color: currentColor;
-        }
+        .menu-item .feather, .menu-item i { width:16px; height:16px; stroke:currentColor; color:currentColor; font-size:16px; flex-shrink:0; }
 
-        /* Account Main Content */
+        /* ── MAIN CONTENT ── */
         .account-main {
             background: var(--bg-card);
             border-radius: var(--radius-lg);
             padding: 2rem;
-            box-shadow: var(--shadow);
             border: 1px solid var(--border);
+            min-height: 500px;
         }
 
-        .account-section {
-            display: block;
-        }
+        .account-section { display:block; }
 
         .account-section h2 {
-            font-size: 1.75rem;
-            font-weight: 600;
+            font-size: 1.3rem;
+            font-weight: 700;
             color: var(--text-primary);
-            margin-bottom: 1.5rem;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 10px;
+            letter-spacing: -0.3px;
         }
 
-        .account-section h2 .feather,
-        .account-section h2 i {
-            width: 24px;
-            height: 24px;
-            stroke: var(--primary-light);
-            color: var(--primary-light);
+        .account-section h2 .feather, .account-section h2 i {
+            width: 20px; height: 20px;
+            stroke: var(--primary); color: var(--primary); font-size: 18px;
         }
 
         .section-description {
-            color: var(--text-secondary);
-            font-size: 1rem;
-            margin-bottom: 2rem;
+            color: var(--text-light);
+            font-size: 0.88rem;
+            margin-bottom: 1.75rem;
             line-height: 1.6;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1.25rem;
         }
 
-        /* Form Styles */
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
+        /* ── FORMS ── */
+        .form-group { margin-bottom: 1.25rem; }
 
         .form-group label {
             display: block;
-            margin-bottom: 0.5rem;
+            margin-bottom: 6px;
             font-weight: 500;
-            color: var(--text-primary);
+            font-size: 0.88rem;
+            color: var(--text-secondary);
         }
 
         .form-group input,
         .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
+            padding: 10px 14px;
+            border: 1px solid var(--border);
             border-radius: var(--radius);
-            font-size: 1rem;
-            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            transition: all 0.2s;
             background: var(--bg-primary);
             color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
         }
 
         .form-group input:focus,
@@ -395,8 +321,10 @@
         .form-group textarea:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(179, 0, 75, 0.2);
+            box-shadow: 0 0 0 3px rgba(255,75,110,0.12);
         }
+
+        .form-group textarea { resize: vertical; }
 
         .form-row {
             display: grid;
@@ -408,79 +336,57 @@
             background: var(--primary);
             color: white;
             border: none;
-            padding: 0.75rem 2rem;
+            padding: 10px 22px;
             border-radius: var(--radius);
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 1rem;
-            display: flex;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 7px;
         }
 
-        .btn-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-            box-shadow: var(--shadow);
-        }
-
-        .btn-primary .feather {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-        }
+        .btn-primary:hover { background:var(--primary-dark); transform:translateY(-1px); box-shadow:var(--shadow); }
+        .btn-primary .feather { width:15px; height:15px; stroke:currentColor; }
 
         .btn-danger {
             background: var(--danger);
             color: white;
             border: none;
-            padding: 0.75rem 1.5rem;
+            padding: 10px 18px;
             border-radius: var(--radius);
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 7px;
+            font-size: 0.88rem;
         }
 
-        .btn-danger:hover {
-            background: #dc2626;
-            transform: translateY(-1px);
-            box-shadow: var(--shadow);
-        }
+        .btn-danger:hover { background:#dc2626; transform:translateY(-1px); }
+        .btn-danger .feather, .btn-danger i { width:14px; height:14px; }
 
-        .btn-danger .feather,
-        .btn-danger i {
-            width: 16px;
-            height: 16px;
-        }
-
-        /* Location Styles */
-        .location-container {
-            position: relative;
-            width: 100%;
-            cursor: pointer;
-        }
+        /* ── LOCATION ── */
+        .location-container { position:relative; width:100%; cursor:pointer; }
 
         .selected-location {
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
+            padding: 10px 14px;
+            border: 1px solid var(--border);
             border-radius: var(--radius);
-            background-color: var(--bg-primary);
-            min-height: 50px;
+            background: var(--bg-primary);
+            min-height: 44px;
             display: flex;
             align-items: center;
             color: var(--text-primary);
+            font-size: 0.9rem;
         }
 
         .location-dropdown {
             display: none;
             position: absolute;
-            top: 100%;
-            left: 0;
-            width: 100%;
+            top: 100%; left: 0; width: 100%;
             background: var(--bg-primary);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -491,297 +397,210 @@
 
         .country-dropdown, .state-dropdown {
             width: 100%;
-            padding: 0.75rem 1rem;
+            padding: 10px 14px;
             border: none;
             border-bottom: 1px solid var(--border);
-            appearance: none;
-            background-color: var(--bg-primary);
+            background: var(--bg-primary);
             color: var(--text-primary);
-            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b3004b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff4b6e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
             background-repeat: no-repeat;
             background-position: right 10px center;
-            background-size: 15px;
-            font-family: 'Inter', sans-serif;
+            background-size: 14px;
         }
 
-        /* Interests Styles */
-        .interests-input {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .interests-input input {
-            flex: 1;
-        }
+        /* ── INTERESTS ── */
+        .interests-input { display:flex; gap:8px; margin-bottom:12px; }
+        .interests-input input { flex:1; }
 
         .interests-input button {
             background: var(--primary);
             color: white;
             border: none;
             border-radius: var(--radius);
-            width: 44px;
+            width: 42px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
-        .interests-input button:hover {
-            background: var(--primary-dark);
-        }
+        .interests-input button:hover { background:var(--primary-dark); }
+        .interests-input button .feather { width:15px; height:15px; stroke:currentColor; }
 
-        .interests-input button .feather {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-        }
-
-        .interests-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
+        .interests-container { display:flex; flex-wrap:wrap; gap:6px; }
 
         .interest-tag {
             display: inline-flex;
             align-items: center;
-            background-color: rgba(179, 0, 75, 0.2);
-            color: var(--primary-light);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
+            background: rgba(255,75,110,0.12);
+            color: var(--primary);
+            padding: 5px 12px;
+            border-radius: 100px;
+            font-size: 0.82rem;
             font-weight: 500;
-            gap: 0.5rem;
-            border: 1px solid rgba(179, 0, 75, 0.3);
+            gap: 6px;
+            border: 1px solid rgba(255,75,110,0.25);
         }
 
-        .interest-tag .remove {
-            cursor: pointer;
-            font-size: 0.8rem;
-            opacity: 0.7;
-        }
+        .interest-tag .remove { cursor:pointer; font-size:0.75rem; opacity:0.7; }
+        .interest-tag .remove:hover { opacity:1; }
 
-        .interest-tag .remove:hover {
-            opacity: 1;
-        }
-
-        /* Social Media Section */
+        /* ── SOCIAL SECTION ── */
         .social-input-group {
-            margin-bottom: 1.5rem;
-            padding: 1.5rem;
-            background: rgba(255, 255, 255, 0.03);
+            margin-bottom: 1rem;
+            padding: 1.25rem;
+            background: rgba(255,255,255,0.02);
             border-radius: var(--radius);
             border: 1px solid var(--border);
+            transition: border-color 0.2s;
         }
+
+        .social-input-group:hover { border-color:rgba(255,75,110,0.2); }
 
         .social-platform-header {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
+            gap: 10px;
+            margin-bottom: 10px;
             font-weight: 600;
+            font-size: 0.88rem;
             color: var(--text-primary);
         }
 
-        .social-platform-header .feather {
-            width: 20px;
-            height: 20px;
-        }
+        .social-platform-header .feather { width:18px; height:18px; }
 
         .social-input {
             width: 100%;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
+            padding: 10px 14px;
+            border: 1px solid var(--border);
             border-radius: var(--radius);
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 1rem;
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
         }
 
-        .social-input:focus {
-            border-color: var(--primary);
-            outline: none;
-        }
+        .social-input:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(255,75,110,0.1); }
 
         .social-preview {
-            margin-top: 0.5rem;
-            padding: 0.75rem 1rem;
+            margin-top: 6px;
+            padding: 6px 10px;
             background: var(--bg-primary);
-            border-radius: var(--radius);
-            font-size: 0.9rem;
-            color: var(--text-secondary);
+            border-radius: 8px;
+            font-size: 0.78rem;
+            color: var(--text-light);
             display: none;
         }
 
         .social-validation {
             display: none;
             align-items: center;
-            gap: 0.75rem;
-            padding: 1rem 1.25rem;
-            background: rgba(139, 0, 0, 0.2);
-            color: #ff6b6b;
+            gap: 10px;
+            padding: 12px 16px;
+            background: rgba(239,68,68,0.1);
+            color: #f87171;
             border-radius: var(--radius);
-            margin: 1.5rem 0;
-            font-size: 0.9rem;
-            border: 1px solid rgba(139, 0, 0, 0.3);
+            margin: 1.25rem 0;
+            font-size: 0.85rem;
+            border: 1px solid rgba(239,68,68,0.25);
         }
 
-        .social-icons-preview {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-            flex-wrap: wrap;
-        }
+        .social-icons-preview { display:flex; gap:10px; margin-top:1.25rem; flex-wrap:wrap; }
 
         .social-icon-preview {
-            width: 44px;
-            height: 44px;
+            width: 42px; height: 42px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            text-decoration: none;
-            font-size: 1.25rem;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.05);
-            border: 2px solid transparent;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
         }
 
-        .social-icon-preview:hover {
-            transform: translateY(-2px);
-            border-color: currentColor;
-            box-shadow: var(--shadow);
-        }
+        .social-icon-preview:hover { transform:translateY(-2px); border-color:currentColor; }
+        .social-icon-preview .feather { width:18px; height:18px; stroke:currentColor; }
+        .social-icon-preview.facebook { color:#1877F2; }
+        .social-icon-preview.instagram { color:#E4405F; }
+        .social-icon-preview.linkedin { color:#0077b5; }
+        .social-icon-preview.globe { color:#10b981; }
 
-        .social-icon-preview .feather {
-            width: 20px;
-            height: 20px;
-            stroke: currentColor;
-        }
-
-        .social-icon-preview.facebook { color: #1877F2; }
-        .social-icon-preview.instagram { color: #E4405F; }
-        .social-icon-preview.linkedin { color: #0077b5; }
-        .social-icon-preview.globe { color: #10b981; }
-
-        /* Posts Section */
-        .user-posts-container {
-            display: grid;
-            gap: 1.5rem;
-            margin-top: 1.5rem;
-        }
+        /* ── POSTS SECTION ── */
+        .user-posts-container { display:grid; gap:1rem; margin-top:1.25rem; }
 
         .user-post-item {
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255,255,255,0.02);
             border-radius: var(--radius);
-            padding: 1.5rem;
+            padding: 1.25rem;
             border: 1px solid var(--border);
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s;
             position: relative;
         }
 
-        .user-post-item:hover {
-            transform: translateY(-2px);
-            border-color: var(--primary);
-            box-shadow: var(--shadow-lg);
-        }
+        .user-post-item:hover { transform:translateY(-2px); border-color:rgba(255,75,110,0.3); box-shadow:var(--shadow); }
 
         .user-post-item .post-header {
             display: flex;
             align-items: center;
-            margin-bottom: 1rem;
-            gap: 0.75rem;
+            margin-bottom: 12px;
+            gap: 10px;
         }
 
         .user-post-item .post-author-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            object-fit: cover;
+            width: 44px; height: 44px;
+            border-radius: 50%; object-fit: cover;
+            border: 2px solid var(--primary);
         }
 
-        .user-post-item .post-author-info h4 {
-            margin: 0;
-            color: var(--text-primary);
-            font-size: 1rem;
-        }
+        .user-post-item .post-author-info h4 { margin:0; color:var(--text-primary); font-size:0.9rem; font-weight:600; }
+        .user-post-item .post-time { color:var(--text-light); font-size:0.75rem; }
 
-        .user-post-item .post-time {
-            color: var(--text-light);
-            font-size: 0.8rem;
-        }
-
-        .user-post-item .post-stats {
-            margin-left: auto;
-            display: flex;
-            gap: 1rem;
-        }
+        .user-post-item .post-stats { margin-left:auto; display:flex; gap:1rem; }
 
         .user-post-item .post-stat {
             display: flex;
             align-items: center;
-            gap: 0.25rem;
+            gap: 4px;
             color: var(--text-light);
-            font-size: 0.9rem;
+            font-size: 0.82rem;
         }
 
-        .user-post-item .post-content {
-            margin-bottom: 1rem;
-        }
-
-        .user-post-item .post-image-container {
-            margin-bottom: 1rem;
-            border-radius: var(--radius);
-            overflow: hidden;
-        }
-
-        .user-post-item .post-image {
-            width: 100%;
-            max-height: 300px;
-            object-fit: cover;
-            border-radius: var(--radius);
-        }
-
-        .user-post-item .post-caption {
-            color: var(--text-primary);
-            line-height: 1.5;
-            margin: 0;
-        }
+        .user-post-item .post-content { margin-bottom:12px; }
+        .user-post-item .post-image-container { margin-bottom:12px; border-radius:var(--radius); overflow:hidden; }
+        .user-post-item .post-image { width:100%; max-height:260px; object-fit:cover; border-radius:var(--radius); }
+        .user-post-item .post-caption { color:var(--text-primary); line-height:1.5; margin:0; font-size:0.9rem; }
 
         .user-post-item .post-actions-account {
             display: flex;
             justify-content: flex-end;
-            padding-top: 1rem;
+            padding-top: 12px;
             border-top: 1px solid var(--border);
         }
 
         .btn-delete-post {
-            background: #8b0000;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
+            background: rgba(239,68,68,0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239,68,68,0.3);
+            padding: 6px 14px;
             border-radius: var(--radius);
             cursor: pointer;
-            font-size: 0.9rem;
-            display: flex;
+            font-size: 0.82rem;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            transition: all 0.3s ease;
+            gap: 6px;
+            transition: all 0.2s;
         }
 
-        .btn-delete-post:hover {
-            background: #660000;
-            transform: scale(1.05);
-        }
-
-        .btn-delete-post .feather {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-        }
+        .btn-delete-post:hover { background:rgba(239,68,68,0.25); transform:translateY(-1px); }
+        .btn-delete-post .feather { width:13px; height:13px; stroke:currentColor; }
 
         .no-posts-message {
             text-align: center;
@@ -789,250 +608,186 @@
             color: var(--text-light);
         }
 
-        .no-posts-message h3 {
-            margin-bottom: 0.5rem;
-            color: var(--text-primary);
-        }
+        .no-posts-message h3 { margin-bottom:6px; color:var(--text-primary); font-size:1rem; }
 
-        .no-posts-message p {
-            margin-bottom: 1rem;
-        }
-
-        /* ========== STORES & PRODUCTS SECTION STYLES ========== */
-        .stores-container {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-            margin-top: 1.5rem;
-        }
+        /* ── STORES SECTION ── */
+        .stores-container { display:flex; flex-direction:column; gap:1.5rem; margin-top:1.25rem; }
 
         .create-store-prompt {
-            background: linear-gradient(135deg, rgba(179, 0, 75, 0.1), rgba(139, 0, 0, 0.1));
+            background: rgba(255,75,110,0.06);
             border-radius: var(--radius-lg);
             padding: 3rem 2rem;
             text-align: center;
-            border: 2px dashed var(--primary);
-            margin: 1rem 0;
+            border: 2px dashed rgba(255,75,110,0.35);
+            margin: 0.5rem 0;
         }
 
-        .create-store-prompt i {
-            font-size: 4rem;
-            color: var(--primary);
-            margin-bottom: 1.5rem;
-        }
-
-        .create-store-prompt h3 {
-            font-size: 1.8rem;
-            margin-bottom: 0.75rem;
-            color: var(--text-primary);
-        }
-
-        .create-store-prompt p {
-            color: var(--text-secondary);
-            margin-bottom: 2rem;
-            font-size: 1.1rem;
-        }
+        .create-store-prompt i { font-size: 3.5rem; color:var(--primary); margin-bottom:1.25rem; display:block; }
+        .create-store-prompt h3 { font-size:1.4rem; margin-bottom:8px; color:var(--text-primary); }
+        .create-store-prompt p { color:var(--text-light); margin-bottom:1.5rem; font-size:0.9rem; }
 
         .create-store-btn {
             display: inline-flex;
             align-items: center;
-            gap: 0.75rem;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            gap: 8px;
+            background: var(--primary);
             color: white;
-            padding: 1rem 2.5rem;
+            padding: 10px 22px;
             border-radius: var(--radius);
             text-decoration: none;
             font-weight: 600;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            transition: all 0.2s;
         }
 
-        .create-store-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(179, 0, 75, 0.4);
-        }
+        .create-store-btn:hover { background:var(--primary-dark); transform:translateY(-2px); box-shadow:0 8px 20px rgba(255,75,110,0.3); }
 
         .store-card {
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255,255,255,0.02);
             border-radius: var(--radius-lg);
             overflow: hidden;
             border: 1px solid var(--border);
-            transition: all 0.3s ease;
+            transition: border-color 0.2s;
         }
 
-        .store-card:hover {
-            border-color: var(--primary);
-            box-shadow: var(--shadow-lg);
-        }
+        .store-card:hover { border-color:rgba(255,75,110,0.25); }
 
         .store-header {
-            padding: 1.5rem;
-            background: linear-gradient(135deg, rgba(179, 0, 75, 0.1), transparent);
+            padding: 1.25rem;
+            background: rgba(255,75,110,0.05);
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
-            gap: 1.5rem;
+            gap: 1.25rem;
             flex-wrap: wrap;
         }
 
         .store-logo {
-            width: 80px;
-            height: 80px;
-            border-radius: 16px;
+            width: 70px; height: 70px;
+            border-radius: 14px;
             object-fit: cover;
-            border: 3px solid var(--primary);
+            border: 2px solid var(--primary);
             background: var(--bg-secondary);
         }
 
-        .store-info {
-            flex: 1;
-        }
+        .store-info { flex:1; }
 
         .store-name {
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: 700;
-            margin-bottom: 0.5rem;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 8px;
             flex-wrap: wrap;
+            color: var(--text-primary);
         }
 
         .store-badge {
             background: var(--primary);
             color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
+            padding: 2px 10px;
+            border-radius: 100px;
+            font-size: 0.72rem;
+            font-weight: 600;
         }
 
         .store-meta {
             display: flex;
-            gap: 1.5rem;
+            gap: 1rem;
             flex-wrap: wrap;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+            color: var(--text-light);
+            font-size: 0.82rem;
         }
 
-        .store-meta i {
-            color: var(--primary);
-            margin-right: 0.25rem;
-        }
+        .store-meta i { color:var(--primary); margin-right:3px; }
 
-        .store-actions {
-            display: flex;
-            gap: 0.75rem;
-        }
+        .store-actions { display:flex; gap:8px; }
 
         .edit-store-btn, .delete-store-btn {
-            padding: 0.5rem 1rem;
+            padding: 7px 14px;
             border-radius: var(--radius);
-            font-size: 0.9rem;
+            font-size: 0.82rem;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 5px;
             border: none;
+            font-weight: 500;
         }
 
-        .edit-store-btn {
-            background: var(--primary);
-            color: white;
-        }
-
-        .edit-store-btn:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-        }
+        .edit-store-btn { background:var(--primary); color:white; }
+        .edit-store-btn:hover { background:var(--primary-dark); transform:translateY(-1px); }
 
         .delete-store-btn {
-            background: rgba(239, 68, 68, 0.2);
+            background: rgba(239,68,68,0.12);
             color: var(--danger);
-            border: 1px solid rgba(239, 68, 68, 0.3);
+            border: 1px solid rgba(239,68,68,0.25);
         }
 
-        .delete-store-btn:hover {
-            background: rgba(239, 68, 68, 0.3);
-            transform: translateY(-2px);
-        }
+        .delete-store-btn:hover { background:rgba(239,68,68,0.2); transform:translateY(-1px); }
 
-        .products-section {
-            padding: 1.5rem;
-        }
+        .products-section { padding: 1.25rem; }
 
         .products-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
 
         .products-header h4 {
-            font-size: 1.2rem;
+            font-size: 0.95rem;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 6px;
+            color: var(--text-primary);
         }
 
         .add-product-btn {
             background: transparent;
             color: var(--primary);
-            border: 1px solid var(--primary);
-            padding: 0.5rem 1rem;
+            border: 1px solid rgba(255,75,110,0.4);
+            padding: 6px 14px;
             border-radius: var(--radius);
-            font-size: 0.9rem;
+            font-size: 0.82rem;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 5px;
             text-decoration: none;
+            font-weight: 500;
         }
 
-        .add-product-btn:hover {
-            background: var(--primary);
-            color: white;
-            transform: translateY(-2px);
-        }
+        .add-product-btn:hover { background:var(--primary); color:white; transform:translateY(-1px); }
 
         .products-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 1rem;
         }
 
         .product-item {
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255,255,255,0.02);
             border-radius: var(--radius);
             overflow: hidden;
             border: 1px solid var(--border);
-            transition: all 0.3s ease;
-            position: relative;
+            transition: all 0.2s;
         }
 
-        .product-item:hover {
-            transform: translateY(-3px);
-            border-color: var(--primary);
-            box-shadow: var(--shadow);
-        }
+        .product-item:hover { transform:translateY(-2px); border-color:rgba(255,75,110,0.25); box-shadow:var(--shadow); }
 
-        .product-image {
-            width: 100%;
-            height: 150px;
-            object-fit: cover;
-            background: var(--bg-secondary);
-        }
+        .product-image { width:100%; height:140px; object-fit:cover; background:var(--bg-secondary); }
 
-        .product-details {
-            padding: 1rem;
-        }
+        .product-details { padding: 0.9rem; }
 
         .product-name {
-            font-size: 1rem;
+            font-size: 0.88rem;
             font-weight: 600;
-            margin-bottom: 0.5rem;
+            margin-bottom: 6px;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
@@ -1043,395 +798,334 @@
         .product-price {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
+            gap: 6px;
+            margin-bottom: 6px;
             flex-wrap: wrap;
         }
 
-        .current-price {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .original-price {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            text-decoration: line-through;
-        }
+        .current-price { font-size:1rem; font-weight:700; color:var(--primary); }
+        .original-price { font-size:0.8rem; color:var(--text-light); text-decoration:line-through; }
 
         .discount-badge {
             background: var(--success);
             color: black;
-            padding: 0.15rem 0.4rem;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            font-weight: 600;
+            padding: 1px 7px;
+            border-radius: 100px;
+            font-size: 0.68rem;
+            font-weight: 700;
         }
 
         .product-stock {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.75rem;
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
-            gap: 0.25rem;
+            gap: 4px;
         }
 
-        .in-stock {
-            color: var(--success);
-        }
+        .in-stock { color:var(--success); }
+        .out-of-stock { color:var(--danger); }
 
-        .out-of-stock {
-            color: var(--danger);
-        }
-
-        .product-actions {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 0.75rem;
-        }
+        .product-actions { display:flex; gap:6px; margin-top:8px; }
 
         .edit-product-btn, .delete-product-btn {
             flex: 1;
-            padding: 0.4rem;
-            border-radius: var(--radius);
-            font-size: 0.75rem;
+            padding: 5px;
+            border-radius: 8px;
+            font-size: 0.72rem;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.25rem;
+            gap: 3px;
             border: none;
+            font-weight: 500;
         }
 
-        .edit-product-btn {
-            background: var(--primary);
-            color: white;
-        }
-
-        .edit-product-btn:hover {
-            background: var(--primary-dark);
-        }
+        .edit-product-btn { background:var(--primary); color:white; }
+        .edit-product-btn:hover { background:var(--primary-dark); }
 
         .delete-product-btn {
-            background: rgba(239, 68, 68, 0.2);
+            background: rgba(239,68,68,0.12);
             color: var(--danger);
-            border: 1px solid rgba(239, 68, 68, 0.3);
+            border: 1px solid rgba(239,68,68,0.25);
         }
 
-        .delete-product-btn:hover {
-            background: rgba(239, 68, 68, 0.3);
-        }
+        .delete-product-btn:hover { background:rgba(239,68,68,0.2); }
 
         .no-products {
             grid-column: 1 / -1;
             text-align: center;
-            padding: 2rem;
-            color: var(--text-secondary);
-            background: rgba(255, 255, 255, 0.02);
+            padding: 1.5rem;
+            color: var(--text-light);
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.02);
             border-radius: var(--radius);
             border: 1px dashed var(--border);
         }
 
-        /* Modal Styles */
+        /* ── MODALS ── */
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            inset: 0;
+            background: rgba(0,0,0,0.8);
             z-index: 2000;
             justify-content: center;
             align-items: center;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(6px);
         }
 
-        .modal.active {
-            display: flex;
-        }
+        .modal.active { display:flex; }
+
+        #deletePostModal.active { display:flex; }
 
         .modal-content {
             background: var(--bg-card);
             border-radius: var(--radius-lg);
-            max-width: 450px;
+            max-width: 440px;
             width: 90%;
-            padding: 2rem;
+            padding: 1.75rem;
             border: 1px solid var(--border);
             animation: modalSlideIn 0.3s ease;
         }
 
         @keyframes modalSlideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity:0; transform:translateY(-16px); }
+            to   { opacity:1; transform:translateY(0); }
         }
 
         .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
 
         .modal-header h3 {
-            font-size: 1.5rem;
+            font-size: 1.1rem;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 8px;
             color: var(--danger);
+            font-weight: 700;
         }
 
-        .modal-header h3 i {
-            color: var(--danger);
-        }
+        .modal-header h3 i { color:var(--danger); }
 
         .close-modal {
-            font-size: 2rem;
+            font-size: 1.6rem;
             cursor: pointer;
-            color: var(--text-secondary);
-            transition: color 0.2s ease;
+            color: var(--text-light);
+            transition: color 0.2s;
             line-height: 1;
         }
 
-        .close-modal:hover {
-            color: var(--danger);
-        }
+        .close-modal:hover { color:var(--danger); }
 
-        .modal-body {
-            margin-bottom: 2rem;
-        }
-
-        .modal-body p {
-            margin-bottom: 1rem;
-            color: var(--text-secondary);
-            line-height: 1.6;
-        }
+        .modal-body { margin-bottom: 1.5rem; }
+        .modal-body p { margin-bottom:10px; color:var(--text-secondary); line-height:1.6; font-size:0.9rem; }
 
         .warning-text {
             color: var(--danger);
-            background: rgba(239, 68, 68, 0.1);
-            padding: 0.75rem 1rem;
+            background: rgba(239,68,68,0.08);
+            padding: 10px 14px;
             border-radius: var(--radius);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            margin-bottom: 1rem;
+            border: 1px solid rgba(239,68,68,0.25);
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 8px;
+            font-size: 0.85rem;
         }
 
         .item-preview {
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255,255,255,0.02);
             border-radius: var(--radius);
-            padding: 1rem;
+            padding: 12px;
             border: 1px solid var(--border);
-            margin-top: 1rem;
+            margin-top: 10px;
         }
 
-        .preview-title {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: var(--primary);
-            font-size: 1.1rem;
-        }
+        .preview-title { font-weight:600; margin-bottom:4px; color:var(--primary); font-size:0.95rem; }
+        .preview-details { font-size:0.82rem; color:var(--text-light); }
 
-        .preview-details {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
+        /* Post delete modal special case */
+        .post-preview { background:rgba(255,255,255,0.02); border-radius:var(--radius); padding:12px; border:1px solid var(--border); margin-top:10px; }
+        .media-badge { font-size:0.75rem; color:var(--text-light); margin-top:6px; display:inline-block; }
+        .preview-caption { font-size:0.85rem; color:var(--text-secondary); margin-top:8px; }
 
-        .modal-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: flex-end;
-        }
+        .modal-actions { display:flex; gap:10px; justify-content:flex-end; }
 
-        /* Loading Spinner */
+        /* ── LOADING ── */
         .loading-spinner {
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.2);
             border-radius: 50%;
             border-top-color: var(--primary);
             animation: spin 1s ease-in-out infinite;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform:rotate(360deg); } }
 
         .loading {
             text-align: center;
-            padding: 3rem;
-            color: var(--text-secondary);
+            padding: 2.5rem;
+            color: var(--text-light);
+            font-size: 0.9rem;
         }
 
-        /* Theme Section */
+        /* ── THEMES SECTION ── */
+        .display-option-group { margin-bottom:1.75rem; }
+
+        .display-option-group h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+        }
+
+        .display-option-group h3 .feather { width:16px; height:16px; stroke:var(--primary); }
+
         .themes-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 1rem;
             margin-top: 1rem;
         }
 
-        .theme-item {
-            text-align: center;
-            cursor: pointer;
-        }
+        .theme-item { text-align:center; cursor:pointer; }
 
         .theme-preview {
-            width: 100%;
-            height: 100px;
+            width: 100%; height: 90px;
             border-radius: var(--radius);
             overflow: hidden;
             position: relative;
-            cursor: pointer;
             border: 2px solid transparent;
-            transition: all 0.3s ease;
+            transition: all 0.2s;
         }
 
-        .theme-preview:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow);
-        }
-
-        .theme-preview.selected {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px var(--primary);
-        }
+        .theme-preview:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+        .theme-preview.selected { border-color:var(--primary); box-shadow:0 0 0 2px rgba(255,75,110,0.3); }
 
         .theme-preview-content {
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: 600;
-            font-size: 0.9rem;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            font-size: 0.85rem;
         }
 
-        .theme-label {
-            text-align: center;
-            margin-top: 0.5rem;
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
+        .theme-label { text-align:center; margin-top:6px; font-size:0.75rem; font-weight:500; color:var(--text-secondary); }
+
+        .preview-section { margin-top: 1.5rem; }
+        .preview-section h3 { font-size:0.95rem; font-weight:600; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+        .preview-section h3 .feather { width:15px; height:15px; stroke:var(--primary); }
 
         .chat-preview {
             background: var(--bg-secondary);
             border-radius: var(--radius);
-            padding: 1.5rem;
-            margin-top: 1.5rem;
+            padding: 1.25rem;
+            margin-top: 1rem;
             border: 1px solid var(--border);
-            min-height: 200px;
+            min-height: 180px;
         }
 
-        .preview-messages {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
+        .preview-messages { display:flex; flex-direction:column; gap:10px; }
 
         .preview-message {
             max-width: 70%;
-            padding: 0.75rem 1rem;
+            padding: 10px 14px;
             border-radius: var(--radius);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             line-height: 1.4;
         }
 
-        .preview-message.sent {
-            align-self: flex-end;
-            background-color: var(--primary);
-            color: white;
-        }
+        .preview-message.sent { align-self:flex-end; background:var(--primary); color:white; }
 
         .preview-message.received {
             align-self: flex-start;
-            background-color: var(--bg-primary);
+            background: var(--bg-primary);
             color: var(--text-primary);
             border: 1px solid var(--border);
         }
 
-        /* Share Section - Made more compact */
+        .display-actions { display:flex; gap:10px; margin-top:1.25rem; flex-wrap:wrap; }
+
+        /* ── SHARE SECTION ── */
         .share-container {
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255,255,255,0.02);
             border-radius: var(--radius);
-            padding: 1.5rem;
+            padding: 1.25rem;
             border: 1px solid var(--border);
-            max-width: 100%;
-            overflow: hidden;
         }
 
-        .share-link-section {
-            width: 100%;
-        }
+        .share-link-section h3 { font-size:0.95rem; font-weight:600; margin-bottom:10px; color:var(--text-primary); }
 
-        .share-link-section h3 {
-            font-size: 1.2rem;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-        }
-
-        .link-input-group {
-            display: flex;
-            gap: 0.5rem;
-            width: 100%;
-            flex-wrap: wrap;
-        }
+        .link-input-group { display:flex; gap:8px; width:100%; flex-wrap:wrap; }
 
         .share-input {
             flex: 1;
-            min-width: 200px;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
+            min-width: 180px;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
             border-radius: var(--radius);
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.95rem;
+            font-size: 0.88rem;
+            font-family: 'Inter', sans-serif;
         }
 
-        .share-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
+        .share-input:focus { outline:none; border-color:var(--primary); }
 
         .copy-feedback {
-            margin-top: 0.75rem;
-            padding: 0.5rem 1rem;
+            margin-top: 8px;
+            padding: 7px 12px;
             border-radius: var(--radius);
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             display: none;
             word-break: break-word;
         }
 
         .copy-feedback.success {
-            background: rgba(34, 197, 94, 0.1);
-            color: #16a34a;
-            border: 1px solid rgba(34, 197, 94, 0.2);
+            background: rgba(16,185,129,0.1);
+            color: #10b981;
+            border: 1px solid rgba(16,185,129,0.2);
             display: block;
         }
 
         .copy-feedback.error {
-            background: rgba(239, 68, 68, 0.1);
-            color: #dc2626;
-            border: 1px solid rgba(239, 68, 68, 0.2);
+            background: rgba(239,68,68,0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239,68,68,0.2);
             display: block;
         }
 
-        /* Remove all gaming-specific styles */
+        /* ── SETTINGS / PRIVACY ── */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px; height: 18px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .checkbox-group label { cursor:pointer; font-size:0.9rem; color:var(--text-secondary); margin:0; }
+
+        /* ── HIDDEN GAMING STYLES (kept for compat) ── */
         .gamer-profile-form-container,
         .profile-preview-container,
         .gamer-stats-grid,
@@ -1446,1373 +1140,980 @@
         .stats-section,
         .preferences-section,
         .achievements-section,
-        .xp-system-card {
-            display: none;
+        .xp-system-card { display:none; }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 900px) {
+            .account-content { grid-template-columns:1fr; }
+            .account-sidebar { position:static; }
         }
 
-        /* Responsive adjustments */
         @media (max-width: 768px) {
-            .account-content {
-                grid-template-columns: 1fr;
-            }
+            .form-row { grid-template-columns:1fr; }
 
-            .account-sidebar {
-                position: static;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-
-            .themes-grid {
-                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            }
+            .themes-grid { grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); }
 
             .nav-menu {
                 position: fixed;
-                left: -100%;
-                top: 70px;
+                left: -100%; top: 60px;
                 flex-direction: column;
-                background-color: rgba(0, 0, 0, 0.85);
-                backdrop-filter: blur(10px);
+                background: rgba(14,16,20,0.97);
+                backdrop-filter: blur(20px);
                 width: 100%;
                 text-align: center;
-                transition: 0.3s;
-                box-shadow: var(--shadow);
-                padding: 2rem 0;
+                transition: left 0.3s;
+                padding: 1.5rem 0;
                 gap: 0;
+                border-bottom: 1px solid var(--border);
             }
 
-            .nav-menu.active {
-                left: 0;
-            }
+            .nav-menu.active { left:0; }
+            .nav-item { margin:0.5rem 0; }
+            .nav-toggle { display:flex; }
 
-            .nav-item {
-                margin: 0.75rem 0;
-            }
+            .link-input-group { flex-direction:column; }
+            .share-input { width:100%; }
+            .btn-primary { width:100%; justify-content:center; }
 
-            .nav-toggle {
-                display: flex;
-            }
-
-            .link-input-group {
-                flex-direction: column;
-            }
-            
-            .share-input {
-                width: 100%;
-            }
-            
-            .btn-primary {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .store-header {
-                flex-direction: column;
-                text-align: center;
-            }
-
-            .store-actions {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .products-grid {
-                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            }
+            .store-header { flex-direction:column; text-align:center; }
+            .store-actions { width:100%; justify-content:center; }
+            .products-grid { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
         }
 
         @media (max-width: 480px) {
-            .account-container {
-                padding: 0 1rem;
-            }
+            .account-container { padding:0 1rem; }
+            .account-sidebar, .account-main { padding:1.25rem; }
 
-            .account-sidebar,
-            .account-main {
-                padding: 1.5rem;
-            }
+            .user-post-item .post-header { flex-direction:column; align-items:flex-start; }
+            .user-post-item .post-stats { margin-left:0; margin-top:6px; width:100%; justify-content:space-between; }
 
-            .user-post-item .post-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .user-post-item .post-stats {
-                margin-left: 0;
-                margin-top: 0.5rem;
-                width: 100%;
-                justify-content: space-between;
-            }
-
-            .modal-content {
-                width: 95%;
-                padding: 1.5rem;
-            }
-
-            .modal-actions {
-                flex-direction: column;
-            }
-
-            .products-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .store-meta {
-                flex-direction: column;
-                gap: 0.5rem;
-                align-items: center;
-            }
-            
-            .share-container {
-                padding: 1rem;
-            }
+            .modal-content { width:95%; padding:1.25rem; }
+            .modal-actions { flex-direction:column; }
+            .products-grid { grid-template-columns:1fr 1fr; }
+            .store-meta { flex-direction:column; gap:4px; align-items:center; }
+            .share-container { padding:1rem; }
         }
     </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-container">
-            <a href="index.html" class="logo">BondBase</a>
-            <div class="nav-toggle" id="mobile-menu">
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
-            </div>
-            <ul class="nav-menu" id="nav-menu">
-                <li class="nav-item">
-                    <a href="mingle.html" class="nav-links">
-                        <svg class="feather" data-feather="users">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                        Connect
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="messages.html" class="nav-links">
-                        <svg class="feather" data-feather="message-circle">
-                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-                        </svg>
-                        Chat
-                        <span class="message-count">0</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="gist.html" class="nav-links">
-                        <svg class="feather" data-feather="book-open">
-                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                        </svg>
-                        Anonymous
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="stream.html" class="nav-links">
-                        <svg class="feather" data-feather="play-circle">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polygon points="10 8 16 12 10 16 10 8"></polygon>
-                        </svg>
-                        <span class="nav-text" style="font-family: 'Inter', sans-serif; font-size: 0.75rem;">Stream</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="account.html" class="nav-links active">
-                        <svg class="feather" data-feather="user">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                        My Profile
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="#" id="logoutBtn" class="nav-links">
-                        <svg class="feather" data-feather="log-out">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                            <polyline points="16 17 21 12 16 7"></polyline>
-                            <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                        Logout
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="groups.html" class="nav-links">
-                        <svg class="feather" data-feather="users">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                        Groups
-                    </a>
-                </li>
-            </ul>
-        </div>
-    </nav>
 
-    <div class="account-container">
-        <div class="account-header">
-            <h1>My Profile</h1>
-            <p>Update your personal information and preferences</p>
-            <a href="payment.html" class="back-btn">
-                <svg class="feather" data-feather="arrow-left">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Manage Payment Methods
-            </a>
+<!-- ── NAV ── -->
+<nav class="navbar">
+    <div class="navbar-container">
+        <a href="index.html" class="logo">Bond<span>Base</span></a>
+        <div class="nav-toggle" id="mobile-menu">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
         </div>
-        
-        <div class="account-content">
-            <div class="account-sidebar">
-                <div class="profile-picture-upload">
-                    <img src="images-default-profile.jpg" alt="Profile" id="accountProfileImage">
-                    <label for="profileImageUpload" class="upload-btn">
-                        <svg class="feather" data-feather="camera">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                            <circle cx="12" cy="13" r="4"></circle>
-                        </svg>
-                        Change Photo
-                    </label>
-                    <input type="file" id="profileImageUpload" accept="image/*" style="display: none;">
-                    <button class="btn-secondary" id="removeProfileImage">Remove</button>
-                </div>
+        <ul class="nav-menu" id="nav-menu">
+            <li class="nav-item">
+                <a href="mingle.html" class="nav-links">
+                    <svg class="feather" data-feather="users"></svg>
+                    Connect
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="messages.html" class="nav-links">
+                    <svg class="feather" data-feather="message-circle"></svg>
+                    Chat
+                    <span class="message-count">0</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="gist.html" class="nav-links">
+                    <svg class="feather" data-feather="eye-off"></svg>
+                    Anonymous
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="stream.html" class="nav-links">
+                    <svg class="feather" data-feather="play-circle"></svg>
+                    Stream
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="account.html" class="nav-links active">
+                    <svg class="feather" data-feather="user"></svg>
+                    My Profile
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" id="logoutBtn" class="nav-links">
+                    <svg class="feather" data-feather="log-out"></svg>
+                    Logout
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="groups.html" class="nav-links">
+                    <svg class="feather" data-feather="users"></svg>
+                    Groups
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
 
-                <div class="account-menu">
-                    <button class="menu-item active" data-section="profile">
-                        <svg class="feather" data-feather="user">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                        Profile Information
-                    </button>
-                    <button class="menu-item" data-section="social">
-                        <svg class="feather" data-feather="share-2">
-                            <circle cx="18" cy="5" r="3"></circle>
-                            <circle cx="6" cy="12" r="3"></circle>
-                            <circle cx="18" cy="19" r="3"></circle>
-                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                        </svg>
-                        Social Links
-                    </button>
-                    <button class="menu-item" data-section="posts">
-                        <svg class="feather" data-feather="book-open">
-                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                        </svg>
-                        My Posts
-                    </button>
-                    <button class="menu-item" data-section="stores">
-                        <i class="fas fa-store"></i>
-                        My Stores & Products
-                    </button>
-                    <button class="menu-item" data-section="display">
-                        <svg class="feather" data-feather="palette">
-                            <circle cx="13.5" cy="6.5" r=".5"></circle>
-                            <circle cx="17.5" cy="10.5" r=".5"></circle>
-                            <circle cx="8.5" cy="7.5" r=".5"></circle>
-                            <circle cx="6.5" cy="12.5" r=".5"></circle>
-                            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
-                        </svg>
-                        Chat Display
-                    </button>
-                    <button class="menu-item" data-section="share">
-                        <svg class="feather" data-feather="share">
-                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-                            <polyline points="16 6 12 2 8 6"></polyline>
-                            <line x1="12" y1="2" x2="12" y2="15"></line>
-                        </svg>
-                        Share BondBase
-                    </button>
-                    <button class="menu-item" data-section="settings">
-                        <svg class="feather" data-feather="settings">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                        </svg>
-                        Settings
-                    </button>
-                    <button class="menu-item" data-section="privacy">
-                        <svg class="feather" data-feather="shield">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                        </svg>
-                        Privacy
-                    </button>
-                </div>
+<!-- ── MAIN ── -->
+<div class="account-container">
+
+    <div class="account-header">
+        <h1>My Account</h1>
+        <p>Update your profile, links, posts and store</p>
+        <a href="payment.html" class="back-btn">
+            <svg class="feather" data-feather="credit-card"></svg>
+            Manage Payment Methods
+        </a>
+    </div>
+
+    <div class="account-content">
+
+        <!-- ── SIDEBAR ── -->
+        <div class="account-sidebar">
+            <div class="profile-picture-upload">
+                <img src="images-default-profile.jpg" alt="Profile" id="accountProfileImage">
+                <label for="profileImageUpload" class="upload-btn">
+                    <svg class="feather" data-feather="camera"></svg>
+                    Change Photo
+                </label>
+                <input type="file" id="profileImageUpload" accept="image/*" style="display:none;">
+                <button class="btn-secondary" id="removeProfileImage">Remove</button>
             </div>
-            
-            <div class="account-main">
-                <!-- Profile Section -->
-                <div class="account-section" id="profileSection">
-                    <h2>
-                        <svg class="feather" data-feather="user">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                        Profile Information
-                    </h2>
-                    <form id="profileForm">
+
+            <div class="account-menu">
+                <button class="menu-item active" data-section="profile">
+                    <svg class="feather" data-feather="user"></svg>
+                    Profile Information
+                </button>
+                <button class="menu-item" data-section="social">
+                    <svg class="feather" data-feather="share-2"></svg>
+                    Social Links
+                </button>
+                <button class="menu-item" data-section="posts">
+                    <svg class="feather" data-feather="layout"></svg>
+                    My Posts
+                </button>
+                <button class="menu-item" data-section="stores">
+                    <i class="fas fa-store"></i>
+                    My Stores &amp; Products
+                </button>
+                <button class="menu-item" data-section="display">
+                    <svg class="feather" data-feather="palette"></svg>
+                    Chat Display
+                </button>
+                <button class="menu-item" data-section="share">
+                    <svg class="feather" data-feather="share"></svg>
+                    Share BondBase
+                </button>
+                <button class="menu-item" data-section="settings">
+                    <svg class="feather" data-feather="settings"></svg>
+                    Settings
+                </button>
+                <button class="menu-item" data-section="privacy">
+                    <svg class="feather" data-feather="shield"></svg>
+                    Privacy
+                </button>
+            </div>
+        </div>
+
+        <!-- ── MAIN AREA ── -->
+        <div class="account-main">
+
+            <!-- PROFILE SECTION -->
+            <div class="account-section" id="profileSection">
+                <h2>
+                    <svg class="feather" data-feather="user"></svg>
+                    Profile Information
+                </h2>
+                <p class="section-description">Update your display name, age, location and bio.</p>
+                <form id="profileForm">
+                    <div class="form-group">
+                        <label for="accountName">Display Name</label>
+                        <input type="text" id="accountName" required placeholder="Your name">
+                    </div>
+                    <div class="form-row">
                         <div class="form-group">
-                            <label for="accountName">Display Name</label>
-                            <input type="text" id="accountName" required>
+                            <label for="accountAge">Age</label>
+                            <input type="number" id="accountAge" min="13" max="120" required placeholder="Your age">
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="accountAge">Age</label>
-                                <input type="number" id="accountAge" min="13" max="120" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="accountGender">Gender</label>
-                                <select id="accountGender" required>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                    <option value="non-binary">Non-binary</option>
-                                    <option value="prefer-not">Prefer not to say</option>
-                                    <option value="other">Other</option>
+                        <div class="form-group">
+                            <label for="accountGender">Gender</label>
+                            <select id="accountGender" required>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="non-binary">Non-binary</option>
+                                <option value="prefer-not">Prefer not to say</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="accountLocation">Location</label>
+                        <div id="locationContainer" class="location-container">
+                            <div id="selectedLocation" class="selected-location"></div>
+                            <input type="hidden" id="accountLocation" name="location">
+                            <span id="flagDisplay" class="flag-display"></span>
+                            <div id="locationDropdown" class="location-dropdown">
+                                <select id="countryDropdown" class="country-dropdown">
+                                    <option value="">Select Country</option>
+                                </select>
+                                <select id="stateDropdown" class="stateDropdown" style="display:none;">
+                                    <option value="">Select State</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="accountLocation">Location</label>
-                            <div id="locationContainer" class="location-container">
-                                <div id="selectedLocation" class="selected-location"></div>
-                                <input type="hidden" id="accountLocation" name="location">
-                                <span id="flagDisplay" class="flag-display"></span>
-                                <div id="locationDropdown" class="location-dropdown">
-                                    <select id="countryDropdown" class="country-dropdown">
-                                        <option value="">Select Country</option>
-                                    </select>
-                                    <select id="stateDropdown" class="stateDropdown" style="display: none;">
-                                        <option value="">Select State</option>
-                                    </select>
-                                </div>
-                            </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="accountBio">Bio</label>
+                        <textarea id="accountBio" rows="4" placeholder="Tell us about yourself..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Interests (up to 10)</label>
+                        <div class="interests-input">
+                            <input type="text" id="accountInterests" placeholder="e.g. photography, hiking">
+                            <button type="button" id="addInterestBtn">
+                                <svg class="feather" data-feather="plus"></svg>
+                            </button>
                         </div>
-                        <div class="form-group">
-                            <label for="accountBio">Bio</label>
-                            <textarea id="accountBio" rows="4" placeholder="Tell us about yourself, your interests, and what you like to do..."></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Interests (Add up to 10)</label>
-                            <div class="interests-input">
-                                <input type="text" id="accountInterests" placeholder="e.g., photography, hiking, cooking, reading">
-                                <button type="button" id="addInterestBtn">
-                                    <svg class="feather" data-feather="plus">
-                                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                                    </svg>
-                                </button>
-                            </div>
-                            <div class="interests-container" id="accountInterestsContainer"></div>
-                        </div>
-                        <div class="form-group">
-                            <label for="accountPhone">Phone Number (Optional)</label>
-                            <input type="tel" id="accountPhone" placeholder="Your phone number">
-                        </div>
-                        <button type="submit" class="btn-primary">
-                            <svg class="feather" data-feather="save">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                <polyline points="7 3 7 8 15 8"></polyline>
-                            </svg>
-                            Save Changes
-                        </button>
-                    </form>
-                </div>
-                
-                <!-- Social Media Links Section -->
-                <div class="account-section" id="socialSection" style="display: none;">
-                    <h2>
-                        <svg class="feather" data-feather="share-2">
-                            <circle cx="18" cy="5" r="3"></circle>
-                            <circle cx="6" cy="12" r="3"></circle>
-                            <circle cx="18" cy="19" r="3"></circle>
-                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                        </svg>
-                        Social Links
-                    </h2>
-                    <p class="section-description">Add your social media links to connect with friends. These will be displayed on your profile.</p>
-                    
-                    <div class="social-links-container">
-                        <div class="social-input-group">
-                            <div class="social-platform-header">
-                                <svg class="feather" data-feather="facebook" style="color: #1877F2;">
-                                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-                                </svg>
-                                <span>Facebook</span>
-                            </div>
-                            <input type="text" id="social-facebook" class="social-input" placeholder="Facebook profile" data-platform="facebook">
-                            <div class="social-preview" id="preview-facebook">
-                                <small>Link: https://facebook.com/<span id="preview-text-facebook">username</span></small>
-                            </div>
-                        </div>
+                        <div class="interests-container" id="accountInterestsContainer"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="accountPhone">Phone Number (Optional)</label>
+                        <input type="tel" id="accountPhone" placeholder="Your phone number">
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        <svg class="feather" data-feather="save"></svg>
+                        Save Changes
+                    </button>
+                </form>
+            </div>
 
-                        <div class="social-input-group">
-                            <div class="social-platform-header">
-                                <svg class="feather" data-feather="instagram" style="color: #E4405F;">
-                                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                                </svg>
-                                <span>Instagram</span>
-                            </div>
-                            <input type="text" id="social-instagram" class="social-input" placeholder="Instagram username" data-platform="instagram">
-                            <div class="social-preview" id="preview-instagram">
-                                <small>Link: https://instagram.com/<span id="preview-text-instagram">username</span></small>
-                            </div>
-                        </div>
+            <!-- SOCIAL SECTION -->
+            <div class="account-section" id="socialSection" style="display:none;">
+                <h2>
+                    <svg class="feather" data-feather="share-2"></svg>
+                    Social Links
+                </h2>
+                <p class="section-description">Add your social media profiles. These appear on your public profile.</p>
 
-                        <div class="social-input-group">
-                            <div class="social-platform-header">
-                                <svg class="feather" data-feather="linkedin" style="color: #0077b5;">
-                                    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
-                                    <rect x="2" y="9" width="4" height="12"></rect>
-                                    <circle cx="4" cy="4" r="2"></circle>
-                                </svg>
-                                <span>LinkedIn</span>
-                            </div>
-                            <input type="text" id="social-linkedin" class="social-input" placeholder="LinkedIn profile" data-platform="linkedin">
-                            <div class="social-preview" id="preview-linkedin">
-                                <small>Link: https://linkedin.com/in/<span id="preview-text-linkedin">username</span></small>
-                            </div>
+                <div class="social-links-container">
+                    <div class="social-input-group">
+                        <div class="social-platform-header">
+                            <svg class="feather" data-feather="facebook" style="color:#1877F2;"></svg>
+                            <span>Facebook</span>
                         </div>
-
-                        <div class="social-input-group">
-                            <div class="social-platform-header">
-                                <svg class="feather" data-feather="globe" style="color: #10b981;">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="2" y1="12" x2="22" y2="12"></line>
-                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                                </svg>
-                                <span>Personal Website</span>
-                            </div>
-                            <input type="text" id="social-website" class="social-input" placeholder="Your personal website" data-platform="website">
-                            <div class="social-preview" id="preview-website">
-                                <small>Link: <span id="preview-text-website">website.com</span></small>
-                            </div>
-                        </div>
-
-                        <div class="social-input-group">
-                            <div class="social-platform-header">
-                                <i class="fab fa-x-twitter" style="color: #1DA1F2; font-size: 20px;"></i>
-                                <span>X (Twitter)</span>
-                            </div>
-                            <input type="text" id="social-twitter" class="social-input" placeholder="X username" data-platform="twitter">
-                            <div class="social-preview" id="preview-twitter">
-                                <small>Link: https://x.com/<span id="preview-text-twitter">username</span></small>
-                            </div>
+                        <input type="text" id="social-facebook" class="social-input" placeholder="Facebook username" data-platform="facebook">
+                        <div class="social-preview" id="preview-facebook">
+                            <small>Link: https://facebook.com/<span id="preview-text-facebook">username</span></small>
                         </div>
                     </div>
 
-                    <div class="social-validation" id="socialValidation">
-                        <svg class="feather" data-feather="alert-circle">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                        <span>Please add at least one social link to save your profile</span>
-                    </div>
-
-                    <div class="social-preview-section">
-                        <h3>Your Social Links Preview</h3>
-                        <p class="section-description">This is how your social links will appear to others:</p>
-                        <div class="social-icons-preview" id="socialIconsPreview">
-                            <!-- Social icons will be dynamically added here -->
+                    <div class="social-input-group">
+                        <div class="social-platform-header">
+                            <svg class="feather" data-feather="instagram" style="color:#E4405F;"></svg>
+                            <span>Instagram</span>
+                        </div>
+                        <input type="text" id="social-instagram" class="social-input" placeholder="Instagram username" data-platform="instagram">
+                        <div class="social-preview" id="preview-instagram">
+                            <small>Link: https://instagram.com/<span id="preview-text-instagram">username</span></small>
                         </div>
                     </div>
+
+                    <div class="social-input-group">
+                        <div class="social-platform-header">
+                            <svg class="feather" data-feather="linkedin" style="color:#0077b5;"></svg>
+                            <span>LinkedIn</span>
+                        </div>
+                        <input type="text" id="social-linkedin" class="social-input" placeholder="LinkedIn profile" data-platform="linkedin">
+                        <div class="social-preview" id="preview-linkedin">
+                            <small>Link: https://linkedin.com/in/<span id="preview-text-linkedin">username</span></small>
+                        </div>
+                    </div>
+
+                    <div class="social-input-group">
+                        <div class="social-platform-header">
+                            <svg class="feather" data-feather="globe" style="color:#10b981;"></svg>
+                            <span>Personal Website</span>
+                        </div>
+                        <input type="text" id="social-website" class="social-input" placeholder="Your website" data-platform="website">
+                        <div class="social-preview" id="preview-website">
+                            <small>Link: <span id="preview-text-website">website.com</span></small>
+                        </div>
+                    </div>
+
+                    <div class="social-input-group">
+                        <div class="social-platform-header">
+                            <i class="fab fa-x-twitter" style="color:#1DA1F2;font-size:18px;"></i>
+                            <span>X (Twitter)</span>
+                        </div>
+                        <input type="text" id="social-twitter" class="social-input" placeholder="X username" data-platform="twitter">
+                        <div class="social-preview" id="preview-twitter">
+                            <small>Link: https://x.com/<span id="preview-text-twitter">username</span></small>
+                        </div>
+                    </div>
+
+                    <!-- snapchat & tiktok kept for social.js compat -->
+                    <input type="hidden" id="social-snapchat" data-platform="snapchat">
+                    <input type="hidden" id="social-tiktok" data-platform="tiktok">
                 </div>
 
-                <!-- My Posts Section -->
-                <div class="account-section" id="postsSection" style="display: none;">
-                    <h2>
-                        <svg class="feather" data-feather="book-open">
-                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                        </svg>
-                        My Posts
-                    </h2>
-                    <p class="section-description">Manage your posts - click on any post to delete it</p>
-                    
-                    <div class="user-posts-container" id="userPostsContainer">
-                        <div class="loading">Loading your posts...</div>
-                    </div>
-
-                    <!-- Delete Confirmation Modal -->
-                    <div id="deletePostModal" class="modal" style="display: none;">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3>Delete Post</h3>
-                                <span class="close-modal">&times;</span>
-                            </div>
-                            <div class="modal-body">
-                                <p>Are you sure you want to delete this post? This action cannot be undone.</p>
-                                <div class="post-preview" id="postPreview"></div>
-                            </div>
-                            <div class="modal-actions">
-                                <button id="cancelDelete" class="btn-secondary">Cancel</button>
-                                <button id="confirmDelete" class="btn-danger">
-                                    <svg class="feather" data-feather="trash-2">
-                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                        <line x1="10" y1="11" x2="10" y2="17"></line>
-                                        <line x1="14" y1="11" x2="14" y2="17"></line>
-                                    </svg>
-                                    Delete Post
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                <div class="social-validation" id="socialValidation">
+                    <svg class="feather" data-feather="alert-circle"></svg>
+                    <span>Please add at least one social link to save your profile</span>
                 </div>
 
-                <!-- ========== STORES & PRODUCTS SECTION ========== -->
-                <div class="account-section" id="storesSection" style="display: none;">
-                    <h2>
-                        <i class="fas fa-store" style="color: var(--primary-light);"></i>
-                        My Stores & Products
-                    </h2>
-                    <p class="section-description">Manage your stores and products. Create, edit, or delete your listings.</p>
-                    
-                    <div id="storesContainer" class="stores-container">
-                        <!-- Stores will be loaded here dynamically -->
-                        <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading your stores...</div>
-                    </div>
-
-                    <!-- Delete Store Modal -->
-                    <div id="deleteStoreModal" class="modal">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3><i class="fas fa-exclamation-triangle"></i> Delete Store</h3>
-                                <span class="close-modal" onclick="closeModal('deleteStoreModal')">&times;</span>
-                            </div>
-                            <div class="modal-body">
-                                <p>Are you sure you want to delete this store? This action cannot be undone.</p>
-                                <div class="warning-text">
-                                    <i class="fas fa-exclamation-circle"></i> All products in this store will also be deleted!
-                                </div>
-                                <div id="storePreview" class="item-preview"></div>
-                            </div>
-                            <div class="modal-actions">
-                                <button class="btn-secondary" onclick="closeModal('deleteStoreModal')">Cancel</button>
-                                <button id="confirmDeleteStore" class="btn-danger">
-                                    <i class="fas fa-trash"></i> Delete Store
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Delete Product Modal -->
-                    <div id="deleteProductModal" class="modal">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3><i class="fas fa-exclamation-triangle"></i> Delete Product</h3>
-                                <span class="close-modal" onclick="closeModal('deleteProductModal')">&times;</span>
-                            </div>
-                            <div class="modal-body">
-                                <p>Are you sure you want to delete this product? This action cannot be undone.</p>
-                                <div id="productPreview" class="item-preview"></div>
-                            </div>
-                            <div class="modal-actions">
-                                <button class="btn-secondary" onclick="closeModal('deleteProductModal')">Cancel</button>
-                                <button id="confirmDeleteProduct" class="btn-danger">
-                                    <i class="fas fa-trash"></i> Delete Product
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Profile Display Section - Only Themes -->
-                <div class="account-section" id="displaySection" style="display: none;">
-                    <h2>
-                        <svg class="feather" data-feather="palette">
-                            <circle cx="13.5" cy="6.5" r=".5"></circle>
-                            <circle cx="17.5" cy="10.5" r=".5"></circle>
-                            <circle cx="8.5" cy="7.5" r=".5"></circle>
-                            <circle cx="6.5" cy="12.5" r=".5"></circle>
-                            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
-                        </svg>
-                        Chat Display
-                    </h2>
-                    <p class="section-description">Customize your chat themes and interface appearance</p>
-                    
-                    <!-- Chat Themes Section -->
-                    <div class="display-option-group">
-                        <h3>
-                            <svg class="feather" data-feather="message-circle">
-                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-                            </svg>
-                            Chat Themes
-                        </h3>
-                        <p class="section-description">Choose how your chat interface looks</p>
-                        
-                        <div class="themes-grid" id="themesGrid">
-                            <div class="theme-item">
-                                <div class="theme-preview">
-                                    <div class="theme-preview-content" style="background: linear-gradient(135deg, #b3004b, #7a0034);">
-                                        Vibrant
-                                    </div>
-                                </div>
-                                <div class="theme-label">Vibrant Theme</div>
-                            </div>
-                            <div class="theme-item">
-                                <div class="theme-preview">
-                                    <div class="theme-preview-content" style="background: linear-gradient(135deg, #8b0000, #660000);">
-                                        Warm
-                                    </div>
-                                </div>
-                                <div class="theme-label">Warm Theme</div>
-                            </div>
-                            <div class="theme-item">
-                                <div class="theme-preview">
-                                    <div class="theme-preview-content" style="background: linear-gradient(135deg, #444, #2e2e2e);">
-                                        Calm
-                                    </div>
-                                </div>
-                                <div class="theme-label">Calm Theme</div>
-                            </div>
-                            <div class="theme-item">
-                                <div class="theme-preview">
-                                    <div class="theme-preview-content" style="background: linear-gradient(135deg, #1a1a1a, #0b0b0b);">
-                                        Natural
-                                    </div>
-                                </div>
-                                <div class="theme-label">Natural Theme</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Chat Theme Preview -->
-                    <div class="preview-section">
-                        <h3>
-                            <svg class="feather" data-feather="eye">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                <circle cx="12" cy="12" r="3"></circle>
-                            </svg>
-                            Live Preview
-                        </h3>
-                        <p class="section-description">See how your selected theme will look in chats</p>
-                        
-                        <div class="chat-preview" id="chatPreview">
-                            <div class="preview-messages">
-                                <div class="preview-message received">
-                                    Hey, how's your day going?
-                                </div>
-                                <div class="preview-message sent">
-                                    Pretty good! Just finished work. Want to catch up later?
-                                </div>
-                                <div class="preview-message received">
-                                    Sounds great! Let's meet at the usual spot.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="display-actions">
-                        <button type="button" class="btn-primary" id="saveDisplaySettings">
-                            <svg class="feather" data-feather="save">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                <polyline points="7 3 7 8 15 8"></polyline>
-                            </svg>
-                            Save Theme Settings
-                        </button>
-                        <button type="button" class="btn-secondary" id="resetDisplaySettings">
-                            <svg class="feather" data-feather="rotate-ccw">
-                                <polyline points="1 4 1 10 7 10"></polyline>
-                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                            </svg>
-                            Reset to Default
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Share BondBase Section - Made more compact -->
-                <div class="account-section" id="shareSection" style="display: none;">
-                    <h2>
-                        <svg class="feather" data-feather="share">
-                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-                            <polyline points="16 6 12 2 8 6"></polyline>
-                            <line x1="12" y1="2" x2="12" y2="15"></line>
-                        </svg>
-                        Share BondBase
-                    </h2>
-                    <p class="section-description">Invite friends to join BondBase. Help grow our community!</p>
-                    
-                    <div class="share-container">
-                        <div class="share-link-section">
-                            <h3>Share with Friends</h3>
-                            <div class="link-input-group">
-                                <input type="text" id="bondlyLink" class="share-input" value="https://BondBase.com" readonly>
-                                <button id="copyBondlyLinkBtn" class="btn-primary">
-                                    <svg class="feather" data-feather="copy">
-                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                    </svg>
-                                    Copy Link
-                                </button>
-                            </div>
-                            <div class="copy-feedback" id="copyBondlyFeedback"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Settings Section -->
-                <div class="account-section" id="settingsSection" style="display: none;">
-                    <h2>
-                        <svg class="feather" data-feather="settings">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                        </svg>
-                        Account Settings
-                    </h2>
-                    <form id="settingsForm">
-                        <div class="form-group">
-                            <label for="accountEmail">Email</label>
-                            <input type="email" id="accountEmail" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label for="currentPassword">Current Password</label>
-                            <input type="password" id="currentPassword">
-                        </div>
-                        <div class="form-group">
-                            <label for="newPassword">New Password</label>
-                            <input type="password" id="newPassword">
-                        </div>
-                        <div class="form-group">
-                            <label for="confirmNewPassword">Confirm New Password</label>
-                            <input type="password" id="confirmNewPassword">
-                        </div>
-                        <button type="submit" class="btn-primary">
-                            <svg class="feather" data-feather="save">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                <polyline points="7 3 7 8 15 8"></polyline>
-                            </svg>
-                            Update Settings
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Privacy Section -->
-                <div class="account-section" id="privacySection" style="display: none;">
-                    <h2>
-                        <svg class="feather" data-feather="shield">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                        </svg>
-                        Privacy Settings
-                    </h2>
-                    <form id="privacyForm">
-                        <div class="form-group checkbox-group">
-                            <input type="checkbox" id="showAge" checked>
-                            <label for="showAge">Show my age on profile</label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <input type="checkbox" id="showLocation" checked>
-                            <label for="showLocation">Show my location on profile</label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <input type="checkbox" id="showOnlineStatus" checked>
-                            <label for="showOnlineStatus">Show when I'm online</label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <input type="checkbox" id="showSocialLinks" checked>
-                            <label for="showSocialLinks">Show my social links on profile</label>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <input type="checkbox" id="showInterests" checked>
-                            <label for="showInterests">Show my interests on profile</label>
-                        </div>
-                        <button type="submit" class="btn-primary">
-                            <svg class="feather" data-feather="save">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                <polyline points="7 3 7 8 15 8"></polyline>
-                            </svg>
-                            Save Privacy Settings
-                        </button>
-                    </form>
+                <div class="social-preview-section" style="margin-top:1.5rem;">
+                    <p class="section-description" style="border:none;padding:0;margin-bottom:10px;">Preview — how your links appear to others:</p>
+                    <div class="social-icons-preview" id="socialIconsPreview"></div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            collection,
-            getDocs,
-            getDoc,
-            doc,
-            query,
-            where,
-            deleteDoc,
-            writeBatch
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+            <!-- POSTS SECTION -->
+            <div class="account-section" id="postsSection" style="display:none;">
+                <h2>
+                    <svg class="feather" data-feather="layout"></svg>
+                    My Posts
+                </h2>
+                <p class="section-description">Manage and delete your posts.</p>
 
-        // Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
-            authDomain: "crypto-6517d.firebaseapp.com",
-            projectId: "crypto-6517d",
-            storageBucket: "crypto-6517d.firebasestorage.app",
-            messagingSenderId: "60263975159",
-            appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-        };
+                <div class="user-posts-container" id="userPostsContainer">
+                    <div class="loading">Loading your posts...</div>
+                </div>
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+                <!-- Delete Post Modal -->
+                <div id="deletePostModal" class="modal" style="display:none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Delete Post</h3>
+                            <span class="close-modal">&times;</span>
+                        </div>
+                        <div class="modal-body">
+                            <p>Are you sure you want to delete this post? This action cannot be undone.</p>
+                            <div class="post-preview" id="postPreview"></div>
+                        </div>
+                        <div class="modal-actions">
+                            <button id="cancelDelete" class="btn-secondary">Cancel</button>
+                            <button id="confirmDelete" class="btn-danger">
+                                <svg class="feather" data-feather="trash-2"></svg>
+                                Delete Post
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        // Initialize Feather Icons
-        document.addEventListener('DOMContentLoaded', function() {
-            if (typeof feather !== 'undefined') {
-                feather.replace();
-            }
-        });
+            <!-- STORES SECTION -->
+            <div class="account-section" id="storesSection" style="display:none;">
+                <h2>
+                    <i class="fas fa-store" style="color:var(--primary);font-size:18px;"></i>
+                    My Stores &amp; Products
+                </h2>
+                <p class="section-description">Create, edit and manage your stores and product listings.</p>
 
-        // Account menu navigation
-        document.querySelectorAll('.menu-item').forEach(item => {
-            item.addEventListener('click', function() {
-                // Remove active class from all menu items
-                document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
-                // Add active class to clicked item
-                this.classList.add('active');
-                
-                // Hide all sections
-                document.querySelectorAll('.account-section').forEach(section => {
-                    section.style.display = 'none';
-                });
-                
-                // Show selected section
-                const sectionId = this.getAttribute('data-section') + 'Section';
-                const targetSection = document.getElementById(sectionId);
-                if (targetSection) {
-                    targetSection.style.display = 'block';
-                    
-                    // If stores section, load stores from Firebase
-                    if (this.getAttribute('data-section') === 'stores') {
-                        loadUserStores();
-                    }
-                }
+                <div id="storesContainer" class="stores-container">
+                    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading your stores...</div>
+                </div>
+
+                <!-- Delete Store Modal -->
+                <div id="deleteStoreModal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3><i class="fas fa-exclamation-triangle"></i> Delete Store</h3>
+                            <span class="close-modal" onclick="closeModal('deleteStoreModal')">&times;</span>
+                        </div>
+                        <div class="modal-body">
+                            <p>Are you sure you want to delete this store? This cannot be undone.</p>
+                            <div class="warning-text">
+                                <i class="fas fa-exclamation-circle"></i> All products in this store will also be deleted!
+                            </div>
+                            <div id="storePreview" class="item-preview"></div>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn-secondary" onclick="closeModal('deleteStoreModal')">Cancel</button>
+                            <button id="confirmDeleteStore" class="btn-danger">
+                                <i class="fas fa-trash"></i> Delete Store
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delete Product Modal -->
+                <div id="deleteProductModal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3><i class="fas fa-exclamation-triangle"></i> Delete Product</h3>
+                            <span class="close-modal" onclick="closeModal('deleteProductModal')">&times;</span>
+                        </div>
+                        <div class="modal-body">
+                            <p>Are you sure you want to delete this product? This cannot be undone.</p>
+                            <div id="productPreview" class="item-preview"></div>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn-secondary" onclick="closeModal('deleteProductModal')">Cancel</button>
+                            <button id="confirmDeleteProduct" class="btn-danger">
+                                <i class="fas fa-trash"></i> Delete Product
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DISPLAY SECTION -->
+            <div class="account-section" id="displaySection" style="display:none;">
+                <h2>
+                    <svg class="feather" data-feather="palette"></svg>
+                    Chat Display
+                </h2>
+                <p class="section-description">Customize your chat theme and interface appearance.</p>
+
+                <div class="display-option-group">
+                    <h3>
+                        <svg class="feather" data-feather="message-circle"></svg>
+                        Chat Themes
+                    </h3>
+                    <p class="section-description" style="border:none;padding:0;margin-bottom:0;">Choose how your chat interface looks</p>
+
+                    <div class="themes-grid" id="themesGrid">
+                        <div class="theme-item">
+                            <div class="theme-preview">
+                                <div class="theme-preview-content" style="background:linear-gradient(135deg,#ff4b6e,#cc2a4a);">Vibrant</div>
+                            </div>
+                            <div class="theme-label">Vibrant</div>
+                        </div>
+                        <div class="theme-item">
+                            <div class="theme-preview">
+                                <div class="theme-preview-content" style="background:linear-gradient(135deg,#8b0000,#660000);">Warm</div>
+                            </div>
+                            <div class="theme-label">Warm</div>
+                        </div>
+                        <div class="theme-item">
+                            <div class="theme-preview">
+                                <div class="theme-preview-content" style="background:linear-gradient(135deg,#444,#2e2e2e);">Calm</div>
+                            </div>
+                            <div class="theme-label">Calm</div>
+                        </div>
+                        <div class="theme-item">
+                            <div class="theme-preview">
+                                <div class="theme-preview-content" style="background:linear-gradient(135deg,#1a1a1a,#0b0b0b);">Natural</div>
+                            </div>
+                            <div class="theme-label">Natural</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preview-section">
+                    <h3>
+                        <svg class="feather" data-feather="eye"></svg>
+                        Live Preview
+                    </h3>
+                    <p class="section-description" style="border:none;padding:0;margin-bottom:0;">See how your selected theme looks in chat</p>
+                    <div class="chat-preview" id="chatPreview">
+                        <div class="preview-messages">
+                            <div class="preview-message received">Hey, how's your day going?</div>
+                            <div class="preview-message sent">Pretty good! Just finished work. Want to catch up later?</div>
+                            <div class="preview-message received">Sounds great! Let's meet at the usual spot.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="display-actions">
+                    <button type="button" class="btn-primary" id="saveDisplaySettings">
+                        <svg class="feather" data-feather="save"></svg>
+                        Save Theme
+                    </button>
+                    <button type="button" class="btn-secondary" id="resetDisplaySettings">
+                        <svg class="feather" data-feather="rotate-ccw"></svg>
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- SHARE SECTION -->
+            <div class="account-section" id="shareSection" style="display:none;">
+                <h2>
+                    <svg class="feather" data-feather="share"></svg>
+                    Share BondBase
+                </h2>
+                <p class="section-description">Invite friends and help grow our community!</p>
+
+                <div class="share-container">
+                    <div class="share-link-section">
+                        <h3>Share with Friends</h3>
+                        <div class="link-input-group">
+                            <input type="text" id="bondlyLink" class="share-input" value="https://BondBase.com" readonly>
+                            <button id="copyBondlyLinkBtn" class="btn-primary">
+                                <svg class="feather" data-feather="copy"></svg>
+                                Copy Link
+                            </button>
+                        </div>
+                        <div class="copy-feedback" id="copyBondlyFeedback"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS SECTION -->
+            <div class="account-section" id="settingsSection" style="display:none;">
+                <h2>
+                    <svg class="feather" data-feather="settings"></svg>
+                    Account Settings
+                </h2>
+                <p class="section-description">Update your email and password.</p>
+                <form id="settingsForm">
+                    <div class="form-group">
+                        <label for="accountEmail">Email</label>
+                        <input type="email" id="accountEmail" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="currentPassword">Current Password</label>
+                        <input type="password" id="currentPassword" placeholder="Enter current password">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" placeholder="Enter new password">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmNewPassword">Confirm New Password</label>
+                        <input type="password" id="confirmNewPassword" placeholder="Confirm new password">
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        <svg class="feather" data-feather="save"></svg>
+                        Update Settings
+                    </button>
+                </form>
+            </div>
+
+            <!-- PRIVACY SECTION -->
+            <div class="account-section" id="privacySection" style="display:none;">
+                <h2>
+                    <svg class="feather" data-feather="shield"></svg>
+                    Privacy Settings
+                </h2>
+                <p class="section-description">Control what others can see on your profile.</p>
+                <form id="privacyForm">
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="showAge" checked>
+                        <label for="showAge">Show my age on profile</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="showLocation" checked>
+                        <label for="showLocation">Show my location on profile</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="showOnlineStatus" checked>
+                        <label for="showOnlineStatus">Show when I'm online</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="showSocialLinks" checked>
+                        <label for="showSocialLinks">Show my social links on profile</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="showInterests" checked>
+                        <label for="showInterests">Show my interests on profile</label>
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        <svg class="feather" data-feather="save"></svg>
+                        Save Privacy Settings
+                    </button>
+                </form>
+            </div>
+
+        </div><!-- /account-main -->
+    </div><!-- /account-content -->
+</div><!-- /account-container -->
+
+<!-- ── SCRIPTS ── -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import {
+        getFirestore, collection, getDocs, getDoc, doc, query, where, deleteDoc, writeBatch
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyC9jF-ocy6HjsVzWVVlAyXW-4aIFgA79-A",
+        authDomain: "crypto-6517d.firebaseapp.com",
+        projectId: "crypto-6517d",
+        storageBucket: "crypto-6517d.firebasestorage.app",
+        messagingSenderId: "60263975159",
+        appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof feather !== 'undefined') feather.replace();
+    });
+
+    // Account menu navigation
+    document.querySelectorAll('.menu-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            document.querySelectorAll('.account-section').forEach(section => {
+                section.style.display = 'none';
             });
-        });
-
-        // Profile image upload
-        document.getElementById('profileImageUpload').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('accountProfileImage').src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Remove profile image
-        document.getElementById('removeProfileImage').addEventListener('click', function() {
-            document.getElementById('accountProfileImage').src = 'images-default-profile.jpg';
-        });
-
-        // Add interest functionality
-        document.getElementById('addInterestBtn').addEventListener('click', function() {
-            const interestInput = document.getElementById('accountInterests');
-            const interest = interestInput.value.trim();
-            
-            if (interest) {
-                const container = document.getElementById('accountInterestsContainer');
-                const tags = container.querySelectorAll('.interest-tag');
-                
-                if (tags.length < 10) {
-                    const tag = document.createElement('span');
-                    tag.className = 'interest-tag';
-                    tag.innerHTML = `
-                        ${interest}
-                        <span class="remove" onclick="this.parentElement.remove()">×</span>
-                    `;
-                    container.appendChild(tag);
-                    interestInput.value = '';
-                } else {
-                    alert('Maximum 10 interests allowed');
+            const sectionId = this.getAttribute('data-section') + 'Section';
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) {
+                targetSection.style.display = 'block';
+                if (this.getAttribute('data-section') === 'stores') {
+                    loadUserStores();
                 }
             }
+            if (typeof feather !== 'undefined') feather.replace();
         });
+    });
 
-        // Copy BondBase link functionality
-        document.getElementById('copyBondlyLinkBtn').addEventListener('click', function() {
-            const bondlyLink = document.getElementById('bondlyLink');
-            const feedback = document.getElementById('copyBondlyFeedback');
-            
-            bondlyLink.select();
-            bondlyLink.setSelectionRange(0, 99999);
-            
-            try {
-                navigator.clipboard.writeText(bondlyLink.value).then(() => {
-                    feedback.textContent = 'Link copied to clipboard!';
-                    feedback.className = 'copy-feedback success';
-                    feedback.style.display = 'block';
-                    
-                    setTimeout(() => {
-                        feedback.style.display = 'none';
-                    }, 3000);
-                });
-            } catch (err) {
-                feedback.textContent = 'Failed to copy link';
-                feedback.className = 'copy-feedback error';
-                feedback.style.display = 'block';
-            }
-        });
+    // Profile image upload
+    document.getElementById('profileImageUpload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('accountProfileImage').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
 
-        // Theme selection functionality
-        document.querySelectorAll('.theme-item').forEach(item => {
-            item.addEventListener('click', function() {
-                document.querySelectorAll('.theme-item').forEach(i => {
-                    i.querySelector('.theme-preview').classList.remove('selected');
-                });
-                this.querySelector('.theme-preview').classList.add('selected');
-                
-                // Update chat preview with selected theme
-                const themeStyle = this.querySelector('.theme-preview-content').style.background;
-                document.getElementById('chatPreview').style.background = themeStyle;
-            });
-        });
+    document.getElementById('removeProfileImage').addEventListener('click', function() {
+        document.getElementById('accountProfileImage').src = 'images-default-profile.jpg';
+    });
 
-        // Modal close function
-        window.closeModal = function(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-        };
-
-        // ========== STORES & PRODUCTS FUNCTIONALITY ==========
-        let currentStores = [];
-        let storeToDelete = null;
-        let productToDelete = null;
-        let currentUser = null;
-
-        // Check authentication
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                console.log('User logged in:', user.uid);
-                
-                // Load profile data if needed
-                loadUserProfile();
+    // Add interest
+    document.getElementById('addInterestBtn').addEventListener('click', function() {
+        const interestInput = document.getElementById('accountInterests');
+        const interest = interestInput.value.trim();
+        if (interest) {
+            const container = document.getElementById('accountInterestsContainer');
+            const tags = container.querySelectorAll('.interest-tag');
+            if (tags.length < 10) {
+                const tag = document.createElement('span');
+                tag.className = 'interest-tag';
+                tag.innerHTML = `${interest}<span class="remove" onclick="this.parentElement.remove()">×</span>`;
+                container.appendChild(tag);
+                interestInput.value = '';
             } else {
-                // Redirect to login if not logged in
-                window.location.href = 'login.html?redirect=account.html';
+                alert('Maximum 10 interests allowed');
             }
+        }
+    });
+
+    // Copy BondBase link
+    document.getElementById('copyBondlyLinkBtn').addEventListener('click', function() {
+        const bondlyLink = document.getElementById('bondlyLink');
+        const feedback = document.getElementById('copyBondlyFeedback');
+        bondlyLink.select();
+        bondlyLink.setSelectionRange(0, 99999);
+        try {
+            navigator.clipboard.writeText(bondlyLink.value).then(() => {
+                feedback.textContent = 'Link copied to clipboard!';
+                feedback.className = 'copy-feedback success';
+                setTimeout(() => { feedback.style.display = 'none'; }, 3000);
+            });
+        } catch (err) {
+            feedback.textContent = 'Failed to copy link';
+            feedback.className = 'copy-feedback error';
+            feedback.style.display = 'block';
+        }
+    });
+
+    // Theme selection
+    document.querySelectorAll('.theme-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.theme-item').forEach(i => {
+                i.querySelector('.theme-preview').classList.remove('selected');
+            });
+            this.querySelector('.theme-preview').classList.add('selected');
+            const themeStyle = this.querySelector('.theme-preview-content').style.background;
+            document.getElementById('chatPreview').style.background = themeStyle;
         });
+    });
 
-        // Load user profile data
-        async function loadUserProfile() {
-            try {
-                const userRef = doc(db, 'users', currentUser.uid);
-                const userSnap = await getDoc(userRef);
-                
-                if (userSnap.exists()) {
-                    const userData = userSnap.data();
-                    
-                    // Populate profile form
-                    document.getElementById('accountName').value = userData.name || '';
-                    document.getElementById('accountAge').value = userData.age || '';
-                    document.getElementById('accountGender').value = userData.gender || 'male';
-                    document.getElementById('accountBio').value = userData.bio || '';
-                    document.getElementById('accountPhone').value = userData.phone || '';
-                    
-                    // Update profile image
-                    if (userData.profileImage) {
-                        document.getElementById('accountProfileImage').src = userData.profileImage;
-                    }
-                    
-                    // Load interests
-                    if (userData.interests && Array.isArray(userData.interests)) {
-                        const container = document.getElementById('accountInterestsContainer');
-                        container.innerHTML = '';
-                        userData.interests.forEach(interest => {
-                            const tag = document.createElement('span');
-                            tag.className = 'interest-tag';
-                            tag.innerHTML = `
-                                ${interest}
-                                <span class="remove" onclick="this.parentElement.remove()">×</span>
-                            `;
-                            container.appendChild(tag);
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading user profile:', error);
-            }
+    // Modal close
+    window.closeModal = function(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    };
+
+    // Post delete modal
+    const postModal = document.getElementById('deletePostModal');
+    const closeModalBtn = document.querySelector('.close-modal');
+    const cancelDelete = document.getElementById('cancelDelete');
+
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', function() { postModal.style.display = 'none'; });
+    }
+    if (cancelDelete) {
+        cancelDelete.addEventListener('click', function() { postModal.style.display = 'none'; });
+    }
+    window.addEventListener('click', function(event) {
+        if (event.target === postModal) postModal.style.display = 'none';
+        if (event.target.classList.contains('modal')) event.target.classList.remove('active');
+    });
+
+    // ─── STORES & PRODUCTS ───
+    let currentStores = [];
+    let storeToDelete = null;
+    let productToDelete = null;
+    let currentUser = null;
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUser = user;
+            loadUserProfile();
+        } else {
+            window.location.href = 'login.html?redirect=account.html';
         }
+    });
 
-        // Load user's stores from Firebase
-        async function loadUserStores() {
-            const storesContainer = document.getElementById('storesContainer');
-            
-            // Show loading
-            storesContainer.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading your stores...</div>';
-            
-            try {
-                if (!currentUser) {
-                    storesContainer.innerHTML = `
-                        <div class="no-posts-message">
-                            <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--warning); margin-bottom: 1rem;"></i>
-                            <h3>Please Log In</h3>
-                            <p>You need to be logged in to view your stores.</p>
-                        </div>
-                    `;
-                    return;
+    async function loadUserProfile() {
+        try {
+            const userRef = doc(db, 'users', currentUser.uid);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                document.getElementById('accountName').value = userData.name || '';
+                document.getElementById('accountAge').value = userData.age || '';
+                document.getElementById('accountGender').value = userData.gender || 'male';
+                document.getElementById('accountBio').value = userData.bio || '';
+                document.getElementById('accountPhone').value = userData.phone || '';
+                if (userData.profileImage) {
+                    document.getElementById('accountProfileImage').src = userData.profileImage;
                 }
-
-                // Query stores where ownerId equals current user's UID
-                const storesRef = collection(db, 'stores');
-                const q = query(storesRef, where('ownerId', '==', currentUser.uid));
-                const querySnapshot = await getDocs(q);
-                
-                currentStores = [];
-                
-                // For each store, load its products
-                for (const storeDoc of querySnapshot.docs) {
-                    const storeData = storeDoc.data();
-                    
-                    // Load products for this store
-                    const productsRef = collection(db, 'products');
-                    const productsQuery = query(productsRef, where('storeId', '==', storeDoc.id));
-                    const productsSnapshot = await getDocs(productsQuery);
-                    
-                    const products = [];
-                    productsSnapshot.forEach(productDoc => {
-                        products.push({
-                            id: productDoc.id,
-                            ...productDoc.data()
-                        });
-                    });
-                    
-                    currentStores.push({
-                        id: storeDoc.id,
-                        ...storeData,
-                        products: products
+                if (userData.interests && Array.isArray(userData.interests)) {
+                    const container = document.getElementById('accountInterestsContainer');
+                    container.innerHTML = '';
+                    userData.interests.forEach(interest => {
+                        const tag = document.createElement('span');
+                        tag.className = 'interest-tag';
+                        tag.innerHTML = `${interest}<span class="remove" onclick="this.parentElement.remove()">×</span>`;
+                        container.appendChild(tag);
                     });
                 }
-                
-                if (currentStores.length === 0) {
-                    showNoStorePrompt();
-                } else {
-                    renderStores();
-                }
-                
-            } catch (error) {
-                console.error('Error loading stores:', error);
-                storesContainer.innerHTML = `
-                    <div class="no-posts-message">
-                        <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--danger); margin-bottom: 1rem;"></i>
-                        <h3>Error Loading Stores</h3>
-                        <p>${error.message}</p>
-                    </div>
-                `;
             }
+        } catch (error) {
+            console.error('Error loading user profile:', error);
         }
+    }
 
-        function showNoStorePrompt() {
-            const storesContainer = document.getElementById('storesContainer');
-            storesContainer.innerHTML = `
-                <div class="create-store-prompt">
-                    <i class="fas fa-store"></i>
-                    <h3>You don't have a store yet!</h3>
-                    <p>Create your first store and start selling your products to the community</p>
-                    <a href="create-store.html" class="create-store-btn">
-                        <i class="fas fa-plus"></i> Create Your Store Now
-                    </a>
-                </div>
-            `;
-        }
-
-        function renderStores() {
-            const storesContainer = document.getElementById('storesContainer');
-            
-            if (!storesContainer) return;
-            
-            storesContainer.innerHTML = currentStores.map(store => `
-                <div class="store-card" data-store-id="${store.id}">
-                    <div class="store-header">
-                        <img src="${store.logo || 'discord2.jpg'}" alt="${store.storeName}" class="store-logo" 
-                             onerror="this.src='discord2.jpg'">
-                        
-                        <div class="store-info">
-                            <div class="store-name">
-                                ${store.storeName}
-                                <span class="store-badge">
-                                    <i class="fas fa-check-circle"></i> Verified
-                                </span>
-                            </div>
-                            
-                            <div class="store-meta">
-                                <span><i class="fas fa-tag"></i> ${store.category || 'General'}</span>
-                                <span><i class="fas fa-box"></i> ${store.products?.length || 0} products</span>
-                                <span><i class="fas fa-users"></i> ${store.followers?.length || 0} followers</span>
-                            </div>
-                            
-                            <div class="store-meta" style="margin-top: 5px;">
-                                ${store.whatsapp ? `<span><i class="fab fa-whatsapp" style="color: #25D366;"></i> +${store.whatsapp}</span>` : ''}
-                                ${store.telegram ? `<span><i class="fab fa-telegram" style="color: #0088cc;"></i> @${store.telegram}</span>` : ''}
-                            </div>
-                        </div>
-                        
-                        <div class="store-actions">
-                            <button class="edit-store-btn" onclick="editStore('${store.id}')">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                            <button class="delete-store-btn" onclick="showDeleteStoreModal('${store.id}')">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="products-section">
-                        <div class="products-header">
-                            <h4><i class="fas fa-box"></i> Products (${store.products?.length || 0})</h4>
-                            <a href="create-product.html?store=${store.id}" class="add-product-btn">
-                                <i class="fas fa-plus"></i> Add Product
-                            </a>
-                        </div>
-                        
-                        <div class="products-grid" id="products-grid-${store.id}">
-                            ${store.products && store.products.length > 0 
-                                ? store.products.map(product => renderProductItem(product, store.id)).join('')
-                                : '<div class="no-products"><i class="fas fa-box-open"></i> No products yet. Click "Add Product" to create one.</div>'
-                            }
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function renderProductItem(product, storeId) {
-            const inStock = product.stock > 0;
-            const hasDiscount = product.discount && product.discount > 0;
-            
-            return `
-                <div class="product-item" data-product-id="${product.id}">
-                    <img src="${product.images?.[0]?.url || product.images?.[0] || 'discord2.jpg'}" alt="${product.name}" class="product-image"
-                         onerror="this.src='discord2.jpg'">
-                    
-                    <div class="product-details">
-                        <h5 class="product-name">${product.name}</h5>
-                        
-                        <div class="product-price">
-                            <span class="current-price">$${product.salePrice || product.price}</span>
-                            ${hasDiscount ? `<span class="original-price">$${product.originalPrice}</span>` : ''}
-                            ${hasDiscount ? `<span class="discount-badge">-${product.discount}%</span>` : ''}
-                        </div>
-                        
-                        <div class="product-stock">
-                            <i class="fas ${inStock ? 'fa-check-circle in-stock' : 'fa-times-circle out-of-stock'}"></i>
-                            ${inStock ? `${product.stock} in stock` : 'Out of stock'}
-                        </div>
-                        
-                        <div class="product-actions">
-                            <button class="edit-product-btn" onclick="editProduct('${product.id}', '${storeId}')">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                            <button class="delete-product-btn" onclick="showDeleteProductModal('${product.id}', '${storeId}')">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Store functions
-        window.editStore = function(storeId) {
-            window.location.href = `edit-store.html?id=${storeId}`;
-        };
-
-        window.showDeleteStoreModal = function(storeId) {
-            const store = currentStores.find(s => s.id === storeId);
-            if (!store) return;
-            
-            storeToDelete = { id: storeId, name: store.storeName, productsCount: store.products?.length || 0 };
-            
-            const preview = document.getElementById('storePreview');
-            preview.innerHTML = `
-                <div class="preview-title">${store.storeName}</div>
-                <div class="preview-details">
-                    <i class="fas fa-box"></i> ${store.products?.length || 0} products • 
-                    <i class="fas fa-users"></i> ${store.followers?.length || 0} followers
-                </div>
-            `;
-            
-            document.getElementById('deleteStoreModal').classList.add('active');
-        };
-
-        document.getElementById('confirmDeleteStore')?.addEventListener('click', async function() {
-            if (!storeToDelete) return;
-            
-            try {
-                // Show loading on button
-                const btn = this;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-                btn.disabled = true;
-                
-                // Delete all products in the store first
-                const store = currentStores.find(s => s.id === storeToDelete.id);
-                if (store && store.products) {
-                    const batch = writeBatch(db);
-                    
-                    for (const product of store.products) {
-                        const productRef = doc(db, 'products', product.id);
-                        batch.delete(productRef);
-                    }
-                    
-                    await batch.commit();
-                }
-                
-                // Delete the store document
-                await deleteDoc(doc(db, 'stores', storeToDelete.id));
-                
-                // Remove from local array
-                currentStores = currentStores.filter(s => s.id !== storeToDelete.id);
-                
-                // Close modal
-                closeModal('deleteStoreModal');
-                
-                // Refresh display
-                if (currentStores.length === 0) {
-                    showNoStorePrompt();
-                } else {
-                    renderStores();
-                }
-                
-                // Show success message
-                alert('Store deleted successfully!');
-                
-            } catch (error) {
-                console.error('Error deleting store:', error);
-                alert('Failed to delete store: ' + error.message);
-            } finally {
-                // Reset button
-                const btn = document.getElementById('confirmDeleteStore');
-                btn.innerHTML = '<i class="fas fa-trash"></i> Delete Store';
-                btn.disabled = false;
-                storeToDelete = null;
+    async function loadUserStores() {
+        const storesContainer = document.getElementById('storesContainer');
+        storesContainer.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading your stores...</div>';
+        try {
+            if (!currentUser) {
+                storesContainer.innerHTML = `<div class="no-posts-message"><i class="fas fa-exclamation-circle" style="font-size:2.5rem;color:var(--warning);display:block;margin-bottom:12px;"></i><h3>Please Log In</h3><p>You need to be logged in to view your stores.</p></div>`;
+                return;
             }
-        });
-
-        // Product functions
-        window.editProduct = function(productId, storeId) {
-            window.location.href = `edit-product.html?id=${productId}&store=${storeId}`;
-        };
-
-        window.showDeleteProductModal = function(productId, storeId) {
-            const store = currentStores.find(s => s.id === storeId);
-            if (!store) return;
-            
-            const product = store.products?.find(p => p.id === productId);
-            if (!product) return;
-            
-            productToDelete = { id: productId, storeId, name: product.name, price: product.salePrice || product.price };
-            
-            const preview = document.getElementById('productPreview');
-            preview.innerHTML = `
-                <div class="preview-title">${product.name}</div>
-                <div class="preview-details">
-                    <i class="fas fa-tag"></i> Price: $${product.salePrice || product.price} • 
-                    <i class="fas fa-boxes"></i> Stock: ${product.stock}
-                </div>
-            `;
-            
-            document.getElementById('deleteProductModal').classList.add('active');
-        };
-
-        document.getElementById('confirmDeleteProduct')?.addEventListener('click', async function() {
-            if (!productToDelete) return;
-            
-            try {
-                // Show loading on button
-                const btn = this;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-                btn.disabled = true;
-                
-                // Delete the product document
-                await deleteDoc(doc(db, 'products', productToDelete.id));
-                
-                // Remove from local array
-                const store = currentStores.find(s => s.id === productToDelete.storeId);
-                if (store && store.products) {
-                    store.products = store.products.filter(p => p.id !== productToDelete.id);
-                }
-                
-                // Close modal
-                closeModal('deleteProductModal');
-                
-                // Refresh display
+            const storesRef = collection(db, 'stores');
+            const q = query(storesRef, where('ownerId', '==', currentUser.uid));
+            const querySnapshot = await getDocs(q);
+            currentStores = [];
+            for (const storeDoc of querySnapshot.docs) {
+                const storeData = storeDoc.data();
+                const productsRef = collection(db, 'products');
+                const productsQuery = query(productsRef, where('storeId', '==', storeDoc.id));
+                const productsSnapshot = await getDocs(productsQuery);
+                const products = [];
+                productsSnapshot.forEach(productDoc => {
+                    products.push({ id: productDoc.id, ...productDoc.data() });
+                });
+                currentStores.push({ id: storeDoc.id, ...storeData, products });
+            }
+            if (currentStores.length === 0) {
+                showNoStorePrompt();
+            } else {
                 renderStores();
-                
-                // Show success message
-                alert('Product deleted successfully!');
-                
-            } catch (error) {
-                console.error('Error deleting product:', error);
-                alert('Failed to delete product: ' + error.message);
-            } finally {
-                // Reset button
-                const btn = document.getElementById('confirmDeleteProduct');
-                btn.innerHTML = '<i class="fas fa-trash"></i> Delete Product';
-                btn.disabled = false;
-                productToDelete = null;
             }
-        });
-
-        // Close modals when clicking outside
-        window.addEventListener('click', function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.classList.remove('active');
-            }
-        });
-
-        // Modal functionality for post deletion (existing)
-        const modal = document.getElementById('deletePostModal');
-        const closeModalBtn = document.querySelector('.close-modal');
-        const cancelDelete = document.getElementById('cancelDelete');
-
-        if (closeModalBtn) {
-            closeModalBtn.addEventListener('click', function() {
-                modal.style.display = 'none';
-            });
+        } catch (error) {
+            console.error('Error loading stores:', error);
+            storesContainer.innerHTML = `<div class="no-posts-message"><i class="fas fa-exclamation-circle" style="font-size:2.5rem;color:var(--danger);display:block;margin-bottom:12px;"></i><h3>Error Loading Stores</h3><p>${error.message}</p></div>`;
         }
+    }
 
-        if (cancelDelete) {
-            cancelDelete.addEventListener('click', function() {
-                modal.style.display = 'none';
-            });
-        }
+    function showNoStorePrompt() {
+        document.getElementById('storesContainer').innerHTML = `
+            <div class="create-store-prompt">
+                <i class="fas fa-store"></i>
+                <h3>You don't have a store yet!</h3>
+                <p>Create your first store and start selling to the BondBase community.</p>
+                <a href="create-store.html" class="create-store-btn">
+                    <i class="fas fa-plus"></i> Create Your Store Now
+                </a>
+            </div>
+        `;
+    }
 
-        // Close modal when clicking outside
-        window.addEventListener('click', function(event) {
-            if (event.target === modal) {
-                modal.style.display = 'none';
+    function renderStores() {
+        const storesContainer = document.getElementById('storesContainer');
+        if (!storesContainer) return;
+        storesContainer.innerHTML = currentStores.map(store => `
+            <div class="store-card" data-store-id="${store.id}">
+                <div class="store-header">
+                    <img src="${store.logo || 'discord2.jpg'}" alt="${store.storeName}" class="store-logo" onerror="this.src='discord2.jpg'">
+                    <div class="store-info">
+                        <div class="store-name">
+                            ${store.storeName}
+                            <span class="store-badge"><i class="fas fa-check-circle"></i> Verified</span>
+                        </div>
+                        <div class="store-meta">
+                            <span><i class="fas fa-tag"></i> ${store.category || 'General'}</span>
+                            <span><i class="fas fa-box"></i> ${store.products?.length || 0} products</span>
+                            <span><i class="fas fa-users"></i> ${store.followers?.length || 0} followers</span>
+                        </div>
+                        <div class="store-meta" style="margin-top:4px;">
+                            ${store.whatsapp ? `<span><i class="fab fa-whatsapp" style="color:#25D366;"></i> +${store.whatsapp}</span>` : ''}
+                            ${store.telegram ? `<span><i class="fab fa-telegram" style="color:#0088cc;"></i> @${store.telegram}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="store-actions">
+                        <button class="edit-store-btn" onclick="editStore('${store.id}')"><i class="fas fa-edit"></i> Edit</button>
+                        <button class="delete-store-btn" onclick="showDeleteStoreModal('${store.id}')"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+                <div class="products-section">
+                    <div class="products-header">
+                        <h4><i class="fas fa-box"></i> Products (${store.products?.length || 0})</h4>
+                        <a href="create-product.html?store=${store.id}" class="add-product-btn">
+                            <i class="fas fa-plus"></i> Add Product
+                        </a>
+                    </div>
+                    <div class="products-grid" id="products-grid-${store.id}">
+                        ${store.products && store.products.length > 0
+                            ? store.products.map(product => renderProductItem(product, store.id)).join('')
+                            : '<div class="no-products"><i class="fas fa-box-open"></i> No products yet. Click "Add Product" to create one.</div>'
+                        }
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderProductItem(product, storeId) {
+        const inStock = product.stock > 0;
+        const hasDiscount = product.discount && product.discount > 0;
+        return `
+            <div class="product-item" data-product-id="${product.id}">
+                <img src="${product.images?.[0]?.url || product.images?.[0] || 'discord2.jpg'}" alt="${product.name}" class="product-image" onerror="this.src='discord2.jpg'">
+                <div class="product-details">
+                    <h5 class="product-name">${product.name}</h5>
+                    <div class="product-price">
+                        <span class="current-price">$${product.salePrice || product.price}</span>
+                        ${hasDiscount ? `<span class="original-price">$${product.originalPrice}</span>` : ''}
+                        ${hasDiscount ? `<span class="discount-badge">-${product.discount}%</span>` : ''}
+                    </div>
+                    <div class="product-stock">
+                        <i class="fas ${inStock ? 'fa-check-circle in-stock' : 'fa-times-circle out-of-stock'}"></i>
+                        ${inStock ? `${product.stock} in stock` : 'Out of stock'}
+                    </div>
+                    <div class="product-actions">
+                        <button class="edit-product-btn" onclick="editProduct('${product.id}','${storeId}')"><i class="fas fa-edit"></i> Edit</button>
+                        <button class="delete-product-btn" onclick="showDeleteProductModal('${product.id}','${storeId}')"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    window.editStore = function(storeId) {
+        window.location.href = `edit-store.html?id=${storeId}`;
+    };
+
+    window.showDeleteStoreModal = function(storeId) {
+        const store = currentStores.find(s => s.id === storeId);
+        if (!store) return;
+        storeToDelete = { id: storeId, name: store.storeName, productsCount: store.products?.length || 0 };
+        document.getElementById('storePreview').innerHTML = `
+            <div class="preview-title">${store.storeName}</div>
+            <div class="preview-details"><i class="fas fa-box"></i> ${store.products?.length || 0} products · <i class="fas fa-users"></i> ${store.followers?.length || 0} followers</div>
+        `;
+        document.getElementById('deleteStoreModal').classList.add('active');
+    };
+
+    document.getElementById('confirmDeleteStore')?.addEventListener('click', async function() {
+        if (!storeToDelete) return;
+        try {
+            const btn = this;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+            btn.disabled = true;
+            const store = currentStores.find(s => s.id === storeToDelete.id);
+            if (store && store.products) {
+                const batch = writeBatch(db);
+                for (const product of store.products) {
+                    batch.delete(doc(db, 'products', product.id));
+                }
+                await batch.commit();
             }
-        });
+            await deleteDoc(doc(db, 'stores', storeToDelete.id));
+            currentStores = currentStores.filter(s => s.id !== storeToDelete.id);
+            closeModal('deleteStoreModal');
+            if (currentStores.length === 0) { showNoStorePrompt(); } else { renderStores(); }
+            alert('Store deleted successfully!');
+        } catch (error) {
+            console.error('Error deleting store:', error);
+            alert('Failed to delete store: ' + error.message);
+        } finally {
+            const btn = document.getElementById('confirmDeleteStore');
+            btn.innerHTML = '<i class="fas fa-trash"></i> Delete Store';
+            btn.disabled = false;
+            storeToDelete = null;
+        }
+    });
 
-        // Remove all gaming-related code
-        // Gamer Profile section has been completely removed
-    </script>
+    window.editProduct = function(productId, storeId) {
+        window.location.href = `edit-product.html?id=${productId}&store=${storeId}`;
+    };
 
-    <!-- Your existing script imports -->
-    <script type="module" src="app.js"></script>
-    <script type="module" src="call.js"></script>
-    <script type="module" src="notification.js"></script>
-    <script type="module" src="chat.js"></script>
-    <script type="module" src="pagination.js"></script>
-    <script type="module" src="creative.js"></script>
-    <script type="module" src="form.js"></script>
-    <script src="location.js"></script>
-    <script type="module" src="social.js"></script>
-    <!-- Removed games.js import -->
+    window.showDeleteProductModal = function(productId, storeId) {
+        const store = currentStores.find(s => s.id === storeId);
+        if (!store) return;
+        const product = store.products?.find(p => p.id === productId);
+        if (!product) return;
+        productToDelete = { id: productId, storeId, name: product.name, price: product.salePrice || product.price };
+        document.getElementById('productPreview').innerHTML = `
+            <div class="preview-title">${product.name}</div>
+            <div class="preview-details"><i class="fas fa-tag"></i> $${product.salePrice || product.price} · <i class="fas fa-boxes"></i> Stock: ${product.stock}</div>
+        `;
+        document.getElementById('deleteProductModal').classList.add('active');
+    };
+
+    document.getElementById('confirmDeleteProduct')?.addEventListener('click', async function() {
+        if (!productToDelete) return;
+        try {
+            const btn = this;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+            btn.disabled = true;
+            await deleteDoc(doc(db, 'products', productToDelete.id));
+            const store = currentStores.find(s => s.id === productToDelete.storeId);
+            if (store && store.products) {
+                store.products = store.products.filter(p => p.id !== productToDelete.id);
+            }
+            closeModal('deleteProductModal');
+            renderStores();
+            alert('Product deleted successfully!');
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            alert('Failed to delete product: ' + error.message);
+        } finally {
+            const btn = document.getElementById('confirmDeleteProduct');
+            btn.innerHTML = '<i class="fas fa-trash"></i> Delete Product';
+            btn.disabled = false;
+            productToDelete = null;
+        }
+    });
+</script>
+
+<!-- External scripts -->
+<script type="module" src="app.js"></script>
+<script type="module" src="call.js"></script>
+<script type="module" src="notification.js"></script>
+<script type="module" src="chat.js"></script>
+<script type="module" src="pagination.js"></script>
+<script type="module" src="creative.js"></script>
+<script type="module" src="form.js"></script>
+<script src="location.js"></script>
+<script type="module" src="social.js"></script>
+
 </body>
 </html>
