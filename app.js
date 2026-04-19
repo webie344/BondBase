@@ -989,8 +989,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
-            border-right: 1px solid var(--border-color, rgba(255,255,255,0.07));
-            overflow: hidden;
+
+    overflow: hidden;
             transition: transform 0.3s ease;
             background: var(--bg-secondary, #14171c);
         }
@@ -1025,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         #messagesList {
             flex: 1;
             overflow-y: auto;
-            padding: 0.5rem 0;
+            padding:  0;
         }
 
         /* Right panel — active chat */
@@ -1072,8 +1072,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             border-bottom: 1px solid rgba(255,255,255,0.03);
         }
 
-        .message-card:hover { background: rgba(255,255,255,0.04); }
-        .message-card.active { background: rgba(255,75,110,0.08); border-left: 3px solid var(--primary, #ff4b6e); }
 
         .message-card img {
             width: 48px; height: 48px;
