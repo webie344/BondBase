@@ -989,8 +989,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
-
-    overflow: hidden;
+            border-right: 1px solid var(--border-color, rgba(255,255,255,0.07));
+            overflow: hidden;
             transition: transform 0.3s ease;
             background: var(--bg-secondary, #14171c);
         }
@@ -1025,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         #messagesList {
             flex: 1;
             overflow-y: auto;
-            padding:  0;
+            padding: 0.5rem 0;
         }
 
         /* Right panel — active chat */
@@ -1072,6 +1072,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             border-bottom: 1px solid rgba(255,255,255,0.03);
         }
 
+        .message-card:hover { background: rgba(255,255,255,0.04); }
+        .message-card.active { background: rgba(255,75,110,0.08); border-left: 3px solid var(--primary, #ff4b6e); }
 
         .message-card img {
             width: 48px; height: 48px;
@@ -2795,7 +2797,7 @@ function renderMessageThreads(threads) {
     messagesList.innerHTML = '';
 
     if (threads.length === 0) {
-        messagesList.innerHTML = '<p class="no-messages" style="padding:1.5rem;text-align:center;color:#7a8090;">No messages yet. Start mingling!</p>';
+        messagesList.innerHTML = '<p class="no-messages" style="padding:2rem 1.5rem;text-align:center;color:#7a8090;font-size:0.88rem;">No messages yet. Start mingling!</p>';
         return;
     }
 
@@ -2804,30 +2806,41 @@ function renderMessageThreads(threads) {
         if (!partnerId || !thread.partnerData) return;
 
         const messageCard = document.createElement('div');
-        messageCard.className = 'message-card';
-        // store partner id for highlighting active thread
+        messageCard.className = 'message-card' + (thread.unreadCount > 0 ? ' unread' : '');
         messageCard.dataset.partnerId = partnerId;
         if (chatPartnerId === partnerId) messageCard.classList.add('active');
 
         let messagePreview = thread.lastMessage?.text || 'New match';
-        if (messagePreview.split(' ').length > 4) {
-            messagePreview = messagePreview.split(' ').slice(0, 4).join(' ') + '...';
-        }
+        if (messagePreview.length > 38) messagePreview = messagePreview.slice(0, 38) + '…';
+
+        // prefix icon for media types
+        if (thread.lastMessage?.audioUrl) messagePreview = '🎤 Voice message';
+        if (thread.lastMessage?.imageUrl) messagePreview = '📷 Photo';
+        if (thread.lastMessage?.videoUrl) messagePreview = '🎥 Video';
+
         const messageTime = thread.lastMessage?.timestamp ? formatTime(thread.lastMessage.timestamp) : '';
 
         messageCard.innerHTML = `
-            <img src="${thread.partnerData.profileImage || 'images-default-profile.jpg'}" alt="${thread.partnerData.name}">
-            <div class="message-content">
-                <h3>${thread.partnerData.name || 'Unknown'} <span class="message-time">${messageTime}</span></h3>
-                <p>${messagePreview}</p>
+            <div class="avatar-wrap">
+                <img src="${thread.partnerData.profileImage || 'images-default-profile.jpg'}"
+                     alt="${thread.partnerData.name || 'User'}"
+                     onerror="this.src='images-default-profile.jpg'">
+                <div class="online-dot" id="dot-${partnerId}"></div>
             </div>
-            ${thread.unreadCount > 0 ? `<span class="unread-count">${thread.unreadCount}</span>` : ''}
-            <div class="online-status" id="status-${partnerId}"><i class="fas fa-circle"></i></div>
+            <div class="message-content">
+                <div class="mc-top">
+                    <span class="mc-name">${thread.partnerData.name || 'Unknown'}</span>
+                    <span class="mc-time">${messageTime}</span>
+                </div>
+                <p class="mc-preview">${messagePreview}</p>
+            </div>
+            <div class="mc-right">
+                ${thread.unreadCount > 0 ? `<span class="unread-count">${thread.unreadCount}</span>` : ''}
+                <div class="online-status" id="status-${partnerId}" style="font-size:10px;"></div>
+            </div>
         `;
 
-        // ─── SPA: clicking a card opens the right panel instead of navigating ───
         messageCard.addEventListener('click', () => { openChat(partnerId); });
-
         messagesList.appendChild(messageCard);
         setupOnlineStatusListener(partnerId, `status-${partnerId}`);
     });

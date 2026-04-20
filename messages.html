@@ -200,74 +200,120 @@
         #messagesList {
             flex: 1;
             overflow-y: auto;
-            padding: 0.25rem 0;
+            padding: 6px 0;
         }
 
-        /* conversation thread cards */
+        /* ── conversation thread cards ── */
         .message-card {
             display: flex;
             align-items: center;
             gap: 14px;
-            padding: 18px 1.25rem;
+            padding: 14px 18px;
             cursor: pointer;
             border-bottom: 1px solid rgba(255,255,255,0.04);
             border-radius: 0;
             transition: background 0.15s;
             position: relative;
+            min-height: 76px;
         }
 
         .message-card:hover { background: rgba(255,255,255,0.05); }
 
         .message-card.active {
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.06);
             border-left: 3px solid var(--primary, #ff4b6e);
+            padding-left: 15px; /* compensate for border-left */
+        }
+
+        /* avatar wrapper — holds the pic + online dot */
+        .message-card .avatar-wrap {
+            position: relative;
+            flex-shrink: 0;
+            width: 54px; height: 54px;
         }
 
         .message-card img {
-            width: 60px; height: 52px;
+            width: 54px; height: 54px;
             border-radius: 50%; object-fit: cover;
             border: 2px solid rgba(255,255,255,0.1);
-            flex-shrink: 0;
+            display: block;
         }
 
+        /* online dot on avatar */
+        .message-card .online-dot {
+            position: absolute;
+            bottom: 2px; right: 2px;
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            background: #4ade80;
+            border: 2px solid var(--bg-secondary, #14171c);
+            display: none; /* shown by app.js when online */
+        }
+
+        /* text block */
         .message-content { flex: 1; min-width: 0; }
 
-        .message-content h3 {
-            font-size: 0.88rem;
-            font-weight: 600;
-            color: var(--text-primary, #f0f2f5);
+        .message-content .mc-top {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
-            margin: 0 0 3px;
+            margin-bottom: 5px;
         }
 
-        .message-content p {
-            font-size: 0.78rem;
+        .message-content .mc-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary, #f0f2f5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 170px;
+        }
+
+        .message-content .mc-time {
+            font-size: 0.7rem;
+            color: var(--text-light, #7a8090);
+            font-weight: 400;
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
+
+        /* unread: time turns pink */
+        .message-card.unread .mc-time { color: var(--primary, #ff4b6e); font-weight: 600; }
+
+        .message-content .mc-preview {
+            font-size: 0.8rem;
             color: var(--text-light, #7a8090);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             margin: 0;
+            line-height: 1.4;
         }
 
-        .message-time {
-            font-size: 0.7rem !important;
-            color: var(--text-light, #7a8090) !important;
-            font-weight: 400 !important;
+        /* unread: preview is brighter */
+        .message-card.unread .mc-preview {
+            color: var(--text-secondary, #c8cdd6);
+            font-weight: 500;
+        }
+
+        /* right column: unread badge */
+        .mc-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
             flex-shrink: 0;
-            margin-left: 9px;
         }
 
         .unread-count {
             background: var(--primary, #ff4b6e);
             color: white;
-            border-radius: 50%;
-            min-width: 19px; height: 19px;
+            border-radius: 100px;
+            min-width: 20px; height: 20px;
             font-size: 0.68rem; font-weight: 700;
             display: flex; align-items: center; justify-content: center;
-            padding: 0 3px;
-            flex-shrink: 0;
+            padding: 0 5px;
         }
 
         .online-status {
@@ -279,6 +325,140 @@
         }
 
         .online-status .feather { width: 8px !important; height: 8px !important; }
+
+        /* ═══════════════════════════════════════════════════════
+           CHAT BUBBLE SYSTEM  (Facebook / Instagram style)
+           — proper corner radius with sharp tail on first bubble
+        ═══════════════════════════════════════════════════════ */
+
+        /* base message wrapper */
+        .chat-messages .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 72%;
+            margin-bottom: 2px;
+            position: relative;
+        }
+
+        .chat-messages .message.sent     { align-self: flex-end;   align-items: flex-end; }
+        .chat-messages .message.received { align-self: flex-start; align-items: flex-start; }
+
+        /* ── the bubble itself — built via .message > p or .message-content ──
+           app.js wraps text in <p> tags, so we target the direct child.
+           We also add a .bubble wrapper for images/voice/video if needed.    */
+
+        /* We style the bubbles through the existing structure app.js creates.
+           The message div IS the bubble — give it shape and tail via ::after  */
+
+        /* SENT bubbles — pink, right-side tail */
+        .chat-messages .message.sent {
+            background: var(--primary, #ff4b6e);
+            color: #fff;
+            border-radius: 18px 18px 4px 18px; /* sharp bottom-right */
+            padding: 9px 13px 7px;
+            box-shadow: 0 2px 8px rgba(255,75,110,0.25);
+            word-break: break-word;
+            line-height: 1.45;
+            font-size: 0.9rem;
+        }
+
+        /* sharp arrow tail — right side */
+        .chat-messages .message.sent::after {
+            content: '';
+            position: absolute;
+            bottom: 0; right: -7px;
+            width: 0; height: 0;
+            border-style: solid;
+            border-width: 0 0 10px 10px;
+            border-color: transparent transparent transparent var(--primary, #ff4b6e);
+        }
+
+        /* RECEIVED bubbles — dark card, left-side tail */
+        .chat-messages .message.received {
+            background: #242830;
+            color: var(--text-primary, #f0f2f5);
+            border-radius: 18px 18px 18px 4px; /* sharp bottom-left */
+            padding: 9px 13px 7px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            word-break: break-word;
+            line-height: 1.45;
+            font-size: 0.9rem;
+        }
+
+        /* sharp arrow tail — left side */
+        .chat-messages .message.received::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: -7px;
+            width: 0; height: 0;
+            border-style: solid;
+            border-width: 0 10px 10px 0;
+            border-color: transparent #242830 transparent transparent;
+        }
+
+        /* ── Consecutive same-sender: remove tail on all but the LAST ──
+           achieved by hiding the pseudo-element when next sibling is same side */
+        .chat-messages .message.sent + .message.sent::after,
+        .chat-messages .message.received + .message.received::after {
+            display: none;
+        }
+
+        /* consecutive same-side: softer corner (no sharp) */
+        .chat-messages .message.sent + .message.sent {
+            border-radius: 18px 4px 4px 18px;
+        }
+
+        .chat-messages .message.received + .message.received {
+            border-radius: 4px 18px 18px 4px;
+        }
+
+        /* last in a consecutive run — restore sharp corner + show tail */
+        .chat-messages .message.sent:not(:has(+ .message.sent)) {
+            border-radius: 18px 18px 4px 18px;
+        }
+
+        .chat-messages .message.received:not(:has(+ .message.received)) {
+            border-radius: 18px 18px 18px 4px;
+        }
+
+        /* ── Side change gap ── */
+        .chat-messages .message.sent + .message.received,
+        .chat-messages .message.received + .message.sent {
+            margin-top: 12px;
+        }
+
+        /* ── No hover tint on bubbles ── */
+        .chat-messages .message:hover { background: unset; }
+        .chat-messages .message.sent:hover     { background: var(--primary, #ff4b6e); }
+        .chat-messages .message.received:hover { background: #242830; }
+
+        /* ── Images inside bubbles ── */
+        .chat-messages .message .message-image {
+            max-width: 260px;
+            max-height: 320px;
+            border-radius: 12px;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* ── Sending state ── */
+        .chat-messages .message.sending { opacity: 0.72; }
+
+        /* ── Message time inside bubble ── */
+        .message-time {
+            display: inline-flex !important;
+            align-items: center !important;
+            white-space: nowrap !important;
+            margin-left: auto !important;
+            font-size: 0.67rem !important;
+            opacity: 0.75 !important;
+            flex-shrink: 0 !important;
+            padding-left: 8px;
+        }
+
+        .message.sent .message-time     { color: rgba(255,255,255,0.85) !important; }
+        .message.received .message-time { color: rgba(255,255,255,0.55) !important; }
+        .message.sending .message-time  { font-style: italic; }
 
         /* ── RIGHT PANEL: chat ── */
         #chatPanel {
@@ -450,33 +630,10 @@
         .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 16px 20px;
+            padding: 20px 16px 12px;
             display: flex;
             flex-direction: column;
-        }
-
-        /* ── WhatsApp-style message spacing ──
-           Consecutive same-side messages: tight (2px)
-           Side change: bigger gap (10px) — only the incoming
-           message gets the top gap so it feels natural        */
-        .chat-messages .message {
-            margin-bottom: 2px;
-              /* subtle, not pill-shaped */
-        }
-
-        /* gap before a received message that follows a sent one */
-        .chat-messages .message.sent + .message.received {
-            margin-top: 10px;
-        }
-
-        /* gap before a sent message that follows a received one */
-        .chat-messages .message.received + .message.sent {
-            margin-top: 10px;
-        }
-
-        /* no hover tint on message bubbles in the chat panel */
-        .chat-messages .message:hover {
-            background: unset;
+            gap: 0;
         }
 
         /* ─── INPUT AREA ─── */
@@ -696,24 +853,6 @@
         }
 
         .message-text { display: inline !important; }
-
-        .message-time {
-            display: inline-flex !important;
-            align-items: center !important;
-            white-space: nowrap !important;
-            margin-left: auto !important;
-            font-size: 0.68rem !important;
-            opacity: 0.7 !important;
-            flex-shrink: 0 !important;
-        }
-
-        .message.sent .message-time     { color: rgba(255,255,255,0.8) !important; }
-        .message.received .message-time { color: var(--text-light, #7a8090) !important; }
-
-        .message.sending .message-time {
-            font-style: italic;
-            color: var(--text-light, #7a8090);
-        }
 
         /* reply indicators inside messages */
         .reply-indicator {
