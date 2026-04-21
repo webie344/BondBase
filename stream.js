@@ -1,4 +1,3 @@
-
 // stream.js - Video Streaming functionality with Cloudinary integration + Social Features
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
@@ -33,7 +32,7 @@ const firebaseConfig = {
     storageBucket: "crypto-6517d.firebasestorage.app",
     messagingSenderId: "60263975159",
     appId: "1:60263975159:web:bd53dcaad86d6ed9592bf2"
-  };
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -83,7 +82,6 @@ const videoCache = {
         this.isCaching = true;
 
         try {
-            // Cache next 5 videos — all in parallel instead of sequential awaits
             const endIndex = Math.min(startIndex + this.cacheSize, videos.length);
             const videosToCache = videos.slice(startIndex, endIndex)
                                         .filter(v => !this.cachedVideos.has(v.id));
@@ -91,8 +89,6 @@ const videoCache = {
             await Promise.all(videosToCache.map(video => new Promise((resolve) => {
                 try {
                     const videoElement = document.createElement('video');
-                    // Use metadata preload — loads enough to get duration/dimensions fast
-                    // without downloading the full file
                     videoElement.preload = 'metadata';
                     videoElement.crossOrigin = 'anonymous';
 
@@ -105,7 +101,6 @@ const videoCache = {
                     videoElement.addEventListener('loadedmetadata', () => {
                         const cached = this.cachedVideos.get(video.id);
                         if (cached) cached.loaded = true;
-                        // Now switch to auto preload to buffer content
                         videoElement.preload = 'auto';
                         resolve();
                     }, { once: true });
@@ -115,10 +110,7 @@ const videoCache = {
                         resolve();
                     }, { once: true });
 
-                    // Never wait more than 8s per video
                     setTimeout(resolve, 8000);
-
-                    // Set src last so event listeners are already attached
                     videoElement.src = video.videoUrl;
                 } catch (error) {
                     console.warn(`Error caching video ${video.id}:`, error);
@@ -126,7 +118,6 @@ const videoCache = {
                 }
             })));
 
-            // Remove old cached videos if cache is too large
             if (this.cachedVideos.size > this.cacheSize * 2) {
                 const keys = Array.from(this.cachedVideos.keys());
                 const videosToRemove = keys.slice(0, this.cacheSize);
@@ -199,14 +190,12 @@ class StreamManager {
         this.commentListeners = new Map();
     }
 
-    // Create a new stream with Cloudinary upload
     async createStream(videoData, headline, description, category, isLocalFile = false) {
         try {
             if (!currentUser) {
                 throw new Error('You must be logged in to create a stream');
             }
 
-            // Get user data
             const userRef = doc(db, 'users', currentUser.uid);
             const userSnap = await getDoc(userRef);
             
@@ -215,17 +204,11 @@ class StreamManager {
             }
 
             const userData = userSnap.data();
-
             let streamData = {};
 
             if (isLocalFile && videoData instanceof File) {
-                // Enhanced validation for downloaded videos
                 await this.validateVideoFile(videoData);
-                
-                // Upload to Cloudinary
                 const videoUrl = await this.uploadVideoToCloudinary(videoData);
-                
-                // Generate thumbnail URL from Cloudinary video
                 const thumbnailUrl = this.generateCloudinaryThumbnail(videoUrl);
                 
                 streamData = {
@@ -260,14 +243,12 @@ class StreamManager {
             }
 
             const streamRef = await addDoc(collection(db, 'streams'), streamData);
-            
             return streamRef.id;
         } catch (error) {
             throw error;
         }
     }
 
-    // Get all videos posted by a specific user
     async getUserVideos(userId) {
         try {
             const videosQuery = query(
@@ -290,9 +271,7 @@ class StreamManager {
                 });
             });
 
-            // Sort by newest first
             videos.sort((a, b) => b.timestamp - a.timestamp);
-            
             return videos;
         } catch (error) {
             console.error('Error getting user videos:', error);
@@ -300,7 +279,6 @@ class StreamManager {
         }
     }
 
-    // Get specific video by ID
     async getVideoById(videoId) {
         try {
             const videoRef = doc(db, 'streams', videoId);
@@ -323,15 +301,12 @@ class StreamManager {
         }
     }
 
-    // Generate Cloudinary thumbnail URL from video URL
     generateCloudinaryThumbnail(videoUrl) {
         try {
-            if (!videoUrl || typeof videoUrl !== 'string') return 'images-defaultse-profile.jpg';
-            if (!videoUrl.includes('cloudinary.com')) return 'images-defaultse-profile.jpg';
+            if (!videoUrl || typeof videoUrl !== 'string') return 'images-default-profile.jpg';
+            if (!videoUrl.includes('cloudinary.com')) return 'images-default-profile.jpg';
 
             if (videoUrl.includes('/upload/')) {
-                // so_0 = grab frame at 0s, f_auto = best format (WebP if supported),
-                // q_auto = adaptive quality, w/h = resize for fast thumbnail delivery
                 const transform = 'w_480,h_854,c_fill,so_0,f_auto,q_auto';
                 const thumb = videoUrl
                     .replace('/upload/', `/upload/${transform}/`)
@@ -339,14 +314,13 @@ class StreamManager {
                 return thumb;
             }
 
-            return 'images-defaultse-profile.jpg';
+            return 'images-default-profile.jpg';
         } catch (error) {
             console.error('Error generating thumbnail:', error);
-            return 'images-defaultse-profile.jpg';
+            return 'images-default-profile.jpg';
         }
     }
 
-    // Check if video needs conversion
     needsConversion(file) {
         const needsConversion = PROBLEMATIC_FORMATS.includes(file.type) || 
                                this.isDownloadedVideo(file) ||
@@ -359,7 +333,6 @@ class StreamManager {
         return needsConversion;
     }
 
-    // Check if video is likely downloaded from social media
     isDownloadedVideo(file) {
         const downloadedIndicators = [
             file.name.match(/(discord|whatsapp|telegram|instagram|facebook|twitter|tiktok|snapchat)/i),
@@ -371,7 +344,6 @@ class StreamManager {
         return downloadedIndicators.some(indicator => indicator);
     }
 
-    // Check if video is portrait orientation
     async isPortraitVideo(file) {
         return new Promise((resolve) => {
             const video = document.createElement('video');
@@ -398,7 +370,6 @@ class StreamManager {
         });
     }
 
-    // Validate video file for phone compatibility
     async validateVideoFile(file) {
         const maxSize = 1024 * 1024 * 1024;
         if (file.size > maxSize) {
@@ -409,27 +380,9 @@ class StreamManager {
             throw new Error('Please select a valid video file');
         }
 
-        const isSupportedFormat = SUPPORTED_VIDEO_FORMATS.some(format => 
-            file.type === format || 
-            file.type.includes(format.replace('video/', ''))
-        );
-
-        const isSupportedExtension = SUPPORTED_EXTENSIONS.some(ext => 
-            file.name.toLowerCase().endsWith(ext)
-        );
-
-        if (!isSupportedFormat && !isSupportedExtension) {
-            // We'll still try to upload as Cloudinary can handle many formats
-        }
-
-        if (this.needsConversion(file)) {
-            // We'll still try to upload with enhanced transformations
-        }
-
         return true;
     }
 
-    // Check if file is likely a video based on name and properties
     isLikelyVideoFile(file) {
         const videoIndicators = [
             file.name.toLowerCase().match(/\.(mp4|mov|avi|mkv|wmv|flv|webm|3gp|m4v|mpg|mpeg)$/),
@@ -440,7 +393,6 @@ class StreamManager {
         return videoIndicators.some(indicator => indicator);
     }
 
-    // Get video format information
     getVideoFormat(file) {
         return {
             mimeType: file.type,
@@ -449,7 +401,6 @@ class StreamManager {
         };
     }
 
-    // Check if video is from common phone formats
     isCommonPhoneFormat(file) {
         const phoneFormats = [
             'video/mp4',
@@ -470,7 +421,6 @@ class StreamManager {
                file.name.toLowerCase().includes('record');
     }
 
-    // Check if video is likely from a phone
     isLikelyPhoneVideo(file) {
         return this.isCommonPhoneFormat(file) || 
                file.name.match(/(IMG_|VID_|PXL_|MVIMG_|CAM_|REC_)/i) !== null ||
@@ -481,7 +431,6 @@ class StreamManager {
                file.type === 'video/3gpp';
     }
 
-    // Upload video to Cloudinary
     async uploadVideoToCloudinary(videoFile) {
         const formData = new FormData();
         formData.append('file', videoFile);
@@ -513,7 +462,6 @@ class StreamManager {
         }
     }
 
-    // Get all streams
     async getStreams(category = 'all') {
         try {
             const streamsQuery = collection(db, 'streams');
@@ -542,9 +490,7 @@ class StreamManager {
                 filteredStreams = streams.filter(stream => stream.category === category);
             }
 
-            // Shuffle videos for random order
             filteredStreams = this.shuffleArray(filteredStreams);
-
             return filteredStreams;
         } catch (error) {
             console.error('Error getting streams:', error);
@@ -552,7 +498,6 @@ class StreamManager {
         }
     }
 
-    // Shuffle array function
     shuffleArray(array) {
         const shuffled = [...array];
         for (let i = shuffled.length - 1; i > 0; i--) {
@@ -562,9 +507,8 @@ class StreamManager {
         return shuffled;
     }
 
-    // Helper function to get thumbnail for a stream
     getStreamThumbnail(streamData) {
-        if (streamData.thumbnailUrl && streamData.thumbnailUrl !== 'images-defaultse-profile.jpg') {
+        if (streamData.thumbnailUrl && streamData.thumbnailUrl !== 'images-default-profile.jpg') {
             return streamData.thumbnailUrl;
         }
         
@@ -572,10 +516,9 @@ class StreamManager {
             return this.generateCloudinaryThumbnail(streamData.videoUrl);
         }
         
-        return 'images-defaultse-profile.jpg';
+        return 'images-default-profile.jpg';
     }
 
-    // Add viewer to stream
     async addViewer(streamId) {
         if (!currentUser) return;
 
@@ -605,7 +548,6 @@ class StreamManager {
         }
     }
 
-    // Remove viewer from stream
     async removeViewer(streamId) {
         if (!currentUser) return;
 
@@ -630,14 +572,12 @@ class StreamManager {
         }
     }
 
-    // LIKE FUNCTIONALITY
     async handleLike(streamId, likeButton) {
         if (!currentUser) {
             alert('Please login to like videos');
             return null;
         }
 
-        // Check if already liked
         const isLiked = likedStreams.has(streamId);
         
         try {
@@ -649,25 +589,19 @@ class StreamManager {
                 let newLikes = (stream.likes || 0);
                 
                 if (isLiked) {
-                    // Unlike
                     newLikes = Math.max(0, newLikes - 1);
                     likedStreams.delete(streamId);
                 } else {
-                    // Like
                     newLikes = newLikes + 1;
                     likedStreams.add(streamId);
                 }
                 
-                // Update Firestore
                 await updateDoc(streamRef, {
                     likes: newLikes,
                     updatedAt: serverTimestamp()
                 });
 
-                // Save to localStorage
                 saveLikedStreams();
-
-                // Return the updated like count and whether it's liked
                 return { likes: newLikes, isLiked: !isLiked };
             }
         } catch (error) {
@@ -676,19 +610,16 @@ class StreamManager {
         }
     }
 
-    // COMMENT FUNCTIONALITY - UPDATED WITH REPLY SUPPORT
     async loadComments(streamId, container) {
         if (!container) return;
 
         try {
-            // Clean up previous listener for this stream if it exists
             if (activeCommentListeners.has(streamId)) {
                 const unsubscribe = activeCommentListeners.get(streamId);
                 unsubscribe();
                 activeCommentListeners.delete(streamId);
             }
 
-            // Create a new real-time listener
             const commentsQuery = query(
                 collection(db, 'streams', streamId, 'comments'), 
                 orderBy('createdAt', 'asc')
@@ -711,19 +642,14 @@ class StreamManager {
                     }
                 });
 
-                // Get user data for all comments
                 this.getUsersData([...userIds]).then(usersData => {
-                    // Clear container again in case we get multiple rapid updates
                     container.innerHTML = '';
-                    
-                    // Track displayed comment IDs to prevent duplicates
                     const displayedCommentIds = new Set();
                     
                     snapshot.forEach(doc => {
                         const comment = doc.data();
                         const commentId = doc.id;
                         
-                        // Skip if we've already displayed this comment
                         if (displayedCommentIds.has(commentId)) {
                             return;
                         }
@@ -734,10 +660,7 @@ class StreamManager {
                         container.appendChild(commentElement);
                     });
                     
-                    // Scroll to bottom
                     container.scrollTop = container.scrollHeight;
-                    
-                    // Add reply functionality
                     this.addReplyListeners(streamId);
                 });
             }, (error) => {
@@ -745,7 +668,6 @@ class StreamManager {
                 container.innerHTML = '<div class="error">Error loading comments</div>';
             });
 
-            // Store the unsubscribe function
             activeCommentListeners.set(streamId, unsubscribe);
 
         } catch (error) {
@@ -772,7 +694,7 @@ class StreamManager {
         
         commentDiv.innerHTML = `
             <div class="comment-header">
-                <img src="${user.profileImage || 'images-defaultse-profile.jpg'}" 
+                <img src="${user.profileImage || 'images-default-profile.jpg'}" 
                      alt="${user.name}" class="comment-avatar">
                 <div class="comment-info">
                     <strong>${user.name || 'Unknown User'}</strong>
@@ -812,8 +734,6 @@ class StreamManager {
             modalCommentInput.focus();
             modalCommentInput.setAttribute('data-reply-to', commentId);
             modalCommentInput.setAttribute('data-reply-user-name', userName);
-            
-            // Scroll to input
             modalCommentInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
@@ -836,9 +756,7 @@ class StreamManager {
                 createdAt: serverTimestamp()
             };
 
-            // Add reply information if replying to a comment
             if (replyTo) {
-                // Get the original comment to include in reply
                 const originalCommentRef = doc(db, 'streams', streamId, 'comments', replyTo.commentId);
                 const originalCommentSnap = await getDoc(originalCommentRef);
                 
@@ -853,10 +771,8 @@ class StreamManager {
                 }
             }
 
-            // Add comment to subcollection
             await addDoc(collection(db, 'streams', streamId, 'comments'), commentData);
 
-            // Update comments count
             const streamRef = doc(db, 'streams', streamId);
             await updateDoc(streamRef, {
                 commentsCount: increment(1),
@@ -886,7 +802,6 @@ class StreamManager {
         return usersData;
     }
 
-    // Listen to stream updates
     listenToStreams(callback, category = 'all') {
         try {
             const streamsQuery = collection(db, 'streams');
@@ -912,9 +827,7 @@ class StreamManager {
                     filteredStreams = streams.filter(stream => stream.category === category);
                 }
 
-                // Shuffle videos when they load
                 filteredStreams = this.shuffleArray(filteredStreams);
-
                 callback(filteredStreams);
             }, (error) => {
                 console.error('Error listening to streams:', error);
@@ -930,7 +843,6 @@ class StreamManager {
         }
     }
 
-    // Listen to viewer count for a specific stream
     listenToViewerCount(streamId, callback) {
         try {
             const streamRef = doc(db, 'streams', streamId);
@@ -954,7 +866,6 @@ class StreamManager {
         }
     }
 
-    // Get total viewers across all streams
     async getTotalViewers() {
         try {
             const streams = await this.getStreams('all');
@@ -964,7 +875,6 @@ class StreamManager {
         }
     }
 
-    // Initialize activity tracking for current user
     initializeActivityTracking() {
         const activityInterval = setInterval(() => {
             this.currentStreams.forEach((streamInfo, streamId) => {
@@ -998,7 +908,6 @@ class StreamManager {
         }
     }
 
-    // Clean up all listeners
     cleanup() {
         if (this.activityInterval) {
             clearInterval(this.activityInterval);
@@ -1009,7 +918,6 @@ class StreamManager {
         this.streamListeners.clear();
         this.viewerListeners.clear();
         
-        // Clean up comment listeners
         activeCommentListeners.forEach(unsubscribe => unsubscribe());
         activeCommentListeners.clear();
         
@@ -1037,7 +945,6 @@ class VideoModal {
     }
 
     init() {
-        // Create modal element
         this.modal = document.createElement('div');
         this.modal.className = 'video-modal';
         this.modal.style.cssText = `
@@ -1053,7 +960,6 @@ class VideoModal {
             overflow: hidden;
         `;
 
-        // Modal content with scrollable container
         this.modal.innerHTML = `
             <div class="video-modal-scroll-container" style="
                 width: 100%;
@@ -1068,7 +974,6 @@ class VideoModal {
                     display: flex;
                     flex-direction: column;
                 ">
-                    <!-- Close button at top (scrollable) -->
                     <div class="video-modal-header" style="
                         position: sticky;
                         top: 0;
@@ -1097,7 +1002,6 @@ class VideoModal {
                         </button>
                     </div>
 
-                    <!-- Video player container -->
                     <div class="video-modal-player-container" style="
                         flex: 1;
                         display: flex;
@@ -1114,7 +1018,6 @@ class VideoModal {
                             overflow: hidden;
                             position: relative;
                         ">
-                            <!-- Video element -->
                             <video id="modalVideoPlayer" style="
                                 width: 100%;
                                 height: auto;
@@ -1122,7 +1025,6 @@ class VideoModal {
                                 display: block;
                             " controls playsinline></video>
 
-                            <!-- Custom progress bar -->
                             <div class="video-progress-container" style="
                                 position: absolute;
                                 bottom: 0;
@@ -1158,7 +1060,6 @@ class VideoModal {
                         </div>
                     </div>
 
-                    <!-- Video info (scrollable) -->
                     <div class="video-modal-info" style="
                         background: #1a1a1a;
                         padding: 2rem;
@@ -1208,7 +1109,6 @@ class VideoModal {
                             </div>
                         </div>
 
-                        <!-- Description with "See More" -->
                         <div class="video-modal-description-container" style="margin-bottom: 1.5rem;">
                             <p id="modalVideoDescription" style="
                                 color: #d1d5db;
@@ -1233,7 +1133,6 @@ class VideoModal {
                             </button>
                         </div>
 
-                        <!-- Video actions -->
                         <div class="video-modal-actions" style="
                             display: flex;
                             gap: 1rem;
@@ -1277,10 +1176,8 @@ class VideoModal {
             </div>
         `;
 
-        // Append to body
         document.body.appendChild(this.modal);
 
-        // Get elements
         this.videoElement = this.modal.querySelector('#modalVideoPlayer');
         this.closeButton = this.modal.querySelector('.video-modal-close');
         this.likeButton = this.modal.querySelector('.video-modal-like');
@@ -1292,50 +1189,42 @@ class VideoModal {
         this.progressHandle = this.modal.querySelector('.video-progress-handle');
         this.scrollContainer = this.modal.querySelector('.video-modal-scroll-container');
 
-        // Add event listeners
         this.closeButton.addEventListener('click', () => this.close());
         this.likeButton.addEventListener('click', () => this.handleLike());
         this.shareButton.addEventListener('click', () => this.handleShare());
         this.seeMoreBtn.addEventListener('click', () => this.toggleDescription());
 
-        // Progress bar events
         if (this.progressContainer) {
             this.progressContainer.addEventListener('mousedown', (e) => this.handleProgressClick(e));
             this.progressContainer.addEventListener('touchstart', (e) => this.handleProgressClick(e));
         }
 
-        // Video time update
         if (this.videoElement) {
             this.videoElement.addEventListener('timeupdate', () => this.updateProgressBar());
             this.videoElement.addEventListener('loadedmetadata', () => this.setupProgressBar());
         }
 
-        // Handle modal scrolling
         if (this.scrollContainer) {
             this.scrollContainer.addEventListener('scroll', () => this.handleScroll());
         }
 
-        // Close modal when clicking outside (on backdrop)
         this.modal.addEventListener('click', (e) => {
             if (e.target === this.modal && !e.target.closest('.video-modal-player-container')) {
                 this.close();
             }
         });
 
-        // Close modal with Escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.isOpen) {
                 this.close();
             }
         });
 
-        // Handle video end
         this.videoElement.addEventListener('ended', () => {
             this.videoElement.currentTime = 0;
             this.updateProgressBar();
         });
 
-        // Prevent body scroll when modal is open
         this.modal.addEventListener('wheel', (e) => {
             if (this.scrollContainer.scrollHeight > this.scrollContainer.clientHeight) {
                 e.stopPropagation();
@@ -1345,23 +1234,19 @@ class VideoModal {
 
     async open(videoId) {
         try {
-            // Show modal
             this.modal.style.display = 'block';
             this.isOpen = true;
             document.body.style.overflow = 'hidden';
 
-            // Reset scroll position
             if (this.scrollContainer) {
                 this.scrollContainer.scrollTop = 0;
             }
 
-            // Get video data
             this.currentVideo = await streamManager.getVideoById(videoId);
             if (!this.currentVideo) {
                 throw new Error('Video not found');
             }
 
-            // Update modal content
             const titleElement = this.modal.querySelector('#modalVideoTitle');
             const authorElement = this.modal.querySelector('#modalVideoAuthor');
             const viewsElement = this.modal.querySelector('#modalVideoViews span');
@@ -1374,20 +1259,12 @@ class VideoModal {
             likesElement.textContent = this.currentVideo.likes || 0;
             commentsElement.textContent = this.currentVideo.commentsCount || 0;
 
-            // Handle description with "See More"
             this.updateDescription();
-
-            // Set video source
             this.videoElement.src = this.currentVideo.videoUrl;
             this.videoElement.load();
-
-            // Update like button state
             this.updateLikeButton();
-
-            // Add viewer count
             streamManager.addViewer(videoId);
 
-            // Play video
             await this.videoElement.play().catch(e => {
                 console.log('Auto-play prevented:', e);
             });
@@ -1408,7 +1285,6 @@ class VideoModal {
         this.isOpen = false;
         document.body.style.overflow = 'auto';
 
-        // Remove viewer count
         if (this.currentVideo) {
             streamManager.removeViewer(this.currentVideo.id);
         }
@@ -1444,14 +1320,12 @@ class VideoModal {
 
     setupProgressBar() {
         if (!this.videoElement || !this.progressFill) return;
-        
         this.progressFill.style.width = '0%';
         this.progressHandle.style.opacity = '0';
     }
 
     updateProgressBar() {
         if (!this.videoElement || !this.progressFill || !this.videoElement.duration) return;
-        
         const progress = (this.videoElement.currentTime / this.videoElement.duration) * 100;
         this.progressFill.style.width = `${progress}%`;
     }
@@ -1468,11 +1342,8 @@ class VideoModal {
         
         this.videoElement.currentTime = percent * this.videoElement.duration;
         this.updateProgressBar();
-        
-        // Show handle
         this.progressHandle.style.opacity = '1';
         
-        // Add move and end listeners
         const handleMove = (moveEvent) => {
             if (!this.isDragging) return;
             
@@ -1500,7 +1371,6 @@ class VideoModal {
     }
 
     handleScroll() {
-        // Optional: Add parallax or other scroll effects
         const scrollTop = this.scrollContainer.scrollTop;
         const header = this.modal.querySelector('.video-modal-header');
         
@@ -1567,7 +1437,7 @@ class VideoModal {
     }
 }
 
-// Enhanced TikTok Feed Class with all requested features
+// Enhanced TikTok Feed Class with proper loading indicators and fixed video skipping
 class TikTokFeed {
     constructor() {
         this.videoFeed = document.getElementById('videoFeed');
@@ -1587,8 +1457,10 @@ class TikTokFeed {
         this.closeComments = document.getElementById('closeComments');
         this.replyTo = null;
         this.isScrolling = false;
-        this.scrollVelocity = 0;
-        this.lastScrollTime = 0;
+        this.touchStartTime = 0;
+        
+        // Track which videos are ready to play (video + audio both ready)
+        this.readyVideos = new Set();
         
         this.init();
     }
@@ -1601,28 +1473,23 @@ class TikTokFeed {
     }
 
     setupSmoothScrolling() {
-        // CSS handles momentum — nothing needed here
         this.videoFeed.style.webkitOverflowScrolling = 'touch';
     }
 
     setupEventListeners() {
-        // Touch events for swiping
         if (this.videoFeed) {
-            this.videoFeed.addEventListener('touchstart', (e) => this.handleTouchStart(e));
-            this.videoFeed.addEventListener('touchmove', (e) => this.handleTouchMove(e));
+            this.videoFeed.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+            this.videoFeed.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
             this.videoFeed.addEventListener('touchend', (e) => this.handleTouchEnd(e));
 
-            // Mouse events for desktop
             this.videoFeed.addEventListener('mousedown', (e) => this.handleMouseDown(e));
             this.videoFeed.addEventListener('mousemove', (e) => this.handleMouseMove(e));
             this.videoFeed.addEventListener('mouseup', (e) => this.handleMouseUp(e));
             this.videoFeed.addEventListener('mouseleave', (e) => this.handleMouseLeave(e));
 
-            // VIDEO CLICK EVENTS - TIKTOK-LIKE CONTROLS
             this.videoFeed.addEventListener('click', (e) => this.handleVideoClick(e));
         }
 
-        // Comments modal
         if (this.closeComments) {
             this.closeComments.addEventListener('click', () => this.closeCommentsModal());
         }
@@ -1644,7 +1511,6 @@ class TikTokFeed {
             });
         }
 
-        // Close modal when clicking outside
         if (this.commentsModal) {
             this.commentsModal.addEventListener('click', (e) => {
                 if (e.target === this.commentsModal) {
@@ -1653,7 +1519,6 @@ class TikTokFeed {
             });
         }
 
-        // Handle visibility change
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 this.pauseCurrentVideo();
@@ -1662,27 +1527,11 @@ class TikTokFeed {
             }
         });
 
-        // Prevent default scroll behavior
-        document.addEventListener('touchmove', (e) => {
-            if (this.isSwiping && e.target.closest('.video-feed')) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-
-        // Handle escape key to clear reply
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.replyTo) {
-                this.clearReply();
-            }
-        });
-
-        // Handle window resize
         window.addEventListener('resize', () => {
             this.adjustVideoSizes();
         });
     }
 
-    // TIKTOK-LIKE VIDEO CONTROLS
     handleVideoClick(e) {
         if (e.target.closest('.side-action, .video-side-actions, .video-info-overlay, .video-progress-container')) {
             return;
@@ -1703,14 +1552,11 @@ class TikTokFeed {
         const video = videoData.videoElement;
         const now = Date.now();
         
-        // Check for double click (within 300ms)
         if (now - lastClickTime < 300) {
-            // Double click detected
             clearTimeout(clickTimeout);
             lastClickTime = 0;
             this.handleDoubleClick(video, videoSlide);
         } else {
-            // Single click - handle after delay
             lastClickTime = now;
             clickTimeout = setTimeout(() => {
                 this.handleSingleClick(video, videoSlide);
@@ -1719,7 +1565,6 @@ class TikTokFeed {
     }
 
     handleSingleClick(video, videoSlide) {
-        // Toggle play/pause
         if (video.paused) {
             video.play().catch(e => console.log('Play failed:', e));
             this.hidePlayPauseOverlay(videoSlide);
@@ -1730,13 +1575,9 @@ class TikTokFeed {
     }
 
     handleDoubleClick(video, videoSlide) {
-        // Fast forward 10 seconds
         video.currentTime = Math.min(video.duration, video.currentTime + 10);
-        
-        // Show fast forward overlay
         this.showFastForwardOverlay(videoSlide);
         
-        // Play if paused
         if (video.paused) {
             video.play().catch(e => console.log('Play failed:', e));
         }
@@ -1786,17 +1627,15 @@ class TikTokFeed {
     }
 
     handleTouchStart(e) {
-        // Don't intercept if touching an action button
         if (e.target.closest('.side-action, .video-side-actions, .video-info-overlay, .video-progress-container')) return;
 
-        this.startY        = e.touches[0].clientY;
-        this.currentY      = this.startY;
+        this.startY = e.touches[0].clientY;
+        this.currentY = this.startY;
         this.touchStartTime = Date.now();
-        this.isSwiping     = true;
-        this.isDragging    = true;
-        this.dragY         = 0;
+        this.isSwiping = true;
+        this.isDragging = true;
+        this.dragY = 0;
 
-        // Freeze transitions while dragging
         this._setSlideTransitions('none');
     }
 
@@ -1805,27 +1644,24 @@ class TikTokFeed {
         e.preventDefault();
 
         this.currentY = e.touches[0].clientY;
-        this.dragY    = this.currentY - this.startY;
+        this.dragY = this.currentY - this.startY;
 
-        // Rubber-band at edges
-        const atTop    = this.currentIndex <= 0;
+        const atTop = this.currentIndex <= 0;
         const atBottom = this.currentIndex >= this.videos.length - 1;
         if ((this.dragY > 0 && atTop) || (this.dragY < 0 && atBottom)) {
             this.dragY = this.dragY * 0.25;
         }
 
-        // Move every slide by the drag delta — you see the next one sliding in
         this._positionSlides(this.currentIndex, this.dragY);
     }
 
     handleTouchEnd(e) {
         if (!this.isSwiping || !this.isDragging) return;
 
-        const elapsed  = Math.max(Date.now() - this.touchStartTime, 1);
-        const velocity = Math.abs(this.dragY) / elapsed; // px/ms
-        const slideH   = window.innerHeight;
+        const elapsed = Math.max(Date.now() - this.touchStartTime, 1);
+        const velocity = Math.abs(this.dragY) / elapsed;
+        const slideH = window.innerHeight;
 
-        // Low threshold for quick flicks, higher for slow drags
         const threshold = velocity > 0.3 ? slideH * 0.07 : slideH * 0.2;
 
         let targetIndex = this.currentIndex;
@@ -1837,7 +1673,6 @@ class TikTokFeed {
             }
         }
 
-        // Animate slides to their resting position
         this._setSlideTransitions('transform 0.36s cubic-bezier(0.165, 0.84, 0.44, 1)');
         this._positionSlides(targetIndex, 0);
 
@@ -1849,24 +1684,29 @@ class TikTokFeed {
             this.changeVideo(targetIndex);
         }
 
-        this.isSwiping  = false;
+        this.isSwiping = false;
         this.isDragging = false;
-        this.dragY      = 0;
+        this.dragY = 0;
     }
 
-    // Position every slide at its correct vertical offset, plus an optional drag delta
     _positionSlides(centreIndex, dragOffset = 0) {
         this.videos.forEach((video, idx) => {
             const data = this.videoElements.get(video.id);
             if (!data?.slide) return;
             const yPercent = (idx - centreIndex) * 100;
             data.slide.style.transform = `translateY(calc(${yPercent}% + ${dragOffset}px))`;
-            // Only render slides within 2 positions of centre for performance
-            data.slide.style.display = Math.abs(idx - centreIndex) <= 2 ? 'block' : 'none';
+            // Show all slides - no hiding to prevent skipped videos
+            data.slide.style.display = 'block';
+            
+            // Mark active slide
+            if (idx === centreIndex) {
+                data.slide.classList.add('active');
+            } else {
+                data.slide.classList.remove('active');
+            }
         });
     }
 
-    // Set transition on every slide at once
     _setSlideTransitions(value) {
         this.videos.forEach(video => {
             const data = this.videoElements.get(video.id);
@@ -1876,11 +1716,11 @@ class TikTokFeed {
 
     handleMouseDown(e) {
         if (e.target.closest('.side-action, .video-side-actions, .video-info-overlay, .video-progress-container')) return;
-        this.startY    = e.clientY;
-        this.currentY  = this.startY;
+        this.startY = e.clientY;
+        this.currentY = this.startY;
         this.isSwiping = true;
         this.isDragging = true;
-        this.dragY     = 0;
+        this.dragY = 0;
         this.touchStartTime = Date.now();
         this._setSlideTransitions('none');
     }
@@ -1888,16 +1728,16 @@ class TikTokFeed {
     handleMouseMove(e) {
         if (!this.isSwiping || !this.isDragging) return;
         this.currentY = e.clientY;
-        this.dragY    = this.currentY - this.startY;
+        this.dragY = this.currentY - this.startY;
         this._positionSlides(this.currentIndex, this.dragY);
     }
 
     handleMouseUp(e) {
         if (!this.isSwiping || !this.isDragging) return;
 
-        const elapsed  = Math.max(Date.now() - this.touchStartTime, 1);
+        const elapsed = Math.max(Date.now() - this.touchStartTime, 1);
         const velocity = Math.abs(this.dragY) / elapsed;
-        const slideH   = window.innerHeight;
+        const slideH = window.innerHeight;
         const threshold = velocity > 0.3 ? slideH * 0.07 : slideH * 0.2;
 
         let targetIndex = this.currentIndex;
@@ -1912,9 +1752,9 @@ class TikTokFeed {
 
         if (targetIndex !== this.currentIndex) this.changeVideo(targetIndex);
 
-        this.isSwiping  = false;
+        this.isSwiping = false;
         this.isDragging = false;
-        this.dragY      = 0;
+        this.dragY = 0;
     }
 
     handleMouseLeave(e) {
@@ -1922,9 +1762,9 @@ class TikTokFeed {
         this._setSlideTransitions('transform 0.28s ease-out');
         this._positionSlides(this.currentIndex, 0);
         setTimeout(() => this._setSlideTransitions('none'), 300);
-        this.isSwiping  = false;
+        this.isSwiping = false;
         this.isDragging = false;
-        this.dragY      = 0;
+        this.dragY = 0;
     }
 
     async loadInitialVideos() {
@@ -1933,11 +1773,9 @@ class TikTokFeed {
             this.videos = streams;
             this.renderVideos();
             
-            // Start from random video
             const randomIndex = Math.floor(Math.random() * this.videos.length);
             this.showVideo(randomIndex);
             
-            // Start caching videos
             this.startVideoCaching();
             
             const loadingOverlay = document.getElementById('loadingOverlay');
@@ -1947,7 +1785,6 @@ class TikTokFeed {
             
             this.updateTotalViewers(streams);
             
-            // Setup real-time listener
             streamManager.listenToStreams((streams) => {
                 const currentIds = this.videos.map(v => v.id).sort();
                 const newIds = streams.map(v => v.id).sort();
@@ -1967,7 +1804,6 @@ class TikTokFeed {
                         }
                     }
                     
-                    // Update cache
                     this.startVideoCaching();
                 }
                 
@@ -1992,17 +1828,14 @@ class TikTokFeed {
     }
 
     startVideoCaching() {
-        // Cache initial 5 videos
         videoCache.cacheVideos(this.videos, 0);
         
-        // Cache next batch when user reaches near the end
         const checkCache = () => {
             if (this.currentIndex >= this.videos.length - 3) {
                 videoCache.cacheVideos(this.videos, this.currentIndex + 1);
             }
         };
         
-        // Check cache every 30 seconds
         setInterval(checkCache, 30000);
     }
 
@@ -2024,10 +1857,8 @@ class TikTokFeed {
         const wasPlaying = currentVideoId ? 
             (this.videoElements.get(currentVideoId)?.videoElement?.paused === false) : false;
         
-        // Get existing slides to preserve video elements
         const existingSlides = Array.from(this.videoFeed.children);
         
-        // Clear only if necessary (when videos have changed significantly)
         if (existingSlides.length !== this.videos.length) {
             this.videoFeed.innerHTML = '';
             existingSlides.forEach(slide => {
@@ -2040,25 +1871,19 @@ class TikTokFeed {
             });
         }
         
-        // Track which videos we have rendered
         const renderedVideoIds = new Set();
         
         this.videos.forEach((video, index) => {
-            // Check if this video already exists in the DOM
             const existingSlide = existingSlides.find(slide => 
                 slide.dataset.streamId === video.id
             );
             
             if (existingSlide) {
-                // Update existing slide
                 existingSlide.dataset.index = index;
                 existingSlide.className = 'video-slide';
-                
-                // Update video info
                 this.updateVideoSlide(existingSlide, video, index);
                 renderedVideoIds.add(video.id);
                 
-                // Keep the existing video element
                 const videoElement = existingSlide.querySelector('video');
                 if (videoElement) {
                     this.videoElements.set(video.id, {
@@ -2073,14 +1898,12 @@ class TikTokFeed {
                     });
                 }
             } else {
-                // Create new slide
                 const slide = this.createVideoSlide(video, index);
                 this.videoFeed.appendChild(slide);
                 renderedVideoIds.add(video.id);
             }
         });
         
-        // Remove any slides that are no longer in the videos array
         existingSlides.forEach(slide => {
             const streamId = slide.dataset.streamId;
             if (!renderedVideoIds.has(streamId)) {
@@ -2095,7 +1918,6 @@ class TikTokFeed {
             }
         });
         
-        // Ensure slides are in correct order
         this.videos.forEach((video, index) => {
             const slide = this.videoFeed.querySelector(`[data-stream-id="${video.id}"]`);
             if (slide && slide.dataset.index !== index.toString()) {
@@ -2103,7 +1925,6 @@ class TikTokFeed {
             }
         });
         
-        // Restore current video position
         if (currentVideoId) {
             const newIndex = this.videos.findIndex(v => v.id === currentVideoId);
             if (newIndex >= 0) {
@@ -2137,14 +1958,13 @@ class TikTokFeed {
         slide.innerHTML = `
             <div class="video-container">
                 <video id="video-${video.id}" playsinline preload="metadata"
-                       poster="${thumbnailUrl}" style="display: none;">
+                       poster="${thumbnailUrl}">
                     <source src="${video.videoUrl}" type="video/mp4">
                 </video>
                 <div class="video-loading" id="loading-${video.id}">
                     <div class="video-loading-spinner"></div>
                 </div>
 
-                <!-- Progress Bar -->
                 <div class="video-progress-container">
                     <div class="video-progress-fill" style="width: 0%">
                         <div class="video-progress-handle"></div>
@@ -2154,7 +1974,7 @@ class TikTokFeed {
 
             <div class="video-info-overlay">
                 <div class="video-author" onclick="navigateToUserProfile('${video.authorId}')" style="cursor:pointer;">
-                    <img src="${video.authorImage || 'images-defaultse-profile.jpg'}"
+                    <img src="${video.authorImage || 'images-default-profile.jpg'}"
                          alt="${video.authorName}"
                          class="video-author-avatar">
                     <div class="video-author-info">
@@ -2169,10 +1989,7 @@ class TikTokFeed {
                 <div class="video-category">${formatCategory(video.category)}</div>
             </div>
 
-            <!-- TikTok / Instagram style side action buttons -->
             <div class="video-side-actions">
-
-                <!-- LIKE -->
                 <button class="side-action like-btn ${isLiked ? 'liked' : ''}"
                         data-stream-id="${video.id}" aria-label="Like">
                     <div class="side-action-icon">
@@ -2185,7 +2002,6 @@ class TikTokFeed {
                     <div class="side-action-count like-count">${formatSocialCount(video.likes || 0)}</div>
                 </button>
 
-                <!-- COMMENT -->
                 <button class="side-action comment-btn"
                         data-stream-id="${video.id}" aria-label="Comment">
                     <div class="side-action-icon">
@@ -2197,7 +2013,6 @@ class TikTokFeed {
                     <div class="side-action-count comment-count">${formatSocialCount(video.commentsCount || 0)}</div>
                 </button>
 
-                <!-- SHARE -->
                 <button class="side-action share-btn"
                         data-stream-id="${video.id}" aria-label="Share">
                     <div class="side-action-icon">
@@ -2209,7 +2024,6 @@ class TikTokFeed {
                     </div>
                     <div class="side-action-count">Share</div>
                 </button>
-
             </div>
         `;
         
@@ -2237,13 +2051,11 @@ class TikTokFeed {
         const displayDescription = shouldShowSeeMore ? 
             description.substring(0, 100) + '...' : description;
         
-        // Update thumbnail if needed
         const videoElement = slide.querySelector('video');
         if (videoElement && videoElement.poster !== thumbnailUrl) {
             videoElement.poster = thumbnailUrl;
         }
         
-        // Update video source if needed
         if (videoElement && videoElement.querySelector('source').src !== video.videoUrl) {
             videoElement.querySelector('source').src = video.videoUrl;
             if (videoElement.dataset.listenersAdded !== 'true') {
@@ -2251,7 +2063,6 @@ class TikTokFeed {
             }
         }
         
-        // Update content
         const authorName = slide.querySelector('.video-author-name');
         if (authorName) authorName.textContent = video.authorName;
         
@@ -2278,17 +2089,15 @@ class TikTokFeed {
         if (likeBtn) {
             likeBtn.className = `side-action like-btn ${isLiked ? 'liked' : ''}`;
             likeBtn.dataset.streamId = video.id;
-            const likeIcon = likeBtn.querySelector('.side-action-icon i');
-            if (likeIcon) likeIcon.className = isLiked ? 'fas fa-heart' : 'far fa-heart';
             const likeCount = likeBtn.querySelector('.like-count');
-            if (likeCount) likeCount.textContent = video.likes || 0;
+            if (likeCount) likeCount.textContent = formatSocialCount(video.likes || 0);
         }
         
         const commentBtn = slide.querySelector('.comment-btn');
         if (commentBtn) {
             commentBtn.dataset.streamId = video.id;
             const commentCount = commentBtn.querySelector('.comment-count');
-            if (commentCount) commentCount.textContent = video.commentsCount || 0;
+            if (commentCount) commentCount.textContent = formatSocialCount(video.commentsCount || 0);
         }
         
         const shareBtn = slide.querySelector('.share-btn');
@@ -2296,20 +2105,17 @@ class TikTokFeed {
             shareBtn.dataset.streamId = video.id;
         }
         
-        // Update author image
         const authorAvatar = slide.querySelector('.video-author-avatar');
         if (authorAvatar) {
-            authorAvatar.src = video.authorImage || 'images-defaultse-profile.jpg';
+            authorAvatar.src = video.authorImage || 'images-default-profile.jpg';
             authorAvatar.alt = video.authorName;
         }
         
-        // Update author click handler
         const authorDiv = slide.querySelector('.video-author');
         if (authorDiv) {
             authorDiv.onclick = () => navigateToUserProfile(video.authorId);
         }
         
-        // Re-attach event listeners if needed
         this.setupVideoSlideEventListeners(slide, video);
     }
 
@@ -2320,7 +2126,6 @@ class TikTokFeed {
         const seeMoreBtn = slide.querySelector('.video-see-more');
         const progressContainer = slide.querySelector('.video-progress-container');
         
-        // Remove existing listeners
         const newLikeBtn = likeBtn.cloneNode(true);
         if (likeBtn.parentNode) {
             likeBtn.parentNode.replaceChild(newLikeBtn, likeBtn);
@@ -2336,7 +2141,6 @@ class TikTokFeed {
             shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
         }
         
-        // Add new listeners
         if (newLikeBtn) {
             newLikeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2375,22 +2179,19 @@ class TikTokFeed {
         if (index < 0 || index >= this.videos.length) return;
 
         this.currentIndex = index;
-
-        // Position every slide correctly — next slide is already at +100%, prev at -100%
         this._positionSlides(index, 0);
 
         const videoId = this.videos[index].id;
         this.loadAndPlayVideo(videoId);
 
-        // Eagerly preload adjacent videos
         if (index + 1 < this.videos.length) {
             const nextVideo = this.videos[index + 1];
-            const nextData  = this.videoElements.get(nextVideo.id);
+            const nextData = this.videoElements.get(nextVideo.id);
             if (nextData) {
                 const nextEl = nextData.slide?.querySelector(`#video-${nextVideo.id}`);
                 if (nextEl && !nextEl.src) {
                     nextEl.preload = 'auto';
-                    nextEl.src     = nextVideo.videoUrl;
+                    nextEl.src = nextVideo.videoUrl;
                     nextEl.load();
                 }
             }
@@ -2398,12 +2199,12 @@ class TikTokFeed {
 
         if (index - 1 >= 0) {
             const prevVideo = this.videos[index - 1];
-            const prevData  = this.videoElements.get(prevVideo.id);
+            const prevData = this.videoElements.get(prevVideo.id);
             if (prevData) {
                 const prevEl = prevData.slide?.querySelector(`#video-${prevVideo.id}`);
                 if (prevEl && !prevEl.src) {
                     prevEl.preload = 'auto';
-                    prevEl.src     = prevVideo.videoUrl;
+                    prevEl.src = prevVideo.videoUrl;
                     prevEl.load();
                 }
             }
@@ -2422,6 +2223,7 @@ class TikTokFeed {
             if (currentUser) {
                 streamManager.removeViewer(prevVideoId);
             }
+            this.readyVideos.delete(prevVideoId);
         }
         
         this.showVideo(newIndex);
@@ -2440,53 +2242,103 @@ class TikTokFeed {
         let videoElement = slide.querySelector(`#video-${videoId}`);
         if (!videoElement) return;
 
-        // Use cached clone if available and loaded
         const cachedVideo = videoCache.getCachedVideo(videoId);
         if (cachedVideo && cachedVideo.loaded) {
-            const cloned = cachedVideo.element.cloneNode();
-            cloned.id     = `video-${videoId}`;
+            const cloned = cachedVideo.element.cloneNode(true);
+            cloned.id = `video-${videoId}`;
             cloned.poster = videoElement.poster;
             cloned.preload = 'auto';
+            cloned.className = '';
+            
             const container = slide.querySelector('.video-container');
-            videoElement.remove();
-            container.prepend(cloned);
+            const oldVideo = videoElement;
+            container.insertBefore(cloned, oldVideo);
+            oldVideo.remove();
             videoElement = cloned;
         }
 
         videoData.videoElement = videoElement;
+        videoElement.style.opacity = '0';
+        videoElement.style.transition = 'opacity 0.2s ease';
 
-        // Pause all other videos instantly
+        // Mute initially to prevent audio playing before video is visible
+        videoElement.muted = true;
+
         this.videoElements.forEach((data, id) => {
             if (id !== videoId && data.videoElement && !data.videoElement.paused) {
                 data.videoElement.pause();
-                if (data.loadingElement) data.loadingElement.style.display = 'none';
+                if (data.loadingElement) {
+                    data.loadingElement.style.display = 'none';
+                }
             }
         });
 
         if (!videoElement.dataset.listenersAdded) {
+            // Show loader immediately
+            if (loadingElement) {
+                loadingElement.style.display = 'flex';
+                loadingElement.style.opacity = '1';
+            }
+
+            // Track when video frame is actually rendered
+            let hasFirstFrame = false;
+            let audioReady = false;
+            let videoReady = false;
+
+            const checkBothReady = () => {
+                if (hasFirstFrame && audioReady) {
+                    this.readyVideos.add(videoId);
+                    if (loadingElement) {
+                        loadingElement.style.display = 'none';
+                    }
+                    videoElement.style.opacity = '1';
+                    // Unmute now that video is visible
+                    videoElement.muted = false;
+                }
+            };
+
             videoElement.addEventListener('loadeddata', () => {
-                if (loadingElement) loadingElement.style.display = 'none';
-                videoElement.style.display = 'block';
-                this.playCurrentVideo();
+                audioReady = true;
+                if (loadingElement && hasFirstFrame) {
+                    loadingElement.style.display = 'none';
+                }
+                checkBothReady();
             });
 
             videoElement.addEventListener('canplay', () => {
-                if (loadingElement) loadingElement.style.display = 'none';
-                videoElement.style.display = 'block';
-            });
-
-            videoElement.addEventListener('waiting', () => {
-                // Only show spinner if we've been waiting >400ms to avoid flicker
-                const t = Date.now();
-                setTimeout(() => {
-                    if (videoElement.readyState < 3 && loadingElement) {
-                        loadingElement.style.display = 'block';
-                    }
-                }, 400);
+                if (loadingElement) {
+                    loadingElement.style.display = 'none';
+                }
+                videoElement.style.opacity = '1';
+                videoElement.muted = false;
+                this.readyVideos.add(videoId);
             });
 
             videoElement.addEventListener('playing', () => {
-                if (loadingElement) loadingElement.style.display = 'none';
+                // Wait for actual frame render
+                if (!hasFirstFrame) {
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            hasFirstFrame = true;
+                            if (loadingElement && audioReady) {
+                                loadingElement.style.display = 'none';
+                            }
+                            videoElement.style.opacity = '1';
+                            videoElement.muted = false;
+                            this.readyVideos.add(videoId);
+                        });
+                    });
+                }
+            });
+
+            videoElement.addEventListener('waiting', () => {
+                if (!hasFirstFrame || !audioReady) {
+                    if (loadingElement) {
+                        loadingElement.style.display = 'flex';
+                        loadingElement.style.opacity = '1';
+                    }
+                    videoElement.style.opacity = '0';
+                }
             });
 
             videoElement.addEventListener('timeupdate', () => {
@@ -2507,31 +2359,38 @@ class TikTokFeed {
                             Retry
                         </button>
                     `;
-                    loadingElement.style.display = 'block';
+                    loadingElement.style.display = 'flex';
                 }
+                videoElement.style.opacity = '0';
             });
 
             videoElement.dataset.listenersAdded = 'true';
         }
 
-        // If video is already buffered enough, play immediately without spinner
-        if (videoElement.readyState >= 3) {
-            if (loadingElement) loadingElement.style.display = 'none';
-            videoElement.style.display = 'block';
-            this.playCurrentVideo();
-            return;
-        }
-
-        // Set src if not already set, then load
         const currentVideo = this.videos.find(v => v.id === videoId);
         if (currentVideo) {
             if (!videoElement.src || !videoElement.src.includes(currentVideo.videoUrl.split('/').pop())) {
                 videoElement.preload = 'auto';
-                videoElement.src     = currentVideo.videoUrl;
+                videoElement.src = currentVideo.videoUrl;
                 videoElement.load();
-            } else if (videoElement.readyState >= 2) {
-                if (loadingElement) loadingElement.style.display = 'none';
-                videoElement.style.display = 'block';
+            }
+            
+            // If video is already ready, show it immediately
+            if (videoElement.readyState >= 3) {
+                if (loadingElement) {
+                    loadingElement.style.display = 'none';
+                }
+                videoElement.style.opacity = '1';
+                videoElement.muted = false;
+                this.readyVideos.add(videoId);
+                this.playCurrentVideo();
+            } else {
+                // Show loader while loading
+                if (loadingElement) {
+                    loadingElement.style.display = 'flex';
+                    loadingElement.style.opacity = '1';
+                }
+                videoElement.style.opacity = '0';
                 this.playCurrentVideo();
             }
         }
@@ -2632,6 +2491,14 @@ class TikTokFeed {
         const videoData = this.videoElements.get(videoId);
         if (videoData && videoData.videoElement) {
             const videoElement = videoData.videoElement;
+            const loadingElement = videoData.loadingElement;
+            
+            videoElement.style.opacity = '0';
+            if (loadingElement) {
+                loadingElement.style.display = 'flex';
+                loadingElement.innerHTML = '<div class="video-loading-spinner"></div>';
+            }
+            
             videoElement.src = videoElement.src;
             videoElement.load();
         }
@@ -2642,10 +2509,6 @@ class TikTokFeed {
             if (videoData.videoElement) {
                 const container = videoData.slide.querySelector('.video-container');
                 if (container) {
-                    const containerWidth = container.offsetWidth;
-                    const containerHeight = container.offsetHeight;
-                    
-                    // Adjust video size to fit container while maintaining aspect ratio
                     videoData.videoElement.style.width = '100%';
                     videoData.videoElement.style.height = '100%';
                     videoData.videoElement.style.objectFit = 'cover';
@@ -2663,21 +2526,17 @@ class TikTokFeed {
             
             if (result) {
                 const likeCount = button.querySelector('.side-action-count');
-                const likeIcon = button.querySelector('.side-action-icon i');
                 
                 if (button.classList.contains('liked')) {
                     button.classList.remove('liked');
-                    const likeIcon = button.querySelector('.side-action-icon svg .heart-outline');
-                    if (likeIcon) { likeIcon.setAttribute('fill','none'); likeIcon.setAttribute('stroke','#fff'); }
                     if (likeCount) {
-                        const currentCount = parseInt(likeCount.textContent.replace(/[KM]/,'')) || 0;
+                        const currentCount = parseInt(likeCount.textContent.replace(/[KM]/g, '')) || 0;
                         likeCount.textContent = formatSocialCount(Math.max(0, (result?.likes ?? currentCount - 1)));
                     }
                 } else {
                     button.classList.add('liked');
-                    // Trigger pop animation
                     button.classList.remove('pop');
-                    void button.offsetWidth; // reflow
+                    void button.offsetWidth;
                     button.classList.add('pop');
                     setTimeout(() => button.classList.remove('pop'), 400);
                     if (likeCount) {
@@ -2766,8 +2625,8 @@ class TikTokFeed {
                 if (currentVideo) {
                     const commentCount = document.querySelector(`.comment-btn[data-stream-id="${this.currentStreamId}"] .side-action-count`);
                     if (commentCount) {
-                        const currentCount = parseInt(commentCount.textContent) || 0;
-                        commentCount.textContent = currentCount + 1;
+                        const currentCount = parseInt(commentCount.textContent.replace(/[KM]/g, '')) || 0;
+                        commentCount.textContent = formatSocialCount(currentCount + 1);
                     }
                     currentVideo.commentsCount = (currentVideo.commentsCount || 0) + 1;
                 }
@@ -2930,7 +2789,7 @@ async function loadUserVideos(userId) {
                     <img src="${thumbnailUrl}" 
                          alt="${video.headline}"
                          class="profile-video-image"
-                         onerror="this.src='images-defaultse-profile.jpg'">
+                         onerror="this.src='images-default-profile.jpg'">
                     <div class="profile-video-overlay">
                         <div class="profile-video-stats">
                             <span class="video-stat">
@@ -2983,10 +2842,10 @@ function openVideoModal(videoId) {
 // Get video thumbnail
 function getVideoThumbnail(stream) {
     if (!stream) {
-        return 'images-defaultse-profile.jpg';
+        return 'images-default-profile.jpg';
     }
     
-    if (stream.thumbnailUrl && stream.thumbnailUrl !== 'images-defaultse-profile.jpg') {
+    if (stream.thumbnailUrl && stream.thumbnailUrl !== 'images-default-profile.jpg') {
         return stream.thumbnailUrl;
     }
     
@@ -2994,7 +2853,7 @@ function getVideoThumbnail(stream) {
         return streamManager.generateCloudinaryThumbnail(stream.videoUrl);
     }
     
-    return 'images-defaultse-profile.jpg';
+    return 'images-default-profile.jpg';
 }
 
 // Auth state management
@@ -3080,7 +2939,7 @@ function initializeProfilePageVideos() {
         loadUserVideos(profileId);
         
         document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('.comment-avatar') || 
+            if (e.target.classList.contains('comment-avatar') || 
                 e.target.closest('.comment-avatar')) {
                 const commentItem = e.target.closest('.comment-item');
                 if (commentItem) {
@@ -3108,7 +2967,6 @@ function initializePostStreamPage() {
         return;
     }
 
-    // Remove URL upload option if it exists
     const urlSection = document.getElementById('urlSection');
     const urlOption = document.querySelector('.upload-option[data-method="url"]');
     if (urlSection) urlSection.remove();
@@ -3355,7 +3213,7 @@ function renderStreams(streams) {
                 <img src="${thumbnailUrl}" 
                      alt="${stream.headline}" 
                      class="video-preview"
-                     onerror="this.src='images-defaultse-profile.jpg'">
+                     onerror="this.src='images-default-profile.jpg'">
                 <div class="video-preview-overlay">
                     <button class="preview-play-button">
                         <i class="fas fa-play"></i>
@@ -3399,7 +3257,7 @@ function renderStreams(streams) {
                 </div>
 
                 <div class="stream-author" onclick="navigateToUserProfile('${stream.authorId}')" style="cursor: pointer;">
-                    <img src="${stream.authorImage || 'images-defaultse-profile.jpg'}" alt="${stream.authorName}" 
+                    <img src="${stream.authorImage || 'images-default-profile.jpg'}" alt="${stream.authorName}" 
                          class="author-avatar"
                          style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                     <div class="author-info">
@@ -3513,8 +3371,8 @@ function updateTotalViewers(streams) {
 
 // Format numbers like TikTok: 1200 → 1.2K, 1500000 → 1.5M
 function formatSocialCount(n) {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.0','') + 'M';
-    if (n >= 1_000)     return (n / 1_000).toFixed(1).replace('.0','') + 'K';
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.0', '') + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace('.0', '') + 'K';
     return String(n);
 }
 
@@ -3524,43 +3382,59 @@ function formatSocialCount(n) {
     const style = document.createElement('style');
     style.id = 'bb-side-action-styles';
     style.textContent = `
-        /* ── Loading spinner — cleaner than Font Awesome fa-spin ── */
         .video-slide {
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
             width: 100% !important;
             height: 100% !important;
-            /* will-change lets the GPU layer each slide separately */
             will-change: transform;
-            /* default: off-screen below */
             transform: translateY(100%);
         }
 
-        /* Remove any existing display:none approach — positioning handles visibility */
-        .video-slide.active { /* kept for JS compatibility but no longer hides/shows */ }
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+
+        .video-slide video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 1;
+        }
+
         .video-loading {
             position: absolute;
             inset: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(0,0,0,0.35);
-            z-index: 5;
+            background: rgba(0,0,0,0.8);
+            z-index: 3;
+            transition: opacity 0.2s ease;
         }
 
         .video-loading-spinner {
-            width: 44px;
-            height: 44px;
-            border: 3px solid rgba(255,255,255,0.25);
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255,255,255,0.2);
             border-top-color: #fff;
             border-radius: 50%;
-            animation: bb-spin 0.7s linear infinite;
+            animation: bb-spin 0.8s linear infinite;
         }
 
-        @keyframes bb-spin { to { transform: rotate(360deg); } }
+        @keyframes bb-spin { 
+            to { transform: rotate(360deg); } 
+        }
 
-        /* ── Side action container ── */
         .video-side-actions {
             position: absolute;
             right: 12px;
@@ -3569,23 +3443,20 @@ function formatSocialCount(n) {
             flex-direction: column;
             align-items: center;
             gap: 22px;
-            z-index: 20;          /* above video-info-overlay */
-            pointer-events: auto; /* always capture taps */
+            z-index: 20;
+            pointer-events: auto;
         }
 
-        /* Prevent the info overlay from swallowing taps meant for the side buttons */
         .video-info-overlay {
-            pointer-events: none; /* overlay itself doesn't capture events… */
+            pointer-events: none;
         }
 
-        /* …but every interactive child still does */
         .video-info-overlay .video-author,
         .video-info-overlay .video-see-more,
         .video-info-overlay a {
             pointer-events: auto;
         }
 
-        /* ── Each button ── */
         .side-action {
             display: flex;
             flex-direction: column;
@@ -3611,34 +3482,24 @@ function formatSocialCount(n) {
             justify-content: center;
             transition: transform 0.15s ease, background 0.15s ease;
             box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+            pointer-events: auto;
         }
 
         .side-action:active .side-action-icon {
             transform: scale(0.88);
         }
 
-        /* SVG icons inside the circle */
         .side-action-icon svg {
-            width: 24px;
-            height: 24px;
+            width: 28px;
+            height: 28px;
             fill: none;
             stroke: #fff;
             stroke-width: 2;
             stroke-linecap: round;
             stroke-linejoin: round;
             filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
-            /* Ensure the entire SVG bounding box catches pointer events
-               even when fill is none — prevents clicks falling through */
             pointer-events: none;
         }
-
-        /* The icon wrapper catches the click for the whole button area */
-        .side-action-icon {
-            pointer-events: auto;
-        }
-
-        /* ── LIKE button — heart fills on liked ── */
-        .like-btn .side-action-icon { background: rgba(255,255,255,0.12); }
 
         .like-btn .side-action-icon svg .heart-outline {
             stroke: #fff;
@@ -3655,7 +3516,6 @@ function formatSocialCount(n) {
             stroke: #ff3058;
         }
 
-        /* Pop animation on like */
         @keyframes bb-heart-pop {
             0%   { transform: scale(1); }
             40%  { transform: scale(1.35); }
@@ -3667,32 +3527,100 @@ function formatSocialCount(n) {
             animation: bb-heart-pop 0.35s ease forwards;
         }
 
-        /* ── COMMENT button ── */
-        .comment-btn .side-action-icon svg {
-            stroke: #fff;
-            fill: rgba(255,255,255,0.15);
-        }
-
-        /* ── SHARE button ── */
-        .share-btn .side-action-icon svg {
-            stroke: #fff;
-            fill: none;
-        }
-
-        /* ── Count label ── */
         .side-action-count {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 700;
             color: #fff;
             text-shadow: 0 1px 3px rgba(0,0,0,0.7);
             letter-spacing: 0.3px;
         }
 
-        /* Hover glow (desktop) */
+        .video-progress-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: rgba(255,255,255,0.2);
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .video-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #b3004b, #ff2d55);
+            transition: width 0.1s linear;
+            position: relative;
+        }
+
+        .video-progress-handle {
+            position: absolute;
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .video-click-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.3);
+            color: white;
+            font-size: 48px;
+            z-index: 25;
+            pointer-events: none;
+            animation: clickFadeOut 0.8s ease forwards;
+        }
+
+        .video-click-overlay.fast-forward {
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .video-click-overlay.fast-forward span {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        @keyframes clickFadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
         @media (hover: hover) {
             .like-btn:hover .side-action-icon    { background: rgba(255,48,88,0.35); transform: scale(1.06); }
             .comment-btn:hover .side-action-icon { background: rgba(255,255,255,0.22); transform: scale(1.06); }
             .share-btn:hover .side-action-icon   { background: rgba(255,255,255,0.22); transform: scale(1.06); }
+        }
+
+        .comments-modal {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1a1a1a;
+            border-radius: 20px 20px 0 0;
+            z-index: 10001;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            max-height: 70vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .comments-modal.active {
+            transform: translateY(0);
         }
     `;
     document.head.appendChild(style);
@@ -3806,15 +3734,11 @@ window.retryTikTokVideo = (videoId) => {
     }
 };
 
-// Make video modal function globally available
 window.openVideoModal = openVideoModal;
-
-// Make profile navigation function globally available
 window.navigateToUserProfile = navigateToUserProfile;
-
-// Make user videos loading function globally available
 window.loadUserVideos = loadUserVideos;
-
 window.getVideoThumbnail = getVideoThumbnail;
 window.formatCategory = formatCategory;
 window.formatTime = formatTime;
+window.toggleStreamComments = toggleStreamComments;
+window.handleAddComment = handleAddComment;
