@@ -1786,13 +1786,18 @@ class TikTokFeed {
     }
 
     handleTouchStart(e) {
-        this.startY       = e.touches[0].clientY;
-        this.currentY     = this.startY;
+        // Don't intercept if touching an action button
+        if (e.target.closest('.side-action, .video-side-actions, .video-info-overlay, .video-progress-container')) return;
+
+        this.startY        = e.touches[0].clientY;
+        this.currentY      = this.startY;
         this.touchStartTime = Date.now();
-        this.isSwiping    = true;
-        this.isDragging   = true;
-        this.dragY        = 0;
-        this.videoFeed.style.transition = 'none';
+        this.isSwiping     = true;
+        this.isDragging    = true;
+        this.dragY         = 0;
+
+        // Freeze transitions while dragging
+        this._setSlideTransitions('none');
     }
 
     handleTouchMove(e) {
@@ -1802,97 +1807,124 @@ class TikTokFeed {
         this.currentY = e.touches[0].clientY;
         this.dragY    = this.currentY - this.startY;
 
-        // Rubber-band resistance at edges
+        // Rubber-band at edges
         const atTop    = this.currentIndex <= 0;
         const atBottom = this.currentIndex >= this.videos.length - 1;
-        let adjustedDrag = this.dragY;
-
         if ((this.dragY > 0 && atTop) || (this.dragY < 0 && atBottom)) {
-            adjustedDrag = this.dragY * 0.3; // strong resistance
+            this.dragY = this.dragY * 0.25;
         }
 
-        this.videoFeed.style.transform = `translateY(${adjustedDrag}px)`;
+        // Move every slide by the drag delta — you see the next one sliding in
+        this._positionSlides(this.currentIndex, this.dragY);
     }
 
     handleTouchEnd(e) {
         if (!this.isSwiping || !this.isDragging) return;
 
-        const elapsed   = Math.max(Date.now() - this.touchStartTime, 1);
-        const velocity  = Math.abs(this.dragY) / elapsed; // px per ms
-        const slideH    = window.innerHeight;
+        const elapsed  = Math.max(Date.now() - this.touchStartTime, 1);
+        const velocity = Math.abs(this.dragY) / elapsed; // px/ms
+        const slideH   = window.innerHeight;
 
-        // Fast flick (velocity > 0.3 px/ms) needs less travel distance
-        const threshold = velocity > 0.3
-            ? slideH * 0.08   // quick flick — 8% travel is enough
-            : slideH * 0.2;   // slow drag  — needs 20% travel
+        // Low threshold for quick flicks, higher for slow drags
+        const threshold = velocity > 0.3 ? slideH * 0.07 : slideH * 0.2;
 
+        let targetIndex = this.currentIndex;
         if (Math.abs(this.dragY) > threshold) {
             if (this.dragY < 0 && this.currentIndex < this.videos.length - 1) {
-                this.changeVideo(this.currentIndex + 1);
+                targetIndex = this.currentIndex + 1;
             } else if (this.dragY > 0 && this.currentIndex > 0) {
-                this.changeVideo(this.currentIndex - 1);
+                targetIndex = this.currentIndex - 1;
             }
         }
 
-        // Spring-like return animation
-        this.videoFeed.style.transition = 'transform 0.38s cubic-bezier(0.165, 0.84, 0.44, 1)';
-        this.videoFeed.style.transform  = 'translateY(0px)';
+        // Animate slides to their resting position
+        this._setSlideTransitions('transform 0.36s cubic-bezier(0.165, 0.84, 0.44, 1)');
+        this._positionSlides(targetIndex, 0);
 
-        setTimeout(() => { this.videoFeed.style.transition = ''; }, 400);
+        setTimeout(() => {
+            this._setSlideTransitions('none');
+        }, 380);
+
+        if (targetIndex !== this.currentIndex) {
+            this.changeVideo(targetIndex);
+        }
 
         this.isSwiping  = false;
         this.isDragging = false;
         this.dragY      = 0;
     }
 
+    // Position every slide at its correct vertical offset, plus an optional drag delta
+    _positionSlides(centreIndex, dragOffset = 0) {
+        this.videos.forEach((video, idx) => {
+            const data = this.videoElements.get(video.id);
+            if (!data?.slide) return;
+            const yPercent = (idx - centreIndex) * 100;
+            data.slide.style.transform = `translateY(calc(${yPercent}% + ${dragOffset}px))`;
+            // Only render slides within 2 positions of centre for performance
+            data.slide.style.display = Math.abs(idx - centreIndex) <= 2 ? 'block' : 'none';
+        });
+    }
+
+    // Set transition on every slide at once
+    _setSlideTransitions(value) {
+        this.videos.forEach(video => {
+            const data = this.videoElements.get(video.id);
+            if (data?.slide) data.slide.style.transition = value;
+        });
+    }
+
     handleMouseDown(e) {
-        this.startY = e.clientY;
-        this.currentY = this.startY;
+        if (e.target.closest('.side-action, .video-side-actions, .video-info-overlay, .video-progress-container')) return;
+        this.startY    = e.clientY;
+        this.currentY  = this.startY;
         this.isSwiping = true;
         this.isDragging = true;
-        this.dragY = 0;
-        this.videoFeed.style.transition = 'none';
+        this.dragY     = 0;
+        this.touchStartTime = Date.now();
+        this._setSlideTransitions('none');
     }
 
     handleMouseMove(e) {
         if (!this.isSwiping || !this.isDragging) return;
         this.currentY = e.clientY;
-        this.dragY = this.currentY - this.startY;
-        
-        this.videoFeed.style.transform = `translateY(${this.dragY}px)`;
+        this.dragY    = this.currentY - this.startY;
+        this._positionSlides(this.currentIndex, this.dragY);
     }
 
     handleMouseUp(e) {
         if (!this.isSwiping || !this.isDragging) return;
-        
-        const slideHeight = window.innerHeight;
-        const threshold = slideHeight * 0.15;
-        
+
+        const elapsed  = Math.max(Date.now() - this.touchStartTime, 1);
+        const velocity = Math.abs(this.dragY) / elapsed;
+        const slideH   = window.innerHeight;
+        const threshold = velocity > 0.3 ? slideH * 0.07 : slideH * 0.2;
+
+        let targetIndex = this.currentIndex;
         if (Math.abs(this.dragY) > threshold) {
-            if (this.dragY < 0 && this.currentIndex < this.videos.length - 1) {
-                this.changeVideo(this.currentIndex + 1);
-            } else if (this.dragY > 0 && this.currentIndex > 0) {
-                this.changeVideo(this.currentIndex - 1);
-            }
+            if (this.dragY < 0 && this.currentIndex < this.videos.length - 1) targetIndex = this.currentIndex + 1;
+            else if (this.dragY > 0 && this.currentIndex > 0) targetIndex = this.currentIndex - 1;
         }
-        
-        this.videoFeed.style.transition = 'transform 0.3s ease-out';
-        this.videoFeed.style.transform = 'translateY(0px)';
-        
-        setTimeout(() => {
-            this.videoFeed.style.transition = '';
-        }, 300);
-        
-        this.isSwiping = false;
+
+        this._setSlideTransitions('transform 0.36s cubic-bezier(0.165, 0.84, 0.44, 1)');
+        this._positionSlides(targetIndex, 0);
+        setTimeout(() => this._setSlideTransitions('none'), 380);
+
+        if (targetIndex !== this.currentIndex) this.changeVideo(targetIndex);
+
+        this.isSwiping  = false;
         this.isDragging = false;
-        this.dragY = 0;
+        this.dragY      = 0;
     }
 
     handleMouseLeave(e) {
-        this.isSwiping = false;
+        if (!this.isSwiping) return;
+        this._setSlideTransitions('transform 0.28s ease-out');
+        this._positionSlides(this.currentIndex, 0);
+        setTimeout(() => this._setSlideTransitions('none'), 300);
+        this.isSwiping  = false;
         this.isDragging = false;
-        this.dragY = 0;
-        this.videoFeed.style.transform = 'translateY(0px)';
+        this.dragY      = 0;
     }
 
     async loadInitialVideos() {
@@ -2342,50 +2374,42 @@ class TikTokFeed {
     showVideo(index) {
         if (index < 0 || index >= this.videos.length) return;
 
-        this.videoElements.forEach((videoData) => {
-            if (videoData.slide) videoData.slide.classList.remove('active', 'next', 'prev');
-        });
+        this.currentIndex = index;
 
-        const currentSlide = this.videoElements.get(this.videos[index].id)?.slide;
-        if (currentSlide) {
-            currentSlide.classList.add('active');
-            this.currentIndex = index;
-            const videoId = this.videos[index].id;
-            this.loadAndPlayVideo(videoId);
+        // Position every slide correctly — next slide is already at +100%, prev at -100%
+        this._positionSlides(index, 0);
 
-            // Preload NEXT video immediately — set src so browser buffers it in background
-            if (index + 1 < this.videos.length) {
-                const nextVideo  = this.videos[index + 1];
-                const nextSlide  = this.videoElements.get(nextVideo.id)?.slide;
-                if (nextSlide) {
-                    nextSlide.classList.add('next');
-                    const nextEl = nextSlide.querySelector(`#video-${nextVideo.id}`);
-                    if (nextEl && !nextEl.src) {
-                        nextEl.preload = 'auto';
-                        nextEl.src     = nextVideo.videoUrl;
-                        nextEl.load();
-                    }
+        const videoId = this.videos[index].id;
+        this.loadAndPlayVideo(videoId);
+
+        // Eagerly preload adjacent videos
+        if (index + 1 < this.videos.length) {
+            const nextVideo = this.videos[index + 1];
+            const nextData  = this.videoElements.get(nextVideo.id);
+            if (nextData) {
+                const nextEl = nextData.slide?.querySelector(`#video-${nextVideo.id}`);
+                if (nextEl && !nextEl.src) {
+                    nextEl.preload = 'auto';
+                    nextEl.src     = nextVideo.videoUrl;
+                    nextEl.load();
                 }
             }
-
-            // Preload PREV video as well
-            if (index - 1 >= 0) {
-                const prevVideo = this.videos[index - 1];
-                const prevSlide = this.videoElements.get(prevVideo.id)?.slide;
-                if (prevSlide) {
-                    prevSlide.classList.add('prev');
-                    const prevEl = prevSlide.querySelector(`#video-${prevVideo.id}`);
-                    if (prevEl && !prevEl.src) {
-                        prevEl.preload = 'auto';
-                        prevEl.src     = prevVideo.videoUrl;
-                        prevEl.load();
-                    }
-                }
-            }
-
-            // Continue background caching
-            videoCache.cacheVideos(this.videos, index + 1);
         }
+
+        if (index - 1 >= 0) {
+            const prevVideo = this.videos[index - 1];
+            const prevData  = this.videoElements.get(prevVideo.id);
+            if (prevData) {
+                const prevEl = prevData.slide?.querySelector(`#video-${prevVideo.id}`);
+                if (prevEl && !prevEl.src) {
+                    prevEl.preload = 'auto';
+                    prevEl.src     = prevVideo.videoUrl;
+                    prevEl.load();
+                }
+            }
+        }
+
+        videoCache.cacheVideos(this.videos, index + 1);
     }
 
     changeVideo(newIndex) {
@@ -3501,6 +3525,20 @@ function formatSocialCount(n) {
     style.id = 'bb-side-action-styles';
     style.textContent = `
         /* ── Loading spinner — cleaner than Font Awesome fa-spin ── */
+        .video-slide {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            /* will-change lets the GPU layer each slide separately */
+            will-change: transform;
+            /* default: off-screen below */
+            transform: translateY(100%);
+        }
+
+        /* Remove any existing display:none approach — positioning handles visibility */
+        .video-slide.active { /* kept for JS compatibility but no longer hides/shows */ }
         .video-loading {
             position: absolute;
             inset: 0;
@@ -3531,7 +3569,20 @@ function formatSocialCount(n) {
             flex-direction: column;
             align-items: center;
             gap: 22px;
-            z-index: 10;
+            z-index: 20;          /* above video-info-overlay */
+            pointer-events: auto; /* always capture taps */
+        }
+
+        /* Prevent the info overlay from swallowing taps meant for the side buttons */
+        .video-info-overlay {
+            pointer-events: none; /* overlay itself doesn't capture events… */
+        }
+
+        /* …but every interactive child still does */
+        .video-info-overlay .video-author,
+        .video-info-overlay .video-see-more,
+        .video-info-overlay a {
+            pointer-events: auto;
         }
 
         /* ── Each button ── */
@@ -3576,6 +3627,14 @@ function formatSocialCount(n) {
             stroke-linecap: round;
             stroke-linejoin: round;
             filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+            /* Ensure the entire SVG bounding box catches pointer events
+               even when fill is none — prevents clicks falling through */
+            pointer-events: none;
+        }
+
+        /* The icon wrapper catches the click for the whole button area */
+        .side-action-icon {
+            pointer-events: auto;
         }
 
         /* ── LIKE button — heart fills on liked ── */
