@@ -175,25 +175,43 @@ class SocialManager {
         }
     }
 
-    // Setup Intersection Observer for video auto-play
+    // Setup Intersection Observer for video auto-play/pause on scroll
     setupVideoIntersectionObserver() {
         this.videoObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
+                const videoContainer = entry.target;
+                const videoId    = videoContainer.dataset.videoId;
+                const videoUrl   = videoContainer.dataset.videoUrl;
+                const thumbUrl   = videoContainer.dataset.thumbnailUrl;
+                const duration   = videoContainer.dataset.duration;
+
                 if (entry.isIntersecting) {
-                    const videoContainer = entry.target;
-                    const videoId = videoContainer.dataset.videoId;
-                    const videoUrl = videoContainer.dataset.videoUrl;
-                    const thumbnailUrl = videoContainer.dataset.thumbnailUrl;
-                    const duration = videoContainer.dataset.duration;
-                    
+                    // Lazy-initialize player on first scroll into view
                     if (videoId && videoUrl && !videoContainer.classList.contains('video-initialized')) {
-                        this.initializeVideoPlayer(videoContainer, videoId, videoUrl, thumbnailUrl, duration);
+                        videoContainer.dataset.autoPlay = 'true';
+                        this.initializeVideoPlayer(videoContainer, videoId, videoUrl, thumbUrl, duration);
+                    } else if (videoContainer.classList.contains('video-initialized')) {
+                        // Already initialized — just resume
+                        const vid = videoContainer.videoElement;
+                        if (vid && vid.paused) {
+                            vid.play().catch(() => {});
+                            // Hide center play button while auto-playing
+                            const btn = videoContainer.querySelector('.video-center-play-btn');
+                            if (btn) btn.innerHTML = '<i class="fas fa-pause"></i>';
+                        }
+                    }
+                } else {
+                    // Out of view — pause
+                    const vid = videoContainer.videoElement;
+                    if (vid && !vid.paused) {
+                        vid.pause();
+                        const btn = videoContainer.querySelector('.video-center-play-btn');
+                        if (btn) btn.innerHTML = '<i class="fas fa-play"></i>';
                     }
                 }
             });
         }, {
-            threshold: 0.5,
-            rootMargin: '50px'
+            threshold: 0.6   // 60% visible before auto-play triggers
         });
     }
 
@@ -990,93 +1008,85 @@ class SocialManager {
                 /* ========== POST FEED LAYOUT ========== */
                 .posts-container {
                     max-width: 640px;
-                    margin: 0 ;
+                    margin: 0 auto;
                     background: transparent;
                     padding: 0 0 80px;
                 }
 
                 .post-item {
-                    background: rgba(255, 255, 255, 0.03);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 20px;
-                    padding: 20px 20px 14px;
-                    margin: 0 0 14px;
-                    transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+                    background: transparent;
+                    border: none;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 0;
+                    padding: 18px 16px 14px;
+                    margin: 0;
+                    transition: background 0.15s ease;
                     position: relative;
                     cursor: pointer;
-                    backdrop-filter: blur(4px);
                 }
 
                 .post-item:hover {
-                    
-                    border-color: rgba(255, 75, 110, 0.2);
-                    transform: translateY(-1px);
+                    background: rgba(255, 255, 255, 0.025);
                 }
 
                 .post-header {
                     display: flex;
                     align-items: center;
-                    gap: 14px;
-                    margin-bottom: 14px;
+                    gap: 12px;
+                    margin-bottom: 12px;
                     position: relative;
                 }
 
                 .post-author-avatar {
-                    width: 52px;
-                    height: 52px;
+                    width: 44px;
+                    height: 44px;
                     border-radius: 50%;
                     object-fit: cover;
                     flex-shrink: 0;
                     cursor: pointer;
-                    border: 2px solid rgba(255, 75, 110, 0.4);
+                    border: 2px solid rgba(255, 75, 110, 0.35);
                     transition: border-color 0.2s;
                 }
 
-                .post-author-avatar:hover {
-                    border-color: #ff4b6e;
-                }
+                .post-author-avatar:hover { border-color: #ff4b6e; }
 
                 .post-author-info {
                     flex: 1;
                     display: flex;
                     flex-direction: column;
-                    gap: 2px;
+                    gap: 1px;
                 }
 
                 .post-author-info h4 {
                     margin: 0;
-                    font-size: 16px;
+                    font-size: 15px;
                     font-weight: 700;
                     color: #f0f2f5;
                     line-height: 1.2;
                     cursor: pointer;
-                    letter-spacing: -0.2px;
                 }
 
-                .post-author-info h4:hover {
-                    color: #ff4b6e;
-                }
+                .post-author-info h4:hover { color: #ff4b6e; }
 
                 .post-time {
-                    font-size: 12.5px;
+                    font-size: 12px;
                     color: #6b6f76;
-                    margin-top: 0;
                 }
 
                 .post-content {
                     margin-left: 0;
-                    margin-bottom: 14px;
-                    font-size: 16px;
-                    line-height: 1.65;
+                    margin-bottom: 12px;
+                    font-size: 15px;
+                    line-height: 1.6;
                     color: #e2e5e9;
                     word-wrap: break-word;
                 }
 
                 .post-caption {
-                    margin: 0 0 12px;
+                    margin: 0 0 10px;
                     white-space: pre-wrap;
-                    font-size: 16px;
-                    line-height: 1.65;
+                    font-size: 15px;
+                    line-height: 1.6;
                 }
 
                 /* Hashtag and mention styling */
@@ -1086,11 +1096,7 @@ class SocialManager {
                     cursor: pointer;
                     transition: color 0.15s;
                 }
-
-                .post-hashtag:hover {
-                    color: #ff7090;
-                    text-decoration: underline;
-                }
+                .post-hashtag:hover { color: #ff7090; text-decoration: underline; }
 
                 .post-mention {
                     color: #60a5fa;
@@ -1098,11 +1104,7 @@ class SocialManager {
                     cursor: pointer;
                     transition: color 0.15s;
                 }
-
-                .post-mention:hover {
-                    color: #93c5fd;
-                    text-decoration: underline;
-                }
+                .post-mention:hover { color: #93c5fd; text-decoration: underline; }
 
                 /* ========== MEDIA CONTAINERS ========== */
                 .post-image-container {
@@ -2147,7 +2149,7 @@ class SocialManager {
                     display: flex;
                     align-items: center;
                     gap: 10px;
-                    max-width: 30px;
+                    max-width: 400px;
                     backdrop-filter: blur(10px);
                     font-family: 'Inter', sans-serif;
                 }
@@ -2756,16 +2758,18 @@ class SocialManager {
         if (container.classList.contains('video-initialized')) {
             const video = container.videoElement;
             if (video.paused) {
-                video.play();
+                video.play().catch(() => {});
             } else {
                 video.pause();
             }
             return;
         }
-        
+
         container.classList.add('video-initialized');
-        
+
         const video = container.videoElement;
+        // Muted is required for autoplay to work in browsers without user interaction
+        video.muted = true;
         video.src = videoUrl;
         
         let hideControlsTimeout;
@@ -2885,15 +2889,19 @@ class SocialManager {
         }
         
         if (volumeBtn && volumeSlider && volumeFill) {
+            // Start muted — show muted icon
+            volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+            volumeFill.style.width = '0%';
+
             volumeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 video.muted = !video.muted;
-                volumeBtn.innerHTML = video.muted ? 
-                    '<i class="fas fa-volume-mute"></i>' : 
+                volumeBtn.innerHTML = video.muted ?
+                    '<i class="fas fa-volume-mute"></i>' :
                     '<i class="fas fa-volume-up"></i>';
                 volumeFill.style.width = video.muted ? '0%' : (video.volume * 100) + '%';
             });
-            
+
             volumeSlider.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const rect = volumeSlider.getBoundingClientRect();
@@ -2904,7 +2912,7 @@ class SocialManager {
                 volumeFill.style.width = (video.volume * 100) + '%';
             });
         }
-        
+
         if (fullscreenBtn) {
             fullscreenBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2917,27 +2925,26 @@ class SocialManager {
                 }
             });
         }
-        
+
         document.addEventListener('fullscreenchange', () => {
             if (fullscreenBtn) {
-                fullscreenBtn.innerHTML = document.fullscreenElement ? 
-                    '<i class="fas fa-compress"></i>' : 
+                fullscreenBtn.innerHTML = document.fullscreenElement ?
+                    '<i class="fas fa-compress"></i>' :
                     '<i class="fas fa-expand"></i>';
             }
         });
-        
+
         video.addEventListener('dblclick', () => {
             if (fullscreenBtn) fullscreenBtn.click();
         });
-        
+
         container.addEventListener('click', (e) => {
             e.stopPropagation();
         });
-        
+
+        // Auto-play immediately — muted so browser allows it
         if (container.dataset.autoPlay === 'true') {
-            setTimeout(() => {
-                video.play().catch(e => console.log('Auto-play prevented:', e));
-            }, 100);
+            video.play().catch(() => {});
         }
     }
 
@@ -4411,56 +4418,71 @@ class SocialManager {
     }
 
     showNotification(message, type = 'info') {
-        if (message.includes('Voted') || message.includes('Vote')) {
-            return;
-        }
-        
+        if (message.includes('Voted') || message.includes('Vote')) return;
+
         const existingNotifications = document.querySelectorAll('.custom-notification');
-        existingNotifications.forEach(notification => notification.remove());
-        
+        existingNotifications.forEach(n => n.remove());
+
         const notification = document.createElement('div');
         notification.className = `custom-notification ${type}`;
-        
-        const bgColor = type === 'error' ? '#dc2626' : 
-                       type === 'success' ? '#16a34a' : 
-                       type === 'warning' ? '#f59e0b' : '#3b82f6';
-        
+
+        const bgColor = type === 'error'   ? '#dc2626' :
+                        type === 'success' ? '#16a34a' :
+                        type === 'warning' ? '#d97706' : '#ff4b6e';
+
+        const borderColor = type === 'error'   ? '#ef4444' :
+                            type === 'success' ? '#22c55e' :
+                            type === 'warning' ? '#f59e0b' : '#ff6b87';
+
         notification.style.cssText = `
             position: fixed;
-            top: 80px;
-            right: 20px;
+            top: 68px;
+            right: 16px;
             background: ${bgColor};
             color: white;
-            padding: 12px 20px;
+            padding: 7px 12px;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-left: 3px solid ${borderColor};
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
             z-index: 10000;
-            animation: slideIn 0.3s ease;
+            animation: bbNotifIn 0.25s ease;
             display: flex;
             align-items: center;
-            gap: 10px;
-            max-width: 400px;
-            backdrop-filter: blur(10px);
+            gap: 7px;
+            max-width: 220px;
             font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.3;
         `;
-        
-        const icon = type === 'error' ? 'alert-circle' : 
-                    type === 'success' ? 'check-circle' : 
-                    type === 'warning' ? 'alert-triangle' : 'info';
-        
+
+        if (!document.getElementById('bbNotifStyles')) {
+            const s = document.createElement('style');
+            s.id = 'bbNotifStyles';
+            s.textContent = `
+                @keyframes bbNotifIn  { from { transform: translateX(110%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+                @keyframes bbNotifOut { from { transform: translateX(0); opacity:1; } to { transform: translateX(110%); opacity:0; } }
+            `;
+            document.head.appendChild(s);
+        }
+
+        const icon = type === 'error' ? 'alert-circle' :
+                     type === 'success' ? 'check-circle' :
+                     type === 'warning' ? 'alert-triangle' : 'info';
+
         notification.innerHTML = `
-            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" style="flex-shrink:0;">
                 ${this.getNotificationIcon(icon)}
             </svg>
             <span>${message}</span>
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
-            notification.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
+            notification.style.animation = 'bbNotifOut 0.25s ease forwards';
+            setTimeout(() => notification.remove(), 250);
+        }, 2800);
     }
 
     getNotificationIcon(icon) {
