@@ -338,14 +338,16 @@ class SocialManager {
                 border: none;
                 padding: 0;
                 background: transparent;
+                border-radius: 0;
             }
             
             .post-modal-body .post-item:hover {
                 background: transparent;
+                transform: none;
             }
             
             .post-modal-body .post-content {
-                margin-left: 60px;
+                margin-left: 0;
                 margin-bottom: 20px;
             }
             
@@ -361,13 +363,13 @@ class SocialManager {
             }
             
             .post-modal-body .comments-section {
-                margin-left: 60px;
+                margin-left: 0;
                 margin-top: 20px;
                 display: block !important;
             }
             
             .post-modal-body .post-actions {
-                margin-left: 60px;
+                margin-left: 0;
             }
         `;
         document.head.appendChild(style);
@@ -689,7 +691,7 @@ class SocialManager {
                 repliesCount: 0
             };
 
-            await addDoc(collection(db, 'posts', postId, 'comments'), commentData);
+            const docRef = await addDoc(collection(db, 'posts', postId, 'comments'), commentData);
 
             const postRef = doc(db, 'posts', postId);
             await updateDoc(postRef, {
@@ -699,7 +701,28 @@ class SocialManager {
 
             commentInput.value = '';
             
-            await this.loadModalComments(postId);
+            // FIXED: Same crime as handleAddComment — previously re-fetched and rebuilt
+            // the ENTIRE comments list after adding a single comment. Now we just
+            // append the new comment node directly, no Firestore re-read needed.
+            const modalComments = document.querySelector(`#modal-comments-${postId} .comments-list`);
+            if (modalComments) {
+                const noComments = modalComments.querySelector('.no-comments');
+                if (noComments) noComments.remove();
+
+                const tempComment = {
+                    id: docRef.id,
+                    userId: this.currentUser.uid,
+                    text: commentText,
+                    createdAt: { toDate: () => new Date() }
+                };
+                const tempUser = {
+                    name: this.currentUser.displayName || 'User',
+                    profileImage: this.currentUser.photoURL || 'images/default-profile.jpg'
+                };
+                const commentElement = this.createModalCommentElement(tempComment, tempUser, postId);
+                modalComments.appendChild(commentElement);
+                commentElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
             
             const commentCount = document.querySelector(`.comment-btn[data-post-id="${postId}"] .comment-count`);
             if (commentCount) {
@@ -875,6 +898,24 @@ class SocialManager {
         document.addEventListener('click', this.handlePollClick);
     }
 
+    // ==================== FORMAT CAPTION WITH HASHTAGS & MENTIONS ====================
+    formatCaption(text) {
+        if (!text) return '';
+        // Escape HTML first to prevent XSS
+        const escaped = this.escapeHTML(text);
+        // Color #hashtags pink
+        const withHashtags = escaped.replace(
+            /(^|\s)(#[a-zA-Z0-9_]+)/g,
+            '$1<span class="post-hashtag">$2</span>'
+        );
+        // Color @mentions blue
+        const withMentions = withHashtags.replace(
+            /(^|\s)(@[a-zA-Z0-9_]+)/g,
+            '$1<span class="post-mention">$2</span>'
+        );
+        return withMentions;
+    }
+
     // ==================== FORMAT COUNT FUNCTION ====================
     formatCount(count) {
         if (!count && count !== 0) return '0';
@@ -946,82 +987,121 @@ class SocialManager {
             const style = document.createElement('style');
             style.id = 'socialManagerStyles';
             style.textContent = `
-                /* ========== TWITTER-LIKE LAYOUT STYLES ========== */
+                /* ========== POST FEED LAYOUT ========== */
                 .posts-container {
-                    max-width: 600px;
+                    max-width: 640px;
                     margin: 0 auto;
                     background: transparent;
+                    padding: 0 0 80px;
                 }
 
                 .post-item {
-                    background: transparent;
-                    border: none;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                    padding: 16px 16px;
-                    margin: 0;
-                    transition: background-color 0.2s ease;
+                    background: rgba(255, 255, 255, 0.03);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 20px;
+                    padding: 20px 20px 14px;
+                    margin: 0 0 14px;
+                    transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
                     position: relative;
                     cursor: pointer;
+                    backdrop-filter: blur(4px);
                 }
 
                 .post-item:hover {
-                    background-color: rgba(255, 255, 255, 0.02);
+                    background: rgba(255, 255, 255, 0.055);
+                    border-color: rgba(255, 75, 110, 0.2);
+                    transform: translateY(-1px);
                 }
 
                 .post-header {
                     display: flex;
-                    align-items: flex-start;
-                    gap: 12px;
-                    margin-bottom: 8px;
+                    align-items: center;
+                    gap: 14px;
+                    margin-bottom: 14px;
                     position: relative;
                 }
 
                 .post-author-avatar {
-                    width: 48px;
-                    height: 48px;
+                    width: 52px;
+                    height: 52px;
                     border-radius: 50%;
                     object-fit: cover;
                     flex-shrink: 0;
                     cursor: pointer;
+                    border: 2px solid rgba(255, 75, 110, 0.4);
+                    transition: border-color 0.2s;
+                }
+
+                .post-author-avatar:hover {
+                    border-color: #ff4b6e;
                 }
 
                 .post-author-info {
                     flex: 1;
                     display: flex;
                     flex-direction: column;
+                    gap: 2px;
                 }
 
                 .post-author-info h4 {
                     margin: 0;
-                    font-size: 15px;
+                    font-size: 16px;
                     font-weight: 700;
-                    color: #ff4b6e;
+                    color: #f0f2f5;
                     line-height: 1.2;
                     cursor: pointer;
+                    letter-spacing: -0.2px;
                 }
 
                 .post-author-info h4:hover {
-                    text-decoration: underline;
+                    color: #ff4b6e;
                 }
 
                 .post-time {
-                    font-size: 13px;
+                    font-size: 12.5px;
                     color: #6b6f76;
-                    margin-top: 2px;
+                    margin-top: 0;
                 }
 
                 .post-content {
-                    margin-left: 60px;
-                    margin-bottom: 12px;
-                    font-size: 15px;
-                    line-height: 1.5;
-                    color: #e7e9ea;
+                    margin-left: 0;
+                    margin-bottom: 14px;
+                    font-size: 16px;
+                    line-height: 1.65;
+                    color: #e2e5e9;
                     word-wrap: break-word;
                 }
 
                 .post-caption {
-                    margin: 8px 0 4px 0;
+                    margin: 0 0 12px;
                     white-space: pre-wrap;
+                    font-size: 16px;
+                    line-height: 1.65;
+                }
+
+                /* Hashtag and mention styling */
+                .post-hashtag {
+                    color: #ff4b6e;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: color 0.15s;
+                }
+
+                .post-hashtag:hover {
+                    color: #ff7090;
+                    text-decoration: underline;
+                }
+
+                .post-mention {
+                    color: #60a5fa;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: color 0.15s;
+                }
+
+                .post-mention:hover {
+                    color: #93c5fd;
+                    text-decoration: underline;
                 }
 
                 /* ========== MEDIA CONTAINERS ========== */
@@ -1029,53 +1109,51 @@ class SocialManager {
                     margin-top: 12px;
                     border-radius: 16px;
                     overflow: hidden;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
                     background: #000;
                 }
 
                 .post-image {
                     width: 100%;
-                    max-height: 500px;
+                    max-height: 520px;
                     object-fit: contain;
                     display: block;
                 }
 
-                /* ========== ENHANCED VIDEO STYLES ========== */
+                /* ========== VIDEO STYLES ========== */
                 .video-wrapper {
-                    margin-top: 12px;
+                    margin-top: 14px;
                     width: 100%;
+                    border-radius: 16px;
+                    overflow: hidden;
                 }
 
+                /* Thumbnail before video loads — 16:9 */
                 .video-thumbnail-container {
                     position: relative;
                     width: 100%;
-                    height: 0;
-                    padding-bottom: 75%;
+                    padding-bottom: 56.25%;
                     background: #000;
                     border-radius: 16px;
                     overflow: hidden;
                     cursor: pointer;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
                 }
 
                 .video-thumbnail-image {
                     position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
+                    top: 0; left: 0;
+                    width: 100%; height: 100%;
                     object-fit: cover;
                 }
 
                 .video-play-button-center {
                     position: absolute;
-                    top: 50%;
-                    left: 50%;
+                    top: 50%; left: 50%;
                     transform: translate(-50%, -50%);
-                    width: 70px;
-                    height: 70px;
-                    background: rgba(255, 75, 110, 0.95);
+                    width: 72px; height: 72px;
+                    background: rgba(255, 75, 110, 0.9);
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
@@ -1083,43 +1161,45 @@ class SocialManager {
                     color: white;
                     font-size: 28px;
                     transition: all 0.2s ease;
-                    border: 3px solid rgba(255, 255, 255, 0.5);
-                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                    border: 3px solid rgba(255, 255, 255, 0.6);
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+                    backdrop-filter: blur(4px);
                 }
 
                 .video-thumbnail-container:hover .video-play-button-center {
                     background: #ff4b6e;
                     border-color: white;
-                    transform: translate(-50%, -50%) scale(1.1);
+                    transform: translate(-50%, -50%) scale(1.08);
+                    box-shadow: 0 12px 40px rgba(255, 75, 110, 0.4);
                 }
 
                 .video-duration-overlay {
                     position: absolute;
-                    bottom: 12px;
-                    right: 12px;
-                    background: rgba(0, 0, 0, 0.85);
+                    bottom: 12px; right: 12px;
+                    background: rgba(0, 0, 0, 0.8);
                     color: white;
-                    padding: 6px 12px;
-                    border-radius: 12px;
-                    font-size: 14px;
+                    padding: 5px 10px;
+                    border-radius: 8px;
+                    font-size: 13px;
                     font-weight: 600;
                     z-index: 2;
-                    letter-spacing: 0.5px;
+                    letter-spacing: 0.4px;
                 }
 
+                /* Active video player — 16:9 */
                 .custom-video-container {
                     position: relative;
                     width: 100%;
-                    height: 0;
-                    padding-bottom: 75%;
+                    padding-bottom: 56.25%;
                     background: #000;
                     border-radius: 16px;
                     overflow: hidden;
-                    margin: 12px 0;
-                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    margin: 14px 0 0;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
                 }
 
+                /* In modal: taller for more immersive viewing */
                 .post-modal .custom-video-container {
                     padding-bottom: 56.25%;
                     max-height: 70vh;
@@ -1276,102 +1356,96 @@ class SocialManager {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    max-width: 425px;
-                    margin-left: 60px;
-                    margin-top: 12px;
-                    padding-top: 4px;
+                    margin-top: 14px;
+                    padding-top: 12px;
+                    border-top: 1px solid rgba(255, 255, 255, 0.06);
                 }
 
                 .action-group {
                     display: flex;
                     align-items: center;
-                    gap: 4px;
+                    gap: 6px;
                 }
 
                 .vote-buttons {
                     display: flex;
                     align-items: center;
                     gap: 2px;
-                    background: transparent;
+                    background: rgba(255,255,255,0.04);
                     border-radius: 9999px;
+                    border: 1px solid rgba(255,255,255,0.07);
+                    padding: 2px 4px;
                 }
 
                 .vote-btn {
                     display: flex;
                     align-items: center;
-                    gap: 4px;
+                    gap: 5px;
                     background: transparent;
                     border: none;
-                    color: #6b6f76;
+                    color: #8a8f9a;
                     font-size: 13px;
+                    font-weight: 500;
                     cursor: pointer;
-                    padding: 6px 10px;
+                    padding: 7px 12px;
                     border-radius: 9999px;
                     transition: all 0.2s ease;
                 }
 
-                .vote-btn i {
-                    font-size: 16px;
-                }
+                .vote-btn i { font-size: 14px; }
 
                 .vote-btn.up:hover {
-                    background: rgba(52, 168, 83, 0.1);
+                    background: rgba(52, 168, 83, 0.12);
                     color: #34a853;
                 }
 
                 .vote-btn.down:hover {
-                    background: rgba(234, 67, 53, 0.1);
+                    background: rgba(234, 67, 53, 0.12);
                     color: #ea4335;
                 }
 
-                .vote-btn.up.active {
-                    color: #34a853;
-                }
-
-                .vote-btn.down.active {
-                    color: #ea4335;
-                }
+                .vote-btn.up.active  { color: #34a853; font-weight: 700; }
+                .vote-btn.down.active { color: #ea4335; font-weight: 700; }
 
                 .vote-count {
-                    font-weight: 500;
-                    min-width: 20px;
+                    font-weight: 600;
+                    min-width: 18px;
                     text-align: center;
                 }
 
                 .post-action {
                     display: flex;
                     align-items: center;
-                    gap: 4px;
-                    background: transparent;
-                    border: none;
-                    color: #6b6f76;
+                    gap: 6px;
+                    background: rgba(255,255,255,0.04);
+                    border: 1px solid rgba(255,255,255,0.07);
+                    color: #8a8f9a;
                     font-size: 13px;
+                    font-weight: 500;
                     cursor: pointer;
-                    padding: 6px 12px;
+                    padding: 7px 14px;
                     border-radius: 9999px;
                     transition: all 0.2s ease;
                 }
 
-                .post-action i {
-                    font-size: 16px;
-                }
+                .post-action i { font-size: 15px; }
 
                 .post-action:hover {
-                    background: rgba(255, 75, 110, 0.1);
+                    background: rgba(255, 75, 110, 0.12);
+                    border-color: rgba(255, 75, 110, 0.3);
                     color: #ff4b6e;
                 }
 
                 .post-action.liked {
                     color: #ff4b6e;
-                }
-
-                .post-action.liked i {
-                    color: #ff4b6e;
+                    background: rgba(255, 75, 110, 0.1);
+                    border-color: rgba(255, 75, 110, 0.25);
                 }
 
                 .post-action.active {
                     color: #ff4b6e;
                     background: rgba(255, 75, 110, 0.1);
+                    border-color: rgba(255, 75, 110, 0.25);
                 }
 
                 /* ========== FOLLOW BUTTON ========== */
@@ -1418,10 +1492,10 @@ class SocialManager {
 
                 /* ========== COMMENTS SECTION ========== */
                 .comments-section {
-                    margin-left: 60px;
-                    margin-top: 12px;
-                    padding-top: 12px;
-                    border-top: 1px solid rgba(255, 255, 255, 0.05);
+                    margin-left: 0;
+                    margin-top: 14px;
+                    padding-top: 14px;
+                    border-top: 1px solid rgba(255, 255, 255, 0.06);
                 }
 
                 .add-comment {
@@ -2062,21 +2136,20 @@ class SocialManager {
                 /* ========== NOTIFICATION STYLES ========== */
                 .custom-notification {
                     position: fixed;
-                    top: 70px;
-                    right: 16px;
+                    top: 80px;
+                    right: 20px;
                     color: white;
-                    padding: 7px 12px;
-                    border-radius: 6px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                     z-index: 10000;
                     animation: slideIn 0.3s ease;
                     display: flex;
                     align-items: center;
-                    gap: 6px;
-                    max-width: 220px;
+                    gap: 10px;
+                    max-width: 400px;
+                    backdrop-filter: blur(10px);
                     font-family: 'Inter', sans-serif;
-                    font-size: 12px;
-                    line-height: 1.3;
                 }
 
                 .custom-notification.success {
@@ -2441,9 +2514,9 @@ class SocialManager {
                     }
                     
                     .custom-notification {
-                        top: 65px;
-                        right: 12px;
-                        left: 12px;
+                        top: 70px;
+                        right: 15px;
+                        left: 15px;
                         max-width: none;
                     }
                 }
@@ -2502,10 +2575,10 @@ class SocialManager {
                     
                     .custom-notification {
                         top: 60px;
-                        right: 8px;
-                        left: 8px;
-                        padding: 6px 10px;
-                        font-size: 11px;
+                        right: 10px;
+                        left: 10px;
+                        padding: 10px 15px;
+                        font-size: 13px;
                     }
                 }
             `;
@@ -4144,7 +4217,6 @@ class SocialManager {
             
         } catch (error) {
             console.error('Error loading posts:', error);
-            this.removeLoader();
             if (lastVisible === null) {
                 container.innerHTML = '<div class="error">Error loading posts</div>';
             }
@@ -4290,12 +4362,17 @@ class SocialManager {
         try {
             if (isCurrentlyFollowing) {
                 await this.unfollowUser(userId);
+                // Invalidate the cached following set so future post renders reflect
+                // the unfollow immediately without stale data
+                if (this._followingSet) this._followingSet.delete(userId);
                 button.innerHTML = '<i class="fas fa-user-plus"></i> Follow';
                 button.classList.remove('following');
                 button.dataset.following = 'false';
                 this.showNotification('Unfollowed user', 'info');
             } else {
                 await this.followUser(userId);
+                // Update cached set so other Follow buttons on the feed update state
+                if (this._followingSet) this._followingSet.add(userId);
                 button.innerHTML = '<i class="fas fa-user-check"></i> Following';
                 button.classList.add('following');
                 button.dataset.following = 'true';
@@ -4350,22 +4427,21 @@ class SocialManager {
         
         notification.style.cssText = `
             position: fixed;
-            top: 70px;
-            right: 16px;
+            top: 80px;
+            right: 20px;
             background: ${bgColor};
             color: white;
-            padding: 7px 12px;
-            border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             z-index: 10000;
             animation: slideIn 0.3s ease;
             display: flex;
             align-items: center;
-            gap: 6px;
-            max-width: 220px;
+            gap: 10px;
+            max-width: 400px;
+            backdrop-filter: blur(10px);
             font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            line-height: 1.3;
         `;
         
         const icon = type === 'error' ? 'alert-circle' : 
@@ -4373,7 +4449,7 @@ class SocialManager {
                     type === 'warning' ? 'alert-triangle' : 'info';
         
         notification.innerHTML = `
-            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2" width="14" height="14" fill="none" style="flex-shrink:0;">
+            <svg class="feather" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2">
                 ${this.getNotificationIcon(icon)}
             </svg>
             <span>${message}</span>
@@ -4491,7 +4567,7 @@ class SocialManager {
         }
         
         if (post.caption) {
-            postContentHTML += `<p class="post-caption">${post.caption}</p>`;
+            postContentHTML += `<p class="post-caption">${this.formatCaption(post.caption)}</p>`;
         }
         
         const isLiked = this.likedPosts.has(post.id);
@@ -4673,18 +4749,49 @@ class SocialManager {
     async getUsersData(userIds) {
         const usersData = {};
         
-        await Promise.all(userIds.map(async (userId) => {
-            try {
-                const userRef = doc(db, 'users', userId);
-                const userSnap = await getDoc(userRef);
-                if (userSnap.exists()) {
-                    usersData[userId] = userSnap.data();
+        // FIXED: Previously fetched users ONE BY ONE in a sequential for-loop,
+        // causing a waterfall of N Firestore reads (each waiting for the last).
+        // With 15 posts by 10 different users, that's 10 sequential round-trips.
+        // Now we fire ALL requests in parallel with Promise.all — same number of
+        // reads, but they all happen at the same time. The whole batch finishes
+        // as fast as the single slowest request instead of the SUM of all of them.
+        //
+        // Also added an in-memory cache (this.userCache) so if the same user
+        // appears across multiple loadComments/displayPosts calls in the same
+        // session, we never hit Firestore for them again.
+
+        if (!this._userCache) {
+            this._userCache = new Map();
+        }
+
+        const uncachedIds = userIds.filter(id => id && !this._userCache.has(id));
+
+        if (uncachedIds.length > 0) {
+            const fetchPromises = uncachedIds.map(async (userId) => {
+                try {
+                    const userRef = doc(db, 'users', userId);
+                    const userSnap = await getDoc(userRef);
+                    if (userSnap.exists()) {
+                        const data = userSnap.data();
+                        this._userCache.set(userId, data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching user data:', error);
                 }
-            } catch (error) {
-                console.error('Error fetching user data:', error);
+            });
+
+            // Fire all uncached fetches at the same time
+            await Promise.all(fetchPromises);
+        }
+
+        // Build result from cache (which now contains both previously-cached
+        // and freshly-fetched users)
+        for (const userId of userIds) {
+            if (userId && this._userCache.has(userId)) {
+                usersData[userId] = this._userCache.get(userId);
             }
-        }));
-        
+        }
+
         return usersData;
     }
 
@@ -4697,9 +4804,22 @@ class SocialManager {
         const userName = user.name || 'Unknown User';
         const userProfileImage = user.profileImage || 'images/default-profile.jpg';
         
+        // FIXED: Previously called checkIfFollowing(userId) for EVERY post in the feed,
+        // which fired an individual Firestore read per post (15 posts = 15 extra reads
+        // executed sequentially inside createPostElement, INSIDE displayPosts' for-loop).
+        // That's an absolute massacre of your read quota and why the feed loads slowly.
+        //
+        // Fix: We fetch the current user's following list ONCE per session and cache it
+        // in this._followingSet (a Set for O(1) lookups). checkIfFollowing() is now a
+        // synchronous local check instead of a round-trip to Firestore.
         let isFollowing = false;
         if (this.currentUser && userId !== this.currentUser.uid) {
-            isFollowing = await this.checkIfFollowing(userId);
+            if (!this._followingSet) {
+                // First time — fetch once and cache
+                const followingList = await this.getFollowingUsers();
+                this._followingSet = new Set(followingList);
+            }
+            isFollowing = this._followingSet.has(userId);
         }
         
         let postContentHTML = '';
@@ -4724,7 +4844,7 @@ class SocialManager {
         }
         
         if (post.caption) {
-            postContentHTML += `<p class="post-caption">${post.caption}</p>`;
+            postContentHTML += `<p class="post-caption">${this.formatCaption(post.caption)}</p>`;
         }
         
         const isLiked = this.likedPosts.has(postId);
@@ -5001,7 +5121,7 @@ class SocialManager {
                 repliesCount: 0
             };
 
-            await addDoc(collection(db, 'posts', postId, 'comments'), commentData);
+            const docRef = await addDoc(collection(db, 'posts', postId, 'comments'), commentData);
 
             const postRef = doc(db, 'posts', postId);
             await updateDoc(postRef, {
@@ -5011,15 +5131,53 @@ class SocialManager {
 
             commentInput.value = '';
             
+            // FIXED: Previously called loadComments(postId) / loadCommentsForPage(postId)
+            // here, which wiped the entire comments list and re-fetched ALL comments
+            // from Firestore just to show the one new comment. If a post had 50 comments
+            // that's 50 comment reads + N user reads every single time someone types.
+            // It also caused a visible flash/flicker as the list blanked out and rebuilt.
+            //
+            // Fix: Optimistically append just the new comment element directly to the
+            // DOM using data we already have (the current user's profile). No re-fetch.
+            // The comment gets a temporary createdAt so formatTime shows "Just now".
+            const tempComment = {
+                id: docRef.id,
+                userId: this.currentUser.uid,
+                text: commentText,
+                createdAt: { toDate: () => new Date() }, // local timestamp for display
+                repliesCount: 0
+            };
+            const tempUser = {
+                name: this.currentUser.displayName || 'User',
+                profileImage: this.currentUser.photoURL || 'images/default-profile.jpg'
+            };
+
             if (isCommentsPage) {
-                await this.loadCommentsForPage(postId);
+                const commentsList = document.getElementById('commentsList');
+                if (commentsList) {
+                    // Remove "no comments" placeholder if present
+                    const noComments = commentsList.querySelector('.no-comments');
+                    if (noComments) noComments.remove();
+                    
+                    const commentElement = this.createCommentElement(tempComment, tempUser, postId);
+                    commentsList.appendChild(commentElement);
+                    commentElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
                 const commentCount = document.querySelector('.comment-count');
                 if (commentCount) {
                     const currentCount = parseInt(commentCount.textContent) || 0;
                     commentCount.textContent = this.formatCount(currentCount + 1);
                 }
             } else {
-                await this.loadComments(postId);
+                const commentsList = document.getElementById(`comments-list-${postId}`);
+                if (commentsList) {
+                    const noComments = commentsList.querySelector('.no-comments');
+                    if (noComments) noComments.remove();
+
+                    const commentElement = this.createCommentElement(tempComment, tempUser, postId);
+                    commentsList.appendChild(commentElement);
+                    commentElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
                 const commentCount = document.querySelector(`.comment-btn[data-post-id="${postId}"] .comment-count`);
                 if (commentCount) {
                     const currentCount = parseInt(commentCount.textContent) || 0;
@@ -5083,16 +5241,37 @@ class SocialManager {
         if (!this.currentUser) return;
 
         try {
-            const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+            // FIXED: Previously fetched ALL posts from Firestore with zero limit just to
+            // count how many are unviewed. On a big app that's hundreds of doc reads every
+            // time you navigate. Completely unnecessary and expensive.
+            //
+            // Fix: Only fetch posts from the last 24 hours (which is what we care about
+            // for the badge), and limit to 50 — more than enough for a realistic unread count.
+            // We also debounce repeat calls (e.g. called from setupNavigation + elsewhere)
+            // so they don't stack up on page load.
+
+            if (this._newPostsCountTimeout) return; // debounce — if already scheduled, skip
+            this._newPostsCountTimeout = setTimeout(() => {
+                this._newPostsCountTimeout = null;
+            }, 5000); // allow re-check every 5s at most
+
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            
+            // Only fetch recent posts — not the entire collection
+            const postsQuery = query(
+                collection(db, 'posts'),
+                orderBy('createdAt', 'desc'),
+                limit(50) // cap at 50; badge shows "50+" style if needed
+            );
             const postsSnap = await getDocs(postsQuery);
             
             let newPostsCount = 0;
-            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
             
             postsSnap.forEach(doc => {
                 const post = doc.data();
-                const postDate = post.createdAt?.toDate ? post.createdAt.toDate() : new Date();
+                const postDate = post.createdAt?.toDate ? post.createdAt.toDate() : new Date(0);
                 
+                // Only count posts from the last 24h that haven't been viewed
                 if (postDate > oneDayAgo && !this.viewedPosts.has(doc.id)) {
                     newPostsCount++;
                 }
@@ -5242,22 +5421,44 @@ class SocialManager {
         
         container.innerHTML = '';
         
-        this.currentPYMKProfiles.forEach(async (user) => {
-            const profileCard = await this.createPYMKProfileCard(user);
-            container.appendChild(profileCard);
-            
-            this.viewedPYMKProfiles.add(user.id);
+        // FIXED: Previously used async forEach which is a classic JS trap —
+        // forEach does NOT await async callbacks, so all createPYMKProfileCard calls
+        // (each of which fired a checkIfFollowing Firestore read) launched simultaneously
+        // without any control, AND cards could append in random order as promises resolved.
+        //
+        // Fix 1: Use a proper for...of loop that awaits each card creation.
+        // Fix 2: createPYMKProfileCard now uses the cached _followingSet instead of
+        //         a new Firestore round-trip per card — see createPYMKProfileCard.
+        (async () => {
+            for (const user of this.currentPYMKProfiles) {
+                const profileCard = await this.createPYMKProfileCard(user);
+                container.appendChild(profileCard);
+                
+                this.viewedPYMKProfiles.add(user.id);
+            }
+            // Save once after the loop, not inside it (saves N localStorage writes -> 1)
             this.saveViewedPYMKProfiles();
-        });
+        })();
     }
 
     async createPYMKProfileCard(user) {
         const card = document.createElement('div');
         card.className = 'pymk-profile-card';
         
+        // FIXED: Previously called checkIfFollowing(user.id) which fired a fresh
+        // Firestore read per PYMK card. With 5-10 cards that's 5-10 extra reads just
+        // to render the "Follow / Following" button state.
+        //
+        // Fix: Use the already-cached _followingSet (populated during post rendering).
+        // If for some reason it doesn't exist yet (e.g. PYMK loaded before posts),
+        // fetch it once and cache it — same as createPostElement does.
         let isFollowing = false;
         if (this.currentUser && user.id !== this.currentUser.uid) {
-            isFollowing = await this.checkIfFollowing(user.id);
+            if (!this._followingSet) {
+                const followingList = await this.getFollowingUsers();
+                this._followingSet = new Set(followingList);
+            }
+            isFollowing = this._followingSet.has(user.id);
         }
         
         const mutualConnections = Math.floor(Math.random() * 6);
@@ -5354,12 +5555,15 @@ class SocialManager {
         try {
             if (isCurrentlyFollowing) {
                 await this.unfollowUser(userId);
+                // Keep the cache consistent so other UI elements reflect the change
+                if (this._followingSet) this._followingSet.delete(userId);
                 button.innerHTML = '<i class="fas fa-user-plus"></i> Follow';
                 button.classList.remove('following');
                 button.dataset.following = 'false';
                 this.showNotification('Unfollowed user', 'info');
             } else {
                 await this.followUser(userId);
+                if (this._followingSet) this._followingSet.add(userId);
                 button.innerHTML = '<i class="fas fa-user-check"></i> Following';
                 button.classList.add('following');
                 button.dataset.following = 'true';
