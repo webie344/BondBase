@@ -990,7 +990,7 @@ class SocialManager {
                 /* ========== POST FEED LAYOUT ========== */
                 .posts-container {
                     max-width: 640px;
-                    margin: 0 auto;
+                    margin: 0 ;
                     background: transparent;
                     padding: 0 0 80px;
                 }
@@ -1008,7 +1008,7 @@ class SocialManager {
                 }
 
                 .post-item:hover {
-                    background: rgba(255, 255, 255, 0.055);
+                    
                     border-color: rgba(255, 75, 110, 0.2);
                     transform: translateY(-1px);
                 }
@@ -2147,7 +2147,7 @@ class SocialManager {
                     display: flex;
                     align-items: center;
                     gap: 10px;
-                    max-width: 400px;
+                    max-width: 30px;
                     backdrop-filter: blur(10px);
                     font-family: 'Inter', sans-serif;
                 }
