@@ -46,7 +46,7 @@
         .main-content {
             display: none !important;
         }
-
+      
         /* TikTok Container */
         #tiktokContainer {
             position: fixed;
@@ -67,41 +67,32 @@
             -webkit-overflow-scrolling: touch;
         }
 
-        /* Video Slide */
+        /* Video Slide — stream.js sets transform via _positionSlides(), never opacity */
         .video-slide {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100vh;
-            opacity: 0;
+            /* NO opacity:0 — that was hiding slides even when they were on screen */
+            /* NO transform here — stream.js sets translateY inline */
+            /* NO transition here — stream.js sets it via _setSlideTransitions() */
             z-index: 1;
-            transform: translateY(100vh);
-            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease;
             pointer-events: none;
-            will-change: transform, opacity;
+            will-change: transform;
             backface-visibility: hidden;
             -webkit-backface-visibility: hidden;
         }
 
+        /* Active slide — only enable pointer events, do NOT touch transform or opacity */
         .video-slide.active {
-            opacity: 1;
-            z-index: 3;
-            transform: translateY(0);
             pointer-events: auto;
+            z-index: 3;
         }
 
-        .video-slide.next {
-            opacity: 1;
-            z-index: 2;
-            transform: translateY(100vh);
-        }
-
-        .video-slide.previous {
-            opacity: 1;
-            z-index: 2;
-            transform: translateY(-100vh);
-        }
+        /* next/previous — kept only for z-index layering, no transforms */
+        .video-slide.next     { z-index: 2; }
+        .video-slide.previous { z-index: 2; }
 
         /* Video Container */
         .video-container {
@@ -125,12 +116,11 @@
 
         .video-loading {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #fff;
-            text-align: center;
-            font-size: 16px;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.55);
             z-index: 5;
             pointer-events: none;
         }
@@ -1477,209 +1467,20 @@
         let swipeStartTime = 0;
         const videoFeed = document.getElementById('videoFeed');
 
-        // Function to handle video change safely
+        // SWIPE HANDLED ENTIRELY BY stream.js — this block intentionally disabled
+        // Having two swipe handlers both calling changeVideo() caused every swipe
+        // to skip videos (it fired twice: once here, once in TikTokFeed handlers).
         function safeChangeVideo(newIndex) {
-            if (window.tiktokFeedInstance && window.tiktokFeedInstance.changeVideo) {
-                window.tiktokFeedInstance.changeVideo(newIndex);
-                
-                // Fix for video display issue - manually update slide classes
-                setTimeout(() => {
-                    const slides = document.querySelectorAll('.video-slide');
-                    slides.forEach((slide, i) => {
-                        slide.classList.remove('active', 'next', 'previous');
-                        if (i === newIndex) {
-                            slide.classList.add('active');
-                        } else if (i === newIndex + 1) {
-                            slide.classList.add('next');
-                        } else if (i === newIndex - 1) {
-                            slide.classList.add('previous');
-                        }
-                    });
-                }, 50);
-            }
+            // no-op — stream.js TikTokFeed handles all swiping
         }
 
-        // Swipe handlers
-        function handleTouchStart(e) {
-            const target = e.target;
-            const isProgressBar = target.closest('.video-progress-container') || 
-                                 target.closest('.video-progress-bar') ||
-                                 target.closest('.video-progress-handle');
-            
-            const isInteractive = target.closest('button') || 
-                                 target.closest('a') || 
-                                 target.closest('.side-action') ||
-                                 target.closest('.video-author') ||
-                                 target.closest('.video-see-more') ||
-                                 target.closest('.bottom-nav-wrapper') || // Ignore bottom nav
-                                 target.closest('.top-nav');
-            
-            if (isProgressBar || isInteractive) {
-                return;
-            }
-            
-            startY = e.touches[0].clientY;
-            currentY = startY;
-            isSwiping = true;
-            swipeStartTime = Date.now();
-            if (videoFeed) {
-                videoFeed.style.transition = 'none';
-            }
-        }
-
-        function handleTouchMove(e) {
-            if (!isSwiping) return;
-            
-            e.preventDefault();
-            currentY = e.touches[0].clientY;
-            const dragY = currentY - startY;
-            
-            if (videoFeed && Math.abs(dragY) > 10) {
-                videoFeed.style.transform = `translateY(${dragY}px)`;
-            }
-        }
-
-        function handleTouchEnd(e) {
-            if (!isSwiping) return;
-            
-            const dragY = currentY - startY;
-            const slideHeight = window.innerHeight;
-            const threshold = slideHeight * 0.1;
-            const swipeDuration = Date.now() - swipeStartTime;
-            const isQuickSwipe = swipeDuration < 300 && Math.abs(dragY) > 50;
-            
-            if (Math.abs(dragY) > threshold || isQuickSwipe) {
-                let currentIndex = 0;
-                let videosLength = 0;
-                
-                if (window.tiktokFeedInstance) {
-                    currentIndex = window.tiktokFeedInstance.currentIndex || 0;
-                    videosLength = window.tiktokFeedInstance.videos ? window.tiktokFeedInstance.videos.length : 0;
-                }
-                
-                if (dragY < 0) {
-                    // Swipe up - next video
-                    if (currentIndex < videosLength - 1) {
-                        safeChangeVideo(currentIndex + 1);
-                    }
-                } else {
-                    // Swipe down - previous video
-                    if (currentIndex > 0) {
-                        safeChangeVideo(currentIndex - 1);
-                    }
-                }
-            }
-            
-            // Reset feed position
-            if (videoFeed) {
-                videoFeed.style.transition = 'transform 0.3s ease-out';
-                videoFeed.style.transform = 'translateY(0px)';
-                
-                setTimeout(() => {
-                    videoFeed.style.transition = '';
-                }, 300);
-            }
-            
-            isSwiping = false;
-        }
-
-        // Mouse handlers for desktop
-        function handleMouseDown(e) {
-            const target = e.target;
-            const isProgressBar = target.closest('.video-progress-container') || 
-                                 target.closest('.video-progress-bar') ||
-                                 target.closest('.video-progress-handle');
-            
-            const isInteractive = target.closest('button') || 
-                                 target.closest('a') || 
-                                 target.closest('.side-action') ||
-                                 target.closest('.video-author') ||
-                                 target.closest('.video-see-more') ||
-                                 target.closest('.bottom-nav-wrapper') ||
-                                 target.closest('.top-nav');
-            
-            if (isProgressBar || isInteractive) {
-                return;
-            }
-            
-            startY = e.clientY;
-            currentY = startY;
-            isSwiping = true;
-            swipeStartTime = Date.now();
-            if (videoFeed) {
-                videoFeed.style.transition = 'none';
-            }
-            e.preventDefault();
-        }
-
-        function handleMouseMove(e) {
-            if (!isSwiping) return;
-            currentY = e.clientY;
-            const dragY = currentY - startY;
-            
-            if (videoFeed && Math.abs(dragY) > 10) {
-                videoFeed.style.transform = `translateY(${dragY}px)`;
-            }
-            e.preventDefault();
-        }
-
-        function handleMouseUp(e) {
-            if (!isSwiping) return;
-            
-            const dragY = currentY - startY;
-            const slideHeight = window.innerHeight;
-            const threshold = slideHeight * 0.1;
-            const swipeDuration = Date.now() - swipeStartTime;
-            const isQuickSwipe = swipeDuration < 300 && Math.abs(dragY) > 50;
-            
-            if (Math.abs(dragY) > threshold || isQuickSwipe) {
-                let currentIndex = 0;
-                let videosLength = 0;
-                
-                if (window.tiktokFeedInstance) {
-                    currentIndex = window.tiktokFeedInstance.currentIndex || 0;
-                    videosLength = window.tiktokFeedInstance.videos ? window.tiktokFeedInstance.videos.length : 0;
-                }
-                
-                if (dragY < 0) {
-                    // Swipe up - next video
-                    if (currentIndex < videosLength - 1) {
-                        safeChangeVideo(currentIndex + 1);
-                    }
-                } else {
-                    // Swipe down - previous video
-                    if (currentIndex > 0) {
-                        safeChangeVideo(currentIndex - 1);
-                    }
-                }
-            }
-            
-            // Reset feed position
-            if (videoFeed) {
-                videoFeed.style.transition = 'transform 0.3s ease-out';
-                videoFeed.style.transform = 'translateY(0px)';
-                
-                setTimeout(() => {
-                    videoFeed.style.transition = '';
-                }, 300);
-            }
-            
-            isSwiping = false;
-            e.preventDefault();
-        }
-
-        function handleMouseLeave() {
-            if (isSwiping) {
-                if (videoFeed) {
-                    videoFeed.style.transform = 'translateY(0px)';
-                    videoFeed.style.transition = 'transform 0.3s ease-out';
-                    setTimeout(() => {
-                        videoFeed.style.transition = '';
-                    }, 300);
-                }
-                isSwiping = false;
-            }
-        }
+        function handleTouchStart(e) {}
+        function handleTouchMove(e)  {}
+        function handleTouchEnd(e)   {}
+        function handleMouseDown(e)  {}
+        function handleMouseMove(e)  {}
+        function handleMouseUp(e)    {}
+        function handleMouseLeave()  {}
 
         // Set up event listeners - SWIPE ONLY
         if (videoFeed) {
@@ -1749,4 +1550,4 @@
         });
     </script>
 </body>
-</html>
+</html>e
