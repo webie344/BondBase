@@ -262,6 +262,284 @@ class LocalCache {
 
 const cache = new LocalCache();
 
+// ==================== SOUND MANAGER (Web Audio synthesized) ====================
+class SoundManager {
+    constructor() {
+        this.enabled = localStorage.getItem('groupchat_sounds') !== 'off';
+        this.ctx = null;
+        this.lastPlayed = new Map();
+        this._unlock = this._unlock.bind(this);
+        ['click', 'touchstart', 'keydown'].forEach(ev =>
+            document.addEventListener(ev, this._unlock, { once: true, passive: true })
+        );
+    }
+    _unlock() {
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC && !this.ctx) this.ctx = new AC();
+            if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        } catch (e) {}
+    }
+    setEnabled(on) {
+        this.enabled = !!on;
+        localStorage.setItem('groupchat_sounds', on ? 'on' : 'off');
+    }
+    _throttle(key, ms) {
+        const now = Date.now();
+        if ((this.lastPlayed.get(key) || 0) + ms > now) return false;
+        this.lastPlayed.set(key, now);
+        return true;
+    }
+    _tone({ freq = 600, dur = 0.12, type = 'sine', vol = 0.18, attack = 0.005, release = 0.08, slide = 0 } = {}) {
+        if (!this.enabled || !this.ctx) return;
+        try {
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, t);
+            if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(vol, t + attack);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + dur + release);
+            osc.connect(gain).connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + dur + release + 0.02);
+        } catch (e) {}
+    }
+    sent() {
+        if (!this._throttle('sent', 120)) return;
+        this._tone({ freq: 880, dur: 0.06, type: 'sine', vol: 0.14, slide: 320 });
+    }
+    received() {
+        if (!this._throttle('received', 250)) return;
+        this._tone({ freq: 520, dur: 0.08, type: 'triangle', vol: 0.16 });
+        setTimeout(() => this._tone({ freq: 780, dur: 0.1, type: 'triangle', vol: 0.14 }), 70);
+    }
+    typing() {
+        if (!this._throttle('typing', 1500)) return;
+        this._tone({ freq: 320, dur: 0.04, type: 'sine', vol: 0.06 });
+    }
+    record() {
+        if (!this._throttle('record', 200)) return;
+        this._tone({ freq: 660, dur: 0.05, type: 'square', vol: 0.1 });
+    }
+    error() {
+        if (!this._throttle('error', 200)) return;
+        this._tone({ freq: 220, dur: 0.18, type: 'sawtooth', vol: 0.18, slide: -120 });
+    }
+    delivered() {
+        if (!this._throttle('delivered', 250)) return;
+        this._tone({ freq: 1040, dur: 0.04, type: 'sine', vol: 0.08 });
+    }
+}
+const soundManager = new SoundManager();
+window.groupChatSounds = soundManager;
+
+// ==================== OPTIMISTIC MESSAGE & PRO STYLES ====================
+function injectGroupChatProStyles() {
+    if (document.getElementById('gc-pro-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'gc-pro-styles';
+    style.textContent = `
+    /* Dark WhatsApp-style bubbles — override transparent !important rules with high specificity */
+    .message-text.bubble-self,
+    .message-text.bubble-self[style*="margin-left: auto;"],
+    .message-text.bubble-self[style*="margin-left:auto"] {
+        background: #005c4b !important;
+        color: #e9edef !important;
+        border: none !important;
+        border-radius: 12px 2px 12px 12px !important;
+        padding: 8px 12px !important;
+        box-shadow: 0 1px 1px rgba(0,0,0,.25) !important;
+    }
+    .message-text.bubble-other,
+    .message-text.bubble-other[style*="margin-right: auto;"],
+    .message-text.bubble-other[style*="margin-right:auto"] {
+        background: #202c33 !important;
+        color: #e9edef !important;
+        border: none !important;
+        border-radius: 2px 12px 12px 12px !important;
+        padding: 8px 12px !important;
+        box-shadow: 0 1px 1px rgba(0,0,0,.25) !important;
+    }
+    .message-text { position: relative; }
+    .message-text.bubble-self::after,
+    .message-text.bubble-other::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        width: 0; height: 0;
+        border-style: solid;
+    }
+    /* Self bubble tail — dark green to match bubble */
+    .message-text.bubble-self::after {
+        right: -7px;
+        border-width: 0 0 10px 8px;
+        border-color: transparent transparent transparent #005c4b;
+    }
+    /* Other bubble tail — dark gray to match bubble */
+    .message-text.bubble-other::after {
+        left: -7px;
+        border-width: 0 8px 10px 0;
+        border-color: transparent #202c33 transparent transparent;
+    }
+    .message-text.tail-hidden::after { display: none !important; }
+    /* Links and replied-to inside dark bubbles */
+    .message-text.bubble-self a, .message-text.bubble-other a { color: #53bdeb !important; }
+    .message-text.bubble-self .replying-to,
+    .message-text.bubble-other .replying-to {
+        background: rgba(255,255,255,.08) !important;
+        border-left: 3px solid #25d366 !important;
+        border-radius: 6px !important;
+        padding: 6px 8px !important;
+        margin-bottom: 4px !important;
+        color: #d1d7db !important;
+    }
+    .msg-meta {
+        display: inline-flex; align-items: center; gap: 4px;
+        float: right; margin: 4px 0 -2px 8px;
+        font-size: 10.5px; color: #6b7a82; opacity: .85;
+        user-select: none;
+    }
+    .msg-meta .ticks { font-family: -apple-system, system-ui, sans-serif; letter-spacing: -2px; }
+    .msg-meta .ticks.read { color: #34b7f1; }
+    .temp-message { opacity: .78; }
+    .temp-message .msg-meta .ticks { color: #9aa6ad; }
+    .temp-message .msg-spinner {
+        display: inline-block; width: 10px; height: 10px;
+        border: 1.5px solid rgba(0,0,0,.18); border-top-color: #34b7f1;
+        border-radius: 50%; animation: gc-spin .7s linear infinite;
+        vertical-align: middle;
+    }
+    @keyframes gc-spin { to { transform: rotate(360deg); } }
+    .temp-media-wrap { position: relative; display: inline-block; max-width: 250px; }
+    .temp-media-wrap img, .temp-media-wrap video {
+        max-width: 250px; max-height: 250px; border-radius: 8px;
+        width: 100%; height: auto; filter: blur(2px) brightness(.85);
+    }
+    .temp-media-overlay {
+        position: absolute; inset: 0;
+        background: rgba(0,0,0,.25);
+        border-radius: 8px;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        color: #fff; gap: 8px;
+    }
+    .temp-media-overlay .ring {
+        width: 36px; height: 36px; border-radius: 50%;
+        border: 3px solid rgba(255,255,255,.35);
+        border-top-color: #fff;
+        animation: gc-spin .8s linear infinite;
+    }
+    .temp-media-overlay .pct { font-size: 12px; font-weight: 600; }
+    .temp-media-overlay .cancel-temp {
+        position: absolute; top: 6px; right: 6px;
+        background: rgba(0,0,0,.55); color: #fff; border: none;
+        width: 26px; height: 26px; border-radius: 50%;
+        cursor: pointer; font-size: 14px; line-height: 1;
+    }
+    .typing-indicator.show { animation: gc-fade-in .25s ease; }
+    @keyframes gc-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .gc-toast-flash { animation: gc-pulse .35s ease; }
+    @keyframes gc-pulse { 0% { transform: scale(.96); } 100% { transform: scale(1); } }
+    `;
+    document.head.appendChild(style);
+}
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', injectGroupChatProStyles, { once: true });
+    } else {
+        injectGroupChatProStyles();
+    }
+}
+
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function buildOptimisticBubble({ tempId, text = '', mediaUrl = null, mediaType = null, replyToText = null }) {
+    const wrap = document.createElement('div');
+    wrap.className = 'message-container temp-message';
+    wrap.dataset.tempId = tempId;
+
+    let mediaHtml = '';
+    if (mediaUrl && mediaType) {
+        const isVideo = mediaType.startsWith('video/');
+        const tag = isVideo
+            ? `<video src="${mediaUrl}" muted></video>`
+            : `<img src="${mediaUrl}" alt="">`;
+        mediaHtml = `
+            <div class="temp-media-wrap" data-temp-media="${tempId}">
+                ${tag}
+                <div class="temp-media-overlay">
+                    <button class="cancel-temp" data-cancel-temp="${tempId}" title="Cancel">×</button>
+                    <div class="ring"></div>
+                    <div class="pct" data-temp-pct="${tempId}">0%</div>
+                </div>
+            </div>`;
+    }
+
+    const replyHtml = replyToText
+        ? `<div class="replying-to" style="font-size:12px;opacity:.8;border-left:3px solid #34b7f1;padding:2px 6px;margin-bottom:4px;">${escapeHtml(replyToText)}</div>`
+        : '';
+
+    wrap.innerHTML = `
+        <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;">
+            <div style="width:36px; flex-shrink:0;"></div>
+            <div style="flex:1; min-width:0;">
+                <div class="message-text bubble-self gc-toast-flash"
+                     style="background:#dcf8c6; padding:8px 12px; border-radius:12px;
+                            max-width:80%; word-wrap:break-word; margin-left:auto;">
+                    ${replyHtml}
+                    <div class="message-content-wrapper">
+                        ${mediaHtml}
+                        ${text ? `<span>${escapeHtml(text)}</span>` : ''}
+                    </div>
+                    <span class="msg-meta">
+                        <span class="time">sending</span>
+                        <span class="msg-spinner"></span>
+                    </span>
+                </div>
+            </div>
+        </div>`;
+    return wrap;
+}
+
+function appendOptimisticBubble(node) {
+    const container = document.getElementById('messagesContainer')
+        || document.querySelector('.messages-container')
+        || document.querySelector('[data-messages-container]');
+    if (!container) return null;
+    container.appendChild(node);
+    container.scrollTop = container.scrollHeight;
+    return node;
+}
+
+function updateTempProgress(tempId, pct) {
+    const el = document.querySelector(`[data-temp-pct="${tempId}"]`);
+    if (el) el.textContent = `${Math.round(pct)}%`;
+}
+
+function markTempFailed(tempId, reason = 'Failed') {
+    const node = document.querySelector(`.temp-message[data-temp-id="${tempId}"]`);
+    if (!node) return;
+    const meta = node.querySelector('.msg-meta');
+    if (meta) {
+        meta.innerHTML = `<span style="color:#d33;font-weight:600;">${escapeHtml(reason)}</span>
+            <button data-retry-temp="${tempId}" style="border:none;background:transparent;color:#34b7f1;cursor:pointer;font-weight:600;">Retry</button>`;
+    }
+    const overlay = node.querySelector('.temp-media-overlay');
+    if (overlay) overlay.querySelector('.ring')?.remove();
+    soundManager.error();
+}
+
+function removeTempBubble(tempId) {
+    document.querySelectorAll(`.temp-message[data-temp-id="${tempId}"]`).forEach(n => n.remove());
+}
+
 // ==================== NETWORK MONITORING ====================
 let isOnline = navigator.onLine;
 
@@ -1255,59 +1533,60 @@ class GroupChat {
         return false;
     }
     
-    // FIXED: Cancel voice recording - properly close modal and clean up
+    // FIXED: Cancel voice recording - ALWAYS closes the modal, even if recorder
+    // is in a stale/failed state. Previously the cleanup was gated on
+    // (mediaRecorder && isRecording) so the overlay/modal could get stuck.
     cancelVoiceRecording() {
         console.log('Cancel voice recording called');
-        
-        if (this.mediaRecorder && this.isRecording) {
-            // Stop the recorder
+
+        // Stop the recorder if it exists (regardless of isRecording flag)
+        if (this.mediaRecorder) {
             try {
-                this.mediaRecorder.stop();
+                if (this.mediaRecorder.state && this.mediaRecorder.state !== 'inactive') {
+                    this.mediaRecorder.stop();
+                }
             } catch (e) {
                 console.log('Error stopping recorder:', e);
             }
-            this.isRecording = false;
-            
-            // Clear timer
-            if (this.recordingTimer) {
-                clearTimeout(this.recordingTimer);
-                this.recordingTimer = null;
-            }
-            
-            // Stop all tracks
+
             if (this.mediaRecorder.stream) {
                 this.mediaRecorder.stream.getTracks().forEach(track => {
-                    try {
-                        track.stop();
-                    } catch (e) {
-                        console.log('Error stopping track:', e);
-                    }
+                    try { track.stop(); } catch (e) { console.log('Error stopping track:', e); }
                 });
             }
-            
-            // Clear voice note data
-            this.currentVoiceNote = null;
-            this.audioChunks = [];
-            this.recordingDuration = 0;
-            this.recordingStartTime = null;
-            
-            // Hide recording UI (this closes the modal)
-            this.hideRecordingUI();
-            
-            // Remove preview if exists
-            this.removeVoiceNotePreview();
-            
-            // Update button state if exists
-            const voiceNoteBtn = document.getElementById('voiceNoteBtn');
-            if (voiceNoteBtn) {
-                voiceNoteBtn.classList.remove('recording');
-            }
-            
-            showNotification('Recording cancelled', 'info');
-            
-            return true;
         }
-        return false;
+
+        this.isRecording = false;
+
+        // Clear timer
+        if (this.recordingTimer) {
+            clearTimeout(this.recordingTimer);
+            this.recordingTimer = null;
+        }
+
+        // Clear voice note data
+        this.currentVoiceNote = null;
+        this.audioChunks = [];
+        this.recordingDuration = 0;
+        this.recordingStartTime = null;
+
+        // ALWAYS hide recording UI / modal — even if no active recording
+        try { this.hideRecordingUI(); } catch (e) {}
+
+        // Remove preview if exists
+        try { this.removeVoiceNotePreview(); } catch (e) {}
+
+        // Update button state if exists
+        const voiceNoteBtn = document.getElementById('voiceNoteBtn');
+        if (voiceNoteBtn) voiceNoteBtn.classList.remove('recording');
+
+        // Belt-and-suspenders: nuke any lingering recording overlay nodes
+        document.querySelectorAll('#voiceRecordingUI, #voiceRecordingOverlay').forEach(n => n.remove());
+
+        if (typeof soundManager !== 'undefined') soundManager.error();
+        try { showNotification('Recording cancelled', 'info'); } catch (e) {}
+
+        return true;
     }
     
     async sendVoiceNote() {
@@ -5307,13 +5586,16 @@ function updateTypingIndicator(typingUsers) {
         typingMessage = `${typingUsers[0].userName}, ${typingUsers[1].userName} and ${typingUsers.length - 2} others are typing`;
     }
     
+    const wasHidden = typingIndicator.style.display === 'none' || !typingIndicator.classList.contains('show');
     typingText.textContent = typingMessage;
     typingIndicator.style.display = 'block';
-    
+
     // Trigger reflow to enable animation
     void typingIndicator.offsetWidth;
-    
+
     typingIndicator.classList.add('show');
+
+    if (wasHidden && typeof soundManager !== 'undefined') soundManager.typing();
 }
 
 // Create upload modal
@@ -5705,55 +5987,72 @@ function initGroupPage() {
                 fileInput.type = 'file';
                 fileInput.accept = 'image/*,video/*,audio/*';
                 fileInput.multiple = false;
-                
+
                 fileInput.addEventListener('change', async (e) => {
                     const file = e.target.files[0];
-                    if (file) {
-                        try {
-                            const uploadId = 'upload_' + Date.now();
-                            
-                            // Create upload modal
-                            const modal = createUploadModal(uploadId, file.name, file.type, () => {
-                                // Cancel function will be called by the modal
-                            });
-                            
-                            // Send media with progress tracking
-                            await groupChat.sendMediaMessage(
-                                groupId, 
-                                file, 
-                                groupChat.replyingToMessage?.id,
-                                (progress) => {
-                                    updateUploadProgress(uploadId, progress);
-                                },
-                                (cancelFunction) => {
-                                    // Store cancel function in the modal's cancel button
-                                    const cancelBtn = document.getElementById(`cancel-upload-${uploadId}`);
-                                    if (cancelBtn) {
-                                        const originalClick = cancelBtn.onclick;
-                                        cancelBtn.onclick = () => {
-                                            if (cancelFunction && typeof cancelFunction === 'function') {
-                                                cancelFunction();
-                                            }
-                                            if (originalClick && typeof originalClick === 'function') {
-                                                originalClick();
-                                            }
-                                        };
-                                    }
-                                }
-                            );
-                            
-                            // Remove upload modal on completion
-                            removeUploadModal(uploadId);
-                            
-                        } catch (error) {
-                            console.error('Error sending media:', error);
-                            if (error.message !== 'Upload cancelled') {
-                                alert(error.message || 'Failed to send media. Please try again.');
+                    if (!file) return;
+
+                    // ---- INLINE OPTIMISTIC SEND (no modal) ----
+                    const tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+                    const localUrl = URL.createObjectURL(file);
+                    const isAudio = file.type.startsWith('audio/');
+                    const previewType = isAudio ? 'image/x-audio' : file.type;
+
+                    const node = buildOptimisticBubble({
+                        tempId,
+                        text: isAudio ? 'Voice note' : '',
+                        mediaUrl: isAudio ? null : localUrl,
+                        mediaType: isAudio ? null : previewType,
+                        replyToText: groupChat.replyingToMessage
+                            ? `${groupChat.replyingToMessage.senderName}: ${groupChat.replyingToMessage.text || 'Media'}`
+                            : null,
+                    });
+                    if (messagesContainer) {
+                        messagesContainer.appendChild(node);
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                    soundManager.sent();
+
+                    let cancelUpload = null;
+
+                    // Cancel button on the temp bubble
+                    const cancelBtn = node.querySelector(`[data-cancel-temp="${tempId}"]`);
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', () => {
+                            if (typeof cancelUpload === 'function') {
+                                try { cancelUpload(); } catch (err) {}
                             }
+                            removeTempBubble(tempId);
+                            URL.revokeObjectURL(localUrl);
+                        });
+                    }
+
+                    try {
+                        await groupChat.sendMediaMessage(
+                            groupId,
+                            file,
+                            groupChat.replyingToMessage?.id,
+                            (progress) => updateTempProgress(tempId, progress),
+                            (cancelFn) => { cancelUpload = cancelFn; }
+                        );
+                        groupChat.clearReply();
+                        soundManager.delivered();
+                        // The Firestore listener will render the real message and replace temp.
+                        setTimeout(() => {
+                            removeTempBubble(tempId);
+                            URL.revokeObjectURL(localUrl);
+                        }, 300);
+                    } catch (error) {
+                        console.error('Error sending media:', error);
+                        if (error.message === 'Upload cancelled') {
+                            removeTempBubble(tempId);
+                        } else {
+                            markTempFailed(tempId, 'Upload failed');
                         }
+                        URL.revokeObjectURL(localUrl);
                     }
                 });
-                
+
                 fileInput.click();
             });
         }
@@ -6073,9 +6372,20 @@ function initGroupPage() {
         }
         
         // Set up new listeners
+        let _prevMsgIds = new Set(messages.map(m => m.id));
         const messagesUnsubscribe = groupChat.listenToMessages(groupId, (newMessages) => {
             console.log('Listener callback received:', newMessages.length, 'messages');
-            
+
+            // Detect newly arrived messages from OTHER users → play receive sound
+            try {
+                const myUid = groupChat.firebaseUser?.uid;
+                const incoming = newMessages.filter(m => !_prevMsgIds.has(m.id) && m.senderId !== myUid && m.type !== 'system');
+                if (incoming.length > 0 && _prevMsgIds.size > 0) {
+                    soundManager.received();
+                }
+                _prevMsgIds = new Set(newMessages.map(m => m.id));
+            } catch (e) {}
+
             // Replace messages array with sorted messages (already in chronological order)
             messages = newMessages;
             
@@ -6578,7 +6888,7 @@ function initGroupPage() {
                     <!-- Message content on the right -->
                     <div style="flex: 1; min-width: 0;">
                         <!-- Sender info will be added by the group header -->
-                        <div class="${messageDivClass}" 
+                        <div class="${messageDivClass} ${message.senderId === groupChat.firebaseUser?.uid ? 'bubble-self' : 'bubble-other'}"
                              data-message-id="${message.id}"
                              style="background: ${message.senderId === groupChat.firebaseUser?.uid ? '#dcf8c6' : '#ffffff'}; 
                                     padding: 8px 12px; 
@@ -6590,6 +6900,10 @@ function initGroupPage() {
                             <div class="message-content-wrapper">
                                 ${messageContent}
                             </div>
+                            <span class="msg-meta">
+                                <span class="time">${formatTime(messageTime)}</span>
+                                ${message.senderId === groupChat.firebaseUser?.uid ? '<span class="ticks read">✓✓</span>' : ''}
+                            </span>
                             <div class="message-reactions" id="reactions-${message.id}">
                                 ${cachedReactions.map(reaction => {
                                     const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
@@ -6670,22 +6984,28 @@ function initGroupPage() {
         const cachedReactions = reactionsCache.get(message.id) || [];
         
         const messageDiv = document.createElement('div');
-        messageDiv.className = 'message-text';
+        const isSelf = message.senderId === groupChat.firebaseUser?.uid;
+        messageDiv.className = `message-text ${isSelf ? 'bubble-self' : 'bubble-other'} ${index > 0 ? 'tail-hidden' : ''}`;
         messageDiv.dataset.messageId = message.id;
         messageDiv.style.cssText = `
-            background: ${message.senderId === groupChat.firebaseUser?.uid ? '#dcf8c6' : '#f0f0f0'}; 
+            background: ${isSelf ? '#dcf8c6' : '#f0f0f0'}; 
             padding: 8px 12px; 
             border-radius: 12px; 
             max-width: 80%;
             word-wrap: break-word;
-            ${message.senderId === groupChat.firebaseUser?.uid ? 'margin-left: auto; background: #dcf8c6;' : 'margin-right: auto; background: #ffffff; border: 1px solid #e0e0e0;'}
+            ${isSelf ? 'margin-left: auto; background: #dcf8c6;' : 'margin-right: auto; background: #ffffff; border: 1px solid #e0e0e0;'}
         `;
         
+        const _msgTime = message.timestamp ? new Date(message.timestamp) : new Date();
         messageDiv.innerHTML = `
             ${replyHtml}
             <div class="message-content-wrapper">
                 ${messageContent}
             </div>
+            <span class="msg-meta">
+                <span class="time">${formatTime(_msgTime)}</span>
+                ${isSelf ? '<span class="ticks read">✓✓</span>' : ''}
+            </span>
             <div class="message-reactions" id="reactions-${message.id}">
                 ${cachedReactions.map(reaction => {
                     const hasUserReacted = reaction.users && reaction.users.includes(groupChat.firebaseUser?.uid);
@@ -6756,88 +7076,105 @@ function initGroupPage() {
         container.appendChild(emptyBubble);
     }
     
-    // FIXED: sendMessage - clears input immediately
+    // FIXED: sendMessage - clears input immediately + optimistic temp bubble
     async function sendMessage() {
         const text = messageInput ? messageInput.value.trim() : '';
-        
+
         if (!text && !groupChat.currentVoiceNote) return;
-        
-        // Clear typing timeout before sending
-        if (typingTimeout) {
-            clearTimeout(typingTimeout);
-        }
-        
-        // Stop typing indicator
+
+        if (typingTimeout) clearTimeout(typingTimeout);
         await groupChat.stopTyping(groupId);
-        
-        // FIXED: Clear input immediately when sending
+
         if (messageInput && text) {
             messageInput.value = '';
             messageInput.style.height = 'auto';
         }
-        
+
+        // Optimistic temp bubble for text messages (voice handled by its own preview)
+        let tempId = null;
+        if (text) {
+            tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+            const replyText = groupChat.replyingToMessage
+                ? `${groupChat.replyingToMessage.senderName}: ${groupChat.replyingToMessage.text || 'Media'}`
+                : null;
+            const node = buildOptimisticBubble({ tempId, text, replyToText: replyText });
+            if (messagesContainer) {
+                messagesContainer.appendChild(node);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            soundManager.sent();
+        }
+
+        const finishOk = () => {
+            groupChat.clearReply();
+            setTimeout(() => {
+                if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                if (tempId) removeTempBubble(tempId);
+                soundManager.delivered();
+            }, 50);
+        };
+
+        const finishErr = (error) => {
+            console.error('Error sending message:', error);
+            if (tempId) {
+                markTempFailed(tempId, 'Not sent');
+            } else {
+                alert(error.message || 'Failed to send message. Please try again.');
+            }
+            soundManager.error();
+            if (messageInput && text && !tempId) {
+                messageInput.value = text;
+                messageInput.dispatchEvent(new Event('input'));
+            }
+        };
+
         if (sendBtn) {
             const originalHTML = sendBtn.innerHTML;
             const originalDisabled = sendBtn.disabled;
             sendBtn.disabled = true;
-            
             try {
                 if (groupChat.currentVoiceNote) {
-                    // Send voice note
+                    soundManager.sent();
                     await groupChat.sendVoiceNote();
                 } else {
-                    // Send text message
                     await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
                 }
-                
-                // Clear the reply indicator after sending
-                groupChat.clearReply();
-                
-                // FIXED: Scroll to bottom immediately after sending
-                setTimeout(() => {
-                    if (messagesContainer) {
-                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    }
-                }, 50);
-                
+                finishOk();
             } catch (error) {
-                console.error('Error sending message:', error);
-                alert(error.message || 'Failed to send message. Please try again.');
-                // Restore text if sending failed
-                if (messageInput && text) {
-                    messageInput.value = text;
-                    messageInput.dispatchEvent(new Event('input'));
-                }
+                finishErr(error);
             } finally {
-                // Always restore airplane icon immediately
                 sendBtn.disabled = originalDisabled;
                 sendBtn.innerHTML = originalHTML;
             }
         } else {
-            // Send without UI updates
             try {
                 if (groupChat.currentVoiceNote) {
+                    soundManager.sent();
                     await groupChat.sendVoiceNote();
                 } else {
                     await groupChat.sendMessage(groupId, text, null, null, groupChat.replyingToMessage?.id);
                 }
-                
-                // Clear the reply indicator after sending
-                groupChat.clearReply();
-                
-                // Scroll to bottom immediately after sending
-                setTimeout(() => {
-                    if (messagesContainer) {
-                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    }
-                }, 50);
-                
+                finishOk();
             } catch (error) {
-                console.error('Error sending message:', error);
-                alert(error.message || 'Failed to send message. Please try again.');
+                finishErr(error);
             }
         }
     }
+
+    // Retry handler for failed temp bubbles
+    document.addEventListener('click', (e) => {
+        const retry = e.target.closest('[data-retry-temp]');
+        if (!retry) return;
+        const id = retry.getAttribute('data-retry-temp');
+        const node = document.querySelector(`.temp-message[data-temp-id="${id}"]`);
+        if (!node) return;
+        const txt = node.querySelector('.message-content-wrapper span')?.textContent || '';
+        removeTempBubble(id);
+        if (txt && messageInput) {
+            messageInput.value = txt;
+            sendMessage();
+        }
+    });
     
     function formatTime(date) {
         if (!(date instanceof Date)) {
