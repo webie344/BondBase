@@ -350,6 +350,119 @@ class LocalCache {
 
 const cache = new LocalCache();
 
+// ==================== SOUND MANAGER (Web Audio — no asset files needed) ====================
+class SoundManager {
+    constructor() {
+        this.ctx = null;
+        this.muted = (() => { try { return localStorage.getItem('bb_sounds_muted') === '1'; } catch (e) { return false; } })();
+        this._lastPlayed = 0;
+    }
+    setMuted(m) {
+        this.muted = !!m;
+        try { localStorage.setItem('bb_sounds_muted', m ? '1' : '0'); } catch (e) {}
+    }
+    _ensureCtx() {
+        if (this.muted) return null;
+        try {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+            return this.ctx;
+        } catch (e) { return null; }
+    }
+    _tone({ freq = 600, duration = 0.12, type = 'sine', gain = 0.15, slideTo = null, attack = 0.005 } = {}) {
+        const ctx = this._ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        if (now - this._lastPlayed < 0.04) return; // throttle
+        this._lastPlayed = now;
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(gain, now + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        osc.connect(g); g.connect(ctx.destination);
+        osc.start(now); osc.stop(now + duration + 0.02);
+    }
+    sent()      { this._tone({ freq: 880, slideTo: 1320, duration: 0.10, gain: 0.10, type: 'sine' }); }
+    delivered() { this._tone({ freq: 1400, duration: 0.06, gain: 0.06, type: 'triangle' }); }
+    received()  { this._tone({ freq: 520, slideTo: 760, duration: 0.16, gain: 0.14, type: 'sine' });
+                  setTimeout(() => this._tone({ freq: 760, duration: 0.10, gain: 0.10, type: 'sine' }), 90); }
+    typing()    { this._tone({ freq: 320, duration: 0.04, gain: 0.04, type: 'sine' }); }
+    record()    { this._tone({ freq: 660, duration: 0.08, gain: 0.10, type: 'square' }); }
+    error()     { this._tone({ freq: 220, slideTo: 110, duration: 0.20, gain: 0.14, type: 'sawtooth' }); }
+}
+const soundManager = new SoundManager();
+window.bondbaseSounds = soundManager;
+// Unlock audio on first user interaction (browser autoplay policy)
+['click', 'touchstart', 'keydown'].forEach(ev => {
+    window.addEventListener(ev, () => soundManager._ensureCtx(), { once: true, passive: true });
+});
+
+// ==================== WHATSAPP-STYLE TYPING BUBBLE ====================
+function injectBondbaseChatStyles() {
+    if (document.getElementById('bb-chat-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'bb-chat-styles';
+    style.textContent = `
+    .wa-typing-bubble {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: #202c33;
+        padding: 10px 14px;
+        border-radius: 2px 12px 12px 12px;
+        margin: 6px 0 6px 8px;
+        max-width: 70px;
+        box-shadow: 0 1px 1px rgba(0,0,0,.25);
+        animation: bbBubbleIn .18s ease-out;
+        position: relative;
+    }
+    .wa-typing-bubble::after {
+        content: '';
+        position: absolute; left: -7px; top: 0;
+        width: 0; height: 0;
+        border-style: solid;
+        border-width: 0 8px 10px 0;
+        border-color: transparent #202c33 transparent transparent;
+    }
+    .wa-typing-bubble .dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: #8696a0;
+        animation: bbDot 1.2s infinite ease-in-out;
+    }
+    .wa-typing-bubble .dot:nth-child(2) { animation-delay: .15s; }
+    .wa-typing-bubble .dot:nth-child(3) { animation-delay: .3s; }
+    @keyframes bbDot {
+        0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+        30% { transform: translateY(-4px); opacity: 1; }
+    }
+    @keyframes bbBubbleIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .wa-typing-row { display: flex; justify-content: flex-start; padding: 0 8px; }
+    `;
+    document.head.appendChild(style);
+}
+function showTypingBubble() {
+    injectBondbaseChatStyles();
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+    if (container.querySelector('.wa-typing-row')) return; // already showing
+    const row = document.createElement('div');
+    row.className = 'wa-typing-row';
+    row.id = 'waTypingRow';
+    row.innerHTML = `<div class="wa-typing-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+    container.appendChild(row);
+    container.scrollTop = container.scrollHeight;
+    try { soundManager.typing(); } catch (e) {}
+}
+function hideTypingBubble() {
+    const row = document.getElementById('waTypingRow');
+    if (row && row.parentNode) row.parentNode.removeChild(row);
+}
+
 async function registerServiceWorker() {
     if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
         try {
@@ -2268,6 +2381,7 @@ function loadChatMessages(userId, partnerId) {
     });
 
     try {
+        let _bbPrevMsgIds = new Set();
         unsubscribeChat = onSnapshot(
             collection(db, 'conversations', threadId, 'messages'),
             async (snapshot) => {
@@ -2287,6 +2401,18 @@ function loadChatMessages(userId, partnerId) {
                 });
 
                 messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+                // ---- Detect newly arrived messages from partner → play sound + hide typing bubble ----
+                try {
+                    const newFromPartner = messages.filter(m =>
+                        !_bbPrevMsgIds.has(m.id) && m.senderId === partnerId
+                    );
+                    if (newFromPartner.length > 0 && _bbPrevMsgIds.size > 0) {
+                        soundManager.received();
+                        hideTypingBubble();
+                    }
+                    _bbPrevMsgIds = new Set(messages.map(m => m.id));
+                } catch (e) {}
 
                 cache.set(cacheKey, messages, 'short');
                 await cache.setMessages(threadId, messages);
@@ -2378,6 +2504,7 @@ async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDu
 
         displayMessage(tempMessage, currentUser.uid);
         document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+        try { soundManager.sent(); } catch (e) {}
 
         if (!isOnline) {
             await cache.addPendingMessage({ type: 'text', tempId: tempMessageId, data: messageData, threadId, timestamp: new Date().toISOString() });
@@ -2386,6 +2513,7 @@ async function addMessage(text = null, imageUrl = null, audioUrl = null, audioDu
         }
 
         await addDoc(collection(db, 'conversations', threadId, 'messages'), messageData);
+        try { soundManager.delivered(); } catch (e) {}
 
         let lastMessageText = text || (imageUrl ? 'Image' : audioUrl ? 'Voice message' : 'Video message');
 
@@ -2859,9 +2987,11 @@ function setupTypingIndicator() {
                 const nameEl = document.getElementById('partnerNameTyping');
                 const nameSource = document.getElementById('chatPartnerName');
                 if (nameEl && nameSource) nameEl.textContent = nameSource.textContent;
-                if (typingIndicator) typingIndicator.style.display = 'block';
+                if (typingIndicator) typingIndicator.style.display = 'none'; // hide old indicator
+                showTypingBubble(); // WhatsApp-style bubble in the chat
             } else {
                 if (typingIndicator) typingIndicator.style.display = 'none';
+                hideTypingBubble();
             }
         });
     } catch (error) {
