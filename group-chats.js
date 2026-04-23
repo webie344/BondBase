@@ -346,7 +346,7 @@ function injectGroupChatProStyles() {
     .message-text.bubble-self,
     .message-text.bubble-self[style*="margin-left: auto;"],
     .message-text.bubble-self[style*="margin-left:auto"] {
-        background: #005c4b !important;
+        background: #2a3942 !important;
         color: #e9edef !important;
         border: none !important;
         border-radius: 12px 2px 12px 12px !important;
@@ -376,7 +376,7 @@ function injectGroupChatProStyles() {
     .message-text.bubble-self::after {
         right: -7px;
         border-width: 0 0 10px 8px;
-        border-color: transparent transparent transparent #005c4b;
+        border-color: transparent transparent transparent #2a3942;
     }
     /* Other bubble tail — dark gray to match bubble */
     .message-text.bubble-other::after {
@@ -6389,19 +6389,18 @@ function initGroupPage() {
             // Replace messages array with sorted messages (already in chronological order)
             messages = newMessages;
             
-            // Check if we should scroll to bottom
-            const shouldScroll = !groupChat.userHasScrolled || 
-                               (messages.length > 0 && 
-                                messages[messages.length - 1].senderId === groupChat.firebaseUser?.uid);
+            // Force-scroll-to-bottom if the latest message is from current user (just sent)
+            const _lastIsMine = messages.length > 0 &&
+                messages[messages.length - 1].senderId === groupChat.firebaseUser?.uid;
             
             setupReactionListeners();
             displayMessages();
             
-            // Scroll to bottom if needed
-            if (shouldScroll && messagesContainer) {
-                setTimeout(() => {
+            // displayMessages now preserves scroll itself; only force-snap on own send
+            if (_lastIsMine && messagesContainer) {
+                requestAnimationFrame(() => {
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                }, 100);
+                });
             }
         });
         
@@ -6581,6 +6580,17 @@ function initGroupPage() {
         // Track which messages we've rendered
         sortedMessages.forEach(msg => renderedMessageIds.add(msg.id));
         
+        // ---- Preserve media playback across re-renders (no video restart) ----
+        const _mediaCache = new Map();
+        try {
+            messagesContainer.querySelectorAll('video[src], audio[src]').forEach(el => {
+                if (el.src) _mediaCache.set(el.tagName + '|' + el.src, el);
+            });
+        } catch (e) {}
+        // ---- Preserve scroll position to avoid jump-to-top flash ----
+        const _wasNearBottom = (messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight) < 80;
+        const _prevScrollTop = messagesContainer.scrollTop;
+        const _prevScrollHeight = messagesContainer.scrollHeight;
         // Clear the container first
         messagesContainer.innerHTML = '';
         
@@ -6703,6 +6713,27 @@ function initGroupPage() {
             
             // Append the fragment to the container
             messagesContainer.appendChild(fragment);
+            
+            // ---- Swap freshly-rendered media nodes with cached ones (preserves playback) ----
+            try {
+                messagesContainer.querySelectorAll('video[src], audio[src]').forEach(fresh => {
+                    const key = fresh.tagName + '|' + fresh.src;
+                    const cached = _mediaCache.get(key);
+                    if (cached && cached !== fresh && fresh.parentNode) {
+                        fresh.parentNode.replaceChild(cached, fresh);
+                        _mediaCache.delete(key);
+                    }
+                });
+            } catch (e) {}
+            // ---- Restore scroll: stick to bottom if user was there, else preserve relative position ----
+            try {
+                if (_wasNearBottom) {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                } else {
+                    const delta = messagesContainer.scrollHeight - _prevScrollHeight;
+                    messagesContainer.scrollTop = _prevScrollTop + delta;
+                }
+            } catch (e) {}
             
             // Now create and attach voice message elements for new voice messages
             setTimeout(() => {
