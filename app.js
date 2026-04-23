@@ -463,6 +463,312 @@ function hideTypingBubble() {
     if (row && row.parentNode) row.parentNode.removeChild(row);
 }
 
+// ==================== MESSAGE ACTION MODAL (long-press only) ====================
+function injectMessageActionStyles() {
+    if (document.getElementById('bb-action-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'bb-action-styles';
+    s.textContent = `
+    .bb-action-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,.55);
+        z-index: 99998; display: flex; align-items: center; justify-content: center;
+        animation: bbFadeIn .15s ease-out;
+    }
+    @keyframes bbFadeIn { from{opacity:0} to{opacity:1} }
+    .bb-action-card {
+        background: #1f2c33; color: #e9edef; border-radius: 14px;
+        min-width: 270px; max-width: 90vw; box-shadow: 0 12px 40px rgba(0,0,0,.6);
+        overflow: hidden; animation: bbPopIn .18s cubic-bezier(.2,.9,.4,1.4);
+    }
+    @keyframes bbPopIn { from{opacity:0;transform:scale(.85)} to{opacity:1;transform:scale(1)} }
+    .bb-action-emojis {
+        display: flex; gap: 4px; padding: 10px 12px; justify-content: space-around;
+        background: #2a3942; border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .bb-action-emojis span {
+        font-size: 24px; cursor: pointer; padding: 6px 8px; border-radius: 50%;
+        transition: transform .12s ease, background .12s;
+    }
+    .bb-action-emojis span:hover { background: rgba(255,255,255,.08); transform: scale(1.18); }
+    .bb-action-list { display: flex; flex-direction: column; }
+    .bb-action-item {
+        display: flex; align-items: center; gap: 14px;
+        padding: 13px 18px; cursor: pointer; font-size: 15px;
+        color: #e9edef; transition: background .12s;
+        border: none; background: transparent; text-align: left; width: 100%;
+    }
+    .bb-action-item i { width: 18px; font-size: 16px; color: #8696a0; }
+    .bb-action-item:hover { background: rgba(255,255,255,.05); }
+    .bb-action-item.danger { color: #ff6b6b; }
+    .bb-action-item.danger i { color: #ff6b6b; }
+
+    /* Highlight modal — single-message spotlight */
+    .bb-highlight-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,.85);
+        z-index: 99999; display: flex; align-items: center; justify-content: center;
+        padding: 20px; animation: bbFadeIn .2s ease-out;
+    }
+    .bb-highlight-card {
+        background: #2a3942; color: #e9edef; border-radius: 16px;
+        padding: 24px; max-width: 480px; width: 100%;
+        box-shadow: 0 20px 60px rgba(0,0,0,.7);
+        animation: bbPopIn .25s cubic-bezier(.2,.9,.4,1.4);
+        position: relative;
+    }
+    .bb-highlight-sender { font-size: 13px; color: #8696a0; margin-bottom: 8px; font-weight: 600; }
+    .bb-highlight-body  { font-size: 18px; line-height: 1.5; word-wrap: break-word; }
+    .bb-highlight-body img, .bb-highlight-body video { max-width: 100%; border-radius: 10px; }
+    .bb-highlight-time { margin-top: 14px; font-size: 11px; color: #667781; text-align: right; }
+    .bb-highlight-close {
+        position: absolute; top: 8px; right: 10px;
+        background: transparent; border: none; color: #8696a0;
+        font-size: 24px; cursor: pointer; padding: 4px 10px;
+    }
+
+    /* Floating voice mini-player */
+    .bb-mini-voice {
+        position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+        background: #005c4b; color: white; border-radius: 30px;
+        padding: 8px 14px; display: flex; align-items: center; gap: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,.35); z-index: 99990;
+        max-width: 92vw; animation: bbPopIn .25s cubic-bezier(.2,.9,.4,1.4);
+        font-size: 13px;
+    }
+    .bb-mini-voice .mvp-btn {
+        background: rgba(255,255,255,.22); border: none; color: white;
+        width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; font-size: 14px;
+        flex-shrink: 0;
+    }
+    .bb-mini-voice .mvp-btn:hover { background: rgba(255,255,255,.32); }
+    .bb-mini-voice .mvp-info { display: flex; flex-direction: column; min-width: 0; max-width: 200px; }
+    .bb-mini-voice .mvp-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bb-mini-voice .mvp-progress {
+        height: 3px; background: rgba(255,255,255,.25); border-radius: 2px; margin-top: 4px;
+        overflow: hidden;
+    }
+    .bb-mini-voice .mvp-fill { height: 100%; background: white; width: 0%; transition: width .1s linear; }
+    `;
+    document.head.appendChild(s);
+}
+
+function closeBbActionModal() {
+    const o = document.getElementById('bbActionOverlay');
+    if (o && o.parentNode) o.parentNode.removeChild(o);
+}
+
+function getMessageById(messageId) {
+    try {
+        const cached = cache.get(`messages_${currentUser?.uid}_${chatPartnerId}`) || [];
+        return cached.find(m => m.id === messageId);
+    } catch (e) { return null; }
+}
+
+function showMessageActionModal(messageId, isSelf) {
+    injectMessageActionStyles();
+    closeBbActionModal();
+    const overlay = document.createElement('div');
+    overlay.className = 'bb-action-overlay';
+    overlay.id = 'bbActionOverlay';
+    const message = getMessageById(messageId);
+    const hasText = !!(message && message.text);
+    overlay.innerHTML = `
+        <div class="bb-action-card" onclick="event.stopPropagation()">
+            <div class="bb-action-emojis">
+                ${EMOJI_REACTIONS.map(em => `<span data-emoji="${em}">${em}</span>`).join('')}
+            </div>
+            <div class="bb-action-list">
+                <button class="bb-action-item" data-act="reply"><i class="fas fa-reply"></i> Reply</button>
+                ${hasText ? `<button class="bb-action-item" data-act="copy"><i class="fas fa-copy"></i> Copy</button>` : ''}
+                <button class="bb-action-item" data-act="highlight"><i class="fas fa-star"></i> Highlight</button>
+                ${isSelf ? `<button class="bb-action-item danger" data-act="delete"><i class="fas fa-trash"></i> Delete</button>` : ''}
+            </div>
+        </div>
+    `;
+    overlay.addEventListener('click', closeBbActionModal);
+    overlay.querySelectorAll('.bb-action-emojis span').forEach(s => {
+        s.addEventListener('click', () => {
+            selectedMessageForReaction = messageId;
+            addReactionToMessage(s.dataset.emoji);
+            closeBbActionModal();
+        });
+    });
+    overlay.querySelectorAll('.bb-action-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const act = btn.dataset.act;
+            closeBbActionModal();
+            if (act === 'reply' && message) showReplyPreview(message);
+            else if (act === 'copy' && message?.text) copyMessageText(message.text);
+            else if (act === 'highlight') showHighlightModal(messageId);
+            else if (act === 'delete') deleteChatMessage(messageId);
+        });
+    });
+    document.body.appendChild(overlay);
+}
+
+function copyMessageText(text) {
+    try {
+        if (navigator.clipboard) navigator.clipboard.writeText(text);
+        else {
+            const ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        if (typeof showNotification === 'function') showNotification('Copied to clipboard', 'success');
+    } catch (e) { console.error('copy failed', e); }
+}
+
+async function deleteChatMessage(messageId) {
+    if (!currentUser || !chatPartnerId || !messageId) return;
+    if (!confirm('Delete this message?')) return;
+    try {
+        const threadId = [currentUser.uid, chatPartnerId].sort().join('_');
+        const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+        await deleteDoc(doc(db, 'conversations', threadId, 'messages', messageId));
+        const el = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        if (typeof showNotification === 'function') showNotification('Message deleted', 'success');
+    } catch (err) {
+        console.error('delete failed', err);
+        if (typeof showNotification === 'function') showNotification('Failed to delete message', 'error');
+    }
+}
+
+function showHighlightModal(messageId) {
+    injectMessageActionStyles();
+    const message = getMessageById(messageId);
+    if (!message) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'bb-highlight-overlay';
+    let body = '';
+    if (message.text) body = (message.text + '').replace(/[<>]/g, c => ({'<':'&lt;','>':'&gt;'}[c]));
+    else if (message.imageUrl) body = `<img src="${message.imageUrl}" alt="image">`;
+    else if (message.videoUrl) body = `<video src="${message.videoUrl}" controls></video>`;
+    else if (message.audioUrl) body = `<audio src="${message.audioUrl}" controls style="width:100%"></audio>`;
+    const senderName = message.senderId === currentUser?.uid
+        ? 'You'
+        : (document.getElementById('chatPartnerName')?.textContent || 'Them');
+    const time = message.timestamp ? new Date(message.timestamp).toLocaleString() : '';
+    overlay.innerHTML = `
+        <div class="bb-highlight-card" onclick="event.stopPropagation()">
+            <button class="bb-highlight-close">&times;</button>
+            <div class="bb-highlight-sender">${senderName}</div>
+            <div class="bb-highlight-body">${body}</div>
+            <div class="bb-highlight-time">${time}</div>
+        </div>
+    `;
+    const close = () => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
+    overlay.addEventListener('click', close);
+    overlay.querySelector('.bb-highlight-close').addEventListener('click', close);
+    document.body.appendChild(overlay);
+}
+
+// Robust long-press (cancels on movement / scroll). Replaces basic picker.
+function setupBondbaseLongPress() {
+    const container = document.getElementById('chatMessages');
+    if (!container || container._bbLpInstalled) return;
+    container._bbLpInstalled = true;
+    let timer = null, startX = 0, startY = 0, target = null;
+    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } target = null; };
+    container.addEventListener('touchstart', (e) => {
+        const el = e.target.closest('.message');
+        if (!el) return;
+        target = el;
+        const t = e.touches[0]; startX = t.clientX; startY = t.clientY;
+        timer = setTimeout(() => {
+            if (!target) return;
+            try { if (navigator.vibrate) navigator.vibrate(40); } catch (er) {}
+            const id = target.dataset.messageId;
+            const isSelf = target.classList.contains('sent');
+            if (id) showMessageActionModal(id, isSelf);
+            target = null;
+        }, 500);
+    }, { passive: true });
+    container.addEventListener('touchmove', (e) => {
+        if (!timer) return;
+        const t = e.touches[0];
+        if (Math.abs(t.clientX - startX) > 8 || Math.abs(t.clientY - startY) > 8) cancel();
+    }, { passive: true });
+    container.addEventListener('touchend', cancel);
+    container.addEventListener('touchcancel', cancel);
+    container.addEventListener('contextmenu', (e) => {
+        const el = e.target.closest('.message');
+        if (!el) return;
+        e.preventDefault();
+        const id = el.dataset.messageId;
+        const isSelf = el.classList.contains('sent');
+        if (id) showMessageActionModal(id, isSelf);
+    });
+}
+
+// ==================== FLOATING VOICE MINI-PLAYER ====================
+const bbVoiceState = { audio: null, url: null, partnerName: null, partnerId: null };
+function bbCreateMiniPlayer() {
+    if (document.getElementById('bbMiniVoice')) return document.getElementById('bbMiniVoice');
+    injectMessageActionStyles();
+    const bar = document.createElement('div');
+    bar.className = 'bb-mini-voice';
+    bar.id = 'bbMiniVoice';
+    bar.innerHTML = `
+        <button class="mvp-btn mvp-play"><i class="fas fa-pause"></i></button>
+        <div class="mvp-info">
+            <span class="mvp-name">Voice message</span>
+            <div class="mvp-progress"><div class="mvp-fill"></div></div>
+        </div>
+        <button class="mvp-btn mvp-close" title="Stop"><i class="fas fa-times"></i></button>
+    `;
+    document.body.appendChild(bar);
+    bar.querySelector('.mvp-play').addEventListener('click', () => {
+        const a = bbVoiceState.audio; if (!a) return;
+        if (a.paused) a.play(); else a.pause();
+    });
+    bar.querySelector('.mvp-close').addEventListener('click', () => {
+        if (bbVoiceState.audio) { bbVoiceState.audio.pause(); bbVoiceState.audio.currentTime = 0; }
+        bbHideMiniPlayer();
+    });
+    return bar;
+}
+function bbShowMiniPlayer() {
+    const bar = bbCreateMiniPlayer();
+    bar.style.display = 'flex';
+    const a = bbVoiceState.audio; if (!a) return;
+    bar.querySelector('.mvp-name').textContent = bbVoiceState.partnerName ? `${bbVoiceState.partnerName} • Voice message` : 'Voice message';
+    const playBtn = bar.querySelector('.mvp-play i');
+    playBtn.className = a.paused ? 'fas fa-play' : 'fas fa-pause';
+    const fill = bar.querySelector('.mvp-fill');
+    if (a._bbProgressTimer) clearInterval(a._bbProgressTimer);
+    a._bbProgressTimer = setInterval(() => {
+        if (!isFinite(a.duration) || a.duration <= 0) return;
+        fill.style.width = ((a.currentTime / a.duration) * 100).toFixed(1) + '%';
+        const i = bar.querySelector('.mvp-play i');
+        if (i) i.className = a.paused ? 'fas fa-play' : 'fas fa-pause';
+    }, 200);
+    a.addEventListener('ended', bbHideMiniPlayer, { once: true });
+}
+function bbHideMiniPlayer() {
+    const bar = document.getElementById('bbMiniVoice');
+    if (bar) bar.style.display = 'none';
+    if (bbVoiceState.audio && bbVoiceState.audio._bbProgressTimer) {
+        clearInterval(bbVoiceState.audio._bbProgressTimer);
+        bbVoiceState.audio._bbProgressTimer = null;
+    }
+}
+function bbRegisterPlayingAudio(audio, url) {
+    // Pause any other tracked audio
+    if (bbVoiceState.audio && bbVoiceState.audio !== audio) {
+        try { bbVoiceState.audio.pause(); } catch (e) {}
+        if (bbVoiceState.audio._bbProgressTimer) clearInterval(bbVoiceState.audio._bbProgressTimer);
+    }
+    bbVoiceState.audio = audio;
+    bbVoiceState.url = url;
+    bbVoiceState.partnerId = chatPartnerId;
+    bbVoiceState.partnerName = document.getElementById('chatPartnerName')?.textContent || null;
+    audio.addEventListener('ended', () => {
+        if (bbVoiceState.audio === audio) bbHideMiniPlayer();
+    });
+}
+
 async function registerServiceWorker() {
     if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
         try {
@@ -2180,8 +2486,16 @@ function createAudioPlayer(audioUrl, duration) {
 
     playBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (audio.paused) { audio.play(); playBtn.innerHTML = '<i class="fas fa-pause"></i>'; startAnimation(); }
-        else { audio.pause(); playBtn.innerHTML = '<i class="fas fa-play"></i>'; stopAnimation(); }
+        if (audio.paused) {
+            audio.play();
+            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            startAnimation();
+            try { bbRegisterPlayingAudio(audio, audioUrl); } catch (er) {}
+        } else {
+            audio.pause();
+            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            stopAnimation();
+        }
     });
     audio.onended = () => { playBtn.innerHTML = '<i class="fas fa-play"></i>'; stopAnimation(); };
     audio.onpause = () => { playBtn.innerHTML = '<i class="fas fa-play"></i>'; stopAnimation(); };
@@ -2645,7 +2959,8 @@ function openChat(partnerId) {
     // Load messages
     loadChatMessages(currentUser.uid, partnerId);
     setupTypingIndicator();
-    setupMessageLongPress();
+    // setupMessageLongPress();  // disabled — replaced by setupBondbaseLongPress (no scroll interference, full action modal)
+    setupBondbaseLongPress();
     setupMessageSwipe();
 
     // Preload microphone for voice notes
@@ -2653,6 +2968,12 @@ function openChat(partnerId) {
 }
 
 function closeChat() {
+    // ---- If a voice note is still playing, lift it into the floating mini-player ----
+    try {
+        if (bbVoiceState.audio && !bbVoiceState.audio.paused) {
+            bbShowMiniPlayer();
+        }
+    } catch (e) {}
     if (unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
     if (chatPartnerId) {
         updateTypingStatus(false);
