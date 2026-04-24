@@ -144,36 +144,119 @@ class SocialManager {
         this.init();
     }
 
-    // Add loader overlay to page (only for posts.html)
+    // ==================== BRANDED BONDBASE LOADER ====================
+    // Transparent floating loader with animated "BondBase" letters that wave
+    // and pulse in the brand pink. Replaces the old full-page modal loader.
     addLoader() {
-        if (document.getElementById('initialLoader')) return;
-        
-        const loader = document.createElement('div');
-        loader.id = 'initialLoader';
-        loader.innerHTML = `
-            <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #1a1d21; display: flex; align-items: center; justify-content: center; z-index: 99999;">
-                <div style="text-align: center;">
-                    <div style="border: 4px solid rgba(255,75,110,0.3); border-top: 4px solid #ff4b6e; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-                    <div style="color: #ff4b6e; font-size: 18px; font-weight: 600;">Loading posts...</div>
-                </div>
-            </div>
-            <style>
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
+        if (document.getElementById('bbLoader')) return;
+        if (!document.getElementById('bbLoaderStyles')) {
+            const s = document.createElement('style');
+            s.id = 'bbLoaderStyles';
+            s.textContent = `
+                #bbLoader {
+                    position: fixed;
+                    inset: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: transparent;
+                    z-index: 99999;
+                    pointer-events: none;
+                    animation: bbLoaderFadeIn .25s ease-out;
                 }
-            </style>
+                #bbLoader .bb-loader-card {
+                    pointer-events: auto;
+                    background: rgba(20, 22, 28, 0.55);
+                    backdrop-filter: blur(14px) saturate(160%);
+                    -webkit-backdrop-filter: blur(14px) saturate(160%);
+                    border: 1px solid rgba(255,255,255,0.08);
+                    border-radius: 22px;
+                    padding: 22px 30px 18px;
+                    box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+                    text-align: center;
+                }
+                #bbLoader .bb-letters {
+                    display: inline-flex;
+                    gap: 2px;
+                    font-family: 'Pacifico', 'Dancing Script', cursive, system-ui, sans-serif;
+                    font-size: 38px;
+                    font-weight: 700;
+                    letter-spacing: -0.5px;
+                    line-height: 1;
+                }
+                #bbLoader .bb-letters span {
+                    display: inline-block;
+                    background: linear-gradient(180deg, #ff7a93 0%, #ff4b6e 50%, #d63658 100%);
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    text-shadow: 0 0 22px rgba(255,75,110,0.35);
+                    animation: bbLetterWave 1.2s ease-in-out infinite;
+                    transform-origin: 50% 100%;
+                }
+                /* stagger each letter */
+                #bbLoader .bb-letters span:nth-child(1){animation-delay: 0.00s}
+                #bbLoader .bb-letters span:nth-child(2){animation-delay: 0.08s}
+                #bbLoader .bb-letters span:nth-child(3){animation-delay: 0.16s}
+                #bbLoader .bb-letters span:nth-child(4){animation-delay: 0.24s}
+                #bbLoader .bb-letters span:nth-child(5){animation-delay: 0.32s}
+                #bbLoader .bb-letters span:nth-child(6){animation-delay: 0.40s}
+                #bbLoader .bb-letters span:nth-child(7){animation-delay: 0.48s}
+                #bbLoader .bb-letters span:nth-child(8){animation-delay: 0.56s}
+                #bbLoader .bb-bar {
+                    margin: 14px auto 0;
+                    width: 140px;
+                    height: 3px;
+                    border-radius: 3px;
+                    background: rgba(255,255,255,0.08);
+                    overflow: hidden;
+                    position: relative;
+                }
+                #bbLoader .bb-bar::after {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    width: 40%;
+                    background: linear-gradient(90deg, transparent, #ff4b6e, transparent);
+                    animation: bbBarSlide 1.2s linear infinite;
+                }
+                @keyframes bbLetterWave {
+                    0%, 100% { transform: translateY(0) scale(1); opacity: 0.85; }
+                    50%      { transform: translateY(-9px) scale(1.06); opacity: 1; }
+                }
+                @keyframes bbBarSlide {
+                    0%   { transform: translateX(-100%); }
+                    100% { transform: translateX(350%); }
+                }
+                @keyframes bbLoaderFadeIn { from{opacity:0} to{opacity:1} }
+                @keyframes bbLoaderFadeOut { from{opacity:1} to{opacity:0} }
+                #bbLoader.bb-fadeout { animation: bbLoaderFadeOut .25s ease-out forwards; }
+            `;
+            document.head.appendChild(s);
+        }
+        const loader = document.createElement('div');
+        loader.id = 'bbLoader';
+        loader.innerHTML = `
+            <div class="bb-loader-card">
+                <div class="bb-letters" aria-label="BondBase loading">
+                    <span>B</span><span>o</span><span>n</span><span>d</span><span>B</span><span>a</span><span>s</span><span>e</span>
+                </div>
+                <div class="bb-bar"></div>
+            </div>
         `;
         document.body.appendChild(loader);
     }
 
-    // Remove loader
     removeLoader() {
-        const loader = document.getElementById('initialLoader');
-        if (loader) {
-            loader.remove();
-        }
+        const loader = document.getElementById('bbLoader') || document.getElementById('initialLoader');
+        if (!loader) return;
+        loader.classList.add('bb-fadeout');
+        setTimeout(() => { if (loader.parentNode) loader.parentNode.removeChild(loader); }, 250);
     }
+
+    // Public helper for any page to show/hide the BondBase loader on demand
+    showLoader() { this.addLoader(); }
+    hideLoader() { this.removeLoader(); }
 
     // Setup Intersection Observer for video auto-play/pause on scroll
     setupVideoIntersectionObserver() {
@@ -229,6 +312,7 @@ class SocialManager {
                 this.setupPollEventListeners();
                 this.setupPostModal();
                 this.setupReplyModal();
+                this.setupProfileSlideUp();
             } else {
                 if (!window.location.pathname.includes('login.html') && 
                     !window.location.pathname.includes('signup.html') &&
@@ -241,37 +325,44 @@ class SocialManager {
 
     // ==================== POST MODAL FOR FULL PAGE VIEW ====================
     
+    // ==================== FULL-PAGE POST VIEW (SPA-style) ====================
+    // Replaces the small "modal" with a full-page view of a single post. Pushes
+    // a history entry so the back button returns the user to the feed exactly
+    // where they were.
     setupPostModal() {
-        if (!document.getElementById('postModal')) {
-            const modal = document.createElement('div');
-            modal.id = 'postModal';
-            modal.className = 'post-modal';
-            modal.innerHTML = `
-                <div class="post-modal-content">
-                    <div class="post-modal-header">
-                        <button class="post-modal-close">&times;</button>
-                    </div>
-                    <div class="post-modal-body" id="postModalBody">
+        if (!document.getElementById('postFullPage')) {
+            const page = document.createElement('div');
+            page.id = 'postFullPage';
+            page.className = 'post-fullpage';
+            page.innerHTML = `
+                <div class="post-fullpage-topbar">
+                    <button class="post-fullpage-back" id="postFullPageBack" aria-label="Back">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Back</span>
+                    </button>
+                    <div class="post-fullpage-title">Post</div>
+                    <div style="width:84px"></div>
+                </div>
+                <div class="post-fullpage-scroll">
+                    <div class="post-fullpage-body" id="postModalBody">
                         <div class="loading">Loading post...</div>
                     </div>
                 </div>
             `;
-            document.body.appendChild(modal);
-            
+            document.body.appendChild(page);
+
             this.addModalStyles();
-            
-            const closeBtn = modal.querySelector('.post-modal-close');
-            closeBtn.addEventListener('click', () => this.closePostModal());
-            
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    this.closePostModal();
-                }
-            });
-            
+
+            const back = page.querySelector('#postFullPageBack');
+            back.addEventListener('click', () => this.closePostModal());
+
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && modal.style.display === 'flex') {
-                    this.closePostModal();
+                if (e.key === 'Escape' && page.classList.contains('open')) this.closePostModal();
+            });
+
+            window.addEventListener('popstate', (e) => {
+                if (page.classList.contains('open') && (!e.state || e.state.bbPostFullPage !== true)) {
+                    this._closePostFullPageInternal();
                 }
             });
         }
@@ -280,77 +371,79 @@ class SocialManager {
     addModalStyles() {
         const style = document.createElement('style');
         style.textContent = `
-            .post-modal {
-                display: none;
+            /* ===== FULL-PAGE POST VIEW (SPA-style) ===== */
+            .post-fullpage {
                 position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.95);
-                z-index: 100000;
-                align-items: center;
-                justify-content: center;
-                backdrop-filter: blur(10px);
-            }
-            
-            .post-modal-content {
+                inset: 0;
                 background: #1a1d21;
-                border-radius: 24px;
-                max-width: 900px;
-                width: 100%;
-                max-height: 90vh;
+                z-index: 100000;
                 display: flex;
                 flex-direction: column;
-                animation: modalFadeIn 0.3s ease;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                transform: translateX(100%);
+                transition: transform .28s cubic-bezier(.2,.8,.3,1);
+                will-change: transform;
             }
-            
-            @keyframes modalFadeIn {
-                from {
-                    opacity: 0;
-                    transform: scale(0.95);
-                }
-                to {
-                    opacity: 1;
-                    transform: scale(1);
-                }
+            .post-fullpage.open {
+                transform: translateX(0);
             }
-            
-            .post-modal-header {
-                padding: 16px 20px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                display: flex;
-                justify-content: flex-end;
+            .post-fullpage-topbar {
                 flex-shrink: 0;
-            }
-            
-            .post-modal-close {
-                background: transparent;
-                border: none;
-                color: #fff;
-                font-size: 28px;
-                cursor: pointer;
-                width: 40px;
-                height: 40px;
                 display: flex;
                 align-items: center;
-                justify-content: center;
-                border-radius: 50%;
-                transition: all 0.2s;
+                justify-content: space-between;
+                padding: 14px 18px;
+                background: rgba(15, 17, 21, 0.95);
+                border-bottom: 1px solid rgba(255,255,255,0.08);
+                position: sticky;
+                top: 0;
+                backdrop-filter: blur(10px);
+                z-index: 5;
             }
-            
-            .post-modal-close:hover {
-                background: rgba(255, 75, 110, 0.2);
-                color: #ff4b6e;
+            .post-fullpage-back {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                background: transparent;
+                border: none;
+                color: #e9edef;
+                font-size: 15px;
+                font-weight: 600;
+                cursor: pointer;
+                padding: 8px 12px;
+                border-radius: 10px;
+                transition: background .15s, color .15s;
             }
-            
-            .post-modal-body {
-                padding: 20px;
-                overflow-y: auto;
+            .post-fullpage-back:hover { background: rgba(255,75,110,.12); color: #ff4b6e; }
+            .post-fullpage-back i { font-size: 16px; }
+            .post-fullpage-title {
+                font-size: 16px;
+                font-weight: 700;
+                color: #fff;
+                letter-spacing: -0.01em;
+            }
+            .post-fullpage-scroll {
                 flex: 1;
+                overflow-y: auto;
+                overflow-x: hidden;
+                -webkit-overflow-scrolling: touch;
             }
+            .post-fullpage-body {
+                max-width: 760px;
+                margin: 0 auto;
+                padding: 22px 16px 60px;
+            }
+            .post-fullpage-body .post-item {
+                background: #1f232a;
+                border-radius: 16px;
+                margin-bottom: 0;
+                border: 1px solid rgba(255,255,255,0.06);
+            }
+            .post-fullpage-body .post-image-container img {
+                max-height: 80vh;
+            }
+            /* Backwards-compat: keep old selectors so existing styles still match */
+            .post-modal { display: none; }
+            .post-modal-body { padding: 20px; }
             
             .post-modal-body .post-item {
                 border: none;
@@ -394,51 +487,68 @@ class SocialManager {
     }
     
     async openPostModal(postId) {
-        const modal = document.getElementById('postModal');
-        const modalBody = document.getElementById('postModalBody');
-        
-        if (!modal || !modalBody) return;
-        
-        modal.style.display = 'flex';
-        modalBody.innerHTML = '<div class="loading">Loading post...</div>';
-        
+        const page = document.getElementById('postFullPage');
+        const body = document.getElementById('postModalBody');
+        if (!page || !body) return;
+
+        // Show + lock background scroll
+        page.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        body.scrollTop = 0;
+        const scroller = page.querySelector('.post-fullpage-scroll');
+        if (scroller) scroller.scrollTop = 0;
+
+        // Push a history entry so the device back button closes this view
+        try {
+            history.pushState({ bbPostFullPage: true, postId }, '', `?post=${encodeURIComponent(postId)}`);
+        } catch (e) {}
+
+        body.innerHTML = '<div class="loading" style="text-align:center;padding:60px 20px;color:#8696a0;">Loading post...</div>';
+
         try {
             const postRef = doc(db, 'posts', postId);
             const postSnap = await getDoc(postRef);
-            
+
             if (!postSnap.exists()) {
-                modalBody.innerHTML = '<div class="error">Post not found</div>';
+                body.innerHTML = '<div class="error" style="text-align:center;padding:60px 20px;color:#ef4444;">Post not found</div>';
                 return;
             }
-            
+
             const post = { id: postSnap.id, ...postSnap.data() };
-            
             const userRef = doc(db, 'users', post.userId);
             const userSnap = await getDoc(userRef);
             const user = userSnap.exists() ? userSnap.data() : {};
-            
+
             const postElement = await this.createModalPostElement(post, user, postId);
-            modalBody.innerHTML = '';
-            modalBody.appendChild(postElement);
-            
+            body.innerHTML = '';
+            body.appendChild(postElement);
+
             await this.loadModalComments(postId);
-            
         } catch (error) {
-            console.error('Error loading post for modal:', error);
-            modalBody.innerHTML = '<div class="error">Error loading post</div>';
+            console.error('Error loading post for full-page view:', error);
+            body.innerHTML = '<div class="error" style="text-align:center;padding:60px 20px;color:#ef4444;">Error loading post</div>';
         }
     }
-    
+
     closePostModal() {
-        const modal = document.getElementById('postModal');
-        if (modal) {
-            modal.style.display = 'none';
-            
-            const videos = modal.querySelectorAll('video');
-            videos.forEach(video => {
-                video.pause();
-            });
+        const page = document.getElementById('postFullPage');
+        if (!page || !page.classList.contains('open')) return;
+        // If we pushed a history entry, going back will trigger popstate which
+        // calls _closePostFullPageInternal. Otherwise close directly.
+        if (history.state && history.state.bbPostFullPage) {
+            history.back();
+        } else {
+            this._closePostFullPageInternal();
         }
+    }
+
+    _closePostFullPageInternal() {
+        const page = document.getElementById('postFullPage');
+        if (!page) return;
+        page.classList.remove('open');
+        document.body.style.overflow = '';
+        const videos = page.querySelectorAll('video');
+        videos.forEach(v => { try { v.pause(); } catch (e) {} });
     }
     
     async createModalPostElement(post, user, postId) {
@@ -574,8 +684,9 @@ class SocialManager {
             downvoteBtn.addEventListener('click', () => this.handleVote(postId, 'down', downvoteBtn));
         }
 
-        const navigateToProfile = () => {
-            window.location.href = `profile.html?id=${post.userId}`;
+        const navigateToProfile = (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            this.openProfileSlideUp(post.userId);
         };
 
         if (profileLink) {
@@ -653,8 +764,9 @@ class SocialManager {
         const avatar = commentDiv.querySelector('.comment-avatar');
         const name = commentDiv.querySelector('.comment-info strong');
         
-        const navigateToProfile = () => {
-            window.location.href = `profile.html?id=${comment.userId}`;
+        const navigateToProfile = (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            this.openProfileSlideUp(comment.userId);
         };
         
         if (avatar) {
@@ -1130,17 +1242,19 @@ class SocialManager {
                     overflow: hidden;
                 }
 
-                /* Thumbnail before video loads — 16:9 */
+                /* Thumbnail before video loads — taller, more cinematic */
                 .video-thumbnail-container {
                     position: relative;
                     width: 100%;
-                    padding-bottom: 56.25%;
+                    padding-bottom: 75%;
+                    min-height: 480px;
+                    max-height: 720px;
                     background: #000;
-                    border-radius: 16px;
+                    border-radius: 18px;
                     overflow: hidden;
                     cursor: pointer;
                     border: 1px solid rgba(255, 255, 255, 0.08);
-                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
                 }
 
                 .video-thumbnail-image {
@@ -1188,23 +1302,31 @@ class SocialManager {
                     letter-spacing: 0.4px;
                 }
 
-                /* Active video player — 16:9 */
+                /* Active video player — taller, more cinematic */
                 .custom-video-container {
                     position: relative;
                     width: 100%;
-                    padding-bottom: 56.25%;
+                    padding-bottom: 75%;
+                    min-height: 480px;
+                    max-height: 720px;
                     background: #000;
-                    border-radius: 16px;
+                    border-radius: 18px;
                     overflow: hidden;
                     margin: 14px 0 0;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+                    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
                     border: 1px solid rgba(255, 255, 255, 0.08);
                 }
 
-                /* In modal: taller for more immersive viewing */
-                .post-modal .custom-video-container {
-                    padding-bottom: 56.25%;
-                    max-height: 70vh;
+                /* In full-page post view: even taller for immersive viewing */
+                .post-modal .custom-video-container,
+                .post-fullpage .custom-video-container,
+                .post-fullpage-body .custom-video-container,
+                .post-fullpage .video-thumbnail-container,
+                .post-fullpage-body .video-thumbnail-container {
+                    padding-bottom: 0;
+                    height: 80vh;
+                    max-height: 80vh;
+                    min-height: 520px;
                 }
 
                 .custom-video-player {
@@ -3553,9 +3675,7 @@ class SocialManager {
             if (replyToName) {
                 replyToName.addEventListener('click', () => {
                     const userId = modal.dataset.replyToUserId;
-                    if (userId) {
-                        window.location.href = `profile.html?id=${userId}`;
-                    }
+                    if (userId) this.openProfileSlideUp(userId);
                 });
             }
             
@@ -3563,14 +3683,300 @@ class SocialManager {
             if (replyToAvatar) {
                 replyToAvatar.addEventListener('click', () => {
                     const userId = modal.dataset.replyToUserId;
-                    if (userId) {
-                        window.location.href = `profile.html?id=${userId}`;
-                    }
+                    if (userId) this.openProfileSlideUp(userId);
                 });
             }
         }
     }
     
+    // ==================== DISCORD-STYLE PROFILE SLIDE-UP ====================
+    // Tapping any user name or avatar opens a bottom slide-up sheet (similar to
+    // Discord's user popout). The sheet contains the user's avatar, display
+    // name, bio, and a primary "View full profile" button that navigates to
+    // profile.html?id=<userId>.
+    setupProfileSlideUp() {
+        if (document.getElementById('bbProfileSlideUp')) return;
+        if (!document.getElementById('bbProfileSlideUpStyles')) {
+            const s = document.createElement('style');
+            s.id = 'bbProfileSlideUpStyles';
+            s.textContent = `
+                #bbProfileSlideUp {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0,0,0,0);
+                    z-index: 100050;
+                    display: none;
+                    align-items: flex-end;
+                    justify-content: center;
+                    transition: background .25s ease;
+                }
+                #bbProfileSlideUp.open { display: flex; background: rgba(0,0,0,0.55); }
+                #bbProfileSlideUp .bb-ps-sheet {
+                    width: 100%;
+                    max-width: 520px;
+                    background: linear-gradient(180deg, #2b2d31 0%, #1e2024 100%);
+                    border-top-left-radius: 22px;
+                    border-top-right-radius: 22px;
+                    border: 1px solid rgba(255,255,255,0.08);
+                    border-bottom: none;
+                    box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
+                    transform: translateY(100%);
+                    transition: transform .3s cubic-bezier(.2,.8,.3,1);
+                    overflow: hidden;
+                    max-height: 85vh;
+                    display: flex;
+                    flex-direction: column;
+                }
+                #bbProfileSlideUp.open .bb-ps-sheet { transform: translateY(0); }
+                #bbProfileSlideUp .bb-ps-grabber {
+                    width: 40px; height: 4px;
+                    background: rgba(255,255,255,0.25);
+                    border-radius: 2px;
+                    margin: 10px auto 6px;
+                    flex-shrink: 0;
+                }
+                #bbProfileSlideUp .bb-ps-banner {
+                    height: 90px;
+                    background: linear-gradient(135deg, #ff4b6e 0%, #d63658 50%, #7b2540 100%);
+                    flex-shrink: 0;
+                    position: relative;
+                }
+                #bbProfileSlideUp .bb-ps-avatar-wrap {
+                    position: absolute;
+                    left: 22px;
+                    bottom: -42px;
+                    width: 92px; height: 92px;
+                    border-radius: 50%;
+                    background: #1e2024;
+                    padding: 5px;
+                    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+                }
+                #bbProfileSlideUp .bb-ps-avatar {
+                    width: 100%; height: 100%;
+                    border-radius: 50%;
+                    object-fit: cover;
+                    background: #2b2d31;
+                    display: block;
+                }
+                #bbProfileSlideUp .bb-ps-online {
+                    position: absolute;
+                    bottom: 6px; right: 6px;
+                    width: 18px; height: 18px;
+                    border-radius: 50%;
+                    background: #23a55a;
+                    border: 4px solid #1e2024;
+                    display: none;
+                }
+                #bbProfileSlideUp .bb-ps-online.on { display: block; }
+                #bbProfileSlideUp .bb-ps-content {
+                    padding: 56px 22px 18px;
+                    overflow-y: auto;
+                    flex: 1;
+                }
+                #bbProfileSlideUp .bb-ps-name {
+                    font-size: 22px;
+                    font-weight: 700;
+                    color: #fff;
+                    line-height: 1.2;
+                    margin: 0 0 4px;
+                    letter-spacing: -0.01em;
+                }
+                #bbProfileSlideUp .bb-ps-handle {
+                    font-size: 14px;
+                    color: #b5bac1;
+                    margin: 0 0 14px;
+                }
+                #bbProfileSlideUp .bb-ps-divider {
+                    height: 1px;
+                    background: rgba(255,255,255,0.08);
+                    margin: 14px 0;
+                }
+                #bbProfileSlideUp .bb-ps-section-title {
+                    font-size: 11px;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    letter-spacing: 0.06em;
+                    color: #b5bac1;
+                    margin: 0 0 6px;
+                }
+                #bbProfileSlideUp .bb-ps-bio {
+                    color: #dbdee1;
+                    font-size: 14px;
+                    line-height: 1.5;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+                #bbProfileSlideUp .bb-ps-meta {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                    margin-top: 10px;
+                }
+                #bbProfileSlideUp .bb-ps-chip {
+                    background: rgba(255,255,255,0.06);
+                    color: #dbdee1;
+                    padding: 6px 12px;
+                    border-radius: 999px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    border: 1px solid rgba(255,255,255,0.06);
+                }
+                #bbProfileSlideUp .bb-ps-actions {
+                    padding: 14px 22px calc(20px + env(safe-area-inset-bottom, 0px));
+                    background: rgba(0,0,0,0.18);
+                    border-top: 1px solid rgba(255,255,255,0.06);
+                    display: flex;
+                    gap: 10px;
+                    flex-shrink: 0;
+                }
+                #bbProfileSlideUp .bb-ps-btn {
+                    flex: 1;
+                    border: none;
+                    border-radius: 12px;
+                    padding: 13px 16px;
+                    font-size: 15px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: transform .12s, filter .12s;
+                }
+                #bbProfileSlideUp .bb-ps-btn:active { transform: scale(.98); }
+                #bbProfileSlideUp .bb-ps-btn-primary {
+                    background: linear-gradient(135deg, #ff4b6e, #d63658);
+                    color: #fff;
+                    box-shadow: 0 6px 16px rgba(255,75,110,0.35);
+                }
+                #bbProfileSlideUp .bb-ps-btn-primary:hover { filter: brightness(1.08); }
+                #bbProfileSlideUp .bb-ps-btn-secondary {
+                    background: rgba(255,255,255,0.06);
+                    color: #fff;
+                    border: 1px solid rgba(255,255,255,0.08);
+                }
+                #bbProfileSlideUp .bb-ps-btn-secondary:hover { background: rgba(255,255,255,0.1); }
+                #bbProfileSlideUp .bb-ps-loading {
+                    text-align: center;
+                    color: #8696a0;
+                    padding: 30px 10px;
+                    font-size: 14px;
+                }
+            `;
+            document.head.appendChild(s);
+        }
+
+        const overlay = document.createElement('div');
+        overlay.id = 'bbProfileSlideUp';
+        overlay.innerHTML = `
+            <div class="bb-ps-sheet" role="dialog" aria-modal="true" aria-label="Profile preview">
+                <div class="bb-ps-grabber"></div>
+                <div class="bb-ps-banner">
+                    <div class="bb-ps-avatar-wrap">
+                        <img class="bb-ps-avatar" id="bbPsAvatar" alt="">
+                        <span class="bb-ps-online" id="bbPsOnline"></span>
+                    </div>
+                </div>
+                <div class="bb-ps-content" id="bbPsContent">
+                    <div class="bb-ps-loading">Loading…</div>
+                </div>
+                <div class="bb-ps-actions">
+                    <button class="bb-ps-btn bb-ps-btn-secondary" id="bbPsClose">Close</button>
+                    <button class="bb-ps-btn bb-ps-btn-primary" id="bbPsView">
+                        <i class="fas fa-user"></i> View full profile
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Tap on dim background to close
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) this.closeProfileSlideUp();
+        });
+        overlay.querySelector('#bbPsClose').addEventListener('click', () => this.closeProfileSlideUp());
+        overlay.querySelector('#bbPsView').addEventListener('click', () => {
+            const id = overlay.dataset.userId;
+            if (id) window.location.href = `profile.html?id=${encodeURIComponent(id)}`;
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && overlay.classList.contains('open')) this.closeProfileSlideUp();
+        });
+    }
+
+    async openProfileSlideUp(userId) {
+        if (!userId) return;
+        if (!document.getElementById('bbProfileSlideUp')) this.setupProfileSlideUp();
+        const overlay = document.getElementById('bbProfileSlideUp');
+        if (!overlay) return;
+
+        overlay.dataset.userId = userId;
+        const content = overlay.querySelector('#bbPsContent');
+        const avatarImg = overlay.querySelector('#bbPsAvatar');
+        const onlineDot = overlay.querySelector('#bbPsOnline');
+
+        avatarImg.src = '';
+        onlineDot.classList.remove('on');
+        content.innerHTML = '<div class="bb-ps-loading">Loading…</div>';
+
+        // Open immediately for snappy UX
+        overlay.classList.add('open');
+
+        try {
+            const userRef = doc(db, 'users', userId);
+            const userSnap = await getDoc(userRef);
+            const u = userSnap.exists() ? userSnap.data() : {};
+
+            const displayName = u.displayName || u.name || u.username || 'User';
+            const handle = u.username ? `@${u.username}` : (u.email ? u.email.split('@')[0] : '');
+            const photo = u.photoURL || u.profilePicture || u.avatar || 'images/default-avatar.png';
+            const bio = u.bio || u.about || '';
+            const age = u.age ? `${u.age}` : '';
+            const location = u.location || u.city || '';
+            const gender = u.gender || '';
+            const isOnline = !!u.isOnline;
+
+            avatarImg.src = photo;
+            avatarImg.alt = displayName;
+            if (isOnline) onlineDot.classList.add('on');
+
+            const chips = [];
+            if (age) chips.push(`<span class="bb-ps-chip"><i class="fas fa-birthday-cake"></i> ${age}</span>`);
+            if (gender) chips.push(`<span class="bb-ps-chip"><i class="fas fa-venus-mars"></i> ${this._escapeHtml(gender)}</span>`);
+            if (location) chips.push(`<span class="bb-ps-chip"><i class="fas fa-map-marker-alt"></i> ${this._escapeHtml(location)}</span>`);
+
+            content.innerHTML = `
+                <h3 class="bb-ps-name">${this._escapeHtml(displayName)}</h3>
+                ${handle ? `<div class="bb-ps-handle">${this._escapeHtml(handle)}</div>` : ''}
+                ${chips.length ? `<div class="bb-ps-meta">${chips.join('')}</div>` : ''}
+                ${bio ? `
+                    <div class="bb-ps-divider"></div>
+                    <div class="bb-ps-section-title">About</div>
+                    <div class="bb-ps-bio">${this._escapeHtml(bio)}</div>
+                ` : ''}
+            `;
+        } catch (err) {
+            console.error('Profile slide-up load error:', err);
+            content.innerHTML = '<div class="bb-ps-loading" style="color:#ef4444;">Could not load profile.</div>';
+        }
+    }
+
+    closeProfileSlideUp() {
+        const overlay = document.getElementById('bbProfileSlideUp');
+        if (!overlay) return;
+        overlay.classList.remove('open');
+    }
+
+    _escapeHtml(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     openReplyModal(commentData, postId, commentId) {
         const modal = document.getElementById('replyModal');
         if (!modal) {
@@ -3717,8 +4123,9 @@ class SocialManager {
         const avatar = commentDiv.querySelector('.comment-avatar');
         const name = commentDiv.querySelector('.comment-info strong');
         
-        const navigateToProfile = () => {
-            window.location.href = `profile.html?id=${comment.userId}`;
+        const navigateToProfile = (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            this.openProfileSlideUp(comment.userId);
         };
         
         if (avatar) {
@@ -3846,8 +4253,9 @@ class SocialManager {
         const avatar = replyDiv.querySelector('.reply-avatar');
         const name = replyDiv.querySelector('.reply-info strong');
         
-        const navigateToProfile = () => {
-            window.location.href = `profile.html?id=${reply.userId}`;
+        const navigateToProfile = (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            this.openProfileSlideUp(reply.userId);
         };
         
         if (avatar) {
@@ -4668,8 +5076,9 @@ class SocialManager {
         const avatar = container.querySelector('.post-author-avatar');
         const name = container.querySelector('.post-author-info h4');
         
-        const navigateToProfile = () => {
-            window.location.href = `profile.html?id=${post.userId}`;
+        const navigateToProfile = (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            this.openProfileSlideUp(post.userId);
         };
         
         if (avatar) {
@@ -4960,8 +5369,9 @@ class SocialManager {
         const avatar = postDiv.querySelector('.post-author-avatar');
         const name = postDiv.querySelector('.post-author-info h4');
         
-        const navigateToProfile = () => {
-            window.location.href = `profile.html?id=${userId}`;
+        const navigateToProfile = (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            this.openProfileSlideUp(userId);
         };
         
         if (avatar) {
@@ -5521,8 +5931,9 @@ class SocialManager {
         const avatar = card.querySelector('.pymk-profile-avatar');
         const name = card.querySelector('.pymk-profile-name');
         
-        const navigateToProfile = () => {
-            window.location.href = `profile.html?id=${user.id}`;
+        const navigateToProfile = (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            this.openProfileSlideUp(user.id);
         };
         
         if (avatar) {
