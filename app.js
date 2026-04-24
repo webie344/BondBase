@@ -622,17 +622,49 @@ function copyMessageText(text) {
 async function deleteChatMessage(messageId) {
     if (!currentUser || !chatPartnerId || !messageId) return;
     if (!confirm('Delete this message?')) return;
-    try {
-        const threadId = [currentUser.uid, chatPartnerId].sort().join('_');
-        const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
-        await deleteDoc(doc(db, 'conversations', threadId, 'messages', messageId));
+    const threadId = [currentUser.uid, chatPartnerId].sort().join('_');
+    const ref = doc(db, 'conversations', threadId, 'messages', messageId);
+
+    // ---- Strip from local caches FIRST so it cannot reappear on reload ----
+    const stripCaches = async () => {
+        try {
+            const cacheKey = `messages_${currentUser.uid}_${chatPartnerId}`;
+            const cached = cache.get(cacheKey) || [];
+            const filtered = cached.filter(m => m.id !== messageId);
+            cache.set(cacheKey, filtered, 'short');
+            if (cache.setMessages) await cache.setMessages(threadId, filtered);
+        } catch (e) { console.warn('cache strip failed', e); }
+    };
+    const removeFromDom = () => {
         const el = document.querySelector(`[data-message-id="${messageId}"]`);
         if (el && el.parentNode) el.parentNode.removeChild(el);
-        if (typeof showNotification === 'function') showNotification('Message deleted', 'success');
+    };
+
+    // ---- Soft-delete first (always allowed, persists across reloads) ----
+    try {
+        await updateDoc(ref, {
+            deleted: true,
+            text: '',
+            imageUrl: '',
+            audioUrl: '',
+            videoUrl: '',
+            deletedAt: serverTimestamp()
+        });
     } catch (err) {
-        console.error('delete failed', err);
-        if (typeof showNotification === 'function') showNotification('Failed to delete message', 'error');
+        console.warn('soft delete updateDoc failed, trying hard delete', err);
     }
+
+    // ---- Then attempt hard delete (best effort) ----
+    try {
+        const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+        await deleteDoc(ref);
+    } catch (err) {
+        console.warn('hard delete failed (soft delete still applied)', err);
+    }
+
+    await stripCaches();
+    removeFromDom();
+    if (typeof showNotification === 'function') showNotification('Message deleted', 'success');
 }
 
 function showHighlightModal(messageId) {
@@ -2157,10 +2189,57 @@ function setupMessageSwipe() {
     }
 }
 
+// ---- Helper: toggle the entire chat input row when recording ----
+// Hides ALL siblings of #voiceNoteIndicator (text input, send button, attach,
+// emoji, video buttons, etc.) so only the recording UI is visible. This means
+// the regular Send button is hidden while a voice note is being recorded.
+function setVoiceRecordingMode(on) {
+    const indicator = document.getElementById('voiceNoteIndicator');
+    if (!indicator) return;
+    const row = indicator.parentNode;
+    if (!row) return;
+    Array.from(row.children).forEach(child => {
+        if (child === indicator) {
+            child.style.display = on ? 'flex' : 'none';
+        } else {
+            if (on) {
+                if (child.dataset.bbPrevDisplay === undefined) {
+                    child.dataset.bbPrevDisplay = child.style.display || '';
+                }
+                child.style.display = 'none';
+            } else {
+                if (child.dataset.bbPrevDisplay !== undefined) {
+                    child.style.display = child.dataset.bbPrevDisplay;
+                    delete child.dataset.bbPrevDisplay;
+                } else {
+                    child.style.display = '';
+                }
+            }
+        }
+    });
+    // Reset the timer label whenever we leave recording mode
+    if (!on) {
+        const t = document.getElementById('voiceNoteTimer');
+        if (t) t.textContent = '0:00';
+    }
+}
+
+// Module-level handle for the auto-stop-on-release listener so any path
+// (cancel / send) can tear it down and avoid double-fire races.
+let _bbStopOnReleaseHandler = null;
+function _bbRemoveStopOnRelease() {
+    if (_bbStopOnReleaseHandler) {
+        document.removeEventListener('mouseup', _bbStopOnReleaseHandler);
+        _bbStopOnReleaseHandler = null;
+    }
+}
+
 async function startRecording() {
     try {
-        document.getElementById('voiceNoteIndicator').style.display = 'flex';
-        document.getElementById('messageInput').style.display = 'none';
+        // Show indicator + reset timer to 0:00 BEFORE we start the stream
+        const t0 = document.getElementById('voiceNoteTimer');
+        if (t0) t0.textContent = '0:00';
+        setVoiceRecordingMode(true);
 
         let stream;
         if (preloadedAudioStream) {
@@ -2169,8 +2248,7 @@ async function startRecording() {
             const hasPermission = await requestMicrophonePermission();
             if (!hasPermission) {
                 showNotification('Microphone access required for voice notes.', 'warning');
-                document.getElementById('voiceNoteIndicator').style.display = 'none';
-                document.getElementById('messageInput').style.display = 'block';
+                setVoiceRecordingMode(false);
                 return;
             }
             stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -2180,69 +2258,116 @@ async function startRecording() {
         audioChunks = [];
         recordingStartTime = Date.now();
         updateRecordingTimer();
+        if (recordingTimer) clearInterval(recordingTimer);
         recordingTimer = setInterval(updateRecordingTimer, 1000);
 
-        mediaRecorder.ondataavailable = (event) => { audioChunks.push(event.data); };
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) audioChunks.push(event.data);
+        };
         mediaRecorder.start(100);
 
-        const stopRecordingOnRelease = () => {
-            stopRecording();
-            document.removeEventListener('mouseup', stopRecordingOnRelease);
+        // Auto-stop on mouseup ONLY for desktop hold-to-record. Tracked so
+        // Cancel/Send paths can tear it down and avoid double-fire races.
+        _bbRemoveStopOnRelease();
+        _bbStopOnReleaseHandler = () => {
+            _bbRemoveStopOnRelease();
+            // Only auto-stop if still actively recording (user did press-and-hold).
+            if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
         };
-        document.addEventListener('mouseup', stopRecordingOnRelease);
+        document.addEventListener('mouseup', _bbStopOnReleaseHandler);
     } catch (error) {
         logError(error, 'starting voice recording');
         showNotification('Could not access microphone.', 'error');
-        document.getElementById('voiceNoteIndicator').style.display = 'none';
-        document.getElementById('messageInput').style.display = 'block';
+        setVoiceRecordingMode(false);
     }
 }
 
 function updateRecordingTimer() {
+    if (recordingStartTime == null) return;
     const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-    document.getElementById('voiceNoteTimer').textContent =
-        `${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, '0')}`;
+    const t = document.getElementById('voiceNoteTimer');
+    if (t) t.textContent = `${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, '0')}`;
 }
 
+// Idempotent: safe to call multiple times.
 async function stopRecording() {
-    if (!mediaRecorder) return;
-    clearInterval(recordingTimer);
-    mediaRecorder.stop();
-    if (!preloadedAudioStream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
-    await new Promise(resolve => { mediaRecorder.onstop = resolve; });
-    document.getElementById('voiceNoteIndicator').style.display = 'none';
-    document.getElementById('messageInput').style.display = 'block';
+    _bbRemoveStopOnRelease();
+    if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
+    if (!mediaRecorder) {
+        setVoiceRecordingMode(false);
+        return;
+    }
+    try {
+        if (mediaRecorder.state !== 'inactive') {
+            const stopPromise = new Promise(resolve => { mediaRecorder.onstop = resolve; });
+            mediaRecorder.stop();
+            await stopPromise;
+        }
+        if (!preloadedAudioStream && mediaRecorder.stream) {
+            mediaRecorder.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+        }
+    } catch (e) { console.warn('stopRecording error', e); }
+    setVoiceRecordingMode(false);
 }
 
+// Single-press cancel — fully idempotent, no awaits that can hang.
 async function cancelRecording() {
-    if (!mediaRecorder) return;
-    clearInterval(recordingTimer);
-    mediaRecorder.stop();
-    if (!preloadedAudioStream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
-    document.getElementById('voiceNoteIndicator').style.display = 'none';
-    document.getElementById('messageInput').style.display = 'block';
+    _bbRemoveStopOnRelease();
+    if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
+    try {
+        if (mediaRecorder) {
+            if (mediaRecorder.state !== 'inactive') {
+                try { mediaRecorder.stop(); } catch (e) {}
+            }
+            if (!preloadedAudioStream && mediaRecorder.stream) {
+                mediaRecorder.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+            }
+        }
+    } catch (e) { console.warn('cancelRecording error', e); }
     mediaRecorder = null;
     audioChunks = [];
+    recordingStartTime = null;
+    setVoiceRecordingMode(false); // hides indicator & resets timer label to 0:00
 }
 
 async function sendVoiceNote() {
-    if (audioChunks.length === 0) { showNotification('No recording to send', 'warning'); return; }
+    if (audioChunks.length === 0 && (!mediaRecorder || mediaRecorder.state === 'inactive')) {
+        showNotification('No recording to send', 'warning'); return;
+    }
 
     try {
         const hasPoints = await deductChatPoint();
         if (!hasPoints) return;
 
-        const tempMessageId = 'temp_voice_' + Date.now();
-        const duration = Math.floor((Date.now() - recordingStartTime) / 1000);
-        const tempMessage = { id: tempMessageId, senderId: currentUser.uid, audioUrl: '', duration, timestamp: new Date().toISOString(), status: 'sending' };
+        // Capture duration BEFORE we reset state
+        const duration = recordingStartTime ? Math.floor((Date.now() - recordingStartTime) / 1000) : 0;
 
-        displayMessage(tempMessage, currentUser.uid);
-        document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+        // ---- Stop the recorder cleanly so the final chunk is captured ----
+        _bbRemoveStopOnRelease();
+        if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            const stopPromise = new Promise(resolve => { mediaRecorder.onstop = resolve; });
+            try { mediaRecorder.stop(); } catch (e) {}
+            await stopPromise;
+        }
+        if (mediaRecorder && !preloadedAudioStream && mediaRecorder.stream) {
+            mediaRecorder.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+        }
 
-        const sendBtn = document.getElementById('sendVoiceNoteBtn');
-        if (sendBtn) { sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading'; sendBtn.disabled = true; }
-
+        // ---- Capture the blob, then immediately reset UI (timer back to 0:00, send button restored) ----
         const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+        const chunksToUpload = audioChunks.slice();
+        mediaRecorder = null;
+        audioChunks = [];
+        recordingStartTime = null;
+        setVoiceRecordingMode(false); // hides indicator, restores send/attach buttons, resets timer label
+
+        const tempMessageId = 'temp_voice_' + Date.now();
+        const tempMessage = { id: tempMessageId, senderId: currentUser.uid, audioUrl: '', duration, timestamp: new Date().toISOString(), status: 'sending' };
+        displayMessage(tempMessage, currentUser.uid);
+        const cm = document.getElementById('chatMessages');
+        if (cm) cm.scrollTop = cm.scrollHeight;
+        try { soundManager.sent && soundManager.sent(); } catch (e) {}
 
         if (!isOnline) {
             await cache.addPendingMessage({ type: 'voice', tempId: tempMessageId, blob: audioBlob, duration, threadId: [currentUser.uid, chatPartnerId].sort().join('_'), timestamp: new Date().toISOString() });
@@ -2252,15 +2377,10 @@ async function sendVoiceNote() {
 
         const audioUrl = await uploadAudioToCloudinary(audioBlob);
         await addMessage(null, null, audioUrl, duration);
-
-        if (sendBtn) { sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send'; sendBtn.disabled = false; }
-        mediaRecorder = null;
-        audioChunks = [];
     } catch (error) {
         logError(error, 'sending voice note');
         showNotification('Failed to send voice note. Please try again.', 'error');
-        const sendBtn = document.getElementById('sendVoiceNoteBtn');
-        if (sendBtn) { sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send'; sendBtn.disabled = false; }
+        setVoiceRecordingMode(false);
     }
 }
 
@@ -2515,6 +2635,7 @@ function createVideoPlayer(videoUrl, duration) {
 }
 
 function displayMessage(message, currentUserId) {
+    if (message && message.deleted) return; // soft-deleted: never render
     const messagesContainer = document.getElementById('chatMessages');
     const noMessagesDiv = messagesContainer.querySelector('.no-messages');
     if (noMessagesDiv) noMessagesDiv.remove();
@@ -2782,6 +2903,11 @@ function updateMessagesDisplay(newMessages, currentUserId) {
     if (existingMessages.length === 0 && newMessages.length > 0) messagesContainer.innerHTML = '';
 
     newMessages.forEach(message => {
+        if (message.deleted) {
+            const existing = messagesContainer.querySelector(`[data-message-id="${message.id}"]`);
+            if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+            return;
+        }
         const existingMessage = messagesContainer.querySelector(`[data-message-id="${message.id}"]`);
         if (!existingMessage) displayMessage(message, currentUserId);
         else updateExistingMessage(existingMessage, message, currentUserId);
@@ -3133,20 +3259,39 @@ function initChatInputEvents() {
     }
 
     if (voiceNoteBtn) {
-        eventManager.addListener(voiceNoteBtn, 'mousedown', async () => {
-            document.getElementById('voiceNoteIndicator').style.display = 'flex';
-            document.getElementById('messageInput').style.display = 'none';
+        eventManager.addListener(voiceNoteBtn, 'mousedown', async (e) => {
+            // Prevent the synthetic click that follows mousedown from re-triggering anything
+            e.preventDefault();
             try { await startRecording(); }
             catch (error) {
-                document.getElementById('voiceNoteIndicator').style.display = 'none';
-                document.getElementById('messageInput').style.display = 'block';
+                setVoiceRecordingMode(false);
                 showNotification('Could not start recording. Please try again.', 'error');
             }
         });
     }
 
-    if (cancelVoiceNoteBtn)      eventManager.addListener(cancelVoiceNoteBtn, 'click', cancelRecording);
-    if (sendVoiceNoteBtn)        eventManager.addListener(sendVoiceNoteBtn, 'click', sendVoiceNote);
+    if (cancelVoiceNoteBtn) {
+        eventManager.addListener(cancelVoiceNoteBtn, 'click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            cancelRecording();
+        });
+        // Also handle pointer/touchend so the cancel responds on the very first tap
+        // even if a stray document mouseup would otherwise race ahead.
+        eventManager.addListener(cancelVoiceNoteBtn, 'mousedown', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            _bbRemoveStopOnRelease();
+        });
+    }
+    if (sendVoiceNoteBtn) {
+        eventManager.addListener(sendVoiceNoteBtn, 'click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            sendVoiceNote();
+        });
+        eventManager.addListener(sendVoiceNoteBtn, 'mousedown', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            _bbRemoveStopOnRelease();
+        });
+    }
 
     if (videoNoteBtn) {
         eventManager.addListener(videoNoteBtn, 'click', async () => {
