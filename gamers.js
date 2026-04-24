@@ -18,7 +18,8 @@ import {
     increment,
     Timestamp,
     onSnapshot,
-    setDoc
+    setDoc,
+    limit
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase configuration
@@ -40,6 +41,16 @@ try {
     console.log('Firebase initialized successfully');
 } catch (error) {
     console.error('Firebase initialization error:', error);
+}
+
+// ==================== SHUFFLE FUNCTION ====================
+function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
 }
 
 // ==================== FOLLOWER NOTIFICATION SYSTEM ====================
@@ -792,7 +803,8 @@ class InstantLoadingSystem {
                 
                 console.log(`⚡ Instant loaded ${this.appData.profiles.length} profiles from cache in ${Date.now() - preloadStartTime}ms`);
                 
-                allProfiles = this.appData.profiles;
+                // Shuffle cached profiles
+                allProfiles = shuffleArray(this.appData.profiles);
                 
             } catch (error) {
                 console.error('Instant load error:', error);
@@ -865,7 +877,7 @@ class InstantLoadingSystem {
             this.hasRenderedFromCache = true;
             
             gamersListElement.innerHTML = '';
-            allProfiles = this.appData.profiles;
+            allProfiles = shuffleArray(this.appData.profiles);
             
             let filteredProfiles = [...allProfiles];
             
@@ -888,8 +900,14 @@ class InstantLoadingSystem {
                     break;
             }
             
-            filteredProfiles.forEach(profile => {
+            filteredProfiles.forEach((profile, index) => {
                 gamersListElement.appendChild(createProfileItem(profile));
+                
+                // Insert product card every PRODUCT_INSERT_INTERVAL profiles
+                if ((index + 1) % PRODUCT_INSERT_INTERVAL === 0 && index < filteredProfiles.length - 1) {
+                    const productRow = createProductRowCard();
+                    gamersListElement.appendChild(productRow);
+                }
             });
             
             if (typeof feather !== 'undefined') {
@@ -1345,6 +1363,8 @@ let currentFilter = 'all';
 let xpSystem = null;
 let isLoading = false;
 let storeStatusCache = {};
+let productsCache = [];
+let productsLoaded = false;
 
 const isProfilePage = window.location.pathname.includes('profile.html');
 const isGamersPage = window.location.pathname.includes('gamers.html') || 
@@ -1353,7 +1373,9 @@ const isXpPage = window.location.pathname.includes('xp.html');
 
 const followerNotifier = new FollowerNotificationSystem();
 
-// ==================== CONNECT SECTION STYLES ====================
+// ==================== PRODUCT INSERTION CONFIGURATION ====================
+const PRODUCT_INSERT_INTERVAL = 4; // Insert product card every 4 profiles
+
 // ==================== CONNECT SECTION STYLES ====================
 function addConnectSectionStyles() {
     if (document.getElementById('connectSectionStyles')) return;
@@ -1386,6 +1408,241 @@ function addConnectSectionStyles() {
             cursor: pointer;
             background: #0e0e14;
         }
+        
+        /* Product Row Card Styles */
+        .product-row-card {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 120px);
+            flex-shrink: 0;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            cursor: default;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .product-row-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(255, 75, 110, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(122, 79, 255, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .product-row-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px 20px 15px;
+            z-index: 5;
+            position: relative;
+        }
+        
+        .product-row-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .product-row-title-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #ff4b6e, #ff6b8a);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 15px rgba(255, 75, 110, 0.4);
+        }
+        
+        .product-row-title h3 {
+            color: white;
+            font-size: 22px;
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .product-row-title p {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            margin: 2px 0 0 0;
+        }
+        
+        .product-row-view-all {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            z-index: 5;
+        }
+        
+        .product-row-view-all:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+        
+        .products-horizontal-scroll {
+            flex: 1;
+            overflow-x: auto;
+            overflow-y: hidden;
+            display: flex;
+            gap: 15px;
+            padding: 10px 20px 30px;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            z-index: 2;
+            position: relative;
+        }
+        
+        .products-horizontal-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .product-card-mini {
+            min-width: 160px;
+            max-width: 160px;
+            height: 240px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            scroll-snap-align: start;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .product-card-mini:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 75, 110, 0.5);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        .product-card-mini-image {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+        }
+        
+        .product-card-mini-info {
+            padding: 12px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .product-card-mini-name {
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            margin: 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.3;
+        }
+        
+        .product-card-mini-price {
+            color: #ff4b6e;
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 5px;
+        }
+        
+        .product-card-mini-original-price {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 12px;
+            text-decoration: line-through;
+            margin-left: 5px;
+        }
+        
+        .product-card-mini-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff4b6e;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            z-index: 3;
+        }
+        
+        .product-row-footer {
+            padding: 0 20px 20px;
+            z-index: 5;
+            position: relative;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .product-row-dots {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        
+        .product-row-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.3);
+            transition: all 0.3s;
+        }
+        
+        .product-row-dot.active {
+            width: 20px;
+            background: #ff4b6e;
+        }
+        
+        /* Loading skeleton for product cards */
+        .product-card-mini-skeleton {
+            min-width: 160px;
+            max-width: 160px;
+            height: 240px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            flex-shrink: 0;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background: rgba(255, 255, 255, 0.05); }
+            50% { background: rgba(255, 255, 255, 0.1); }
+            100% { background: rgba(255, 255, 255, 0.05); }
+        }
+        
+        /* Existing styles continue below */
         .card-bg {
             position: absolute;
             inset: 0;
@@ -1642,7 +1899,6 @@ function addConnectSectionStyles() {
         .gamer-item.loading { background: linear-gradient(160deg,#1a1a2e,#16213e); pointer-events:none; }
         .loading-avatar { width:100%; height:100%; background:linear-gradient(90deg,#1a1a2e 25%,#252540 50%,#1a1a2e 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; }
         .loading-info,.loading-line { display:none; }
-        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
         .empty-state { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px; color:white; }
         .empty-state svg { width:56px; height:56px; color:#ff4b6e; margin-bottom:20px; opacity:0.6; }
         .empty-title { font-size:22px; font-weight:700; margin-bottom:10px; }
@@ -1654,6 +1910,199 @@ function addConnectSectionStyles() {
         .gamer-item .card-info,.gamer-item .card-actions { animation:cardSlideUp 0.5s ease forwards; }
     `;
     document.head.appendChild(style);
+}
+
+// ==================== PRODUCT ROW FUNCTIONS ====================
+async function loadProductsForMingle() {
+    try {
+        // Return cached products if already loaded
+        if (productsCache.length > 0) {
+            console.log('📦 Using cached products:', productsCache.length);
+            return productsCache;
+        }
+        
+        console.log('🔄 Fetching products from Firebase...');
+        
+        // Fetch products directly from Firestore
+        const productsRef = collection(db, 'products');
+        const q = query(
+            productsRef, 
+            where('status', '==', 'active'),
+            limit(10)
+        );
+        
+        const querySnapshot = await getDocs(q);
+        
+        productsCache = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            productsCache.push({
+                id: doc.id,
+                ...data
+            });
+        });
+        
+        // Sort by createdAt (newest first)
+        productsCache.sort((a, b) => {
+            const dateA = a.createdAt ? (a.createdAt.seconds || 0) : 0;
+            const dateB = b.createdAt ? (b.createdAt.seconds || 0) : 0;
+            return dateB - dateA;
+        });
+        
+        console.log(`✅ Loaded ${productsCache.length} products from Firebase`);
+        productsLoaded = true;
+        
+        return productsCache;
+    } catch (error) {
+        console.error('Error loading products:', error);
+        // Return fallback data if Firebase fails
+        return getFallbackProducts();
+    }
+}
+
+function getFallbackProducts() {
+    return [
+        { id: 'fp1', name: 'Gaming Mouse Pro', price: 59.99, currency: 'USD', images: [{ url: 'https://via.placeholder.com/160x140/1a1a2e/ff4b6e?text=Mouse' }], views: 234, likes: ['u1', 'u2'], status: 'new', discount: 0, createdAt: { seconds: Date.now()/1000 - 86400 } },
+        { id: 'fp2', name: 'Mechanical Keyboard', price: 129.99, originalPrice: 159.99, currency: 'USD', images: [{ url: 'https://via.placeholder.com/160x140/1a1a2e/ff4b6e?text=Keyboard' }], views: 567, likes: ['u1', 'u2', 'u3'], discount: 20, createdAt: { seconds: Date.now()/1000 - 172800 } },
+        { id: 'fp3', name: 'Gaming Headset', price: 89.99, currency: 'USD', images: [{ url: 'https://via.placeholder.com/160x140/1a1a2e/00ff88?text=Headset' }], views: 123, likes: ['u1'], status: 'new', discount: 0, createdAt: { seconds: Date.now()/1000 - 259200 } },
+        { id: 'fp4', name: '4K Gaming Monitor', price: 399.99, originalPrice: 499.99, currency: 'USD', images: [{ url: 'https://via.placeholder.com/160x140/1a1a2e/667eea?text=Monitor' }], views: 89, likes: ['u1', 'u2'], discount: 20, createdAt: { seconds: Date.now()/1000 - 345600 } },
+        { id: 'fp5', name: 'Gaming Chair', price: 249.99, currency: 'USD', images: [{ url: 'https://via.placeholder.com/160x140/1a1a2e/764ba2?text=Chair' }], views: 45, likes: ['u1'], discount: 0, createdAt: { seconds: Date.now()/1000 - 432000 } },
+        { id: 'fp6', name: 'RGB Mouse Pad', price: 29.99, currency: 'USD', images: [{ url: 'https://via.placeholder.com/160x140/1a1a2e/b3004b?text=MousePad' }], views: 178, likes: ['u1', 'u2'], discount: 0, createdAt: { seconds: Date.now()/1000 - 518400 } },
+        { id: 'fp7', name: 'Streaming Mic', price: 79.99, originalPrice: 99.99, currency: 'USD', images: [{ url: 'https://via.placeholder.com/160x140/1a1a2e/7a0034?text=Mic' }], views: 92, likes: ['u1'], discount: 20, createdAt: { seconds: Date.now()/1000 - 604800 } },
+        { id: 'fp8', name: 'Webcam 1080p', price: 69.99, currency: 'USD', images: [{ url: 'https://via.placeholder.com/160x140/1a1a2e/e63986?text=Webcam' }], views: 67, likes: ['u1', 'u3'], status: 'new', discount: 0, createdAt: { seconds: Date.now()/1000 - 691200 } }
+    ];
+}
+
+function createProductMiniCard(product) {
+    const currencySymbols = {
+        USD: '$',
+        NGN: '₦',
+        GBP: '£'
+    };
+    const currency = product.currency || 'USD';
+    const symbol = currencySymbols[currency] || '$';
+    const price = product.salePrice || product.price || 0;
+    const originalPrice = product.originalPrice || price;
+    const hasDiscount = product.discount > 0 && price < originalPrice;
+    
+    let productImage = 'https://via.placeholder.com/160x140/1a1a2e/ff4b6e?text=Product';
+    if (product.images && product.images.length > 0) {
+        const firstImage = product.images[0];
+        if (typeof firstImage === 'string') {
+            productImage = firstImage;
+        } else if (firstImage && firstImage.thumbnail) {
+            productImage = firstImage.thumbnail;
+        } else if (firstImage && firstImage.url) {
+            productImage = firstImage.url;
+        }
+    } else if (product.image) {
+        productImage = typeof product.image === 'string' ? product.image : product.image.url || productImage;
+    }
+    
+    const card = document.createElement('div');
+    card.className = 'product-card-mini';
+    card.onclick = (e) => {
+        e.stopPropagation();
+        window.location.href = `product.html?id=${product.id}`;
+    };
+    
+    card.innerHTML = `
+        ${hasDiscount ? `<span class="product-card-mini-badge">-${product.discount}%</span>` : ''}
+        ${product.status === 'new' && !hasDiscount ? `<span class="product-card-mini-badge" style="background:#00c896;">NEW</span>` : ''}
+        <img src="${productImage}" alt="${product.name || 'Product'}" class="product-card-mini-image" 
+             onerror="this.src='https://via.placeholder.com/160x140/1a1a2e/ff4b6e?text=Product'">
+        <div class="product-card-mini-info">
+            <h4 class="product-card-mini-name">${product.name || 'Unnamed Product'}</h4>
+            <div class="product-card-mini-price">
+                ${symbol}${price.toFixed(2)}
+                ${hasDiscount ? `<span class="product-card-mini-original-price">${symbol}${originalPrice.toFixed(2)}</span>` : ''}
+            </div>
+        </div>
+    `;
+    
+    return card;
+}
+
+function createProductRowCard() {
+    const div = document.createElement('div');
+    div.className = 'product-row-card';
+    
+    const uniqueId = `ps-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    div.innerHTML = `
+        <div class="product-row-header">
+            <div class="product-row-title">
+                <div class="product-row-title-icon">🛍️</div>
+                <div>
+                    <h3>Marketplace</h3>
+                    <p>Discover amazing products</p>
+                </div>
+            </div>
+            <button class="product-row-view-all" onclick="event.stopPropagation(); window.location.href='store.html'">
+                View All <i data-feather="arrow-right"></i>
+            </button>
+        </div>
+        <div id="${uniqueId}" class="products-horizontal-scroll">
+            ${[1,2,3,4,5].map(() => '<div class="product-card-mini-skeleton"></div>').join('')}
+        </div>
+        <div class="product-row-footer">
+            <div class="product-row-dots" id="${uniqueId}-dots">
+                <div class="product-row-dot active"></div>
+                <div class="product-row-dot"></div>
+                <div class="product-row-dot"></div>
+                <div class="product-row-dot"></div>
+                <div class="product-row-dot"></div>
+            </div>
+        </div>
+    `;
+    
+    // Load products asynchronously
+    setTimeout(async () => {
+        const products = await loadProductsForMingle();
+        const scrollContainer = document.getElementById(uniqueId);
+        
+        if (scrollContainer && products.length > 0) {
+            scrollContainer.innerHTML = '';
+            products.forEach(product => {
+                scrollContainer.appendChild(createProductMiniCard(product));
+            });
+            
+            // Update dots
+            const dotsContainer = document.getElementById(`${uniqueId}-dots`);
+            if (dotsContainer) {
+                dotsContainer.innerHTML = '';
+                products.forEach((_, index) => {
+                    const dot = document.createElement('div');
+                    dot.className = `product-row-dot ${index === 0 ? 'active' : ''}`;
+                    dotsContainer.appendChild(dot);
+                });
+            }
+            
+            // Add scroll listener for dots
+            scrollContainer.addEventListener('scroll', () => {
+                const scrollLeft = scrollContainer.scrollLeft;
+                const cardWidth = 175; // 160px card + 15px gap
+                const activeIndex = Math.round(scrollLeft / cardWidth);
+                
+                const dots = dotsContainer ? dotsContainer.querySelectorAll('.product-row-dot') : [];
+                dots.forEach((dot, index) => {
+                    dot.classList.toggle('active', index === activeIndex);
+                });
+            });
+        } else if (scrollContainer && products.length === 0) {
+            scrollContainer.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:center;width:100%;color:rgba(255,255,255,0.5);">
+                    <p>No products available yet</p>
+                </div>
+            `;
+        }
+        
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    }, 100);
+    
+    return div;
 }
 
 // ==================== XP SYSTEM INTEGRATION ====================
@@ -1784,7 +2233,7 @@ function startXPTracking() {
 
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 Initializing with instant loading...');
+    console.log('🚀 Initializing with shuffled profiles and product cards...');
     
     addConnectSectionStyles();
     
@@ -1794,6 +2243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isGamersPage) {
         instantLoader.renderInstantly();
         setupEventListeners();
+        setupScrollDots();
     }
     
     await registerServiceWorker();
@@ -1834,6 +2284,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Auth error:', error);
     });
 });
+
+// ==================== SCROLL DOTS FOR VERTICAL NAVIGATION ====================
+function setupScrollDots() {
+    const gamersList = document.getElementById('gamersList');
+    if (!gamersList) return;
+    
+    const dotsContainer = document.getElementById('scrollDots') || document.createElement('div');
+    dotsContainer.id = 'scrollDots';
+    if (!document.getElementById('scrollDots')) {
+        document.body.appendChild(dotsContainer);
+    }
+    
+    function updateDots() {
+        dotsContainer.innerHTML = '';
+        const items = gamersList.querySelectorAll('.gamer-item, .product-row-card');
+        const scrollTop = gamersList.scrollTop;
+        const itemHeight = gamersList.offsetHeight;
+        const activeIndex = Math.round(scrollTop / itemHeight);
+        
+        items.forEach((_, index) => {
+            const dot = document.createElement('div');
+            dot.className = `scroll-dot ${index === activeIndex ? 'active' : ''}`;
+            dot.addEventListener('click', () => {
+                gamersList.scrollTo({
+                    top: index * itemHeight,
+                    behavior: 'smooth'
+                });
+            });
+            dotsContainer.appendChild(dot);
+        });
+    }
+    
+    gamersList.addEventListener('scroll', updateDots);
+    
+    // Initial update after render
+    setTimeout(updateDots, 500);
+}
 
 // ==================== NUMBER FORMATTING FUNCTION ====================
 function formatNumber(num) {
@@ -1926,31 +2413,29 @@ async function fetchFreshProfiles(silentRefresh = false) {
         
         console.log(`✅ Loaded ${newProfiles.length} fresh profiles from Firebase`);
         
-        newProfiles.sort((a, b) => {
-            if (a.isOnline && !b.isOnline) return -1;
-            if (!a.isOnline && b.isOnline) return 1;
-            return a.name.localeCompare(b.name);
-        });
+        // SHUFFLE THE PROFILES
+        const shuffledProfiles = shuffleArray(newProfiles);
+        console.log('🔀 Profiles shuffled for variety');
         
-        allProfiles = newProfiles;
+        allProfiles = shuffledProfiles;
         
-        newProfiles.forEach(profile => {
+        shuffledProfiles.forEach(profile => {
             instantLoader.updateProfile(profile);
         });
         
         try {
-            await indexedDBCache.setProfiles(newProfiles);
+            await indexedDBCache.setProfiles(shuffledProfiles);
             console.log('💾 Profiles cached in IndexedDB');
         } catch (cacheError) {
             console.log('Could not cache profiles in IndexedDB:', cacheError);
         }
         
-        cache.set('all_profiles', newProfiles, 'short');
+        cache.set('all_profiles', shuffledProfiles, 'short');
         
         if (!silentRefresh || !instantLoader.hasRenderedFromCache) {
             renderProfilesList();
         } else {
-            smoothUpdateProfiles(newProfiles);
+            smoothUpdateProfiles(shuffledProfiles);
         }
         
     } catch (error) {
@@ -1961,7 +2446,7 @@ async function fetchFreshProfiles(silentRefresh = false) {
             const cachedProfiles = cache.get('all_profiles');
             if (cachedProfiles && cachedProfiles.length > 0) {
                 console.log('Showing cached profiles from localStorage');
-                allProfiles = cachedProfiles;
+                allProfiles = shuffleArray(cachedProfiles);
                 if (!instantLoader.hasRenderedFromCache) {
                     renderProfilesList();
                 }
@@ -1981,7 +2466,7 @@ function smoothUpdateProfiles(newProfiles) {
     
     existingItems.forEach(item => {
         const profileId = item.dataset.profileId;
-        if (profileId && !updatedIds.has(profileId)) {
+        if (profileId && !updatedIds.has(profileId) && !item.classList.contains('product-row-card')) {
             item.remove();
         }
     });
@@ -2002,6 +2487,7 @@ function smoothUpdateProfiles(newProfiles) {
                     gamersListElement.appendChild(newItem);
                 }
             }
+            recalculateProductPositions();
         }
     });
 }
@@ -2239,7 +2725,7 @@ function renderProfilesList() {
         return;
     }
     
-    console.log(`Rendering ${allProfiles.length} profiles with lively card design`);
+    console.log(`Rendering ${allProfiles.length} profiles with product cards interspersed`);
     
     let filteredProfiles = [...allProfiles];
     
@@ -2276,16 +2762,57 @@ function renderProfilesList() {
     
     gamersListElement.innerHTML = '';
     filteredProfiles.forEach((profile, index) => {
+        // Add profile card
         const card = createProfileItem(profile);
         card.style.animationDelay = `${index * 0.05}s`;
         gamersListElement.appendChild(card);
+        
+        // Insert product card every PRODUCT_INSERT_INTERVAL profiles
+        if ((index + 1) % PRODUCT_INSERT_INTERVAL === 0 && index < filteredProfiles.length - 1) {
+            const productRow = createProductRowCard();
+            gamersListElement.appendChild(productRow);
+            console.log(`📦 Inserted product card after profile ${index + 1}`);
+        }
     });
     
     if (typeof feather !== 'undefined') {
         feather.replace();
     }
     
-    console.log('✅ Lively profiles rendered successfully');
+    // Update scroll dots
+    setTimeout(setupScrollDots, 100);
+    
+    console.log('✅ Profiles rendered with product cards successfully');
+}
+
+function recalculateProductPositions() {
+    const gamersListElement = document.getElementById('gamersList');
+    if (!gamersListElement) return;
+    
+    const allItems = Array.from(gamersListElement.children);
+    let profileCount = 0;
+    let needsRebuild = false;
+    
+    allItems.forEach((item, index) => {
+        if (item.classList.contains('product-row-card')) {
+            if ((profileCount) % PRODUCT_INSERT_INTERVAL !== 0) {
+                needsRebuild = true;
+            }
+        } else if (item.dataset.profileId) {
+            profileCount++;
+            if (profileCount % PRODUCT_INSERT_INTERVAL === 0) {
+                const nextItem = allItems[index + 1];
+                if (!nextItem || !nextItem.classList.contains('product-row-card')) {
+                    needsRebuild = true;
+                }
+            }
+        }
+    });
+    
+    if (needsRebuild) {
+        console.log('🔄 Rebuilding product card positions');
+        renderProfilesList();
+    }
 }
 
 function createProfileItem(profile) {
@@ -2345,7 +2872,6 @@ function createProfileItem(profile) {
             ` : ''}
 
             <div class="card-tags">
-                ${profile.isOnline ? '' : ''}
                 ${rankDisplay ? `
                     <span class="card-tag gold">
                         <i data-feather="award"></i> ${rankDisplay}
@@ -3269,7 +3795,7 @@ function setupEventListeners() {
                     profile.bio.toLowerCase().includes(searchTerm) ||
                     (profile.xpRank && profile.xpRank.toLowerCase().includes(searchTerm))
                 );
-                displayFilteredProfiles(filtered);
+                displayFilteredProfiles(shuffleArray(filtered));
             } else {
                 renderProfilesList();
             }
@@ -3326,6 +3852,12 @@ function displayFilteredProfiles(filteredProfiles) {
         const card = createProfileItem(profile);
         card.style.animationDelay = `${index * 0.05}s`;
         gamersListElement.appendChild(card);
+        
+        // Insert product card every PRODUCT_INSERT_INTERVAL profiles for search results too
+        if ((index + 1) % PRODUCT_INSERT_INTERVAL === 0 && index < filteredProfiles.length - 1) {
+            const productRow = createProductRowCard();
+            gamersListElement.appendChild(productRow);
+        }
     });
     
     if (typeof feather !== 'undefined') {
@@ -3487,4 +4019,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('✅ gamers.js loaded successfully - Feather Icons Integrated!');
+console.log('✅ gamers.js loaded successfully - Shuffled profiles with product cards integrated!');
