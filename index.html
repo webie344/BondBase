@@ -63,6 +63,9 @@
                 <input id="signup-email" type="email" autocomplete="email" required placeholder="you@example.com" />
                 <label for="signup-password" class="mt-sm">Password</label>
                 <input id="signup-password" type="password" autocomplete="new-password" required minlength="6" placeholder="At least 6 characters" />
+                <label for="signup-invite" class="mt-sm">Invite code <span class="muted small">(optional)</span></label>
+                <input id="signup-invite" type="text" maxlength="10" placeholder="DROP-XXXX" autocapitalize="characters" autocomplete="off" />
+                <p class="hint">Got one from a friend? Both get a streak boost.</p>
                 <button type="submit" class="btn btn-primary btn-lg btn-block mt-md">Create Account</button>
                 <p id="signup-error" class="error-text" hidden></p>
             </form>
@@ -148,6 +151,29 @@
                 <h3>You're in today</h3>
                 <p class="muted">Your drop is on the feed.</p>
                 <button class="btn btn-secondary btn-block mt-md" onclick="location.hash='#/feed'">View today's feed</button>
+            </div>
+
+            <div class="quick-tiles">
+                <button class="quick-tile" id="today-story-btn">
+                    <span class="qt-emoji">▶</span>
+                    <span class="qt-label">Today's story</span>
+                    <span class="qt-sub muted small">Auto-play all drops</span>
+                </button>
+                <a class="quick-tile" href="#/leaderboard">
+                    <span class="qt-emoji">🔥</span>
+                    <span class="qt-label">Leaderboard</span>
+                    <span class="qt-sub muted small">Streaks among friends</span>
+                </a>
+                <a class="quick-tile" href="#/circles">
+                    <span class="qt-emoji">○</span>
+                    <span class="qt-label">Circles</span>
+                    <span class="qt-sub muted small">Private group prompts</span>
+                </a>
+                <a class="quick-tile" href="#/prompts">
+                    <span class="qt-emoji">✦</span>
+                    <span class="qt-label">Prompts vote</span>
+                    <span class="qt-sub muted small">Pick tomorrow's prompt</span>
+                </a>
             </div>
         </div>
     </section>
@@ -248,7 +274,8 @@
             </div>
 
             <div id="profile-own-actions" class="profile-actions" hidden>
-                <button class="btn btn-ghost btn-block" onclick="location.hash='#/settings'">Settings</button>
+                <button id="profile-recap-btn" class="btn btn-secondary btn-block">Weekly recap image</button>
+                <button class="btn btn-ghost btn-block mt-sm" onclick="location.hash='#/settings'">Settings</button>
                 <button id="profile-signout-btn" class="btn btn-ghost btn-block">Sign out</button>
             </div>
 
@@ -264,10 +291,12 @@
         <div class="container">
             <h1 class="page-title">Friends</h1>
 
-            <div class="tab-bar">
+            <div class="tab-bar tab-bar-scroll">
                 <button class="tab-btn active" data-friends-tab="list">Friends <span id="friends-count-badge" class="badge-count" hidden>0</span></button>
                 <button class="tab-btn" data-friends-tab="requests">Requests <span id="friends-req-badge" class="badge-count" hidden>0</span></button>
                 <button class="tab-btn" data-friends-tab="find">Find</button>
+                <button class="tab-btn" data-friends-tab="leaderboard">Leaderboard</button>
+                <button class="tab-btn" data-friends-tab="circles">Circles</button>
             </div>
 
             <div id="friends-tab-list" class="friends-tab">
@@ -295,6 +324,58 @@
                 <div id="friends-search-result" class="friends-list mt-md"></div>
                 <p id="friends-search-status" class="muted center mt-md" hidden></p>
             </div>
+
+            <div id="friends-tab-leaderboard" class="friends-tab" hidden>
+                <p class="muted small mb-md">Streaks among you and your friends. Past 7 days of drops shown.</p>
+                <div id="leaderboard-list" class="leaderboard-list"></div>
+                <div id="leaderboard-empty" class="empty-state" hidden><p class="muted">Add friends to see the leaderboard.</p></div>
+            </div>
+
+            <div id="friends-tab-circles" class="friends-tab" hidden>
+                <button id="circle-create-btn" class="btn btn-primary btn-block">+ New circle</button>
+                <p class="muted small mt-sm mb-md">Circles are private groups with their own daily prompt.</p>
+                <div id="circles-list" class="circles-list"></div>
+                <div id="circles-empty" class="empty-state" hidden><p class="muted">No circles yet. Create one to share private drops with a small group.</p></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== CIRCLE DETAIL ===== -->
+    <section id="view-circle" class="view" hidden>
+        <div class="container">
+            <button class="link-btn back-btn" onclick="history.back()">← Back</button>
+            <p class="overline" id="circle-detail-name">Circle</p>
+            <h1 class="page-title" id="circle-detail-prompt">—</h1>
+            <p class="muted small" id="circle-detail-meta">0 members</p>
+
+            <div class="setting-row mt-md">
+                <button id="circle-edit-prompt-btn" class="btn btn-ghost btn-sm">Set today's prompt</button>
+                <button id="circle-add-member-btn" class="btn btn-ghost btn-sm">Add member</button>
+                <button id="circle-leave-btn" class="btn btn-danger-ghost btn-sm">Leave</button>
+            </div>
+
+            <button id="circle-capture-btn" class="btn btn-primary btn-block mt-md">Capture for this circle</button>
+
+            <h3 class="section-title mt-lg">Today's drops</h3>
+            <div id="circle-feed" class="feed-grid"></div>
+            <div id="circle-feed-empty" class="empty-state" hidden><p class="muted">No drops in this circle yet today.</p></div>
+        </div>
+    </section>
+
+    <!-- ===== COMMUNITY PROMPTS VOTE ===== -->
+    <section id="view-prompts" class="view" hidden>
+        <div class="container">
+            <button class="link-btn back-btn" onclick="history.back()">← Back</button>
+            <h1 class="page-title">Tomorrow's prompt</h1>
+            <p class="muted small">Submit a prompt or vote on others. The top voted at midnight becomes tomorrow's prompt.</p>
+
+            <form id="prompt-submit-form" class="row-gap mt-md">
+                <input id="prompt-submit-input" type="text" maxlength="80" placeholder="Suggest a prompt…" autocomplete="off" required />
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+
+            <div id="prompts-vote-list" class="prompts-vote-list mt-lg"></div>
+            <div id="prompts-vote-empty" class="empty-state" hidden><p class="muted">No suggestions yet. Be the first.</p></div>
         </div>
     </section>
 
@@ -333,11 +414,20 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             </label>
             <input id="thread-image-input" type="file" accept="image/*" hidden />
+            <button type="button" id="thread-voice-btn" class="composer-icon-btn" aria-label="Record voice note">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </button>
             <input id="thread-input" type="text" placeholder="Message…" autocomplete="off" />
             <button type="submit" class="composer-send-btn" aria-label="Send">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
             </button>
         </form>
+        <div id="thread-recording-bar" class="recording-bar" hidden>
+            <span class="rec-dot"></span>
+            <span class="rec-time" id="thread-rec-time">0:00</span>
+            <button type="button" id="thread-rec-cancel" class="btn btn-ghost btn-sm">Cancel</button>
+            <button type="button" id="thread-rec-send" class="btn btn-primary btn-sm">Send</button>
+        </div>
     </section>
 
     <!-- ===== POST DETAIL ===== -->
@@ -428,6 +518,17 @@
 
             <hr class="divider" />
 
+            <h3 class="section-title">Your invite code</h3>
+            <p class="muted small">Share this so friends get a streak boost when they sign up.</p>
+            <div class="invite-code-row">
+                <code id="settings-invite-code" class="invite-code">DROP-—</code>
+                <button id="settings-invite-copy" class="btn btn-ghost btn-sm">Copy</button>
+                <button id="settings-invite-share" class="btn btn-ghost btn-sm">Share link</button>
+            </div>
+            <p id="settings-invite-stats" class="muted small mt-sm">0 friends joined with your code.</p>
+
+            <hr class="divider" />
+
             <button id="settings-signout-btn" class="btn btn-ghost btn-block">Sign out</button>
             <button id="settings-delete-btn" class="btn btn-danger-ghost btn-block mt-sm">Delete account</button>
         </div>
@@ -488,6 +589,72 @@
                     <button type="submit" class="btn btn-primary btn-sm">Post</button>
                 </form>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== STORY PLAYER ===== -->
+<div id="story-dialog" class="dialog story-dialog" hidden>
+    <div class="story-progress" id="story-progress"></div>
+    <button class="dialog-close story-close" id="story-close" aria-label="Close">×</button>
+    <div class="story-stage">
+        <button class="story-tap story-tap-left" id="story-prev" aria-label="Previous"></button>
+        <button class="story-tap story-tap-right" id="story-next" aria-label="Next"></button>
+        <img id="story-img" alt="" />
+        <div class="story-meta">
+            <p class="story-username" id="story-username">@—</p>
+            <p class="story-prompt" id="story-prompt">—</p>
+            <p class="story-caption" id="story-caption"></p>
+        </div>
+    </div>
+</div>
+
+<!-- ===== WEEKLY RECAP ===== -->
+<div id="recap-dialog" class="dialog" hidden>
+    <button class="dialog-close" id="recap-close" aria-label="Close">×</button>
+    <div class="dialog-content recap-content">
+        <h3>Your week in drops</h3>
+        <p class="muted small mb-md">Past 7 days · ready to share</p>
+        <div id="recap-canvas-wrap" class="recap-canvas-wrap">
+            <div id="recap-card" class="recap-card">
+                <div class="recap-header">
+                    <p class="recap-brand">Drop</p>
+                    <p class="recap-period" id="recap-period">—</p>
+                </div>
+                <div id="recap-grid" class="recap-grid"></div>
+                <div class="recap-footer">
+                    <span id="recap-username" class="recap-username">@—</span>
+                    <span id="recap-streak" class="recap-streak">🔥 0</span>
+                </div>
+            </div>
+        </div>
+        <button id="recap-save-btn" class="btn btn-primary btn-block mt-md">Save image</button>
+    </div>
+</div>
+
+<!-- ===== CIRCLE CREATE / EDIT ===== -->
+<div id="circle-dialog" class="dialog dialog-small" hidden>
+    <div class="dialog-content dialog-card">
+        <h3 id="circle-dialog-title">New circle</h3>
+        <label for="circle-dialog-name">Name</label>
+        <input id="circle-dialog-name" type="text" maxlength="40" placeholder="The crew" />
+        <label for="circle-dialog-prompt" class="mt-sm">Today's prompt for this circle</label>
+        <input id="circle-dialog-prompt" type="text" maxlength="80" placeholder="Show what you're up to right now" />
+        <div class="dialog-actions">
+            <button id="circle-dialog-cancel" class="btn btn-ghost">Cancel</button>
+            <button id="circle-dialog-save" class="btn btn-primary">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== CIRCLE ADD MEMBER ===== -->
+<div id="circle-member-dialog" class="dialog dialog-small" hidden>
+    <div class="dialog-content dialog-card">
+        <h3>Add a friend</h3>
+        <p class="muted small">Pick from your friends list.</p>
+        <div id="circle-member-list" class="friends-list"></div>
+        <div class="dialog-actions">
+            <button id="circle-member-cancel" class="btn btn-ghost">Done</button>
         </div>
     </div>
 </div>

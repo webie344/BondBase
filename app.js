@@ -349,24 +349,70 @@ async function handleSignup(e) {
     const name = $("#signup-name").value.trim();
     const email = $("#signup-email").value.trim();
     const password = $("#signup-password").value;
+    const inviteRaw = ($("#signup-invite")?.value || "").trim().toUpperCase();
     const errEl = $("#signup-error");
     errEl.hidden = true;
     try {
+        // Validate invite code BEFORE creating account so the user can correct it.
+        let inviter = null;
+        if (inviteRaw) {
+            inviter = await findInviter(inviteRaw);
+            if (!inviter) {
+                errEl.textContent = "That invite code isn't valid.";
+                errEl.hidden = false;
+                return;
+            }
+        }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const myInviteCode = generateInviteCode();
         await setDoc(doc(db, "users", cred.user.uid), {
             email,
             displayName: name,
             createdAt: serverTimestamp(),
-            currentStreak: 0,
-            longestStreak: 0,
+            currentStreak: inviter ? 1 : 0,    // streak boost on join
+            longestStreak: inviter ? 1 : 0,
             totalDrops: 0,
             promptTimeLocal: "19:00",
-            pushEnabled: false
+            pushEnabled: false,
+            inviteCode: myInviteCode,
+            invitedBy: inviter ? inviter.uid : null,
+            invitedCount: 0
         });
+        if (inviter) {
+            // Reward inviter: +1 to invitedCount, bump streak by 1.
+            await updateDoc(doc(db, "users", inviter.uid), {
+                invitedCount: increment(1),
+                currentStreak: increment(1),
+                longestStreak: increment(1)
+            }).catch(() => {});
+        }
     } catch (err) {
         errEl.textContent = friendlyAuthError(err);
         errEl.hidden = false;
     }
+}
+
+function generateInviteCode() {
+    // 4 unambiguous chars (no 0/O/1/I).
+    const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
+    return `DROP-${s}`;
+}
+
+async function findInviter(code) {
+    const snap = await getDocs(query(collection(db, "users"), where("inviteCode", "==", code), limit(1)));
+    if (snap.empty) return null;
+    return { uid: snap.docs[0].id, ...snap.docs[0].data() };
+}
+
+async function ensureMyInviteCode() {
+    if (!state.profile) return;
+    if (state.profile.inviteCode) return state.profile.inviteCode;
+    const code = generateInviteCode();
+    await updateDoc(doc(db, "users", state.user.uid), { inviteCode: code }).catch(() => {});
+    state.profile.inviteCode = code;
+    return code;
 }
 
 async function handleLogin(e) {
@@ -494,9 +540,40 @@ async function loadTodayPrompt() {
     if (snap.exists()) {
         state.todayPrompt = { date: key, ...snap.data() };
     } else {
-        state.todayPrompt = { date: key, text: "Show what's right in front of you." };
+        // Try yesterday's top-voted community submission as today's prompt.
+        const winner = await pickTopCommunityPromptFor(key).catch(() => null);
+        if (winner) {
+            await setDoc(doc(db, "prompts", key), {
+                date: key, text: winner.text, source: "community",
+                submittedBy: winner.submittedBy || null
+            }).catch(() => {});
+            state.todayPrompt = { date: key, text: winner.text, source: "community" };
+        } else {
+            state.todayPrompt = { date: key, text: "Show what's right in front of you." };
+        }
     }
     return state.todayPrompt;
+}
+
+async function pickTopCommunityPromptFor(targetDate) {
+    // Pick highest-voted pending submission, mark it used.
+    const q = query(
+        collection(db, "promptSubmissions"),
+        where("status", "==", "pending"),
+        limit(50)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    const sorted = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.votes || 0) - (a.votes || 0));
+    const top = sorted[0];
+    if (!top || (top.votes || 0) < 1) return null;
+    await updateDoc(doc(db, "promptSubmissions", top.id), {
+        status: "used",
+        usedDate: targetDate
+    }).catch(() => {});
+    return top;
 }
 
 async function seedPrompts() {
@@ -617,7 +694,8 @@ function applyFeedRender() {
     const grid = $("#feed-grid");
     if (!grid) return;
 
-    let docs = [...state.feedDocs];
+    // Always exclude posts scoped to a circle from the public/global feed.
+    let docs = state.feedDocs.filter(d => !d.data().circleId);
 
     if (state.feedTab === "friends") {
         const allowed = new Set([state.user.uid, ...state.friends.keys()]);
@@ -1150,18 +1228,31 @@ async function handlePost() {
         const captionRaw = $("#capture-caption").value.trim();
         const hashtags = extractHashtags(captionRaw);
 
+        // If user came from a circle's "Capture for this circle" button,
+        // attach the circleId so the post is scoped to that circle's feed.
+        const pendingCircleId = sessionStorage.getItem("dropPendingCircle") || null;
+        sessionStorage.removeItem("dropPendingCircle");
+        let circlePromptText = null;
+        if (pendingCircleId) {
+            try {
+                const cs = await getDoc(doc(db, "circles", pendingCircleId));
+                if (cs.exists()) circlePromptText = cs.data().todayPrompt;
+            } catch {}
+        }
+
         // Create post (keeps `imageUrl` for backwards compat = first image)
         await addDoc(collection(db, "posts"), {
             uid: state.user.uid,
             username: state.profile.username,
             displayName: state.profile.displayName || state.profile.username,
             promptDate,
-            promptText: state.todayPrompt.text,
+            promptText: circlePromptText || state.todayPrompt.text,
             imageUrl: images[0],
             images,
             caption: captionRaw,
             hashtags,
             isOnTime: onTime,
+            circleId: pendingCircleId,
             likes: 0,
             likedBy: [],
             commentsCount: 0,
@@ -1171,10 +1262,11 @@ async function handlePost() {
             createdAt: serverTimestamp()
         });
 
-        // Update streak
-        await updateUserStreak();
+        // Streaks count public daily drops only.
+        if (!pendingCircleId) await updateUserStreak();
 
         showToast("Posted!", "success");
+        if (pendingCircleId) { location.hash = `#/circle/${pendingCircleId}`; return; }
         location.hash = "#/feed";
     } catch (err) {
         console.error(err);
@@ -1321,6 +1413,8 @@ async function renderProfile(uid) {
 
     if (isOwn) {
         $("#profile-signout-btn").onclick = handleSignout;
+        const recapBtn = $("#profile-recap-btn");
+        if (recapBtn) recapBtn.onclick = openWeeklyRecap;
     }
 }
 
@@ -1381,6 +1475,16 @@ function renderSettings() {
     $("#settings-time").value = state.profile?.promptTimeLocal || "19:00";
     $("#settings-push").checked = !!state.profile?.pushEnabled;
     $("#settings-saved").hidden = true;
+    // Invite section
+    ensureMyInviteCode().then(code => {
+        const codeEl = $("#settings-invite-code");
+        if (codeEl) codeEl.textContent = code || "DROP-—";
+    });
+    const stats = $("#settings-invite-stats");
+    if (stats) {
+        const n = state.profile?.invitedCount || 0;
+        stats.textContent = `${n} friend${n === 1 ? "" : "s"} joined with your code.`;
+    }
 }
 
 function setupSettingsControls() {
@@ -1657,6 +1761,10 @@ function setFriendsTab(tab) {
     $("#friends-tab-list").hidden = tab !== "list";
     $("#friends-tab-requests").hidden = tab !== "requests";
     $("#friends-tab-find").hidden = tab !== "find";
+    $("#friends-tab-leaderboard").hidden = tab !== "leaderboard";
+    $("#friends-tab-circles").hidden = tab !== "circles";
+    if (tab === "leaderboard") renderLeaderboard();
+    if (tab === "circles") renderCirclesList();
 }
 
 function renderFriendsList() {
@@ -2126,6 +2234,8 @@ function renderThreadMessagesHTML(sortedDocs) {
         let bubbleContent;
         if (m.imageUrl) {
             bubbleContent = `<img class="msg-image" src="${escapeHtml(m.imageUrl)}" alt="" />`;
+        } else if (m.audioUrl) {
+            bubbleContent = `<div class="msg-bubble msg-audio"><audio controls preload="none" src="${escapeHtml(m.audioUrl)}"></audio></div>`;
         } else {
             bubbleContent = `<div class="msg-bubble">${linkifyText(m.text || "")}</div>`;
         }
@@ -2151,7 +2261,7 @@ function leaveThread() {
 }
 
 async function sendMessage(otherUid, payload) {
-    // payload: { text } or { imageUrl }
+    // payload: { text } | { imageUrl } | { audioUrl, audioDuration }
     const me = state.user.uid;
     const cid = chatIdFor(me, otherUid);
     const myUsername = state.profile.username;
@@ -2165,10 +2275,18 @@ async function sendMessage(otherUid, payload) {
 
     const now = serverTimestamp();
     const isImage = !!payload.imageUrl;
-    const messageDoc = isImage
-        ? { imageUrl: payload.imageUrl, uid: me, createdAt: now }
-        : { text: payload.text, uid: me, createdAt: now };
-    const previewText = isImage ? "📷 Photo" : payload.text;
+    const isAudio = !!payload.audioUrl;
+    let messageDoc, previewText;
+    if (isImage) {
+        messageDoc = { imageUrl: payload.imageUrl, uid: me, createdAt: now };
+        previewText = "📷 Photo";
+    } else if (isAudio) {
+        messageDoc = { audioUrl: payload.audioUrl, audioDuration: payload.audioDuration || 0, uid: me, createdAt: now };
+        previewText = "🎤 Voice note";
+    } else {
+        messageDoc = { text: payload.text, uid: me, createdAt: now };
+        previewText = payload.text;
+    }
 
     try {
         await addDoc(collection(db, "chats", cid, "messages"), messageDoc);
@@ -2589,6 +2707,583 @@ async function renderHashtag(tag) {
 }
 
 /* =============================================================
+   STREAK LEADERBOARD (friends + me)
+   ============================================================= */
+
+async function renderLeaderboard() {
+    const list = $("#leaderboard-list");
+    const empty = $("#leaderboard-empty");
+    if (!list) return;
+    list.innerHTML = `<p class="muted small center">Loading…</p>`;
+
+    const me = state.user.uid;
+    const ids = [me, ...Array.from(state.friends.keys())];
+    if (ids.length <= 1 && state.friends.size === 0) {
+        list.innerHTML = "";
+        empty.hidden = false;
+        return;
+    }
+    empty.hidden = true;
+
+    // Fetch user docs (single-getDoc loop — friends list is small)
+    const users = await Promise.all(ids.map(async (uid) => {
+        const s = await getDoc(doc(db, "users", uid));
+        return s.exists() ? { uid, ...s.data() } : null;
+    }));
+
+    // Past 7-day drop counts per user
+    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const cutoff = todayKey(sevenDaysAgo);
+    const dropCounts = await Promise.all(ids.map(async (uid) => {
+        try {
+            const q = query(
+                collection(db, "posts"),
+                where("uid", "==", uid),
+                where("promptDate", ">=", cutoff)
+            );
+            const snap = await getDocs(q);
+            return snap.size;
+        } catch { return 0; }
+    }));
+
+    const rows = users
+        .filter(Boolean)
+        .map((u, i) => ({ ...u, weekDrops: dropCounts[i] }))
+        .sort((a, b) => (b.currentStreak || 0) - (a.currentStreak || 0)
+                     || (b.weekDrops || 0) - (a.weekDrops || 0));
+
+    list.innerHTML = rows.map((u, i) => {
+        const rank = i + 1;
+        const isMe = u.uid === me;
+        const name = escapeHtml(u.displayName || u.username || "user");
+        const handle = escapeHtml(u.username || "—");
+        return `
+            <a class="lb-row rank-${rank} ${isMe ? "is-me" : ""}" href="#/profile/${encodeURIComponent(u.uid)}" style="text-decoration:none;color:inherit;">
+                <div class="lb-rank">${rank}</div>
+                <div class="lb-avatar">${escapeHtml(initials(u.displayName || u.username))}</div>
+                <div class="lb-info">
+                    <div class="lb-name">${name}${isMe ? " <span class='muted small'>(you)</span>" : ""}</div>
+                    <div class="lb-sub">@${handle} · ${u.weekDrops} this week</div>
+                </div>
+                <div class="lb-streak">🔥 ${u.currentStreak || 0}</div>
+            </a>
+        `;
+    }).join("");
+}
+
+/* =============================================================
+   STORY-STYLE DAILY RECAP (auto-advance through today's drops)
+   ============================================================= */
+
+const story = {
+    posts: [],
+    idx: 0,
+    timer: null,
+    durationMs: 3000
+};
+
+async function openStoryPlayer() {
+    if (!state.todayPrompt) await loadTodayPrompt();
+    let docs = state.feedDocs && state.feedDocs.length ? [...state.feedDocs] : null;
+    if (!docs) {
+        try {
+            const q = query(
+                collection(db, "posts"),
+                where("promptDate", "==", todayKey()),
+                limit(50)
+            );
+            const snap = await getDocs(q);
+            docs = snap.docs;
+        } catch { docs = []; }
+    }
+    // Sort by createdAt asc so the story is chronological
+    docs.sort((a, b) => {
+        const ta = a.data().createdAt?.toMillis?.() || 0;
+        const tb = b.data().createdAt?.toMillis?.() || 0;
+        return ta - tb;
+    });
+    if (!docs.length) {
+        showToast("No drops yet today.");
+        return;
+    }
+    story.posts = docs.map(d => ({ id: d.id, ...d.data() }));
+    story.idx = 0;
+    $("#story-dialog").hidden = false;
+    document.body.style.overflow = "hidden";
+    showStoryFrame();
+}
+
+function showStoryFrame() {
+    const p = story.posts[story.idx];
+    if (!p) { closeStory(); return; }
+    $("#story-img").src = (p.images?.[0]) || p.imageUrl || "";
+    $("#story-username").textContent = `@${p.username || "user"}`;
+    $("#story-prompt").textContent = p.promptText || "";
+    $("#story-caption").textContent = p.caption || "";
+    // Build progress segments
+    const prog = $("#story-progress");
+    prog.style.setProperty("--story-dur", `${story.durationMs}ms`);
+    prog.innerHTML = story.posts.map((_, i) => {
+        const cls = i < story.idx ? "done" : i === story.idx ? "active" : "";
+        return `<div class="seg ${cls}"><span class="fill"></span></div>`;
+    }).join("");
+    if (story.timer) clearTimeout(story.timer);
+    story.timer = setTimeout(nextStoryFrame, story.durationMs);
+}
+
+function nextStoryFrame() {
+    if (story.idx < story.posts.length - 1) {
+        story.idx++;
+        showStoryFrame();
+    } else {
+        closeStory();
+    }
+}
+
+function prevStoryFrame() {
+    if (story.idx > 0) {
+        story.idx--;
+        showStoryFrame();
+    }
+}
+
+function closeStory() {
+    if (story.timer) { clearTimeout(story.timer); story.timer = null; }
+    $("#story-dialog").hidden = true;
+    document.body.style.overflow = "";
+}
+
+/* =============================================================
+   WEEKLY HIGHLIGHT REEL (single shareable image)
+   ============================================================= */
+
+async function openWeeklyRecap() {
+    const dlg = $("#recap-dialog");
+    const grid = $("#recap-grid");
+    if (!dlg || !grid) return;
+    dlg.hidden = false;
+    grid.innerHTML = `<p class="muted small center" style="grid-column:1/-1;">Loading…</p>`;
+
+    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const cutoff = todayKey(sevenDaysAgo);
+
+    const q = query(
+        collection(db, "posts"),
+        where("uid", "==", state.user.uid),
+        where("promptDate", ">=", cutoff)
+    );
+    const snap = await getDocs(q);
+    const posts = snap.docs
+        .map(d => d.data())
+        .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+        .slice(0, 9);
+
+    // Always render 9 tiles (fill empties for grid harmony)
+    let html = "";
+    for (let i = 0; i < 9; i++) {
+        const p = posts[i];
+        if (p) {
+            const url = (p.images?.[0]) || p.imageUrl || "";
+            html += `<div class="recap-tile"><img crossorigin="anonymous" src="${escapeHtml(url)}" alt=""/></div>`;
+        } else {
+            html += `<div class="recap-tile empty"></div>`;
+        }
+    }
+    grid.innerHTML = html;
+
+    const fmt = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    $("#recap-period").textContent = `${fmt(sevenDaysAgo)} – ${fmt(new Date())}`;
+    $("#recap-username").textContent = `@${state.profile?.username || "you"}`;
+    $("#recap-streak").textContent = `🔥 ${state.profile?.currentStreak || 0}`;
+}
+
+async function saveRecapImage() {
+    const card = $("#recap-card");
+    if (!card) return;
+    try {
+        const canvas = await html2canvas(card, { useCORS: true, backgroundColor: null, scale: 2 });
+        canvas.toBlob((blob) => {
+            if (!blob) { showToast("Could not export image.", "error"); return; }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `drop-recap-${todayKey()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            showToast("Recap saved.", "success");
+        }, "image/png");
+    } catch (err) {
+        console.error(err);
+        showToast("Couldn't generate image.", "error");
+    }
+}
+
+/* =============================================================
+   COMMUNITY-VOTED PROMPTS
+   promptSubmissions/{id}: { text, submittedBy, submittedByUsername,
+                             votes, voters[], status, createdAt }
+   ============================================================= */
+
+let promptsUnsub = null;
+
+async function renderPrompts() {
+    const list = $("#prompts-vote-list");
+    const empty = $("#prompts-vote-empty");
+    if (!list) return;
+    list.innerHTML = `<p class="muted small center">Loading…</p>`;
+    if (promptsUnsub) { promptsUnsub(); promptsUnsub = null; }
+
+    const q = query(
+        collection(db, "promptSubmissions"),
+        where("status", "==", "pending"),
+        limit(50)
+    );
+    promptsUnsub = onSnapshot(q, (snap) => {
+        if (snap.empty) {
+            list.innerHTML = "";
+            empty.hidden = false;
+            return;
+        }
+        empty.hidden = true;
+        const docs = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (b.votes || 0) - (a.votes || 0));
+        const me = state.user.uid;
+        list.innerHTML = docs.map(d => {
+            const voted = (d.voters || []).includes(me);
+            const mine = d.submittedBy === me;
+            return `
+                <div class="pv-row">
+                    <div class="pv-text">
+                        ${escapeHtml(d.text)}
+                        <div class="pv-by">by @${escapeHtml(d.submittedByUsername || "—")}${mine ? " · you" : ""}</div>
+                    </div>
+                    <button class="pv-vote-btn ${voted ? "voted" : ""}" data-id="${d.id}" data-voted="${voted ? "1" : "0"}">
+                        <span class="arrow">▲</span>
+                        <span class="count">${d.votes || 0}</span>
+                    </button>
+                </div>
+            `;
+        }).join("");
+        list.querySelectorAll(".pv-vote-btn").forEach(btn => {
+            btn.onclick = () => togglePromptVote(btn.dataset.id, btn.dataset.voted === "1");
+        });
+    }, (err) => {
+        console.error(err);
+        list.innerHTML = `<p class="muted small center">Couldn't load.</p>`;
+    });
+}
+
+async function submitCommunityPrompt(text) {
+    const t = text.trim();
+    if (t.length < 6 || t.length > 80) {
+        showToast("Keep it between 6 and 80 characters.", "error");
+        return;
+    }
+    try {
+        await addDoc(collection(db, "promptSubmissions"), {
+            text: t,
+            submittedBy: state.user.uid,
+            submittedByUsername: state.profile?.username || "user",
+            votes: 1,
+            voters: [state.user.uid],
+            status: "pending",
+            createdAt: serverTimestamp()
+        });
+        showToast("Submitted.", "success");
+    } catch (err) {
+        console.error(err);
+        showToast("Could not submit.", "error");
+    }
+}
+
+async function togglePromptVote(id, alreadyVoted) {
+    const me = state.user.uid;
+    try {
+        await updateDoc(doc(db, "promptSubmissions", id), {
+            votes: increment(alreadyVoted ? -1 : 1),
+            voters: alreadyVoted ? arrayRemove(me) : arrayUnion(me)
+        });
+    } catch (err) {
+        console.error(err);
+        showToast("Vote failed.", "error");
+    }
+}
+
+/* =============================================================
+   CIRCLES (private group prompts)
+   circles/{id}: { name, ownerUid, memberUids[], todayPrompt,
+                   todayPromptDate, createdAt }
+   posts can carry { circleId } to scope to a circle
+   ============================================================= */
+
+let circlesUnsub = null;
+let activeCircleId = null;
+let activeCircleData = null;
+let circleFeedUnsub = null;
+
+function renderCirclesList() {
+    const list = $("#circles-list");
+    const empty = $("#circles-empty");
+    if (!list) return;
+    list.innerHTML = `<p class="muted small center">Loading…</p>`;
+    if (circlesUnsub) { circlesUnsub(); circlesUnsub = null; }
+
+    const q = query(
+        collection(db, "circles"),
+        where("memberUids", "array-contains", state.user.uid)
+    );
+    circlesUnsub = onSnapshot(q, (snap) => {
+        if (snap.empty) {
+            list.innerHTML = "";
+            empty.hidden = false;
+            return;
+        }
+        empty.hidden = true;
+        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        list.innerHTML = rows.map(c => `
+            <a class="circle-row" href="#/circle/${encodeURIComponent(c.id)}">
+                <div class="circle-icon">${escapeHtml(initials(c.name))}</div>
+                <div class="circle-info">
+                    <div class="circle-name">${escapeHtml(c.name)}</div>
+                    <div class="circle-meta">${(c.memberUids || []).length} members${c.todayPromptDate === todayKey() ? " · prompt set" : ""}</div>
+                </div>
+            </a>
+        `).join("");
+    }, (err) => {
+        console.error(err);
+        list.innerHTML = `<p class="muted small center">Couldn't load circles.</p>`;
+    });
+}
+
+async function createCircleFromDialog() {
+    const name = $("#circle-dialog-name").value.trim();
+    const promptText = $("#circle-dialog-prompt").value.trim();
+    if (!name) { showToast("Name your circle.", "error"); return; }
+    try {
+        const ref = await addDoc(collection(db, "circles"), {
+            name,
+            ownerUid: state.user.uid,
+            memberUids: [state.user.uid],
+            todayPrompt: promptText || "Show what you're up to right now.",
+            todayPromptDate: todayKey(),
+            createdAt: serverTimestamp()
+        });
+        $("#circle-dialog").hidden = true;
+        showToast("Circle created.", "success");
+        location.hash = `#/circle/${ref.id}`;
+    } catch (err) {
+        console.error(err);
+        showToast("Could not create circle.", "error");
+    }
+}
+
+async function renderCircleDetail(circleId) {
+    activeCircleId = circleId;
+    if (circleFeedUnsub) { circleFeedUnsub(); circleFeedUnsub = null; }
+    const snap = await getDoc(doc(db, "circles", circleId));
+    if (!snap.exists()) {
+        showToast("Circle not found.", "error");
+        location.hash = "#/friends";
+        return;
+    }
+    activeCircleData = { id: circleId, ...snap.data() };
+
+    $("#circle-detail-name").textContent = activeCircleData.name;
+    const promptText = activeCircleData.todayPromptDate === todayKey()
+        ? activeCircleData.todayPrompt
+        : (activeCircleData.todayPrompt || "No prompt set for today");
+    $("#circle-detail-prompt").textContent = promptText;
+    $("#circle-detail-meta").textContent = `${(activeCircleData.memberUids || []).length} members · ${activeCircleData.ownerUid === state.user.uid ? "owner" : "member"}`;
+
+    $("#circle-edit-prompt-btn").onclick = async () => {
+        const next = prompt("Today's prompt for this circle:", activeCircleData.todayPrompt || "");
+        if (!next) return;
+        await updateDoc(doc(db, "circles", circleId), {
+            todayPrompt: next.trim().slice(0, 80),
+            todayPromptDate: todayKey()
+        });
+        renderCircleDetail(circleId);
+    };
+    $("#circle-add-member-btn").onclick = () => openAddCircleMember(circleId);
+    $("#circle-leave-btn").onclick = async () => {
+        const ok = await confirmDialog("Leave this circle?", "You won't see drops in it anymore.", "Leave");
+        if (!ok) return;
+        await updateDoc(doc(db, "circles", circleId), { memberUids: arrayRemove(state.user.uid) });
+        location.hash = "#/friends";
+    };
+    $("#circle-capture-btn").onclick = () => {
+        // Stash the active circle id for the capture flow.
+        sessionStorage.setItem("dropPendingCircle", circleId);
+        location.hash = "#/capture";
+    };
+
+    // Live circle feed for today
+    const grid = $("#circle-feed");
+    const empty = $("#circle-feed-empty");
+    grid.innerHTML = "";
+    const fq = query(
+        collection(db, "posts"),
+        where("circleId", "==", circleId),
+        where("promptDate", "==", todayKey())
+    );
+    circleFeedUnsub = onSnapshot(fq, (snap) => {
+        if (snap.empty) { grid.innerHTML = ""; empty.hidden = false; return; }
+        empty.hidden = true;
+        const docs = [...snap.docs].sort((a, b) =>
+            (b.data().createdAt?.toMillis?.() || 0) - (a.data().createdAt?.toMillis?.() || 0)
+        );
+        grid.innerHTML = docs.map(d => renderPostCardHTML(d.id, d.data())).join("");
+        wirePostCards(grid);
+    });
+}
+
+function openAddCircleMember(circleId) {
+    const dlg = $("#circle-member-dialog");
+    const list = $("#circle-member-list");
+    if (!dlg || !list) return;
+    if (state.friends.size === 0) {
+        showToast("Add some friends first.");
+        return;
+    }
+    const memberSet = new Set(activeCircleData?.memberUids || []);
+    list.innerHTML = [...state.friends.entries()].map(([uid, f]) => {
+        const inCircle = memberSet.has(uid);
+        return `
+            <div class="friend-row">
+                <div class="friend-avatar">${escapeHtml(initials(f.displayName || f.username))}</div>
+                <div class="friend-info">
+                    <div class="friend-name">${escapeHtml(f.displayName || f.username || "user")}</div>
+                    <div class="friend-sub">@${escapeHtml(f.username || "")}</div>
+                </div>
+                <button class="btn ${inCircle ? "btn-ghost" : "btn-primary"} btn-sm" data-uid="${uid}" data-in="${inCircle ? "1" : "0"}">
+                    ${inCircle ? "Remove" : "Add"}
+                </button>
+            </div>
+        `;
+    }).join("");
+    list.querySelectorAll("button[data-uid]").forEach(b => {
+        b.onclick = async () => {
+            const uid = b.dataset.uid;
+            const isIn = b.dataset.in === "1";
+            await updateDoc(doc(db, "circles", circleId), {
+                memberUids: isIn ? arrayRemove(uid) : arrayUnion(uid)
+            });
+            const snap = await getDoc(doc(db, "circles", circleId));
+            activeCircleData = { id: circleId, ...snap.data() };
+            openAddCircleMember(circleId);
+        };
+    });
+    dlg.hidden = false;
+}
+
+/* =============================================================
+   VOICE NOTES (chat)
+   Records via MediaRecorder, uploads to Cloudinary as video resource
+   (Cloudinary's audio-only files use the /video/upload endpoint).
+   ============================================================= */
+
+const voice = {
+    rec: null, chunks: [], stream: null,
+    startedAt: 0, timer: null
+};
+
+async function startVoiceRecording() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+        showToast("Voice notes aren't supported on this device.", "error");
+        return;
+    }
+    try {
+        voice.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+        showToast("Microphone access denied.", "error");
+        return;
+    }
+    voice.chunks = [];
+    const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+    voice.rec = new MediaRecorder(voice.stream, mime ? { mimeType: mime } : undefined);
+    voice.rec.ondataavailable = (e) => { if (e.data.size > 0) voice.chunks.push(e.data); };
+    voice.rec.start();
+    voice.startedAt = Date.now();
+    $("#thread-form").hidden = true;
+    $("#thread-recording-bar").hidden = false;
+    if (voice.timer) clearInterval(voice.timer);
+    voice.timer = setInterval(() => {
+        const secs = Math.floor((Date.now() - voice.startedAt) / 1000);
+        const mm = Math.floor(secs / 60);
+        const ss = String(secs % 60).padStart(2, "0");
+        $("#thread-rec-time").textContent = `${mm}:${ss}`;
+        if (secs >= 120) finishVoiceRecording(true); // hard cap 2 min
+    }, 250);
+}
+
+function cancelVoiceRecording() {
+    cleanupVoice();
+    $("#thread-recording-bar").hidden = true;
+    $("#thread-form").hidden = false;
+}
+
+function cleanupVoice() {
+    if (voice.timer) { clearInterval(voice.timer); voice.timer = null; }
+    try { if (voice.rec && voice.rec.state !== "inactive") voice.rec.stop(); } catch {}
+    if (voice.stream) {
+        voice.stream.getTracks().forEach(t => t.stop());
+        voice.stream = null;
+    }
+}
+
+async function finishVoiceRecording(autoSend = true) {
+    if (!voice.rec) { cancelVoiceRecording(); return; }
+    const otherUid = state.threadOtherUid;
+    const durationSec = Math.floor((Date.now() - voice.startedAt) / 1000);
+
+    const stopped = new Promise((resolve) => {
+        voice.rec.onstop = () => resolve();
+    });
+    try { voice.rec.stop(); } catch {}
+    await stopped;
+    if (voice.stream) {
+        voice.stream.getTracks().forEach(t => t.stop());
+        voice.stream = null;
+    }
+    if (voice.timer) { clearInterval(voice.timer); voice.timer = null; }
+
+    $("#thread-recording-bar").hidden = true;
+    $("#thread-form").hidden = false;
+
+    if (!autoSend || durationSec < 1 || !voice.chunks.length || !otherUid) {
+        voice.chunks = []; voice.rec = null;
+        return;
+    }
+
+    const blob = new Blob(voice.chunks, { type: voice.rec.mimeType || "audio/webm" });
+    voice.chunks = []; voice.rec = null;
+    showToast("Sending voice note…");
+    try {
+        const url = await uploadAudioToCloudinary(blob);
+        await sendMessage(otherUid, { audioUrl: url, audioDuration: durationSec });
+    } catch (err) {
+        console.error(err);
+        showToast("Voice note failed.", "error");
+    }
+}
+
+async function uploadAudioToCloudinary(blob) {
+    const fd = new FormData();
+    fd.append("file", blob, `voice-${Date.now()}.webm`);
+    fd.append("upload_preset", CONFIG.cloudinary.uploadPreset);
+    // Cloudinary serves audio under the "video" resource type.
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CONFIG.cloudinary.cloudName}/video/upload`, {
+        method: "POST", body: fd
+    });
+    if (!res.ok) throw new Error("Upload failed");
+    const data = await res.json();
+    return data.secure_url;
+}
+
+/* =============================================================
    ROUTER
    ============================================================= */
 
@@ -2599,6 +3294,10 @@ const ROUTES = [
     { hash: "#/capture",     view: "view-capture",     chrome: true,  public: false },
     { hash: "#/feed",        view: "view-feed",        chrome: true,  public: false },
     { hash: "#/friends",     view: "view-friends",     chrome: true,  public: false },
+    { hash: "#/leaderboard", view: "view-friends",     chrome: true,  public: false },
+    { hash: "#/circles",     view: "view-friends",     chrome: true,  public: false },
+    { hash: "#/circle/",     view: "view-circle",      chrome: true,  public: false, prefix: true },
+    { hash: "#/prompts",     view: "view-prompts",     chrome: true,  public: false },
     { hash: "#/chats",       view: "view-chats",       chrome: true,  public: false },
     { hash: "#/thread/",     view: "view-thread",      chrome: true,  public: false, prefix: true },
     { hash: "#/share/",      view: "view-share",       chrome: true,  public: false, prefix: true },
@@ -2677,10 +3376,19 @@ async function router() {
     else if (route.view === "view-settings") renderSettings();
     else if (route.view === "view-onboarding") showOnboardingSlide(0);
     else if (route.view === "view-friends") {
-        setFriendsTab(activeFriendsTab);
+        // Honor #/leaderboard and #/circles by switching tab
+        let tab = activeFriendsTab;
+        if (hash === "#/leaderboard") tab = "leaderboard";
+        else if (hash === "#/circles") tab = "circles";
+        setFriendsTab(tab);
         renderFriendsList();
         renderFriendRequests();
     }
+    else if (route.view === "view-circle") {
+        const m = hash.match(/^#\/circle\/(.+)$/);
+        if (m) await renderCircleDetail(decodeURIComponent(m[1]));
+    }
+    else if (route.view === "view-prompts") renderPrompts();
     else if (route.view === "view-chats") renderChatsList();
     else if (route.view === "view-thread") {
         const m = hash.match(/^#\/thread\/(.+)$/);
@@ -2705,6 +3413,18 @@ async function router() {
     if (route.view !== "view-today" && state.countdownInterval) {
         clearInterval(state.countdownInterval);
         state.countdownInterval = null;
+    }
+    // Stop circle feed when leaving a circle
+    if (route.view !== "view-circle" && circleFeedUnsub) {
+        circleFeedUnsub(); circleFeedUnsub = null;
+    }
+    // Stop prompts subscription when leaving prompts vote
+    if (route.view !== "view-prompts" && promptsUnsub) {
+        promptsUnsub(); promptsUnsub = null;
+    }
+    // Stop circles list subscription when leaving friends view entirely
+    if (route.view !== "view-friends" && circlesUnsub) {
+        circlesUnsub(); circlesUnsub = null;
     }
 
     window.scrollTo(0, 0);
@@ -2747,6 +3467,74 @@ document.addEventListener("DOMContentLoaded", () => {
     // Friend search form
     const searchForm = $("#friends-search-form");
     if (searchForm) searchForm.addEventListener("submit", handleFriendSearch);
+
+    // ----- Today view: open story player -----
+    const storyBtn = $("#today-story-btn");
+    if (storyBtn) storyBtn.onclick = openStoryPlayer;
+
+    // ----- Story player controls -----
+    $("#story-close")?.addEventListener("click", closeStory);
+    $("#story-prev")?.addEventListener("click", prevStoryFrame);
+    $("#story-next")?.addEventListener("click", nextStoryFrame);
+
+    // ----- Recap dialog controls -----
+    $("#recap-close")?.addEventListener("click", () => $("#recap-dialog").hidden = true);
+    $("#recap-save-btn")?.addEventListener("click", saveRecapImage);
+
+    // ----- Community prompts: submit form -----
+    const promptForm = $("#prompt-submit-form");
+    if (promptForm) {
+        promptForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const inp = $("#prompt-submit-input");
+            const v = inp.value;
+            inp.value = "";
+            await submitCommunityPrompt(v);
+        });
+    }
+
+    // ----- Circles: open create dialog -----
+    $("#circle-create-btn")?.addEventListener("click", () => {
+        $("#circle-dialog-title").textContent = "New circle";
+        $("#circle-dialog-name").value = "";
+        $("#circle-dialog-prompt").value = "";
+        $("#circle-dialog-save").textContent = "Create";
+        $("#circle-dialog").hidden = false;
+    });
+    $("#circle-dialog-cancel")?.addEventListener("click", () => $("#circle-dialog").hidden = true);
+    $("#circle-dialog-save")?.addEventListener("click", createCircleFromDialog);
+    $("#circle-member-cancel")?.addEventListener("click", () => $("#circle-member-dialog").hidden = true);
+
+    // ----- Settings: invite code copy + share -----
+    $("#settings-invite-copy")?.addEventListener("click", async () => {
+        const code = $("#settings-invite-code").textContent.trim();
+        try { await navigator.clipboard.writeText(code); showToast("Code copied.", "success"); }
+        catch { showToast("Could not copy.", "error"); }
+    });
+    $("#settings-invite-share")?.addEventListener("click", async () => {
+        const code = $("#settings-invite-code").textContent.trim();
+        const url = `${location.origin}${location.pathname}#/signup?invite=${encodeURIComponent(code)}`;
+        const text = `Join me on Drop — one prompt, one photo, once a day. Use my invite ${code} so we both get a streak boost: ${url}`;
+        if (navigator.share) {
+            try { await navigator.share({ title: "Join me on Drop", text, url }); return; } catch {}
+        }
+        try { await navigator.clipboard.writeText(text); showToast("Share text copied.", "success"); }
+        catch { showToast("Could not share.", "error"); }
+    });
+
+    // ----- Signup: pre-fill invite code from URL (?invite= or #/signup?invite=) -----
+    const inviteFromHash = (location.hash.match(/[?&]invite=([^&]+)/) || [])[1];
+    const inviteFromQuery = (location.search.match(/[?&]invite=([^&]+)/) || [])[1];
+    const presetInvite = inviteFromHash || inviteFromQuery;
+    if (presetInvite) {
+        const inp = $("#signup-invite");
+        if (inp) inp.value = decodeURIComponent(presetInvite).toUpperCase();
+    }
+
+    // ----- Voice notes: composer mic button -----
+    $("#thread-voice-btn")?.addEventListener("click", startVoiceRecording);
+    $("#thread-rec-cancel")?.addEventListener("click", cancelVoiceRecording);
+    $("#thread-rec-send")?.addEventListener("click", () => finishVoiceRecording(true));
 
     // Run router once for initial page (e.g. opening with #/share/abc directly)
     if (!auth.currentUser) router();
