@@ -1,1261 +1,510 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Add this to your EXISTING index.html file -->
-<meta property="og:title" content="Bond Base - The friendship hub">
-<meta property="og:description" content="BondBase is a social hub where you can connect with people worldwide, share ideas, build your profile, and even open your own store or offer services — all in one place..">
-<meta property="og:image" content="https://bond-base.vercel.app/Bondbases.png">
-<meta property="og:url" content="https://bond-base.vercel.app">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BondBase — Where Connections Become Communities</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#fafaf9" />
+    <meta name="description" content="One prompt. One photo. Once a day." />
+    <title>Drop — One prompt. One photo. Once a day.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        :root {
-            --pink: #ff4b6e;
-            --pink-dim: rgba(255, 75, 110, 0.12);
-            --pink-glow: rgba(255, 75, 110, 0.35);
-            --bg: #0e1014;
-            --bg2: #14171c;
-            --bg3: #1c2028;
-            --border: rgba(255,255,255,0.07);
-            --text: #f0f2f5;
-            --muted: #7a8090;
-            --font-display: 'Syne', sans-serif;
-            --font-body: 'DM Sans', sans-serif;
-        }
-
-        html { scroll-behavior: smooth; }
-
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: var(--font-body);
-            font-size: 16px;
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
-
-        /* ── NOISE OVERLAY ── */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-            pointer-events: none;
-            z-index: 999;
-            opacity: 0.4;
-        }
-
-        /* ── NAV ── */
-        nav {
-            position: fixed;
-            top: 0; left: 0; right: 0;
-            z-index: 100;
-            padding: 20px 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(14,16,20,0.7);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            transition: all 0.3s;
-        }
-
-        .nav-logo {
-            font-family: var(--font-display);
-            font-size: 22px;
-            font-weight: 800;
-            color: var(--text);
-            text-decoration: none;
-            letter-spacing: -0.5px;
-        }
-
-        .nav-logo span { color: var(--pink); }
-
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 32px;
-            list-style: none;
-        }
-
-        .nav-links a {
-            color: var(--muted);
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-
-        .nav-links a:hover { color: var(--text); }
-
-        .nav-cta {
-            background: var(--pink);
-            color: white !important;
-            padding: 9px 20px;
-            border-radius: 8px;
-            font-weight: 600 !important;
-            font-size: 14px !important;
-            transition: opacity 0.2s !important;
-        }
-
-        .nav-cta:hover { opacity: 0.88; }
-
-        /* ── HERO ── */
-        .hero {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 120px 24px 80px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* radial glow behind hero text */
-        .hero::after {
-            content: '';
-            position: absolute;
-            top: 30%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 700px;
-            height: 500px;
-            background: radial-gradient(ellipse, rgba(255,75,110,0.14) 0%, transparent 70%);
-            pointer-events: none;
-        }
-
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: var(--pink-dim);
-            border: 1px solid rgba(255,75,110,0.25);
-            color: var(--pink);
-            font-size: 12px;
-            font-weight: 600;
-            padding: 6px 14px;
-            border-radius: 100px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            margin-bottom: 32px;
-            opacity: 0;
-            animation: fadeUp 0.6s ease forwards 0.1s;
-        }
-
-        .hero-badge i { font-size: 10px; }
-
-        .hero h1 {
-            font-family: var(--font-display);
-            font-size: clamp(48px, 8vw, 96px);
-            font-weight: 800;
-            line-height: 1.0;
-            letter-spacing: -2px;
-            margin-bottom: 28px;
-            opacity: 0;
-            animation: fadeUp 0.7s ease forwards 0.25s;
-        }
-
-        .hero h1 em {
-            font-style: normal;
-            color: var(--pink);
-            position: relative;
-        }
-
-        .hero h1 em::after {
-            content: '';
-            position: absolute;
-            bottom: 4px;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--pink);
-            border-radius: 2px;
-            opacity: 0.5;
-        }
-
-        .hero-sub {
-            font-size: clamp(16px, 2vw, 20px);
-            color: var(--muted);
-            max-width: 520px;
-            margin: 0 auto 48px;
-            font-weight: 300;
-            line-height: 1.7;
-            opacity: 0;
-            animation: fadeUp 0.7s ease forwards 0.4s;
-        }
-
-        .hero-actions {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 16px;
-            opacity: 0;
-            animation: fadeUp 0.7s ease forwards 0.55s;
-        }
-
-        .waitlist-form {
-            display: flex;
-            gap: 0;
-            width: 100%;
-            max-width: 420px;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            background: var(--bg2);
-            box-shadow: 0 0 0 1px var(--border), 0 20px 60px rgba(0,0,0,0.4);
-            transition: box-shadow 0.3s;
-        }
-
-        .waitlist-form:focus-within {
-            box-shadow: 0 0 0 2px var(--pink-glow), 0 20px 60px rgba(0,0,0,0.4);
-        }
-
-        .waitlist-form input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            outline: none;
-            padding: 14px 18px;
-            color: var(--text);
-            font-family: var(--font-body);
-            font-size: 14px;
-        }
-
-        .waitlist-form input::placeholder { color: var(--muted); }
-
-        .waitlist-form button {
-            background: var(--pink);
-            border: none;
-            color: white;
-            padding: 14px 22px;
-            font-family: var(--font-display);
-            font-weight: 700;
-            font-size: 13px;
-            cursor: pointer;
-            letter-spacing: 0.3px;
-            white-space: nowrap;
-            transition: opacity 0.2s;
-        }
-
-        .waitlist-form button:hover { opacity: 0.88; }
-
-        .hero-note {
-            font-size: 12px;
-            color: var(--muted);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .hero-note i { color: var(--pink); font-size: 10px; }
-
-        /* ── SOCIAL PROOF ── */
-        .proof-strip {
-            border-top: 1px solid var(--border);
-            border-bottom: 1px solid var(--border);
-            background: var(--bg2);
-            padding: 20px 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 48px;
-            flex-wrap: wrap;
-            opacity: 0;
-            animation: fadeUp 0.7s ease forwards 0.8s;
-        }
-
-        .proof-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 13px;
-            color: var(--muted);
-        }
-
-        .proof-item i { color: var(--pink); font-size: 15px; }
-
-        .proof-item strong { color: var(--text); font-weight: 600; }
-
-        /* ── SECTION SHARED ── */
-        section { padding: 100px 24px; }
-
-        .section-label {
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: var(--pink);
-            margin-bottom: 16px;
-        }
-
-        .section-title {
-            font-family: var(--font-display);
-            font-size: clamp(32px, 5vw, 56px);
-            font-weight: 800;
-            line-height: 1.1;
-            letter-spacing: -1px;
-            margin-bottom: 20px;
-        }
-
-        .section-body {
-            color: var(--muted);
-            font-size: 17px;
-            font-weight: 300;
-            line-height: 1.75;
-            max-width: 520px;
-        }
-
-        /* ── FEATURES ── */
-        .features-wrap {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-
-        .features-header {
-            text-align: center;
-            margin-bottom: 64px;
-        }
-
-        .features-header .section-body {
-            margin: 0 auto;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 2px;
-            background: var(--border);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            overflow: hidden;
-        }
-
-        .feature-card {
-            background: var(--bg2);
-            padding: 36px 32px;
-            position: relative;
-            transition: background 0.3s;
-            overflow: hidden;
-        }
-
-        .feature-card::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, var(--pink-dim), transparent);
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .feature-card:hover { background: var(--bg3); }
-        .feature-card:hover::before { opacity: 1; }
-
-        .feature-icon {
-            width: 48px;
-            height: 48px;
-            background: var(--pink-dim);
-            border: 1px solid rgba(255,75,110,0.2);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            color: var(--pink);
-            margin-bottom: 20px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .feature-card h3 {
-            font-family: var(--font-display);
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .feature-card p {
-            font-size: 14px;
-            color: var(--muted);
-            line-height: 1.65;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* ── HOW IT WORKS ── */
-        .how-wrap {
-            max-width: 1100px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 80px;
-            align-items: center;
-        }
-
-        .steps-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-        }
-
-        .step {
-            display: flex;
-            gap: 20px;
-            padding: 28px 0;
-            border-bottom: 1px solid var(--border);
-            position: relative;
-            cursor: default;
-        }
-
-        .step:last-child { border-bottom: none; }
-
-        .step-num {
-            font-family: var(--font-display);
-            font-size: 13px;
-            font-weight: 800;
-            color: var(--pink);
-            min-width: 28px;
-            padding-top: 3px;
-            opacity: 0.6;
-        }
-
-        .step h4 {
-            font-family: var(--font-display);
-            font-size: 17px;
-            font-weight: 700;
-            margin-bottom: 6px;
-        }
-
-        .step p {
-            font-size: 14px;
-            color: var(--muted);
-            line-height: 1.6;
-        }
-
-        /* mock phone card */
-        .phone-mock {
-            background: var(--bg2);
-            border: 1px solid var(--border);
-            border-radius: 28px;
-            padding: 28px;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.5), 0 0 0 1px var(--border);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .phone-mock::before {
-            content: '';
-            position: absolute;
-            top: -60px; right: -60px;
-            width: 200px; height: 200px;
-            background: radial-gradient(circle, var(--pink-glow), transparent 70%);
-        }
-
-        .mock-bar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 20px;
-        }
-
-        .mock-dot {
-            width: 10px; height: 10px;
-            border-radius: 50%;
-        }
-
-        .mock-dot:nth-child(1) { background: #ff5f57; }
-        .mock-dot:nth-child(2) { background: #febc2e; }
-        .mock-dot:nth-child(3) { background: #28c840; }
-
-        .mock-post {
-            background: var(--bg3);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 16px;
-            margin-bottom: 12px;
-            transition: transform 0.2s;
-        }
-
-        .mock-post:hover { transform: translateY(-2px); }
-
-        .mock-post-head {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-
-        .mock-avatar {
-            width: 34px; height: 34px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--pink), #ff8a50);
-            flex-shrink: 0;
-        }
-
-        .mock-avatar.b { background: linear-gradient(135deg, #6c63ff, #4ecdc4); }
-        .mock-avatar.c { background: linear-gradient(135deg, #f7971e, #ffd200); }
-
-        .mock-name {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text);
-        }
-
-        .mock-time { font-size: 11px; color: var(--muted); }
-
-        .mock-text {
-            font-size: 13px;
-            color: var(--muted);
-            line-height: 1.5;
-            margin-bottom: 12px;
-        }
-
-        .mock-actions {
-            display: flex;
-            gap: 16px;
-        }
-
-        .mock-action {
-            font-size: 12px;
-            color: var(--muted);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .mock-action i { color: var(--pink); font-size: 13px; }
-
-        .mock-img-placeholder {
-            height: 90px;
-            background: linear-gradient(135deg, var(--bg), var(--bg3));
-            border-radius: 10px;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--muted);
-            font-size: 24px;
-        }
-
-        /* ── FOUNDING MEMBER ── */
-        .founding {
-            background: var(--bg2);
-            border-top: 1px solid var(--border);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .founding-wrap {
-            max-width: 900px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 80px;
-            align-items: center;
-        }
-
-        .perks-list {
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-            margin-top: 32px;
-        }
-
-        .perk {
-            display: flex;
-            align-items: flex-start;
-            gap: 14px;
-        }
-
-        .perk-check {
-            width: 22px; height: 22px;
-            background: var(--pink-dim);
-            border: 1px solid rgba(255,75,110,0.3);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-
-        .perk-check i { color: var(--pink); font-size: 10px; }
-
-        .perk p { font-size: 15px; color: var(--muted); line-height: 1.55; }
-        .perk strong { color: var(--text); }
-
-        .founding-cta {
-            background: var(--bg3);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 36px;
-            text-align: center;
-        }
-
-        .founding-cta h3 {
-            font-family: var(--font-display);
-            font-size: 26px;
-            font-weight: 800;
-            margin-bottom: 8px;
-            letter-spacing: -0.5px;
-        }
-
-        .founding-cta p {
-            color: var(--muted);
-            font-size: 14px;
-            margin-bottom: 24px;
-            line-height: 1.6;
-        }
-
-        .spots-bar {
-            background: var(--bg2);
-            border-radius: 8px;
-            height: 8px;
-            margin-bottom: 8px;
-            overflow: hidden;
-        }
-
-        .spots-fill {
-            height: 100%;
-            width: 67%;
-            background: linear-gradient(90deg, var(--pink), #ff8a65);
-            border-radius: 8px;
-        }
-
-        .spots-label {
-            font-size: 12px;
-            color: var(--muted);
-            margin-bottom: 24px;
-            text-align: left;
-        }
-
-        .spots-label span { color: var(--pink); font-weight: 600; }
-
-        .btn-primary {
-            display: inline-block;
-            background: var(--pink);
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 10px;
-            font-family: var(--font-display);
-            font-weight: 700;
-            font-size: 15px;
-            cursor: pointer;
-            text-decoration: none;
-            width: 100%;
-            transition: opacity 0.2s, transform 0.2s;
-            letter-spacing: 0.2px;
-        }
-
-        .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
-
-        .btn-secondary {
-            display: inline-block;
-            background: transparent;
-            color: var(--text);
-            border: 1px solid var(--border);
-            padding: 13px 28px;
-            border-radius: 10px;
-            font-family: var(--font-display);
-            font-weight: 600;
-            font-size: 15px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: border-color 0.2s, color 0.2s;
-        }
-
-        .btn-secondary:hover { border-color: var(--pink); color: var(--pink); }
-
-        /* ── TESTIMONIALS ── */
-        .testimonials-wrap {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-
-        .testimonials-header {
-            text-align: center;
-            margin-bottom: 56px;
-        }
-
-        .testimonials-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-        }
-
-        .testimonial-card {
-            background: var(--bg2);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 28px;
-            transition: border-color 0.3s, transform 0.3s;
-        }
-
-        .testimonial-card:hover {
-            border-color: rgba(255,75,110,0.3);
-            transform: translateY(-3px);
-        }
-
-        .stars {
-            color: var(--pink);
-            font-size: 13px;
-            margin-bottom: 16px;
-            letter-spacing: 2px;
-        }
-
-        .testimonial-card blockquote {
-            font-size: 15px;
-            color: var(--text);
-            line-height: 1.65;
-            font-style: normal;
-            margin-bottom: 20px;
-            font-weight: 300;
-        }
-
-        .testimonial-author {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .t-avatar {
-            width: 36px; height: 36px;
-            border-radius: 50%;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-family: var(--font-display);
-            flex-shrink: 0;
-        }
-
-        .t-name { font-size: 14px; font-weight: 600; }
-        .t-role { font-size: 12px; color: var(--muted); }
-
-        /* ── FINAL CTA ── */
-        .final-cta {
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .final-cta::before {
-            content: '';
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 600px; height: 400px;
-            background: radial-gradient(ellipse, rgba(255,75,110,0.1), transparent 70%);
-        }
-
-        .final-cta-wrap {
-            position: relative;
-            z-index: 1;
-            max-width: 700px;
-            margin: 0 auto;
-        }
-
-        .final-cta h2 {
-            font-family: var(--font-display);
-            font-size: clamp(36px, 6vw, 72px);
-            font-weight: 800;
-            letter-spacing: -1.5px;
-            line-height: 1.05;
-            margin-bottom: 24px;
-        }
-
-        .final-cta p {
-            font-size: 18px;
-            color: var(--muted);
-            margin-bottom: 40px;
-            font-weight: 300;
-        }
-
-        .final-buttons {
-            display: flex;
-            gap: 14px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        /* ── FOOTER ── */
-        footer {
-            border-top: 1px solid var(--border);
-            padding: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-
-        .footer-logo {
-            font-family: var(--font-display);
-            font-size: 18px;
-            font-weight: 800;
-            color: var(--text);
-            text-decoration: none;
-        }
-
-        .footer-logo span { color: var(--pink); }
-
-        .footer-links {
-            display: flex;
-            gap: 28px;
-            list-style: none;
-        }
-
-        .footer-links a {
-            color: var(--muted);
-            text-decoration: none;
-            font-size: 13px;
-            transition: color 0.2s;
-        }
-
-        .footer-links a:hover { color: var(--text); }
-
-        .footer-copy {
-            font-size: 13px;
-            color: var(--muted);
-        }
-
-        /* ── TOAST ── */
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background: var(--bg2);
-            border: 1px solid rgba(255,75,110,0.4);
-            color: var(--text);
-            padding: 14px 20px;
-            border-radius: 12px;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-            transform: translateY(80px);
-            opacity: 0;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 1000;
-        }
-
-        .toast.show { transform: translateY(0); opacity: 1; }
-        .toast i { color: var(--pink); }
-
-        /* ── ANIMATIONS ── */
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(24px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .reveal {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.7s ease, transform 0.7s ease;
-        }
-
-        .reveal.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        /* ── RESPONSIVE ── */
-        @media (max-width: 768px) {
-            nav { padding: 16px 20px; }
-            .nav-links { display: none; }
-
-            .how-wrap,
-            .founding-wrap {
-                grid-template-columns: 1fr;
-                gap: 48px;
-            }
-
-            footer {
-                flex-direction: column;
-                text-align: center;
-                padding: 32px 20px;
-            }
-
-            .footer-links { flex-wrap: wrap; justify-content: center; }
-            .proof-strip { gap: 24px; padding: 20px; }
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-    <a href="#" class="nav-logo">Bond<span>Base</span></a>
-    <ul class="nav-links">
-        <li><a href="#features">Features</a></li>
-        <li><a href="#how">How it works</a></li>
-        <li><a href="#founding">Founding members</a></li>
-        <li><a href="login.html" class="nav-cta">Sign in</a></li>
-    </ul>
+<!-- ===== TOP HEADER (shown when logged in) ===== -->
+<header id="top-header" class="top-header" hidden>
+    <a href="#/" class="brand">Drop</a>
+    <div class="header-actions">
+        <a href="#/notifications" class="icon-btn" id="header-notif-btn" aria-label="Notifications">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span id="nav-notif-badge" class="nav-badge corner-badge" hidden></span>
+        </a>
+        <button id="header-settings-btn" class="icon-btn" aria-label="Settings">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+    </div>
+</header>
+
+<!-- ===== APP CONTAINER ===== -->
+<main id="app-main">
+
+    <!-- ===== LOGIN ===== -->
+    <section id="view-login" class="view view-auth" hidden>
+        <div class="auth-container">
+            <h1 class="brand brand-large">Drop</h1>
+            <p class="muted center mb-lg">One prompt. One photo. Once a day.</p>
+            <form id="login-form" class="card">
+                <label for="login-email">Email</label>
+                <input id="login-email" type="email" autocomplete="email" required placeholder="you@example.com" />
+                <div class="row-between mt-sm">
+                    <label for="login-password">Password</label>
+                    <button type="button" id="forgot-btn" class="link-btn">Forgot?</button>
+                </div>
+                <input id="login-password" type="password" autocomplete="current-password" required minlength="6" />
+                <button type="submit" class="btn btn-primary btn-lg btn-block mt-md">Sign In</button>
+                <p id="login-error" class="error-text" hidden></p>
+            </form>
+            <p class="center mt-lg muted">Don't have an account? <a href="#/signup" class="link">Sign up</a></p>
+        </div>
+    </section>
+
+    <!-- ===== SIGNUP ===== -->
+    <section id="view-signup" class="view view-auth" hidden>
+        <div class="auth-container">
+            <h1 class="brand brand-large">Drop</h1>
+            <p class="muted center mb-lg">Real moments. No filters. One a day.</p>
+            <form id="signup-form" class="card">
+                <label for="signup-name">Display name</label>
+                <input id="signup-name" type="text" autocomplete="name" required maxlength="40" placeholder="What should we call you?" />
+                <label for="signup-email" class="mt-sm">Email</label>
+                <input id="signup-email" type="email" autocomplete="email" required placeholder="you@example.com" />
+                <label for="signup-password" class="mt-sm">Password</label>
+                <input id="signup-password" type="password" autocomplete="new-password" required minlength="6" placeholder="At least 6 characters" />
+                <button type="submit" class="btn btn-primary btn-lg btn-block mt-md">Create Account</button>
+                <p id="signup-error" class="error-text" hidden></p>
+            </form>
+            <p class="center mt-lg muted">Already have an account? <a href="#/login" class="link">Sign in</a></p>
+        </div>
+    </section>
+
+    <!-- ===== ONBOARDING ===== -->
+    <section id="view-onboarding" class="view view-auth" hidden>
+        <div class="onboarding-container">
+            <div id="onboarding-slides" class="onboarding-slides">
+                <div class="onboarding-slide" data-slide="0">
+                    <div class="onboarding-illustration accent-bg">
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </div>
+                    <h2 class="display">One prompt. Once a day.</h2>
+                    <p class="muted">A new prompt drops at the same time every day. You have a few minutes to capture it.</p>
+                </div>
+                <div class="onboarding-slide" data-slide="1" hidden>
+                    <div class="onboarding-illustration accent-bg">
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    </div>
+                    <h2 class="display">Real moments. No filters.</h2>
+                    <p class="muted">No edits. No staging. Just what's actually happening.</p>
+                </div>
+                <div class="onboarding-slide" data-slide="2" hidden>
+                    <div class="onboarding-illustration accent-bg">
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <h2 class="display">Build your streak.</h2>
+                    <p class="muted">Pick a username and you're in.</p>
+                    <form id="onboarding-form" class="mt-lg" style="width:100%">
+                        <label for="onboarding-username">Username</label>
+                        <input id="onboarding-username" type="text" required maxlength="24" pattern="[a-zA-Z0-9_]+" placeholder="yourname" autocomplete="off" autocapitalize="off" />
+                        <p class="hint">Letters, numbers and underscores only.</p>
+                        <button type="submit" class="btn btn-primary btn-lg btn-block mt-md">Continue</button>
+                        <p id="onboarding-error" class="error-text" hidden></p>
+                    </form>
+                </div>
+            </div>
+            <div class="onboarding-dots" id="onboarding-dots">
+                <button class="dot active" data-dot="0" aria-label="Slide 1"></button>
+                <button class="dot" data-dot="1" aria-label="Slide 2"></button>
+                <button class="dot" data-dot="2" aria-label="Slide 3"></button>
+            </div>
+            <div id="onboarding-nav" class="onboarding-nav">
+                <button id="onboarding-back" class="btn btn-ghost" hidden>Back</button>
+                <button id="onboarding-next" class="btn btn-primary">Next</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== TODAY (HOME) ===== -->
+    <section id="view-today" class="view" hidden>
+        <div class="container">
+            <div class="streak-row">
+                <div class="streak-pill" id="today-streak">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>
+                    <span class="streak-num">0</span>
+                    <span class="streak-label">day streak</span>
+                </div>
+                <span class="muted small" id="today-date"></span>
+            </div>
+
+            <div class="prompt-card">
+                <p class="overline">Today's prompt</p>
+                <h1 class="prompt-text" id="today-prompt-text">Loading…</h1>
+                <div class="countdown" id="today-countdown">
+                    <span class="countdown-label">Opens in</span>
+                    <span class="countdown-value">—</span>
+                </div>
+            </div>
+
+            <div id="today-action" class="action-block">
+                <button id="today-snap-btn" class="btn btn-primary btn-xl btn-block" disabled>Capture</button>
+                <p id="today-action-hint" class="muted center small mt-sm"></p>
+            </div>
+
+            <div id="today-already-posted" class="already-posted" hidden>
+                <div class="check-circle">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h3>You're in today</h3>
+                <p class="muted">Your drop is on the feed.</p>
+                <button class="btn btn-secondary btn-block mt-md" onclick="location.hash='#/feed'">View today's feed</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FEED ===== -->
+    <section id="view-feed" class="view" hidden>
+        <div class="container">
+            <div class="feed-header">
+                <p class="overline">Today</p>
+                <h1 class="page-title" id="feed-prompt-text">—</h1>
+                <div class="tab-bar tab-bar-sm">
+                    <button class="tab-btn active" data-feed-tab="friends">Friends</button>
+                    <button class="tab-btn" data-feed-tab="all">Everyone</button>
+                </div>
+                <p class="muted small" id="feed-count">0 drops</p>
+            </div>
+
+            <div id="feed-empty" class="empty-state" hidden>
+                <div class="empty-illustration">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                </div>
+                <h3>No drops yet today</h3>
+                <p class="muted">Be the first when the prompt opens.</p>
+            </div>
+
+            <div id="feed-grid" class="feed-grid"></div>
+        </div>
+    </section>
+
+    <!-- ===== CAPTURE ===== -->
+    <section id="view-capture" class="view" hidden>
+        <div class="container">
+            <button class="link-btn back-btn" onclick="history.back()">← Back</button>
+            <p class="overline">Today's prompt</p>
+            <h2 class="prompt-text-small" id="capture-prompt-text">—</h2>
+
+            <div id="capture-picker" class="capture-picker">
+                <label for="capture-camera" class="capture-tile">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <span class="capture-label">Take photo</span>
+                </label>
+                <input id="capture-camera" type="file" accept="image/*" capture="environment" hidden />
+
+                <label for="capture-library" class="capture-tile">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span class="capture-label">From library</span>
+                    <span class="capture-hint">Up to 5 photos</span>
+                </label>
+                <input id="capture-library" type="file" accept="image/*" multiple hidden />
+            </div>
+
+            <div id="capture-preview-block" hidden>
+                <div id="capture-previews" class="capture-previews"></div>
+                <label for="capture-caption">Caption</label>
+                <textarea id="capture-caption" maxlength="240" rows="2" placeholder="Say something… use #hashtags"></textarea>
+                <p class="hint" id="capture-caption-count">0 / 240</p>
+
+                <button id="capture-post-btn" class="btn btn-primary btn-xl btn-block mt-md">Post</button>
+                <button id="capture-retake-btn" class="btn btn-ghost btn-block mt-sm">Retake</button>
+                <p id="capture-error" class="error-text" hidden></p>
+            </div>
+
+            <div id="capture-uploading" class="uploading" hidden>
+                <div class="spinner"></div>
+                <p class="muted">Posting your drop…</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== PROFILE ===== -->
+    <section id="view-profile" class="view" hidden>
+        <div class="container">
+            <div class="profile-header">
+                <div class="avatar avatar-lg" id="profile-avatar">?</div>
+                <h1 class="page-title" id="profile-display-name">—</h1>
+                <p class="muted" id="profile-username">@—</p>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat">
+                    <span class="stat-num" id="profile-current-streak">0</span>
+                    <span class="stat-label">Current</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-num" id="profile-longest-streak">0</span>
+                    <span class="stat-label">Longest</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-num" id="profile-total">0</span>
+                    <span class="stat-label">Drops</span>
+                </div>
+            </div>
+
+            <h3 class="section-title">Last 30 days</h3>
+            <div id="profile-grid" class="profile-grid"></div>
+            <div id="profile-empty" class="empty-state" hidden>
+                <p class="muted">No drops yet.</p>
+            </div>
+
+            <div id="profile-own-actions" class="profile-actions" hidden>
+                <button class="btn btn-ghost btn-block" onclick="location.hash='#/settings'">Settings</button>
+                <button id="profile-signout-btn" class="btn btn-ghost btn-block">Sign out</button>
+            </div>
+
+            <div id="profile-other-actions" class="profile-actions" hidden>
+                <button id="profile-friend-btn" class="btn btn-primary btn-block">Add friend</button>
+                <button id="profile-message-btn" class="btn btn-secondary btn-block mt-sm" hidden>Message</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FRIENDS ===== -->
+    <section id="view-friends" class="view" hidden>
+        <div class="container">
+            <h1 class="page-title">Friends</h1>
+
+            <div class="tab-bar">
+                <button class="tab-btn active" data-friends-tab="list">Friends <span id="friends-count-badge" class="badge-count" hidden>0</span></button>
+                <button class="tab-btn" data-friends-tab="requests">Requests <span id="friends-req-badge" class="badge-count" hidden>0</span></button>
+                <button class="tab-btn" data-friends-tab="find">Find</button>
+            </div>
+
+            <div id="friends-tab-list" class="friends-tab">
+                <div id="friends-list" class="friends-list"></div>
+                <div id="friends-empty" class="empty-state" hidden>
+                    <h3>No friends yet</h3>
+                    <p class="muted">Find people in the Find tab.</p>
+                </div>
+            </div>
+
+            <div id="friends-tab-requests" class="friends-tab" hidden>
+                <h3 class="section-title">Incoming</h3>
+                <div id="friends-requests-in" class="friends-list"></div>
+                <div id="friends-requests-in-empty" class="empty-state" hidden><p class="muted">No incoming requests.</p></div>
+                <h3 class="section-title mt-lg">Sent</h3>
+                <div id="friends-requests-out" class="friends-list"></div>
+                <div id="friends-requests-out-empty" class="empty-state" hidden><p class="muted">No sent requests.</p></div>
+            </div>
+
+            <div id="friends-tab-find" class="friends-tab" hidden>
+                <form id="friends-search-form" class="row-gap">
+                    <input id="friends-search-input" type="text" placeholder="Search by username" autocomplete="off" />
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </form>
+                <div id="friends-search-result" class="friends-list mt-md"></div>
+                <p id="friends-search-status" class="muted center mt-md" hidden></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== CHATS INBOX ===== -->
+    <section id="view-chats" class="view" hidden>
+        <div class="container">
+            <h1 class="page-title">Chats</h1>
+            <div id="chats-list" class="chats-list"></div>
+            <div id="chats-empty" class="empty-state" hidden>
+                <h3>No conversations yet</h3>
+                <p class="muted">Open a friend's profile and tap Message.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== CHAT THREAD ===== -->
+    <section id="view-thread" class="view" hidden>
+        <div class="thread-header">
+            <button class="link-btn back-btn icon-back" onclick="history.back()" aria-label="Back">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div class="thread-header-info">
+                <div id="thread-avatar" class="thread-avatar">?</div>
+                <div>
+                    <h2 id="thread-title" class="thread-title">@—</h2>
+                    <p id="thread-subtitle" class="thread-subtitle">Active</p>
+                </div>
+            </div>
+            <a id="thread-profile-link" href="#/profile/" class="icon-btn" aria-label="View profile">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            </a>
+        </div>
+        <div id="thread-messages" class="thread-messages"></div>
+        <form id="thread-form" class="thread-composer">
+            <label for="thread-image-input" class="composer-icon-btn" aria-label="Send image">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </label>
+            <input id="thread-image-input" type="file" accept="image/*" hidden />
+            <input id="thread-input" type="text" placeholder="Message…" autocomplete="off" />
+            <button type="submit" class="composer-send-btn" aria-label="Send">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+            </button>
+        </form>
+    </section>
+
+    <!-- ===== POST DETAIL ===== -->
+    <section id="view-post" class="view" hidden>
+        <div class="container container-narrow">
+            <button class="link-btn back-btn" onclick="history.back()">← Back</button>
+            <div id="post-detail" class="post-detail"></div>
+        </div>
+    </section>
+
+    <!-- ===== HASHTAG ===== -->
+    <section id="view-hashtag" class="view" hidden>
+        <div class="container">
+            <button class="link-btn back-btn" onclick="history.back()">← Back</button>
+            <h1 id="hashtag-title" class="page-title">#—</h1>
+            <p id="hashtag-count" class="muted small">0 drops</p>
+            <div id="hashtag-feed" class="feed-grid mt-md"></div>
+            <div id="hashtag-empty" class="empty-state" hidden>
+                <p class="muted">No drops with this hashtag yet.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== NOTIFICATIONS ===== -->
+    <section id="view-notifications" class="view" hidden>
+        <div class="container container-narrow">
+            <button class="link-btn back-btn" onclick="history.back()">← Back</button>
+            <h1 class="page-title">Notifications</h1>
+            <div id="notifications-list" class="notifications-list"></div>
+            <div id="notifications-empty" class="empty-state" hidden>
+                <p class="muted">Nothing yet. When people view, like, or comment on your drops, you'll see it here.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SHARE ===== -->
+    <section id="view-share" class="view" hidden>
+        <div class="container">
+            <button class="link-btn back-btn" onclick="history.back()">← Back</button>
+            <h1 class="page-title">Share your drop</h1>
+
+            <div id="share-card-wrap" class="share-card-wrap" hidden>
+                <div id="share-card" class="share-card">
+                    <img id="share-card-img" alt="" crossorigin="anonymous" />
+                    <div class="share-card-overlay">
+                        <p class="share-card-prompt" id="share-card-prompt">—</p>
+                        <p class="share-card-meta">
+                            <span id="share-card-username">@—</span>
+                            <span class="dot-sep">·</span>
+                            <span class="share-card-brand">Drop</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <button id="share-download-btn" class="btn btn-primary btn-block mt-lg">Save image</button>
+            <button id="share-copy-btn" class="btn btn-secondary btn-block mt-sm">Copy link</button>
+        </div>
+    </section>
+
+    <!-- ===== SETTINGS ===== -->
+    <section id="view-settings" class="view" hidden>
+        <div class="container">
+            <button class="link-btn back-btn" onclick="history.back()">← Back</button>
+            <h1 class="page-title">Settings</h1>
+
+            <div class="setting-row">
+                <div>
+                    <h3>Prompt time</h3>
+                    <p class="muted small">Today's prompt opens at this local time.</p>
+                </div>
+                <input id="settings-time" type="time" />
+            </div>
+
+            <div class="setting-row">
+                <div>
+                    <h3>Push notifications</h3>
+                    <p class="muted small">Daily nudge when the prompt opens.</p>
+                </div>
+                <label class="switch">
+                    <input id="settings-push" type="checkbox" />
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <button id="settings-save-btn" class="btn btn-primary btn-block mt-lg">Save changes</button>
+            <p id="settings-saved" class="muted center small mt-sm" hidden>Saved.</p>
+
+            <hr class="divider" />
+
+            <button id="settings-signout-btn" class="btn btn-ghost btn-block">Sign out</button>
+            <button id="settings-delete-btn" class="btn btn-danger-ghost btn-block mt-sm">Delete account</button>
+        </div>
+    </section>
+
+</main>
+
+<!-- ===== BOTTOM NAV (shown when logged in) ===== -->
+<nav id="bottom-nav" class="bottom-nav" hidden>
+    <a href="#/" class="nav-item" data-route="today">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Today</span>
+    </a>
+    <a href="#/feed" class="nav-item" data-route="feed">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Feed</span>
+    </a>
+    <a href="#/friends" class="nav-item" data-route="friends">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Friends<span id="nav-friends-badge" class="nav-badge" hidden></span></span>
+    </a>
+    <a href="#/chats" class="nav-item" data-route="chats">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Chats<span id="nav-chats-badge" class="nav-badge" hidden></span></span>
+    </a>
+    <a href="#/profile" class="nav-item" data-route="profile">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>You</span>
+    </a>
 </nav>
 
-<!-- HERO -->
-<section class="hero">
-    <div>
-        <div class="hero-badge">
-            <i class="fas fa-fire"></i>
-            Now accepting founding members
-        </div>
-        <h1>Your space.<br><em>Your people.</em><br>Your rules.</h1>
-        <p class="hero-sub">
-            BondBase is the platform where real connections grow into real communities — with a built-in store, live chat, and tools to let your personality lead.
-        </p>
-        <div class="hero-actions">
-            <div class="waitlist-form" id="heroForm">
-                <input type="email" id="heroEmail" placeholder="Enter your email address" />
-                <button onclick="joinWaitlist()">Get Early Access</button>
-            </div>
-            <span class="hero-note">
-                <i class="fas fa-lock"></i>
-                Free forever for founding members · No credit card needed
-            </span>
-        </div>
-    </div>
-</section>
+<!-- ===== TOAST CONTAINER ===== -->
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-<!-- SOCIAL PROOF STRIP -->
-<div class="proof-strip">
-    <div class="proof-item">
-        <i class="fas fa-bolt"></i>
-        <span><strong>Instant setup</strong> — live in 60 seconds</span>
-    </div>
-    <div class="proof-item">
-        <i class="fas fa-store"></i>
-        <span><strong>Built-in storefront</strong> — sell without third parties</span>
-    </div>
-    <div class="proof-item">
-        <i class="fas fa-comments"></i>
-        <span><strong>Real-time chat</strong> — voice, text & community spaces</span>
-    </div>
-    <div class="proof-item">
-        <i class="fas fa-shield-alt"></i>
-        <span><strong>No ads</strong> — your feed, your way</span>
+<!-- ===== FULLSCREEN PHOTO DIALOG ===== -->
+<div id="photo-dialog" class="dialog" hidden>
+    <button class="dialog-close" id="photo-dialog-close" aria-label="Close">×</button>
+    <div class="dialog-content">
+        <img id="photo-dialog-img" alt="" />
+        <div class="dialog-meta">
+            <p class="overline" id="photo-dialog-prompt">—</p>
+            <p id="photo-dialog-username" class="dialog-username">@—</p>
+            <p id="photo-dialog-caption" class="dialog-caption"></p>
+            <div class="dialog-actions">
+                <button id="photo-dialog-like" class="like-btn">
+                    <span class="heart">♡</span>
+                    <span class="like-count">0</span>
+                </button>
+                <button id="photo-dialog-share" class="btn btn-ghost btn-sm">Share</button>
+            </div>
+
+            <div class="comments-section">
+                <h4 class="comments-title">Comments</h4>
+                <div id="photo-dialog-comments" class="comments-list"></div>
+                <p id="photo-dialog-comments-empty" class="muted small" hidden>Be the first to comment.</p>
+                <form id="photo-dialog-comment-form" class="comment-composer">
+                    <input id="photo-dialog-comment-input" type="text" placeholder="Add a comment…" autocomplete="off" maxlength="240" required />
+                    <button type="submit" class="btn btn-primary btn-sm">Post</button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- FEATURES -->
-<section id="features">
-    <div class="features-wrap">
-        <div class="features-header reveal">
-            <div class="section-label">What you get</div>
-            <h2 class="section-title">Everything in one place.<br>Nothing you don't need.</h2>
-            <p class="section-body">Most platforms make you choose between community, commerce, and creativity. BondBase does all three — without the noise.</p>
-        </div>
-        <div class="features-grid reveal">
-            <div class="feature-card">
-                <div class="feature-icon"><i class="fas fa-globe-africa"></i></div>
-                <h3>Global Community</h3>
-                <p>Connect with people who share your world — across borders, time zones, and backgrounds. Build real friendships, not just follower counts.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon"><i class="fas fa-store"></i></div>
-                <h3>Digital Storefront</h3>
-                <p>Open your shop inside your profile. Sell products, services, or digital content — no separate platform, no fees eaten by middlemen.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon"><i class="fas fa-bolt"></i></div>
-                <h3>Real-Time Chat</h3>
-                <p>Instant messages, voice chats, and community spaces that actually feel alive. Talk to your people the moment inspiration hits.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon"><i class="fas fa-palette"></i></div>
-                <h3>Express Yourself</h3>
-                <p>Polls, posts, videos, replies — your profile is your canvas. Show up as the full, layered person you actually are.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon"><i class="fas fa-users"></i></div>
-                <h3>Smart Discovery</h3>
-                <p>People You May Know surfaces connections based on real patterns — not random algorithms pushing whoever paid most to be seen.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon"><i class="fas fa-chart-bar"></i></div>
-                <h3>Live Polls & Votes</h3>
-                <p>Ask your audience anything. Get instant, honest feedback. Build engagement that goes deeper than a double-tap.</p>
-            </div>
+<!-- ===== CONFIRM DIALOG ===== -->
+<div id="confirm-dialog" class="dialog dialog-small" hidden>
+    <div class="dialog-content dialog-card">
+        <h3 id="confirm-title">Are you sure?</h3>
+        <p id="confirm-message" class="muted"></p>
+        <div class="dialog-actions">
+            <button id="confirm-cancel" class="btn btn-ghost">Cancel</button>
+            <button id="confirm-ok" class="btn btn-danger">Confirm</button>
         </div>
     </div>
-</section>
-
-<!-- HOW IT WORKS -->
-<section id="how" style="background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-    <div class="how-wrap">
-        <div class="reveal">
-            <div class="section-label">How it works</div>
-            <h2 class="section-title">Up and running in under a minute.</h2>
-            <div class="steps-list">
-                <div class="step">
-                    <span class="step-num">01</span>
-                    <div>
-                        <h4>Create your space</h4>
-                        <p>Sign up, customize your profile, and tell the world who you are. No templates. No compromises.</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <span class="step-num">02</span>
-                    <div>
-                        <h4>Find your people</h4>
-                        <p>Discover users through Smart Discovery, follow creators you love, and build a feed that's actually worth opening.</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <span class="step-num">03</span>
-                    <div>
-                        <h4>Post, chat, sell</h4>
-                        <p>Share posts, hop into voice chats, run polls, and open your store — all from the same place, all on day one.</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <span class="step-num">04</span>
-                    <div>
-                        <h4>Grow your community</h4>
-                        <p>Your followers aren't just numbers. They're people who chose you. Engage them with tools built for real connection.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Mock UI -->
-        <div class="phone-mock reveal">
-            <div class="mock-bar">
-                <div class="mock-dot"></div>
-                <div class="mock-dot"></div>
-                <div class="mock-dot"></div>
-            </div>
-            <div class="mock-post">
-                <div class="mock-post-head">
-                    <div class="mock-avatar"></div>
-                    <div>
-                        <div class="mock-name">Aisha Mensah</div>
-                        <div class="mock-time">2 min ago</div>
-                    </div>
-                </div>
-                <div class="mock-img-placeholder"><i class="fas fa-image"></i></div>
-                <div class="mock-text">Finally launched my art store on BondBase. First sale within 3 hours 🔥</div>
-                <div class="mock-actions">
-                    <span class="mock-action"><i class="fas fa-arrow-up"></i> 142</span>
-                    <span class="mock-action"><i class="far fa-comment"></i> 38</span>
-                    <span class="mock-action"><i class="far fa-heart"></i> 89</span>
-                </div>
-            </div>
-            <div class="mock-post">
-                <div class="mock-post-head">
-                    <div class="mock-avatar b"></div>
-                    <div>
-                        <div class="mock-name">Dev Collective</div>
-                        <div class="mock-time">15 min ago</div>
-                    </div>
-                </div>
-                <div class="mock-text">Poll: What's the most underrated programming language right now?</div>
-                <div class="mock-actions">
-                    <span class="mock-action"><i class="fas fa-chart-bar"></i> 214 votes</span>
-                    <span class="mock-action"><i class="far fa-comment"></i> 61</span>
-                </div>
-            </div>
-            <div class="mock-post" style="margin-bottom:0">
-                <div class="mock-post-head">
-                    <div class="mock-avatar c"></div>
-                    <div>
-                        <div class="mock-name">Tunde Creates</div>
-                        <div class="mock-time">1 hr ago</div>
-                    </div>
-                </div>
-                <div class="mock-text">Hosting a live voice chat tonight at 8PM WAT — topic: building your brand from zero. Join in 👇</div>
-                <div class="mock-actions">
-                    <span class="mock-action"><i class="fas fa-microphone"></i> Live tonight</span>
-                    <span class="mock-action"><i class="fas fa-arrow-up"></i> 77</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- FOUNDING MEMBERS -->
-<section id="founding">
-    <div class="founding-wrap">
-        <div class="reveal">
-            <div class="section-label">Founding members</div>
-            <h2 class="section-title">Be part of the first 1,000.</h2>
-            <p class="section-body">Founding members shape BondBase from day one — and get perks that will never be available again.</p>
-            <div class="perks-list">
-                <div class="perk">
-                    <div class="perk-check"><i class="fas fa-check"></i></div>
-                    <p><strong>Founding Member badge</strong> — permanent, visible on your profile forever</p>
-                </div>
-                <div class="perk">
-                    <div class="perk-check"><i class="fas fa-check"></i></div>
-                    <p><strong>Priority access</strong> — get in before the public launch opens</p>
-                </div>
-                <div class="perk">
-                    <div class="perk-check"><i class="fas fa-check"></i></div>
-                    <p><strong>Zero store fees</strong> — sell for free, forever, no commission cuts</p>
-                </div>
-                <div class="perk">
-                    <div class="perk-check"><i class="fas fa-check"></i></div>
-                    <p><strong>Direct input</strong> — your feedback shapes features before launch</p>
-                </div>
-            </div>
-        </div>
-        <div class="founding-cta reveal">
-            <h3>Claim your spot</h3>
-            <p>Once we hit 1,000 founding members, this offer closes permanently.</p>
-            <div class="spots-bar"><div class="spots-fill"></div></div>
-            <div class="spots-label"><span>670 of 1,000</span> spots claimed</div>
-            <input type="email" id="foundingEmail" placeholder="Your email address"
-                style="width:100%; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:13px 16px; color:var(--text); font-size:14px; font-family:var(--font-body); margin-bottom:12px; outline:none; transition:border-color 0.2s;"
-                onfocus="this.style.borderColor='var(--pink)'" onblur="this.style.borderColor='var(--border)'">
-            <button class="btn-primary" onclick="joinFounders()">Become a Founding Member</button>
-        </div>
-    </div>
-</section>
-
-<!-- TESTIMONIALS -->
-<section style="background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-    <div class="testimonials-wrap">
-        <div class="testimonials-header reveal">
-            <div class="section-label">Early users say</div>
-            <h2 class="section-title">People are already talking.</h2>
-        </div>
-        <div class="testimonials-grid">
-            <div class="testimonial-card reveal">
-                <div class="stars">★★★★★</div>
-                <blockquote>"Finally a platform that doesn't make me choose between connecting with people and running my business. I set up my store in 10 minutes."</blockquote>
-                <div class="testimonial-author">
-                    <div class="t-avatar" style="background: linear-gradient(135deg, #ff4b6e, #ff8a50);">A</div>
-                    <div>
-                        <div class="t-name">Amara O.</div>
-                        <div class="t-role">Photographer & creator</div>
-                    </div>
-                </div>
-            </div>
-            <div class="testimonial-card reveal">
-                <div class="stars">★★★★★</div>
-                <blockquote>"The polls feature alone is worth it. I get more genuine feedback from my BondBase community than anywhere else I've tried."</blockquote>
-                <div class="testimonial-author">
-                    <div class="t-avatar" style="background: linear-gradient(135deg, #6c63ff, #4ecdc4);">K</div>
-                    <div>
-                        <div class="t-name">Kofi A.</div>
-                        <div class="t-role">Developer & writer</div>
-                    </div>
-                </div>
-            </div>
-            <div class="testimonial-card reveal">
-                <div class="stars">★★★★★</div>
-                <blockquote>"It feels like someone actually thought about the user experience. Everything is where you expect it and there's no algorithm burying your posts."</blockquote>
-                <div class="testimonial-author">
-                    <div class="t-avatar" style="background: linear-gradient(135deg, #f7971e, #ffd200);">Z</div>
-                    <div>
-                        <div class="t-name">Zara M.</div>
-                        <div class="t-role">Entrepreneur</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- FINAL CTA -->
-<section class="final-cta">
-    <div class="final-cta-wrap reveal">
-        <h2>Ready to find<br><em style="color:var(--pink);font-style:normal;">your people?</em></h2>
-        <p>Join thousands already building on BondBase. It takes less than a minute.</p>
-        <div class="final-buttons">
-            <a href="signup.html" class="btn-primary" style="text-decoration:none; display:inline-block; padding: 14px 32px;">Create Your Space Free</a>
-            <a href="login.html" class="btn-secondary" style="text-decoration:none; display:inline-block; padding: 14px 32px;">Sign In</a>
-        </div>
-    </div>
-</section>
-
-<!-- FOOTER -->
-<footer>
-    <a href="#" class="footer-logo">Bond<span>Base</span></a>
-    <ul class="footer-links">
-        <li><a href="#">About</a></li>
-        <li><a href="#">Privacy</a></li>
-        <li><a href="#">Terms</a></li>
-        <li><a href="#">Contact</a></li>
-    </ul>
-    <span class="footer-copy">© 2025 BondBase. All rights reserved.</span>
-</footer>
-
-<!-- TOAST -->
-<div class="toast" id="toast">
-    <i class="fas fa-check-circle"></i>
-    <span id="toastMsg">You're on the list!</span>
 </div>
 
-<script>
-    // Scroll reveal
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry, i) => {
-            if (entry.isIntersecting) {
-                setTimeout(() => entry.target.classList.add('visible'), i * 80);
-                observer.unobserve(entry.target);
-            }
-        });
-    }, { threshold: 0.12 });
-
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-    // Toast helper
-    function showToast(msg) {
-        const toast = document.getElementById('toast');
-        document.getElementById('toastMsg').textContent = msg;
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3500);
-    }
-
-    // Hero waitlist
-    function joinWaitlist() {
-        const email = document.getElementById('heroEmail').value.trim();
-        if (!email || !email.includes('@')) {
-            document.getElementById('heroEmail').style.borderColor = '#ff4b6e';
-            return;
-        }
-        showToast("🎉 You're on the list! We'll be in touch.");
-        document.getElementById('heroEmail').value = '';
-        // Replace with your actual backend/Firestore call
-    }
-
-    // Founder CTA
-    function joinFounders() {
-        const email = document.getElementById('foundingEmail').value.trim();
-        if (!email || !email.includes('@')) {
-            document.getElementById('foundingEmail').style.borderColor = '#ff4b6e';
-            return;
-        }
-        showToast("🔥 Founding member spot secured!");
-        document.getElementById('foundingEmail').value = '';
-        // Replace with your actual backend/Firestore call
-    }
-
-    // Enter key on hero form
-    document.getElementById('heroEmail').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') joinWaitlist();
-    });
-
-    // Nav scroll effect
-    window.addEventListener('scroll', () => {
-        document.querySelector('nav').style.background =
-            window.scrollY > 40
-                ? 'rgba(14,16,20,0.95)'
-                : 'rgba(14,16,20,0.7)';
-    });
-</script>
+<!-- ===== APP SCRIPT ===== -->
+<script type="module" src="app.js"></script>
 </body>
 </html>
