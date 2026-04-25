@@ -646,8 +646,63 @@ function applyFeedRender() {
     $("#feed-empty").hidden = true;
     $("#feed-count").textContent = `${docs.length} drop${docs.length === 1 ? "" : "s"}`;
 
-    grid.innerHTML = docs.map(d => renderPostCardHTML(d.id, d.data())).join("");
-    wirePostCards(grid);
+    // Incremental render: only diff/patch cards instead of wiping the whole grid.
+    // This prevents the full-grid flash when a single post (e.g. a reaction)
+    // changes in the snapshot.
+    const existing = new Map();
+    grid.querySelectorAll(".post-card").forEach(c => existing.set(c.dataset.postId, c));
+
+    const newIds = new Set(docs.map(d => d.id));
+    existing.forEach((card, id) => { if (!newIds.has(id)) card.remove(); });
+
+    let prev = null;
+    docs.forEach(d => {
+        const id = d.id;
+        const data = d.data();
+        let card = existing.get(id);
+        if (!card) {
+            const tpl = document.createElement("template");
+            tpl.innerHTML = renderPostCardHTML(id, data).trim();
+            card = tpl.content.firstElementChild;
+            if (prev && prev.nextSibling !== card) prev.after(card);
+            else if (!prev) grid.prepend(card);
+            else grid.appendChild(card);
+            wirePostCard(card);
+        } else {
+            // Patch in-place: replace inner HTML, preserve outer article + its
+            // event listener (set in wirePostCard) so no full-page flash.
+            const tpl = document.createElement("template");
+            tpl.innerHTML = renderPostCardHTML(id, data).trim();
+            const fresh = tpl.content.firstElementChild;
+            // Only swap inner if changed (cheap signature: likes+comments+reactions+caption)
+            const sig = postSignature(data);
+            if (card.dataset.sig !== sig) {
+                card.innerHTML = fresh.innerHTML;
+                card.dataset.sig = sig;
+                wireCarouselScroll(card);
+            }
+            if (prev && prev.nextSibling !== card) prev.after(card);
+            else if (!prev && grid.firstChild !== card) grid.prepend(card);
+        }
+        if (!card.dataset.sig) card.dataset.sig = postSignature(data);
+        prev = card;
+    });
+}
+
+function postSignature(p) {
+    const reactions = p.reactions || {};
+    const rs = Object.keys(reactions).sort().map(k => `${k}:${reactions[k]}`).join(",");
+    const ur = (p.userReactions || {})[(state.user && state.user.uid) || ""] || "";
+    const lb = (p.likedBy || []).length;
+    return [
+        p.likes || 0,
+        p.commentsCount || 0,
+        rs,
+        ur,
+        lb,
+        (p.caption || "").length,
+        p.imageUrl || ""
+    ].join("|");
 }
 
 function renderPostCardHTML(postId, p) {
@@ -723,19 +778,28 @@ function renderReactionsRowHTML(p, myReaction, postId, compact) {
 }
 
 function wirePostCards(container) {
-    container.querySelectorAll(".post-card").forEach(card => {
-        const postId = card.dataset.postId;
-        // Carousel scroll → update counter + dots
-        const track = card.querySelector(".post-image-track");
-        if (track) {
-            const counter = card.querySelector(".carousel-counter");
-            const dots = card.querySelectorAll(".carousel-dot");
-            track.addEventListener("scroll", () => {
-                const idx = Math.round(track.scrollLeft / track.clientWidth);
-                if (counter) counter.textContent = `${idx + 1}/${dots.length}`;
-                dots.forEach((d, i) => d.classList.toggle("active", i === idx));
-            });
-        }
+    container.querySelectorAll(".post-card").forEach(card => wirePostCard(card));
+}
+
+function wireCarouselScroll(card) {
+    const track = card.querySelector(".post-image-track");
+    if (!track || track.dataset.wired) return;
+    track.dataset.wired = "1";
+    const counter = card.querySelector(".carousel-counter");
+    const dots = card.querySelectorAll(".carousel-dot");
+    track.addEventListener("scroll", () => {
+        const idx = Math.round(track.scrollLeft / track.clientWidth);
+        if (counter) counter.textContent = `${idx + 1}/${dots.length}`;
+        dots.forEach((d, i) => d.classList.toggle("active", i === idx));
+    });
+}
+
+function wirePostCard(card) {
+    if (card.dataset.wired) return;
+    card.dataset.wired = "1";
+    const postId = card.dataset.postId;
+    wireCarouselScroll(card);
+    {
         card.addEventListener("click", async (e) => {
             const target = e.target.closest("[data-action], [data-username], [data-reaction]");
             if (!target) {
@@ -771,7 +835,7 @@ function wirePostCards(container) {
             // "open" or "comment" or anywhere else → post detail page
             location.hash = `#/post/${postId}`;
         });
-    });
+    }
 }
 
 async function toggleLikeOnPost(postId, btn) {
@@ -835,15 +899,40 @@ async function toggleReaction(postId, reactionKey) {
         updates[`reactions.${reactionKey}`] = increment(1);
         updates[`userReactions.${state.user.uid}`] = reactionKey;
     }
+    // Optimistic in-place patch BEFORE the network round-trip so the user
+    // sees the chip update immediately and there's no full-page flash.
+    const optimisticReactions = { ...reactions };
+    let optimisticUserReaction;
+    if (previous === reactionKey) {
+        optimisticReactions[reactionKey] = Math.max(0, (optimisticReactions[reactionKey] || 0) - 1);
+        optimisticUserReaction = null;
+    } else {
+        if (previous) optimisticReactions[previous] = Math.max(0, (optimisticReactions[previous] || 0) - 1);
+        optimisticReactions[reactionKey] = (optimisticReactions[reactionKey] || 0) + 1;
+        optimisticUserReaction = reactionKey;
+    }
+    patchReactionsInDOM(postId, optimisticReactions, optimisticUserReaction);
+
     try {
         await updateDoc(ref, updates);
-        // Refresh feed card in-place (the snapshot listener will repaint)
-        // Refresh post detail if open
-        if (location.hash === `#/post/${postId}`) renderPost(postId);
+        // Snapshot listener will reconcile any drift.
     } catch (err) {
         console.warn(err);
         showToast("Couldn't react.", "error");
+        // Revert on failure
+        patchReactionsInDOM(postId, reactions, previous);
     }
+}
+
+// Patch every visible reactions-row for this post (feed, detail, hashtag…)
+// without re-rendering the whole card.
+function patchReactionsInDOM(postId, reactions, myReaction) {
+    const fakePost = { reactions, userReactions: { [state.user.uid]: myReaction } };
+    const newHtml = renderReactionsRowHTML(fakePost, myReaction || null, postId, /*compact*/ true);
+    document.querySelectorAll(`.post-card[data-post-id="${postId}"], #post-detail [data-post-id="${postId}"]`).forEach(card => {
+        const row = card.querySelector(":scope > .reactions-row, .reactions-row");
+        if (row) row.outerHTML = newHtml;
+    });
 }
 
 function showReactionPicker(anchorEl, postId) {
@@ -1200,9 +1289,30 @@ async function renderProfile(uid) {
             const tb = b.data().createdAt?.toMillis?.() || 0;
             return tb - ta;
         }).slice(0, 30);
+        const monthShort = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
         grid.innerHTML = sortedDocs.map(d => {
             const post = d.data();
-            return `<div class="profile-thumb" data-post-id="${d.id}"><img src="${escapeHtml(post.imageUrl)}" alt="" loading="lazy" /></div>`;
+            const ts = post.createdAt?.toMillis?.() || Date.now();
+            const dt = new Date(ts);
+            const dateLabel = `${monthShort[dt.getMonth()]} ${dt.getDate()}`;
+            const promptText = (post.promptText || "").trim();
+            const likes = post.likes || 0;
+            const comments = post.commentsCount || 0;
+            const stat = likes + comments;
+            const imgs = (post.images && post.images.length) ? post.images : [post.imageUrl];
+            const isMulti = imgs.length > 1;
+            const heart = `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9.5-9C.7 8.4 2.6 5 6 5c2 0 3.5 1.2 4.5 2.7C11.5 6.2 13 5 15 5c3.4 0 5.3 3.4 3.5 7-2.5 4.5-9.5 9-9.5 9z"/></svg>`;
+            const stack = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M21 7v12a2 2 0 0 1-2 2H7"/></svg>`;
+            return `
+                <div class="profile-thumb" data-post-id="${d.id}">
+                    <img src="${escapeHtml(post.imageUrl || imgs[0] || "")}" alt="" loading="lazy" />
+                    ${isMulti ? `<span class="profile-thumb-multi">${stack}</span>` : ""}
+                    ${stat > 0 ? `<span class="profile-thumb-stats">${heart}<span>${stat}</span></span>` : ""}
+                    <div class="profile-thumb-overlay">
+                        <div class="profile-thumb-date">${dateLabel}</div>
+                        ${promptText ? `<div class="profile-thumb-prompt">${escapeHtml(promptText)}</div>` : ""}
+                    </div>
+                </div>`;
         }).join("");
         grid.querySelectorAll(".profile-thumb").forEach(t => {
             t.onclick = () => location.hash = `#/post/${t.dataset.postId}`;
@@ -1899,20 +2009,83 @@ async function openThread(otherUid) {
         } catch (e) { /* may not exist yet */ }
     }
 
+    // Incremental thread render: only insert new messages instead of
+    // wiping `messagesEl.innerHTML` on every snapshot. This is what causes
+    // the perceived full-page flash when sending a message.
+    const threadCache = new Map(); // id -> { ts, mine }
     state.threadUnsub = onSnapshot(
         collection(db, "chats", cid, "messages"),
         (snap) => {
+            const nearBottom = (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight) < 80;
+
+            // Sort all current docs once to compute consecutive/day-divider context
             const sorted = [...snap.docs].sort((a, b) => {
                 const ta = a.data().createdAt?.toMillis?.() || 0;
                 const tb = b.data().createdAt?.toMillis?.() || 0;
                 return ta - tb;
             });
-            messagesEl.innerHTML = renderThreadMessagesHTML(sorted);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-            // Wire image clicks (open full size)
-            messagesEl.querySelectorAll(".msg-image").forEach(img => {
-                img.onclick = () => window.open(img.src, "_blank");
+
+            // Handle removals
+            const liveIds = new Set(sorted.map(d => d.id));
+            threadCache.forEach((_, id) => {
+                if (!liveIds.has(id)) {
+                    const node = messagesEl.querySelector(`[data-msg-id="${id}"]`);
+                    if (node) {
+                        // Also remove any preceding day-divider that becomes orphaned
+                        node.remove();
+                    }
+                    threadCache.delete(id);
+                }
             });
+
+            // Handle additions and in-place text updates
+            let prevSender = null;
+            let lastDate = "";
+            sorted.forEach((d) => {
+                const m = d.data();
+                const ts = m.createdAt?.toMillis?.() || Date.now();
+                const dayLabel = formatDayDivider(ts);
+                const needsDivider = dayLabel !== lastDate;
+                if (needsDivider) {
+                    lastDate = dayLabel;
+                    prevSender = null;
+                    // Make sure a divider exists immediately before this message
+                    const node = messagesEl.querySelector(`[data-msg-id="${d.id}"]`);
+                    const expected = `<div class="msg-time-divider" data-divider-for="${d.id}">${dayLabel}</div>`;
+                    if (node) {
+                        const prev = node.previousElementSibling;
+                        if (!prev || !prev.classList.contains("msg-time-divider")) {
+                            node.insertAdjacentHTML("beforebegin", expected);
+                        }
+                    }
+                }
+                const consecutive = prevSender === m.uid;
+                prevSender = m.uid;
+
+                if (!threadCache.has(d.id)) {
+                    // INSERT new message
+                    const mine = m.uid === state.user.uid;
+                    let bubbleContent;
+                    if (m.imageUrl) {
+                        bubbleContent = `<img class="msg-image" src="${escapeHtml(m.imageUrl)}" alt="" />`;
+                    } else {
+                        bubbleContent = `<div class="msg-bubble">${linkifyText(m.text || "")}</div>`;
+                    }
+                    let html = "";
+                    if (needsDivider) {
+                        html += `<div class="msg-time-divider" data-divider-for="${d.id}">${dayLabel}</div>`;
+                    }
+                    html += `<div class="msg-row ${mine ? "from-me" : "from-them"} ${consecutive ? "consecutive" : ""}" data-msg-id="${d.id}">${bubbleContent}</div>`;
+                    messagesEl.insertAdjacentHTML("beforeend", html);
+                    // Wire any new image
+                    const newRow = messagesEl.querySelector(`[data-msg-id="${d.id}"] .msg-image`);
+                    if (newRow) newRow.onclick = () => window.open(newRow.src, "_blank");
+                    threadCache.set(d.id, { ts, mine });
+                }
+            });
+
+            // Only auto-scroll if user was already at the bottom
+            if (nearBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
         },
         (err) => console.warn("thread listener:", err)
     );
