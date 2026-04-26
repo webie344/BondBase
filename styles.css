@@ -29,6 +29,40 @@
     --header-h: 56px;
     --nav-h: 64px;
     --safe-bottom: env(safe-area-inset-bottom, 0);
+    --header-bg: rgba(250, 250, 249, 0.85);
+    --nav-bg: rgba(250, 250, 249, 0.92);
+    --danger-soft: #fef2f2;
+}
+
+/* ===== Dark theme ===== */
+html[data-theme="dark"] {
+    --bg: #0b0b0c;
+    --surface: #16171a;
+    --surface-2: #1f2024;
+    --ink: #f5f5f4;
+    --ink-soft: #e5e5e4;
+    --muted: #9a9a99;
+    --border: #2a2b30;
+    --border-strong: #3a3b41;
+    --accent: #ff5a2b;
+    --accent-hover: #ff7a52;
+    --accent-soft: #2a1610;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+    --header-bg: rgba(11, 11, 12, 0.85);
+    --nav-bg: rgba(11, 11, 12, 0.92);
+    --danger-soft: #2a1414;
+    color-scheme: dark;
+}
+
+/* Smooth swap when toggling */
+html, body, .top-header, .bottom-nav, .post-card, .card, .prompt-card,
+.friend-card, .chat-row, .stats-row, .quick-tile, .dialog-content,
+input, textarea, .tab-bar, .seg, .seg-btn {
+    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
 }
 
 * {
@@ -93,7 +127,7 @@ a { color: inherit; text-decoration: none; }
     position: fixed;
     top: 0; left: 0; right: 0;
     height: var(--header-h);
-    background: rgba(250, 250, 249, 0.85);
+    background: var(--header-bg);
     backdrop-filter: saturate(180%) blur(16px);
     -webkit-backdrop-filter: saturate(180%) blur(16px);
     border-bottom: 1px solid var(--border);
@@ -136,7 +170,7 @@ a { color: inherit; text-decoration: none; }
     bottom: 0; left: 0; right: 0;
     height: calc(var(--nav-h) + var(--safe-bottom));
     padding-bottom: var(--safe-bottom);
-    background: rgba(250, 250, 249, 0.92);
+    background: var(--nav-bg);
     backdrop-filter: saturate(180%) blur(16px);
     -webkit-backdrop-filter: saturate(180%) blur(16px);
     border-top: 1px solid var(--border);
@@ -348,7 +382,7 @@ textarea {
     color: var(--danger);
     border-color: var(--border-strong);
 }
-.btn-danger-ghost:hover:not(:disabled) { background: #fef2f2; }
+.btn-danger-ghost:hover:not(:disabled) { background: var(--danger-soft); }
 
 .btn-lg { padding: 14px 28px; font-size: 16px; }
 .btn-xl { padding: 18px 32px; font-size: 17px; font-weight: 700; }
@@ -986,6 +1020,51 @@ textarea {
     height: 48px;
 }
 .empty-state h3 { color: var(--ink); font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+
+/* =============================================
+   Theme toggle button + segmented control
+   ============================================= */
+
+.theme-toggle .theme-icon-sun { display: none; }
+.theme-toggle .theme-icon-moon { display: block; }
+html[data-theme="dark"] .theme-toggle .theme-icon-sun { display: block; }
+html[data-theme="dark"] .theme-toggle .theme-icon-moon { display: none; }
+
+.seg {
+    display: inline-flex;
+    background: var(--surface-2);
+    border-radius: var(--radius-full);
+    padding: 3px;
+    gap: 2px;
+    flex-shrink: 0;
+}
+.seg-btn {
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 150ms, color 150ms;
+}
+.seg-btn[aria-checked="true"] {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+html[data-theme="dark"] .seg-btn[aria-checked="true"] {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Image dimming in dark mode for visual comfort */
+html[data-theme="dark"] .post-image,
+html[data-theme="dark"] .profile-thumb img,
+html[data-theme="dark"] .memories-thumb,
+html[data-theme="dark"] .spotlight-thumb {
+    filter: brightness(0.9);
+}
 
 /* =============================================
    Toast
@@ -3068,3 +3147,54 @@ body.in-thread #bottom-nav { display: none !important; }
     font-weight: 700;
 }
 .post-with-text a:hover { text-decoration: underline; }
+
+/* =============================================================
+   LIVELINESS — extras
+   Big heart burst (double-tap to like) + per-day theme accent
+   ============================================================= */
+
+/* Big heart that pops over the photo on double-tap */
+.big-heart-burst {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.2);
+    font-size: 120px;
+    line-height: 1;
+    color: #ff3b6b;
+    text-shadow: 0 4px 24px rgba(0,0,0,0.35);
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+    animation: bigHeartPop 900ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+    will-change: transform, opacity;
+}
+@keyframes bigHeartPop {
+    0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.2) rotate(-12deg); }
+    25%  { opacity: 1;   transform: translate(-50%, -50%) scale(1.2) rotate(6deg);   }
+    55%  { opacity: 1;   transform: translate(-50%, -50%) scale(1.0) rotate(-3deg);  }
+    100% { opacity: 0;   transform: translate(-50%, -65%) scale(0.95) rotate(0deg);  }
+}
+
+/* Per-day theme accent on the Today prompt card.
+   Adds a subtle 4px top color band so each day feels distinct. */
+.prompt-card[data-theme] {
+    position: relative;
+    overflow: hidden;
+}
+.prompt-card[data-theme]::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: var(--theme-accent, var(--accent));
+    border-radius: 16px 16px 0 0;
+    opacity: 0.95;
+}
+.prompt-card[data-theme="freestyle"] { --theme-accent: linear-gradient(90deg,#c46cff,#ff5b8a); }
+.prompt-card[data-theme="portrait"]  { --theme-accent: #3ea7ff; }
+.prompt-card[data-theme="food"]      { --theme-accent: #ff8a3d; }
+.prompt-card[data-theme="view"]      { --theme-accent: #ffb12b; }
+.prompt-card[data-theme="texture"]   { --theme-accent: #8a6a4a; }
+.prompt-card[data-theme="motion"]    { --theme-accent: #36c98a; }
+.prompt-card[data-theme="window"]    { --theme-accent: #6c8cff; }

@@ -179,6 +179,19 @@ function spawnFloatingReaction(emoji, anchorEl) {
     }
 }
 
+// ----- 1b. Big heart burst (double-tap to like) -----
+function spawnBigHeart(anchorEl) {
+    if (!anchorEl) return;
+    const heart = document.createElement("div");
+    heart.className = "big-heart-burst";
+    heart.textContent = "♥";
+    // Position relative to the anchor; anchor needs position:relative in CSS
+    const prev = getComputedStyle(anchorEl).position;
+    if (prev === "static") anchorEl.style.position = "relative";
+    anchorEl.appendChild(heart);
+    setTimeout(() => heart.remove(), 900);
+}
+
 // ----- 2. Streak milestone confetti -----
 function isStreakMilestone(n) {
     return n === 3 || n === 7 || n === 14 || n === 30 || n === 50 || n === 100 || n === 365;
@@ -351,6 +364,9 @@ function renderThemePill() {
     pill.querySelector(".theme-emoji").textContent = t.emoji;
     pill.querySelector(".theme-label").textContent = t.label;
     pill.hidden = false;
+    // Liveliness: tint the parent prompt card with the day's theme color
+    const card = pill.closest(".prompt-card");
+    if (card) card.dataset.theme = t.key;
 }
 
 // ----- 8. Pull-to-refresh -----
@@ -1327,6 +1343,26 @@ function wirePostCard(card) {
     card.dataset.wired = "1";
     const postId = card.dataset.postId;
     wireCarouselScroll(card);
+    // Double-tap photo to like (Instagram-style)
+    const wrap = card.querySelector(".post-image-wrap");
+    if (wrap) {
+        let lastTap = 0;
+        wrap.addEventListener("click", (e) => {
+            const now = Date.now();
+            if (now - lastTap < 320) {
+                e.preventDefault();
+                e.stopPropagation();
+                const likeBtn = card.querySelector('.like-btn[data-action="like"]');
+                if (likeBtn && !likeBtn.classList.contains("liked")) {
+                    toggleLikeOnPost(postId, likeBtn);
+                }
+                spawnBigHeart(wrap);
+                lastTap = 0;
+            } else {
+                lastTap = now;
+            }
+        });
+    }
     {
         card.addEventListener("click", async (e) => {
             const target = e.target.closest("[data-action], [data-username], [data-reaction]");
@@ -1377,6 +1413,8 @@ async function toggleLikeOnPost(postId, btn) {
     btn.classList.add("pulse");
     setTimeout(() => btn.classList.remove("pulse"), 400);
     if (heart) heart.textContent = wasLiked ? "♡" : "♥";
+    // Liveliness: float a few hearts up from the button when liking
+    if (!wasLiked) spawnFloatingReaction("❤️", btn);
     const newCount = (Number(count?.textContent) || 0) + (wasLiked ? -1 : 1);
     if (count) count.textContent = Math.max(0, newCount);
     try {
@@ -4333,6 +4371,66 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Run router once for initial page (e.g. opening with #/share/abc directly)
     if (!auth.currentUser) router();
+
+    // ----- Theme switching (light / dark / auto) -----
+    initThemeControls();
 });
+
+/* =============================================
+   THEME (light / dark / auto)
+   Persists user choice in localStorage and reacts to system changes.
+   The no-flash bootstrap in <head> sets the initial theme before paint.
+   ============================================= */
+function getThemeMode() {
+    return localStorage.getItem("drop-theme") || "auto";
+}
+function applyTheme(mode) {
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const resolved = mode === "auto" ? (prefersDark ? "dark" : "light") : mode;
+    document.documentElement.setAttribute("data-theme", resolved);
+    const meta = document.getElementById("meta-theme-color")
+        || document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", resolved === "dark" ? "#0b0b0c" : "#fafaf9");
+    syncThemeSegUI(mode);
+}
+function setThemeMode(mode) {
+    if (!["light", "dark", "auto"].includes(mode)) mode = "auto";
+    localStorage.setItem("drop-theme", mode);
+    applyTheme(mode);
+}
+function syncThemeSegUI(mode) {
+    document.querySelectorAll("#settings-theme-seg .seg-btn").forEach(btn => {
+        btn.setAttribute("aria-checked", btn.dataset.themeMode === mode ? "true" : "false");
+    });
+}
+function initThemeControls() {
+    const mode = getThemeMode();
+    applyTheme(mode);
+
+    // Header sun/moon toggle: cycles light <-> dark (skips auto for one-tap feel)
+    const headerBtn = document.getElementById("header-theme-btn");
+    if (headerBtn && !headerBtn.dataset.bound) {
+        headerBtn.dataset.bound = "1";
+        headerBtn.addEventListener("click", () => {
+            const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+            setThemeMode(current === "dark" ? "light" : "dark");
+        });
+    }
+
+    // Settings segmented control: light / dark / auto
+    document.querySelectorAll("#settings-theme-seg .seg-btn").forEach(btn => {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", () => setThemeMode(btn.dataset.themeMode));
+    });
+
+    // Follow system changes when in auto mode
+    if (window.matchMedia) {
+        const mq = window.matchMedia("(prefers-color-scheme: dark)");
+        const onChange = () => { if (getThemeMode() === "auto") applyTheme("auto"); };
+        if (mq.addEventListener) mq.addEventListener("change", onChange);
+        else if (mq.addListener) mq.addListener(onChange);
+    }
+}
 
 
