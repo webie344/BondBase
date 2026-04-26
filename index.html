@@ -131,11 +131,26 @@
             </div>
 
             <div class="prompt-card">
+                <span id="today-theme-pill" class="theme-pill" data-theme="freestyle" hidden>
+                    <span class="theme-emoji">✦</span><span class="theme-label">Freestyle</span>
+                </span>
                 <p class="overline">Today's prompt</p>
                 <h1 class="prompt-text" id="today-prompt-text">Loading…</h1>
                 <div class="countdown" id="today-countdown">
                     <span class="countdown-label">Opens in</span>
                     <span class="countdown-value">—</span>
+                </div>
+                <div id="today-live-counter" class="today-live-counter" hidden>
+                    <span class="live-dot"></span>
+                    <span class="live-text">0 friends have dropped today</span>
+                </div>
+            </div>
+
+            <div id="today-memories" class="memories-card" hidden>
+                <img id="today-memories-thumb" class="memories-thumb" alt="" />
+                <div class="memories-body">
+                    <p class="memories-title">On this day</p>
+                    <p id="today-memories-text" class="memories-text">—</p>
                 </div>
             </div>
 
@@ -189,6 +204,14 @@
                     <button class="tab-btn" data-feed-tab="all">Everyone</button>
                 </div>
                 <p class="muted small" id="feed-count">0 drops</p>
+            </div>
+
+            <div id="feed-spotlight" class="spotlight-banner" hidden>
+                <img id="feed-spotlight-thumb" class="spotlight-thumb" alt="" />
+                <div class="spotlight-body">
+                    <span class="spotlight-badge">Drop of the day</span>
+                    <p id="feed-spotlight-text" class="spotlight-text">—</p>
+                </div>
             </div>
 
             <div id="feed-empty" class="empty-state" hidden>
@@ -580,6 +603,8 @@
 
 <!-- ===== TOAST CONTAINER ===== -->
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
+<div id="ptr-indicator" class="ptr-indicator" aria-hidden="true"><div class="ptr-spinner"></div></div>
+<div id="friend-toast" class="friend-toast" hidden></div>
 
 <!-- ===== FULLSCREEN PHOTO DIALOG ===== -->
 <div id="photo-dialog" class="dialog" hidden>

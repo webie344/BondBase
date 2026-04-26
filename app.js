@@ -141,6 +141,325 @@ function formatDateLong(d = new Date()) {
     return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 }
 
+/* =============================================================
+   LIVELINESS HELPERS
+   Floating reactions, confetti, themed weeks, pull-to-refresh,
+   live counter, memories, drop-of-day, friend-just-dropped toast.
+   ============================================================= */
+
+const REACTION_EMOJI = {
+    fire: "🔥", love: "❤️", laugh: "😂", wow: "😮", sad: "😢", clap: "👏"
+};
+
+// ----- 1. Floating reaction emoji -----
+function spawnFloatingReaction(emoji, anchorEl) {
+    if (!emoji) return;
+    let x = window.innerWidth / 2;
+    let y = window.innerHeight - 120;
+    if (anchorEl && anchorEl.getBoundingClientRect) {
+        const r = anchorEl.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2;
+    }
+    // Spawn 5 emojis with slight horizontal jitter
+    for (let i = 0; i < 5; i++) {
+        const el = document.createElement("div");
+        el.className = "float-emoji";
+        el.textContent = emoji;
+        const jitter = (Math.random() - 0.5) * 60;
+        el.style.left = `${x + jitter}px`;
+        el.style.top = `${y}px`;
+        el.style.animationDelay = `${i * 70}ms`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1700 + i * 70);
+    }
+}
+
+// ----- 2. Streak milestone confetti -----
+function isStreakMilestone(n) {
+    return n === 3 || n === 7 || n === 14 || n === 30 || n === 50 || n === 100 || n === 365;
+}
+function celebrateStreak(streakNum) {
+    const pill = document.getElementById("today-streak");
+    if (pill) {
+        pill.classList.remove("is-milestone");
+        // force reflow so the animation re-triggers
+        void pill.offsetWidth;
+        pill.classList.add("is-milestone");
+    }
+    spawnConfetti();
+    Sounds.likeReceived?.();
+}
+function spawnConfetti() {
+    const colors = ["#ff5a32", "#ffb12b", "#3ea7ff", "#36c98a", "#c46cff", "#ff5b8a"];
+    const n = 36;
+    const startX = window.innerWidth / 2;
+    const startY = window.innerHeight * 0.25;
+    for (let i = 0; i < n; i++) {
+        const el = document.createElement("div");
+        el.className = "confetti-piece";
+        el.style.background = colors[i % colors.length];
+        el.style.left = `${startX}px`;
+        el.style.top = `${startY}px`;
+        const angle = (Math.PI * 2 * i) / n + Math.random() * 0.4;
+        const dist = 140 + Math.random() * 180;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist + 220;
+        el.style.setProperty("--end-tf", `translate(${dx}px, ${dy}px)`);
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1600);
+    }
+}
+
+// ----- 3. Live counter on Today -----
+function startTodayCounter() {
+    if (state.todayCounterUnsub) state.todayCounterUnsub();
+    if (!state.user) return;
+    const q = query(collection(db, "posts"), where("promptDate", "==", todayKey()));
+    state.todayCounterUnsub = onSnapshot(q, (snap) => {
+        // Count distinct friend UIDs (excluding self) who posted today
+        const friendUids = new Set(state.friends.keys());
+        const dropped = new Set();
+        snap.docs.forEach(d => {
+            const data = d.data();
+            if (data.circleId) return;
+            if (data.uid === state.user.uid) return;
+            if (friendUids.has(data.uid)) dropped.add(data.uid);
+        });
+        const el = document.getElementById("today-live-counter");
+        if (!el) return;
+        const n = dropped.size;
+        if (n === 0) {
+            el.hidden = true;
+        } else {
+            el.hidden = false;
+            const txt = el.querySelector(".live-text");
+            if (txt) txt.textContent = `${n} friend${n === 1 ? " has" : "s have"} dropped today`;
+        }
+    }, (err) => console.warn("today counter:", err));
+}
+function setNavLivePulse() {
+    const today = document.querySelector('.nav-item[data-route="today"]');
+    if (!today) return;
+    const w = (typeof getWindowState === "function") ? getWindowState() : null;
+    if (w && w.phase === "open") today.classList.add("is-live");
+    else today.classList.remove("is-live");
+}
+
+// ----- 4. Memories ("on this day last year") -----
+async function loadMemories() {
+    const card = document.getElementById("today-memories");
+    if (!card || !state.user) return;
+    card.hidden = true;
+    try {
+        const today = new Date();
+        const lastYear = new Date(today);
+        lastYear.setFullYear(today.getFullYear() - 1);
+        const targetKey = todayKey(lastYear);
+        // Single where() — no composite index. Filter client-side.
+        const qs = await getDocs(query(
+            collection(db, "posts"),
+            where("uid", "==", state.user.uid),
+            limit(200)
+        ));
+        const match = qs.docs.find(d => d.data().promptDate === targetKey);
+        if (!match) return;
+        const data = match.data();
+        const img = (data.images && data.images[0]) || data.imageUrl;
+        if (!img) return;
+        document.getElementById("today-memories-thumb").src = img;
+        const text = data.caption?.trim()
+            || (data.promptText ? `"${data.promptText}"` : "Your drop from a year ago");
+        document.getElementById("today-memories-text").textContent = text;
+        card.hidden = false;
+        card.onclick = () => { location.hash = `#/post/${match.id}`; };
+    } catch (err) {
+        console.warn("memories load:", err);
+    }
+}
+
+// ----- 5. Drop of the day (top-liked from yesterday) -----
+async function loadDropOfTheDay() {
+    const banner = document.getElementById("feed-spotlight");
+    if (!banner) return;
+    banner.hidden = true;
+    try {
+        const qs = await getDocs(query(
+            collection(db, "posts"),
+            where("promptDate", "==", yesterdayKey()),
+            limit(80)
+        ));
+        let top = null;
+        qs.docs.forEach(d => {
+            const data = d.data();
+            if (data.circleId) return;
+            const likes = data.likes || 0;
+            if (likes < 1) return;
+            if (!top || likes > (top.data().likes || 0)) top = d;
+        });
+        if (!top) return;
+        const data = top.data();
+        const img = (data.images && data.images[0]) || data.imageUrl;
+        if (!img) return;
+        document.getElementById("feed-spotlight-thumb").src = img;
+        document.getElementById("feed-spotlight-text").innerHTML =
+            `<strong>@${escapeHtml(data.username || "user")}</strong> · ${data.likes || 0} like${(data.likes || 0) === 1 ? "" : "s"}`;
+        banner.hidden = false;
+        banner.onclick = () => { location.hash = `#/post/${top.id}`; };
+    } catch (err) {
+        console.warn("drop of the day:", err);
+    }
+}
+
+// ----- 6. Skeleton shimmer markup -----
+function skeletonFeedHTML(n = 3) {
+    return Array.from({ length: n }, () => `<div class="skel skel-card"></div>`).join("");
+}
+function skeletonRowsHTML(n = 5) {
+    return Array.from({ length: n }, () => `
+        <div class="skel-row">
+            <div class="skel skel-avatar"></div>
+            <div class="skel-lines">
+                <div class="skel skel-line med"></div>
+                <div class="skel skel-line short"></div>
+            </div>
+        </div>`).join("");
+}
+
+// ----- 7. Themed weeks -----
+const THEMES = [
+    { key: "freestyle", emoji: "✦", label: "Sunday freestyle" }, // Sun = 0
+    { key: "portrait",  emoji: "👤", label: "Portrait Monday" },  // Mon = 1
+    { key: "food",      emoji: "🍽", label: "Tasty Tuesday" },    // Tue = 2
+    { key: "view",      emoji: "🌅", label: "Window Wednesday" }, // Wed = 3
+    { key: "texture",   emoji: "✋", label: "Texture Thursday" }, // Thu = 4
+    { key: "motion",    emoji: "💨", label: "Motion Friday" },    // Fri = 5
+    { key: "window",    emoji: "🪟", label: "Snapshot Saturday" } // Sat = 6
+];
+function getDailyTheme(d = new Date()) {
+    return THEMES[d.getDay()] || THEMES[0];
+}
+function renderThemePill() {
+    const pill = document.getElementById("today-theme-pill");
+    if (!pill) return;
+    const t = getDailyTheme();
+    pill.dataset.theme = t.key;
+    pill.querySelector(".theme-emoji").textContent = t.emoji;
+    pill.querySelector(".theme-label").textContent = t.label;
+    pill.hidden = false;
+}
+
+// ----- 8. Pull-to-refresh -----
+const PTR = {
+    startY: 0,
+    pulling: false,
+    armed: false,
+    threshold: 70,
+    onRefresh: null
+};
+function setupPullToRefresh() {
+    const ind = document.getElementById("ptr-indicator");
+    if (!ind) return;
+
+    window.addEventListener("touchstart", (e) => {
+        if (window.scrollY > 0) { PTR.armed = false; return; }
+        PTR.armed = true;
+        PTR.startY = e.touches[0].clientY;
+        PTR.pulling = false;
+    }, { passive: true });
+
+    window.addEventListener("touchmove", (e) => {
+        if (!PTR.armed) return;
+        const dy = e.touches[0].clientY - PTR.startY;
+        if (dy <= 0) { PTR.pulling = false; ind.classList.remove("is-pulling"); return; }
+        PTR.pulling = true;
+        ind.classList.add("is-pulling");
+        const pct = Math.min(1, dy / PTR.threshold);
+        const offset = -100 + pct * 120; // -100% (hidden) -> +20%
+        ind.style.transform = `translate(-50%, ${offset}%)`;
+    }, { passive: true });
+
+    window.addEventListener("touchend", () => {
+        if (!PTR.armed) return;
+        const wasPulling = PTR.pulling;
+        const trigger = wasPulling && parseFloat(ind.style.transform.match(/-?\d+\.?\d*%/g)?.[1] || "-100") > 0;
+        ind.classList.remove("is-pulling");
+        if (trigger) {
+            ind.classList.add("is-refreshing");
+            ind.style.transform = "";
+            const fn = PTR.onRefresh || (() => Promise.resolve());
+            Promise.resolve(fn()).finally(() => {
+                setTimeout(() => {
+                    ind.classList.remove("is-refreshing");
+                    ind.style.transform = "";
+                }, 300);
+            });
+        } else {
+            ind.style.transform = "";
+        }
+        PTR.armed = false;
+        PTR.pulling = false;
+    });
+}
+function setPullToRefreshHandler(fn) { PTR.onRefresh = fn; }
+
+// ----- 10. Friend-just-dropped toast -----
+function startFriendDropWatcher() {
+    if (state.friendDropUnsub) state.friendDropUnsub();
+    if (!state.user) return;
+    state.friendDropSeen = new Set();
+    let firstSnap = true;
+    const q = query(collection(db, "posts"), where("promptDate", "==", todayKey()));
+    state.friendDropUnsub = onSnapshot(q, (snap) => {
+        snap.docChanges().forEach(ch => {
+            if (ch.type !== "added") return;
+            const id = ch.doc.id;
+            if (state.friendDropSeen.has(id)) return;
+            state.friendDropSeen.add(id);
+            if (firstSnap) return; // skip backfill
+            const data = ch.doc.data();
+            if (data.circleId) return;
+            if (data.uid === state.user.uid) return;
+            if (!state.friends.has(data.uid)) return;
+            // Don't toast if the user is already viewing the feed
+            if (location.hash.startsWith("#/feed") || location.hash.startsWith("#/post/")) return;
+            showFriendDropToast(data, id);
+        });
+        firstSnap = false;
+    }, (err) => console.warn("friend drop watcher:", err));
+}
+let _friendToastTimer = null;
+function showFriendDropToast(post, postId) {
+    const el = document.getElementById("friend-toast");
+    if (!el) return;
+    const img = (post.images && post.images[0]) || post.imageUrl || "";
+    const initial = (post.username || "?").charAt(0).toUpperCase();
+    el.innerHTML = `
+        ${img
+            ? `<img src="${escapeHtml(img)}" alt="" />`
+            : `<div class="post-avatar" style="width:36px;height:36px;font-size:14px;">${escapeHtml(initial)}</div>`}
+        <span class="ft-text"><strong>@${escapeHtml(post.username || "user")}</strong> just dropped</span>`;
+    el.hidden = false;
+    el.onclick = () => {
+        location.hash = `#/post/${postId}`;
+        hideFriendDropToast();
+    };
+    // Force reflow then show
+    void el.offsetWidth;
+    el.classList.add("is-shown");
+    el.classList.remove("is-leaving");
+    Sounds.friendAccepted?.();
+    if (_friendToastTimer) clearTimeout(_friendToastTimer);
+    _friendToastTimer = setTimeout(hideFriendDropToast, 4500);
+}
+function hideFriendDropToast() {
+    const el = document.getElementById("friend-toast");
+    if (!el) return;
+    el.classList.remove("is-shown");
+    el.classList.add("is-leaving");
+    setTimeout(() => { el.hidden = true; el.classList.remove("is-leaving"); }, 300);
+}
+
 function formatTimeAgo(date) {
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
     if (seconds < 60) return "just now";
@@ -283,7 +602,14 @@ const state = {
 
     // ----- notifications state -----
     notificationsUnsub: null,
-    notifications: []                  // array of doc snapshots
+    notifications: [],                 // array of doc snapshots
+
+    // ----- liveliness state -----
+    todayCounterUnsub: null,           // listener for "X friends dropped today"
+    friendDropUnsub: null,             // listener for friend-just-dropped toast
+    friendDropSeen: null,              // Set<postId> of seen post IDs
+    lastStreakShown: 0,                // last streak we celebrated (avoid double-confetti)
+    feedRenderedOnce: false            // suppress new-card animation on initial load
 };
 
 const REACTIONS = [
@@ -363,6 +689,10 @@ onAuthStateChanged(auth, async (user) => {
             startSocialSubscriptions(user.uid);
             // Start notifications subscription
             subscribeToNotifications(user.uid);
+            // Start liveliness subscriptions
+            startTodayCounter();
+            startFriendDropWatcher();
+            state.lastStreakShown = state.profile.currentStreak || 0;
             // First time? No username yet → onboarding.
             if (!state.profile.username && !location.hash.startsWith("#/onboarding")) {
                 location.hash = "#/onboarding";
@@ -392,6 +722,8 @@ onAuthStateChanged(auth, async (user) => {
         if (state.commentsUnsub) { state.commentsUnsub(); state.commentsUnsub = null; }
         if (state.threadUnsub) { state.threadUnsub(); state.threadUnsub = null; }
         if (state.notificationsUnsub) { state.notificationsUnsub(); state.notificationsUnsub = null; }
+        if (state.todayCounterUnsub) { state.todayCounterUnsub(); state.todayCounterUnsub = null; }
+        if (state.friendDropUnsub) { state.friendDropUnsub(); state.friendDropUnsub = null; }
         state.repliesUnsubs.forEach(u => u()); state.repliesUnsubs.clear();
         if (!["#/login", "#/signup"].some(h => location.hash.startsWith(h))) {
             location.hash = "#/login";
@@ -669,6 +1001,11 @@ async function renderToday() {
     state.countdownInterval = setInterval(updateCountdown, 1000);
     updateCountdown();
 
+    // Liveliness: themed pill, memories, and refresh hook
+    renderThemePill();
+    loadMemories();
+    setPullToRefreshHandler(async () => { await renderToday(); });
+
     $("#today-snap-btn").onclick = () => { location.hash = "#/capture"; };
 }
 
@@ -710,6 +1047,8 @@ function updateCountdown() {
         btn.textContent = "Post late";
         hint.textContent = "You can still post — it'll just be marked late.";
     }
+    // Liveliness: red pulse on the Today nav while the prompt is open
+    setNavLivePulse();
 }
 
 async function hasPostedToday() {
@@ -733,8 +1072,14 @@ function renderFeed() {
     $("#feed-prompt-text").textContent = promptText;
 
     const grid = $("#feed-grid");
-    grid.innerHTML = "";
+    // Liveliness: shimmer placeholders while the first snapshot arrives
+    grid.innerHTML = skeletonFeedHTML(3);
+    state.feedRenderedOnce = false;
     $("#feed-empty").hidden = true;
+    // Liveliness: top-liked drop from yesterday banner
+    loadDropOfTheDay();
+    // Liveliness: pull-to-refresh re-subscribes
+    setPullToRefreshHandler(async () => { renderFeed(); });
 
     if (state.feedUnsub) state.feedUnsub();
 
@@ -758,6 +1103,11 @@ function renderFeed() {
 function applyFeedRender() {
     const grid = $("#feed-grid");
     if (!grid) return;
+
+    // Clear skeleton placeholders the first time real data arrives
+    if (!state.feedRenderedOnce) {
+        grid.querySelectorAll(".skel-card").forEach(el => el.remove());
+    }
 
     // Always exclude posts scoped to a circle from the public/global feed.
     let docs = state.feedDocs.filter(d => !d.data().circleId);
@@ -811,6 +1161,12 @@ function applyFeedRender() {
             else if (!prev) grid.prepend(card);
             else grid.appendChild(card);
             wirePostCard(card);
+            // Liveliness: animate in only after the initial paint, so we don't
+            // animate every card on first feed load.
+            if (state.feedRenderedOnce) {
+                card.classList.add("is-new");
+                setTimeout(() => card.classList.remove("is-new"), 500);
+            }
         } else {
             // Patch in-place: replace inner HTML, preserve outer article + its
             // event listener (set in wirePostCard) so no full-page flash.
@@ -830,6 +1186,7 @@ function applyFeedRender() {
         if (!card.dataset.sig) card.dataset.sig = postSignature(data);
         prev = card;
     });
+    state.feedRenderedOnce = true;
 }
 
 function postSignature(p) {
@@ -1056,6 +1413,15 @@ async function toggleReaction(postId, reactionKey) {
     }
     patchReactionsInDOM(postId, optimisticReactions, optimisticUserReaction);
 
+    // Liveliness: float the emoji up from the chip the user just tapped
+    if (previous !== reactionKey) {
+        const anchor = document.querySelector(
+            `.post-card[data-post-id="${postId}"] .reaction-chip[data-reaction="${reactionKey}"]`
+        );
+        spawnFloatingReaction(REACTION_EMOJI[reactionKey], anchor);
+        Sounds.likeReceived?.();
+    }
+
     try {
         await updateDoc(ref, updates);
         // Snapshot listener will reconcile any drift.
@@ -1260,6 +1626,17 @@ function renderCapturePreviews() {
         div.appendChild(btn);
         wrap.appendChild(div);
     });
+    // "+ Add another" tile — lets users stack photos one at a time.
+    // This is essential for native webviews (Median.co, older WebView)
+    // where the multi-file picker is restricted to a single selection.
+    if (captureFiles.length < MAX_CAPTURE_FILES) {
+        const addTile = document.createElement("label");
+        addTile.className = "capture-preview-thumb capture-preview-add";
+        addTile.htmlFor = "capture-library";
+        addTile.title = "Add another photo";
+        addTile.innerHTML = `<span class="add-plus">+</span><span class="add-label">Add</span>`;
+        wrap.appendChild(addTile);
+    }
 }
 
 async function uploadToCloudinary(file) {
@@ -1395,6 +1772,11 @@ async function updateUserStreak() {
     });
 
     state.profile.currentStreak = currentStreak;
+    // Liveliness: confetti + pulse on milestone days
+    if (currentStreak !== state.lastStreakShown && isStreakMilestone(currentStreak)) {
+        try { celebrateStreak(currentStreak); } catch (e) { console.warn("celebrate:", e); }
+    }
+    state.lastStreakShown = currentStreak;
     state.profile.longestStreak = longestStreak;
     state.profile.totalDrops = (state.profile.totalDrops || 0) + 1;
     state.profile.lastPostDate = today;
@@ -1455,7 +1837,8 @@ async function renderProfile(usernameOrUid) {
 
     // Last 30 posts
     const grid = $("#profile-grid");
-    grid.innerHTML = "";
+    // Liveliness: shimmer placeholders while the query resolves
+    grid.innerHTML = skeletonFeedHTML(3);
     // Single where() — no composite index needed. Sort client-side below.
     const q = query(
         collection(db, "posts"),
@@ -2166,11 +2549,20 @@ function chatIdFor(uidA, uidB) {
 function renderChatsList() {
     const list = $("#chats-list");
     if (!list) return;
+    // Liveliness: shimmer rows while we wait for the threads listener.
+    // chatThreadsUnsub is started at login; if the map is still empty AND
+    // the listener hasn't fired yet, show skeletons. We track that with
+    // a one-shot dataset flag.
     if (state.chatThreads.size === 0) {
+        if (!list.dataset.loaded && state.chatThreadsUnsub) {
+            list.innerHTML = skeletonRowsHTML(4);
+            return;
+        }
         list.innerHTML = "";
         $("#chats-empty").hidden = false;
         return;
     }
+    list.dataset.loaded = "1";
     $("#chats-empty").hidden = true;
     const rows = [...state.chatThreads.values()].sort((a, b) => {
         const ta = a.updatedAt?.toMillis?.() || 0;
@@ -2644,6 +3036,7 @@ function renderNotifications() {
             case "friend_request": actionText = `<strong>@${escapeHtml(n.fromUsername)}</strong> sent you a friend request.`; break;
             case "friend_accept":  actionText = `<strong>@${escapeHtml(n.fromUsername)}</strong> accepted your friend request.`; break;
             case "message":  actionText = `<strong>@${escapeHtml(n.fromUsername)}</strong>: ${escapeHtml((n.text || "").slice(0, 60))}`; break;
+            case "circle_join": actionText = `<strong>@${escapeHtml(n.fromUsername)}</strong> added you to <strong>${escapeHtml(n.circleName || "a circle")}</strong>.`; break;
             default:         actionText = `<strong>@${escapeHtml(n.fromUsername || "Someone")}</strong> did something.`;
         }
         const thumb = n.postThumb ? `<img class="notif-thumb" src="${escapeHtml(n.postThumb)}" alt="" />` : "";
@@ -2676,6 +3069,11 @@ function renderNotifications() {
                 if (fromUid) location.hash = `#/thread/${fromUid}`;
             } else if (type === "friend_request" || type === "friend_accept") {
                 location.hash = "#/friends";
+            } else if (type === "circle_join") {
+                const sn = state.notifications.find(d => d.id === id);
+                const cid = sn?.data()?.circleId;
+                if (cid) location.hash = `#/circle/${cid}`;
+                else location.hash = "#/circles";
             } else if (fromUsername) {
                 location.hash = `#/profile/${encodeURIComponent(fromUsername)}`;
             }
@@ -3430,6 +3828,16 @@ function openAddCircleMember(circleId) {
             await updateDoc(doc(db, "circles", circleId), {
                 memberUids: isIn ? arrayRemove(uid) : arrayUnion(uid)
             });
+            // Notify the friend that they were added (only on add, not remove)
+            if (!isIn) {
+                writeNotification(uid, {
+                    type: "circle_join",
+                    fromUid: state.user.uid,
+                    fromUsername: state.profile?.username || "user",
+                    circleId,
+                    circleName: activeCircleData?.name || "a circle"
+                });
+            }
             const snap = await getDoc(doc(db, "circles", circleId));
             activeCircleData = { id: circleId, ...snap.data() };
             openAddCircleMember(circleId);
@@ -3614,6 +4022,8 @@ async function router() {
             || (r === "profile" && route.view === "view-profile");
         el.classList.toggle("active", active);
     });
+    // Liveliness: red pulse on Today nav while the prompt is open
+    setNavLivePulse();
 
     // Leave thread cleanup if not viewing it
     if (route.view !== "view-thread") leaveThread();
@@ -3707,6 +4117,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setupOnboardingControls();
     setupCaptureControls();
     setupSettingsControls();
+    setupPullToRefresh();
 
     // Feed tabs (Friends / Everyone)
     $$(".tab-btn[data-feed-tab]").forEach(btn => {
