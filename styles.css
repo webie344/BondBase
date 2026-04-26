@@ -1647,6 +1647,26 @@ body.in-thread { padding-top: 0 !important; }
     background: var(--surface-2);
 }
 .capture-preview-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* "+ Add" tile shown alongside thumbs when more photos can fit */
+.capture-preview-add {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    border: 1.5px dashed var(--border);
+    background: var(--surface-2);
+    color: var(--muted);
+    transition: background 120ms, border-color 120ms, color 120ms;
+}
+.capture-preview-add:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--surface);
+}
+.capture-preview-add .add-plus { font-size: 28px; line-height: 1; font-weight: 300; }
+.capture-preview-add .add-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 .capture-preview-remove {
     position: absolute;
     top: 4px;
@@ -2550,3 +2570,337 @@ body.in-thread #bottom-nav { display: none !important; }
     letter-spacing: 0.5px;
 }
 .mb-md { margin-bottom: 16px; }
+
+/* =============================================================
+   LIVELINESS FEATURES
+   Floating reactions, streak pulse, live indicator, memories,
+   spotlight, skeletons, themed pills, pull-to-refresh, etc.
+   ============================================================= */
+
+/* --- 1. Floating reaction emojis --- */
+.float-emoji {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    font-size: 28px;
+    user-select: none;
+    will-change: transform, opacity;
+    animation: floatUp 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+@keyframes floatUp {
+    0%   { opacity: 1; transform: translate(-50%, 0)    scale(0.6) rotate(0deg); }
+    20%  { opacity: 1; transform: translate(-50%, -20px) scale(1.2) rotate(-8deg); }
+    100% { opacity: 0; transform: translate(-50%, -180px) scale(1.0) rotate(12deg); }
+}
+
+/* --- 2. Streak pulse + milestone confetti --- */
+.streak-pill .streak-num {
+    display: inline-block;
+    transition: transform 200ms;
+}
+.streak-pill.is-milestone {
+    animation: streakPop 700ms ease-out;
+}
+@keyframes streakPop {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.18); }
+    65%  { transform: scale(0.96); }
+    100% { transform: scale(1); }
+}
+.confetti-piece {
+    position: fixed;
+    width: 8px; height: 14px;
+    z-index: 9998;
+    pointer-events: none;
+    border-radius: 2px;
+    will-change: transform, opacity;
+    animation: confettiFall 1500ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+@keyframes confettiFall {
+    0%   { opacity: 1; transform: translate(0, 0) rotate(0); }
+    100% { opacity: 0; transform: var(--end-tf) rotate(540deg); }
+}
+
+/* --- 3. Live now pulse on Today nav + counter --- */
+.nav-item[data-route="today"] { position: relative; }
+.nav-item[data-route="today"].is-live::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 18px);
+    width: 8px; height: 8px;
+    background: #ff3b30;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.55);
+    animation: livePulse 1.6s ease-in-out infinite;
+}
+@keyframes livePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.55); }
+    50%      { box-shadow: 0 0 0 8px rgba(255, 59, 48, 0); }
+}
+.today-live-counter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 8px 14px;
+    background: rgba(255, 90, 50, 0.08);
+    border: 1px solid rgba(255, 90, 50, 0.2);
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 500;
+}
+.today-live-counter .live-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #ff3b30;
+    animation: livePulse 1.6s ease-in-out infinite;
+}
+
+/* --- 4. Memories card --- */
+.memories-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    margin-top: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.memories-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+    border-color: var(--border-strong);
+    border-left-color: var(--accent);
+}
+.memories-thumb {
+    width: 52px; height: 52px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.memories-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.memories-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin: 0;
+}
+.memories-text {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --- 5. Drop of the day spotlight banner --- */
+.spotlight-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    margin: 0 0 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.spotlight-banner:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+    border-color: var(--border-strong);
+    border-left-color: var(--accent);
+}
+.spotlight-thumb {
+    width: 56px; height: 56px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--surface-2);
+}
+.spotlight-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.spotlight-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    align-self: flex-start;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+}
+.spotlight-badge::before {
+    content: "★";
+    font-size: 10px;
+    line-height: 1;
+}
+.spotlight-text {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.spotlight-text strong { color: var(--ink); font-weight: 600; }
+
+/* --- 6. Skeleton shimmer loaders --- */
+.skel {
+    background: linear-gradient(90deg,
+        var(--surface-2) 0%,
+        rgba(255,255,255,0.5) 50%,
+        var(--surface-2) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+    border-radius: 6px;
+}
+@keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.skel-card {
+    aspect-ratio: 4 / 5;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+}
+.skel-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border);
+}
+.skel-avatar { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; }
+.skel-lines { flex: 1; }
+.skel-line { height: 12px; margin-bottom: 8px; }
+.skel-line.short { width: 40%; }
+.skel-line.med   { width: 70%; }
+.skel-line.long  { width: 90%; }
+
+/* --- 7. Themed-week pill --- */
+.theme-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+}
+.theme-pill .theme-emoji { font-size: 13px; }
+.theme-pill[data-theme="portrait"]  { background: #fce4ec; color: #b8255f; }
+.theme-pill[data-theme="food"]      { background: #fff3cd; color: #8a6d00; }
+.theme-pill[data-theme="view"]      { background: #d6eaff; color: #0a5fbc; }
+.theme-pill[data-theme="motion"]    { background: #ffe5d4; color: #b34700; }
+.theme-pill[data-theme="texture"]   { background: #e7e2ff; color: #4f3bb6; }
+.theme-pill[data-theme="window"]    { background: #d3f1e1; color: #0e7a3b; }
+.theme-pill[data-theme="freestyle"] { background: #ececec; color: #555; }
+
+/* --- 8. Pull-to-refresh indicator --- */
+.ptr-indicator {
+    position: fixed;
+    top: var(--header-h, 56px);
+    left: 50%;
+    transform: translate(-50%, -100%);
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    transition: transform 180ms ease, opacity 180ms ease;
+    opacity: 0;
+    pointer-events: none;
+}
+.ptr-indicator .ptr-spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+}
+.ptr-indicator.is-pulling {
+    opacity: 1;
+}
+.ptr-indicator.is-refreshing {
+    opacity: 1;
+    transform: translate(-50%, 8px);
+}
+.ptr-indicator.is-refreshing .ptr-spinner {
+    animation: ptrSpin 700ms linear infinite;
+}
+@keyframes ptrSpin { to { transform: rotate(360deg); } }
+
+/* --- 9. New post entry animation --- */
+.post-card.is-new {
+    animation: postSlideIn 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes postSlideIn {
+    0%   { opacity: 0; transform: translateY(-12px) scale(0.985); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* --- 10. Friend-just-dropped slide-in toast --- */
+.friend-toast {
+    position: fixed;
+    top: calc(var(--header-h, 56px) + 12px);
+    left: 50%;
+    transform: translate(-50%, -120%);
+    z-index: 1500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px 8px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.15);
+    cursor: pointer;
+    transition: transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 220ms;
+    max-width: 90vw;
+}
+.friend-toast.is-shown {
+    transform: translate(-50%, 0);
+}
+.friend-toast.is-leaving {
+    opacity: 0;
+    transform: translate(-50%, -40%);
+}
+.friend-toast img {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.friend-toast .ft-text {
+    font-size: 13px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.friend-toast .ft-text strong { font-weight: 700; }
