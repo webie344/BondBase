@@ -31,7 +31,15 @@ const CONFIG = {
         uploadPreset: "profile-pictures"
     },
     onesignal: {
-        appId: ""    // optional; leave empty to disable push
+        appId: ""    // legacy, no longer used — kept so old refs don't break
+    },
+    // Firebase Cloud Messaging (free web push). To turn on:
+    //   1. Firebase Console > Project Settings > Cloud Messaging
+    //   2. Under "Web Push certificates", click Generate Key Pair
+    //   3. Paste the key here, then redeploy.
+    // Until this is set, the push toggle in Settings will quietly do nothing.
+    fcm: {
+        vapidKey: "BLQsknL2NRqCD5ZT5LwOSIloH9hnuAXk-0_I3N-AU3CV37CO871Uo508Own-XFzmrt-kQICZZ9mERyCP3C5nKTQ"
     }
 };
 
@@ -702,7 +710,7 @@ onAuthStateChanged(auth, async (user) => {
         if (profileSnap.exists()) {
             state.profile = { uid: user.uid, ...profileSnap.data() };
             // Init push if available + enabled
-            if (CONFIG.onesignal.appId && state.profile.pushEnabled !== false) {
+            if (CONFIG.fcm.vapidKey && state.profile.pushEnabled !== false) {
                 initPushFor(user.uid).catch(() => {});
             }
             // Start social subscriptions (friends, requests, chat threads)
@@ -2136,9 +2144,26 @@ function setupSettingsControls() {
             state.profile.promptTimeLocal = newTime;
             state.profile.pushEnabled = pushOn;
 
-            if (CONFIG.onesignal.appId && window.PushNotifications) {
-                if (pushOn) await window.PushNotifications.loginUser(state.user.uid);
-                else await window.PushNotifications.logoutUser();
+            if (CONFIG.fcm.vapidKey) {
+                if (pushOn) {
+                    // Lazily load the module if it wasn't already
+                    if (!window.Notifications) await initPushFor(state.user.uid);
+                    const token = await window.Notifications?.enable(state.user.uid);
+                    if (!token) {
+                        if (Notification.permission === "denied") {
+                            showToast("Notifications blocked. Enable them in your browser site settings.", "error");
+                        } else {
+                            showToast("Couldn't turn on notifications on this device.", "error");
+                        }
+                        $("#settings-push").checked = false;
+                        await updateDoc(doc(db, "users", state.user.uid), { pushEnabled: false });
+                        state.profile.pushEnabled = false;
+                    }
+                } else if (window.Notifications) {
+                    await window.Notifications.disable(state.user.uid);
+                }
+            } else if (pushOn) {
+                showToast("Push isn't configured yet.", "default");
             }
 
             $("#settings-saved").hidden = false;
@@ -2156,12 +2181,21 @@ function setupSettingsControls() {
    ============================================================= */
 
 async function initPushFor(uid) {
-    if (state.pushReady || !CONFIG.onesignal.appId) return;
+    if (state.pushReady || !CONFIG.fcm.vapidKey) return;
     try {
-        const mod = await import("./push-notifications.js");
-        window.PushNotifications = mod.PushNotifications;
-        await mod.PushNotifications.init({ appId: CONFIG.onesignal.appId });
-        await mod.PushNotifications.loginUser(uid);
+        const mod = await import("./notification.js");
+        window.Notifications = mod.Notifications;
+        mod.Notifications.configure({
+            firebaseConfig: CONFIG.firebase,
+            vapidKey: CONFIG.fcm.vapidKey
+        });
+        // When a push arrives while the tab is open, show our in-app toast
+        mod.Notifications.onForeground((payload) => {
+            const n = payload?.notification || {};
+            if (n.title || n.body) showToast(n.body || n.title, "default");
+        });
+        // If the user already opted in, silently refresh their token
+        await mod.Notifications.initIfEnabled(uid);
         state.pushReady = true;
     } catch (err) {
         console.warn("Push init failed:", err);
