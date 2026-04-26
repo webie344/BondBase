@@ -2257,15 +2257,22 @@ body.in-thread #bottom-nav { display: none !important; }
 /* =============================================================
    STORY PLAYER
    ============================================================= */
+/* Override .dialog (which centers a small content card) so the story
+   takes the full screen vertically, like WhatsApp Status. */
 .story-dialog {
     background: #000 !important;
     z-index: 1000;
+    padding: 0 !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
 }
 .story-progress {
     display: flex; gap: 4px;
-    padding: 12px 14px 6px;
+    padding: max(env(safe-area-inset-top, 0px), 14px) 14px 8px;
     position: relative;
     z-index: 2;
+    flex: 0 0 auto;
 }
 .story-progress .seg {
     flex: 1; height: 3px; border-radius: 2px;
@@ -2289,13 +2296,17 @@ body.in-thread #bottom-nav { display: none !important; }
 }
 .story-stage {
     position: relative;
-    flex: 1;
+    flex: 1 1 auto;
+    width: 100%;
     display: flex; align-items: center; justify-content: center;
     overflow: hidden;
+    background: #000;
 }
 .story-stage img {
+    width: 100%; height: 100%;
     max-width: 100%; max-height: 100%;
     object-fit: contain;
+    background: #000;
 }
 .story-tap {
     position: absolute; top: 0; bottom: 0;
@@ -2319,7 +2330,18 @@ body.in-thread #bottom-nav { display: none !important; }
 /* =============================================================
    WEEKLY RECAP
    ============================================================= */
-.recap-content { max-width: 380px; }
+.recap-content {
+    max-width: 380px;
+    padding: 22px 20px 20px;
+    background: var(--surface);
+    overflow-y: auto;
+}
+.recap-content h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--ink);
+}
 .recap-canvas-wrap {
     display: flex; justify-content: center;
     margin-top: 8px;
@@ -2353,7 +2375,17 @@ body.in-thread #bottom-nav { display: none !important; }
 }
 .recap-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .recap-tile.empty {
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.08);
+    border: 1px dashed rgba(255,255,255,0.15);
+}
+.recap-empty-msg {
+    grid-column: 1 / -1;
+    align-self: center;
+    text-align: center;
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 20px;
 }
 .recap-footer {
     display: flex; justify-content: space-between; align-items: center;
@@ -2383,12 +2415,104 @@ body.in-thread #bottom-nav { display: none !important; }
 }
 .rec-time { font-variant-numeric: tabular-nums; flex: 1; font-weight: 600; }
 
-.msg-audio {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 10px;
-    min-width: 180px;
+/* Audio bubble: let the native player carry the styling so the controls
+   are always visible regardless of bubble theme. */
+.msg-bubble.msg-audio {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 22px !important;
+    overflow: hidden;
+    min-width: 220px;
+    max-width: 260px;
 }
-.msg-audio audio { width: 100%; height: 32px; }
+.msg-bubble.msg-audio audio {
+    display: block;
+    width: 100%;
+    height: 44px;
+    border-radius: 22px;
+    background: var(--surface-2, #f0f0f0);
+}
+/* Reply quote shown above a message bubble */
+.msg-reply-quote {
+    border-left: 3px solid var(--accent);
+    background: rgba(0,0,0,0.05);
+    padding: 6px 10px;
+    margin: 0 4px 4px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    color: var(--muted);
+    max-width: 100%;
+    cursor: pointer;
+}
+.msg-row.from-me .msg-reply-quote {
+    background: rgba(255,255,255,0.18);
+    border-left-color: rgba(255,255,255,0.7);
+    color: rgba(255,255,255,0.9);
+}
+.msg-reply-quote .rq-name {
+    font-weight: 700;
+    color: var(--accent);
+    display: block;
+    font-size: 12px;
+    margin-bottom: 1px;
+}
+.msg-row.from-me .msg-reply-quote .rq-name { color: white; }
+.msg-reply-quote .rq-text {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* The compact reply icon shown alongside each message on hover/long-press */
+.msg-reply-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 120ms ease;
+    align-self: center;
+}
+.msg-row:hover .msg-reply-btn,
+.msg-row.show-reply .msg-reply-btn { opacity: 1; }
+.msg-reply-btn:hover { background: rgba(0,0,0,0.06); color: var(--ink); }
+/* Reply preview shown above the composer */
+.thread-reply-preview {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    margin: 0 8px 4px;
+    background: var(--surface-2, #f0f0f0);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    font-size: 13px;
+}
+.thread-reply-preview .trp-body {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+.thread-reply-preview .trp-name {
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 12px;
+    display: block;
+}
+.thread-reply-preview .trp-text {
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+.thread-reply-preview .trp-cancel {
+    background: transparent; border: none;
+    font-size: 22px; line-height: 1;
+    color: var(--muted); cursor: pointer;
+    padding: 4px 8px;
+}
 
 /* =============================================================
    INVITE CODE (settings)

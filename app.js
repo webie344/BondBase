@@ -1338,17 +1338,41 @@ async function updateUserStreak() {
    PROFILE VIEW
    ============================================================= */
 
-async function renderProfile(uid) {
-    const targetUid = uid || state.user.uid;
-    const isOwn = targetUid === state.user.uid;
-
-    const snap = await getDoc(doc(db, "users", targetUid));
-    if (!snap.exists()) {
+async function renderProfile(usernameOrUid) {
+    // The link target may be either the document UID (when we already
+    // know it, e.g. from chat threads) or a @username (from post cards,
+    // comments, etc.). Resolve to the user doc either way.
+    let targetUid;
+    let p;
+    if (!usernameOrUid || usernameOrUid === state.user.uid) {
+        targetUid = state.user.uid;
+        const snap = await getDoc(doc(db, "users", targetUid));
+        if (snap.exists()) p = snap.data();
+    } else {
+        // Try as document UID first.
+        const snap = await getDoc(doc(db, "users", usernameOrUid));
+        if (snap.exists()) {
+            targetUid = usernameOrUid;
+            p = snap.data();
+        } else {
+            // Fall back to a username lookup.
+            const uname = usernameOrUid.replace(/^@/, "");
+            const qs = await getDocs(query(
+                collection(db, "users"),
+                where("username", "==", uname)
+            ));
+            if (!qs.empty) {
+                targetUid = qs.docs[0].id;
+                p = qs.docs[0].data();
+            }
+        }
+    }
+    if (!p || !targetUid) {
         showToast("Profile not found.", "error");
         location.hash = "#/";
         return;
     }
-    const p = snap.data();
+    const isOwn = targetUid === state.user.uid;
 
     $("#profile-display-name").textContent = p.displayName || p.username || "—";
     $("#profile-username").textContent = `@${p.username || "—"}`;
@@ -2173,21 +2197,13 @@ async function openThread(otherUid) {
                 if (!threadCache.has(d.id)) {
                     // INSERT new message
                     const mine = m.uid === state.user.uid;
-                    let bubbleContent;
-                    if (m.imageUrl) {
-                        bubbleContent = `<img class="msg-image" src="${escapeHtml(m.imageUrl)}" alt="" />`;
-                    } else {
-                        bubbleContent = `<div class="msg-bubble">${linkifyText(m.text || "")}</div>`;
-                    }
                     let html = "";
                     if (needsDivider) {
                         html += `<div class="msg-time-divider" data-divider-for="${d.id}">${dayLabel}</div>`;
                     }
-                    html += `<div class="msg-row ${mine ? "from-me" : "from-them"} ${consecutive ? "consecutive" : ""}" data-msg-id="${d.id}">${bubbleContent}</div>`;
+                    html += buildMessageRowHTML(d.id, m, mine, consecutive);
                     messagesEl.insertAdjacentHTML("beforeend", html);
-                    // Wire any new image
-                    const newRow = messagesEl.querySelector(`[data-msg-id="${d.id}"] .msg-image`);
-                    if (newRow) newRow.onclick = () => window.open(newRow.src, "_blank");
+                    wireMessageRow(messagesEl.querySelector(`[data-msg-id="${d.id}"]`), m);
                     threadCache.set(d.id, { ts, mine });
                 }
             });
@@ -2204,7 +2220,8 @@ async function openThread(otherUid) {
         const text = input.value.trim();
         if (!text) return;
         input.value = "";
-        sendMessage(otherUid, { text });
+        const replyTo = consumeReplyDraft();
+        sendMessage(otherUid, { text, replyTo });
     };
     $("#thread-image-input").onchange = async (e) => {
         const file = e.target.files[0];
@@ -2212,14 +2229,89 @@ async function openThread(otherUid) {
         if (!file) return;
         await sendImageMessage(otherUid, file);
     };
+    // Reset any leftover reply draft when entering a thread.
+    cancelReplyDraft();
     $("#thread-input").focus();
+}
+
+/* ----- Message bubble rendering (shared between snapshot + initial) ----- */
+
+function buildMessageRowHTML(id, m, mine, consecutive) {
+    let inner = "";
+    // Quoted reply preview at the top of the bubble
+    if (m.replyTo) {
+        const r = m.replyTo;
+        const author = r.senderUid === state.user.uid ? "You" : `@${r.senderUsername || "user"}`;
+        let snippet = r.snippet || "";
+        if (r.isImage) snippet = "📷 Photo";
+        else if (r.isAudio) snippet = "🎤 Voice note";
+        inner += `<div class="msg-bubble"><div class="msg-reply-quote" data-reply-to-id="${escapeHtml(r.messageId || "")}">
+            <span class="rq-name">${escapeHtml(author)}</span>
+            <span class="rq-text">${escapeHtml(snippet || "Message")}</span>
+          </div>`;
+        // body inside same bubble for text; for media we close and emit standalone
+        if (m.imageUrl) {
+            inner += `</div><img class="msg-image" src="${escapeHtml(m.imageUrl)}" alt="" />`;
+        } else if (m.audioUrl) {
+            inner += `</div><div class="msg-bubble msg-audio"><audio controls preload="metadata" src="${escapeHtml(m.audioUrl)}"></audio></div>`;
+        } else {
+            inner += linkifyText(m.text || "") + `</div>`;
+        }
+    } else {
+        if (m.imageUrl) {
+            inner = `<img class="msg-image" src="${escapeHtml(m.imageUrl)}" alt="" />`;
+        } else if (m.audioUrl) {
+            inner = `<div class="msg-bubble msg-audio"><audio controls preload="metadata" src="${escapeHtml(m.audioUrl)}"></audio></div>`;
+        } else {
+            inner = `<div class="msg-bubble">${linkifyText(m.text || "")}</div>`;
+        }
+    }
+    const replyBtn = `<button type="button" class="msg-reply-btn" data-action="reply-to" aria-label="Reply">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+      </button>`;
+    return `<div class="msg-row ${mine ? "from-me" : "from-them"} ${consecutive ? "consecutive" : ""}" data-msg-id="${id}">${inner}${replyBtn}</div>`;
+}
+
+function wireMessageRow(rowEl, m) {
+    if (!rowEl) return;
+    const img = rowEl.querySelector(".msg-image");
+    if (img) img.onclick = () => window.open(img.src, "_blank");
+    const replyBtn = rowEl.querySelector('[data-action="reply-to"]');
+    if (replyBtn) {
+        replyBtn.onclick = (e) => {
+            e.stopPropagation();
+            startReplyTo(rowEl.dataset.msgId, m);
+        };
+    }
+    // Tap quoted preview to scroll to original message
+    const quote = rowEl.querySelector(".msg-reply-quote");
+    if (quote) {
+        quote.onclick = (e) => {
+            e.stopPropagation();
+            const targetId = quote.dataset.replyToId;
+            if (!targetId) return;
+            const target = document.querySelector(`[data-msg-id="${targetId}"]`);
+            if (target) {
+                target.scrollIntoView({ behavior: "smooth", block: "center" });
+                target.classList.add("show-reply");
+                setTimeout(() => target.classList.remove("show-reply"), 1500);
+            }
+        };
+    }
+    // Long-press on the row also opens reply (mobile)
+    let pressTimer = null;
+    rowEl.addEventListener("touchstart", () => {
+        pressTimer = setTimeout(() => startReplyTo(rowEl.dataset.msgId, m), 450);
+    }, { passive: true });
+    rowEl.addEventListener("touchend", () => { if (pressTimer) clearTimeout(pressTimer); });
+    rowEl.addEventListener("touchmove", () => { if (pressTimer) clearTimeout(pressTimer); });
 }
 
 function renderThreadMessagesHTML(sortedDocs) {
     let html = "";
     let lastDate = "";
     let prevSender = null;
-    sortedDocs.forEach((d, i) => {
+    sortedDocs.forEach((d) => {
         const m = d.data();
         const mine = m.uid === state.user.uid;
         const ts = m.createdAt?.toMillis?.() || Date.now();
@@ -2231,17 +2323,54 @@ function renderThreadMessagesHTML(sortedDocs) {
         }
         const consecutive = prevSender === m.uid;
         prevSender = m.uid;
-        let bubbleContent;
-        if (m.imageUrl) {
-            bubbleContent = `<img class="msg-image" src="${escapeHtml(m.imageUrl)}" alt="" />`;
-        } else if (m.audioUrl) {
-            bubbleContent = `<div class="msg-bubble msg-audio"><audio controls preload="none" src="${escapeHtml(m.audioUrl)}"></audio></div>`;
-        } else {
-            bubbleContent = `<div class="msg-bubble">${linkifyText(m.text || "")}</div>`;
-        }
-        html += `<div class="msg-row ${mine ? "from-me" : "from-them"} ${consecutive ? "consecutive" : ""}">${bubbleContent}</div>`;
+        html += buildMessageRowHTML(d.id, m, mine, consecutive);
     });
     return html;
+}
+
+/* ----- Reply draft state (per-thread) ----- */
+
+let replyDraft = null; // { messageId, senderUid, senderUsername, snippet, isImage, isAudio }
+
+function startReplyTo(messageId, m) {
+    let senderUsername;
+    if (m.uid === state.user.uid) {
+        senderUsername = state.profile.username;
+    } else {
+        senderUsername = state.friends.get(m.uid)?.username
+            || state.chatThreads.get(chatIdFor(state.user.uid, state.threadOtherUid))?.otherUsername
+            || "user";
+    }
+    let snippet = (m.text || "").slice(0, 80);
+    if (m.imageUrl) snippet = "📷 Photo";
+    else if (m.audioUrl) snippet = "🎤 Voice note";
+    replyDraft = {
+        messageId,
+        senderUid: m.uid,
+        senderUsername,
+        snippet,
+        isImage: !!m.imageUrl,
+        isAudio: !!m.audioUrl
+    };
+    const bar = $("#thread-reply-preview");
+    if (bar) {
+        bar.hidden = false;
+        $("#trp-name").textContent = m.uid === state.user.uid ? "You" : `@${senderUsername}`;
+        $("#trp-text").textContent = snippet || "Message";
+    }
+    $("#thread-input")?.focus();
+}
+
+function cancelReplyDraft() {
+    replyDraft = null;
+    const bar = $("#thread-reply-preview");
+    if (bar) bar.hidden = true;
+}
+
+function consumeReplyDraft() {
+    const r = replyDraft;
+    cancelReplyDraft();
+    return r;
 }
 
 function formatDayDivider(ms) {
@@ -2262,6 +2391,7 @@ function leaveThread() {
 
 async function sendMessage(otherUid, payload) {
     // payload: { text } | { imageUrl } | { audioUrl, audioDuration }
+    //         optionally extended with { replyTo: { messageId, senderUid, ... } }
     const me = state.user.uid;
     const cid = chatIdFor(me, otherUid);
     const myUsername = state.profile.username;
@@ -2286,6 +2416,18 @@ async function sendMessage(otherUid, payload) {
     } else {
         messageDoc = { text: payload.text, uid: me, createdAt: now };
         previewText = payload.text;
+    }
+    if (payload.replyTo) {
+        // Strip undefined fields — Firestore rejects undefined.
+        const r = payload.replyTo;
+        messageDoc.replyTo = {
+            messageId: r.messageId || "",
+            senderUid: r.senderUid || "",
+            senderUsername: r.senderUsername || "",
+            snippet: (r.snippet || "").slice(0, 120),
+            isImage: !!r.isImage,
+            isAudio: !!r.isAudio
+        };
     }
 
     try {
@@ -2326,7 +2468,8 @@ async function sendImageMessage(otherUid, file) {
     showToast("Uploading image…");
     try {
         const url = await uploadToCloudinary(file);
-        await sendMessage(otherUid, { imageUrl: url });
+        const replyTo = consumeReplyDraft();
+        await sendMessage(otherUid, { imageUrl: url, replyTo });
     } catch (err) {
         console.error(err);
         showToast("Image upload failed.", "error");
@@ -2878,18 +3021,27 @@ async function openWeeklyRecap() {
         .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
         .slice(0, 9);
 
-    // Always render 9 tiles (fill empties for grid harmony)
-    let html = "";
-    for (let i = 0; i < 9; i++) {
-        const p = posts[i];
-        if (p) {
-            const url = (p.images?.[0]) || p.imageUrl || "";
-            html += `<div class="recap-tile"><img crossorigin="anonymous" src="${escapeHtml(url)}" alt=""/></div>`;
-        } else {
-            html += `<div class="recap-tile empty"></div>`;
+    // If the user hasn't dropped at all this week, show a friendly empty
+    // state instead of an all-blank grid (which made the modal look broken).
+    if (posts.length === 0) {
+        grid.innerHTML = `<div class="recap-empty-msg">
+            No drops this week yet.<br/>
+            Post a few daily prompts and your recap card will fill up.
+        </div>`;
+    } else {
+        // Always render 9 tiles (fill empties for grid harmony)
+        let html = "";
+        for (let i = 0; i < 9; i++) {
+            const p = posts[i];
+            if (p) {
+                const url = (p.images?.[0]) || p.imageUrl || "";
+                html += `<div class="recap-tile"><img crossorigin="anonymous" src="${escapeHtml(url)}" alt=""/></div>`;
+            } else {
+                html += `<div class="recap-tile empty"></div>`;
+            }
         }
+        grid.innerHTML = html;
     }
-    grid.innerHTML = html;
 
     const fmt = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
     $("#recap-period").textContent = `${fmt(sevenDaysAgo)} – ${fmt(new Date())}`;
@@ -3263,7 +3415,8 @@ async function finishVoiceRecording(autoSend = true) {
     showToast("Sending voice note…");
     try {
         const url = await uploadAudioToCloudinary(blob);
-        await sendMessage(otherUid, { audioUrl: url, audioDuration: durationSec });
+        const replyTo = consumeReplyDraft();
+        await sendMessage(otherUid, { audioUrl: url, audioDuration: durationSec, replyTo });
     } catch (err) {
         console.error(err);
         showToast("Voice note failed.", "error");
@@ -3535,6 +3688,9 @@ document.addEventListener("DOMContentLoaded", () => {
     $("#thread-voice-btn")?.addEventListener("click", startVoiceRecording);
     $("#thread-rec-cancel")?.addEventListener("click", cancelVoiceRecording);
     $("#thread-rec-send")?.addEventListener("click", () => finishVoiceRecording(true));
+
+    // ----- Chat replies: cancel pending reply -----
+    $("#trp-cancel")?.addEventListener("click", cancelReplyDraft);
 
     // Run router once for initial page (e.g. opening with #/share/abc directly)
     if (!auth.currentUser) router();

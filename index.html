@@ -409,6 +409,13 @@
             </a>
         </div>
         <div id="thread-messages" class="thread-messages"></div>
+        <div id="thread-reply-preview" class="thread-reply-preview" hidden>
+            <div class="trp-body">
+                <span class="trp-name" id="trp-name">@user</span>
+                <span class="trp-text" id="trp-text">message</span>
+            </div>
+            <button type="button" id="trp-cancel" class="trp-cancel" aria-label="Cancel reply">×</button>
+        </div>
         <form id="thread-form" class="thread-composer">
             <label for="thread-image-input" class="composer-icon-btn" aria-label="Send image">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
