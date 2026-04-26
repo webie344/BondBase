@@ -175,6 +175,63 @@ function showToast(msg, type = "default") {
     }, 2600);
 }
 
+/* =============================================================
+   IN-APP SOUND CUES
+   Tiny synthesized tones via Web Audio — no external files,
+   no licensing concerns. User can mute in Settings.
+   ============================================================= */
+const Sounds = (() => {
+    let ctx = null;
+    let enabled = localStorage.getItem("drop:sounds") !== "0"; // default ON
+
+    function ensureCtx() {
+        if (!enabled) return null;
+        try {
+            if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (ctx.state === "suspended") ctx.resume();
+            return ctx;
+        } catch (e) { return null; }
+    }
+
+    // Play one tone: f Hz, dur s, type, peak gain
+    function tone(f, dur = 0.12, type = "sine", gain = 0.08, delay = 0) {
+        const c = ensureCtx();
+        if (!c) return;
+        const t0 = c.currentTime + delay;
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(f, t0);
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(gain, t0 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        osc.connect(g).connect(c.destination);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.02);
+    }
+
+    return {
+        get enabled() { return enabled; },
+        set(on) {
+            enabled = !!on;
+            localStorage.setItem("drop:sounds", on ? "1" : "0");
+            if (on) tone(660, 0.1, "sine", 0.06); // confirmation blip
+        },
+        // Distinct cues — short, gentle, never alarming
+        promptOpen()    { tone(523, 0.18, "sine",     0.07);
+                          tone(784, 0.22, "sine",     0.07, 0.08); },     // C5 → G5
+        postSent()      { tone(880, 0.10, "triangle", 0.08);
+                          tone(1175, 0.16, "triangle", 0.08, 0.07); },    // A5 → D6
+        likeReceived()  { tone(988, 0.12, "sine",     0.06); },           // B5 ping
+        messageIn()     { tone(740, 0.09, "sine",     0.06);
+                          tone(988, 0.12, "sine",     0.06, 0.05); },     // F#5 → B5
+        messageOut()    { tone(1320, 0.06, "sine",    0.04); },           // soft swish
+        friendAccepted(){ tone(587, 0.10, "triangle", 0.07);
+                          tone(740, 0.10, "triangle", 0.07, 0.08);
+                          tone(988, 0.18, "triangle", 0.07, 0.16); },     // D5–F#5–B5
+    };
+})();
+
 function confirmDialog(title, message, okText = "Confirm") {
     return new Promise((resolve) => {
         $("#confirm-title").textContent = title;
@@ -615,6 +672,7 @@ async function renderToday() {
     $("#today-snap-btn").onclick = () => { location.hash = "#/capture"; };
 }
 
+let _lastCountdownPhase = null;
 function updateCountdown() {
     const w = getWindowState();
     const cd = $("#today-countdown");
@@ -622,6 +680,13 @@ function updateCountdown() {
     const value = cd.querySelector(".countdown-value");
     const btn = $("#today-snap-btn");
     const hint = $("#today-action-hint");
+
+    // Play a soft chime the moment the prompt opens (only on transition,
+    // not while sitting on the page after it's already open).
+    if (_lastCountdownPhase && _lastCountdownPhase !== "open" && w.phase === "open") {
+        Sounds.promptOpen();
+    }
+    _lastCountdownPhase = w.phase;
 
     if (w.phase === "before") {
         cd.classList.remove("is-open");
@@ -1265,6 +1330,7 @@ async function handlePost() {
         // Streaks count public daily drops only.
         if (!pendingCircleId) await updateUserStreak();
 
+        Sounds.postSent();
         showToast("Posted!", "success");
         if (pendingCircleId) { location.hash = `#/circle/${pendingCircleId}`; return; }
         location.hash = "#/feed";
@@ -1498,6 +1564,8 @@ async function renderShare(postId) {
 function renderSettings() {
     $("#settings-time").value = state.profile?.promptTimeLocal || "19:00";
     $("#settings-push").checked = !!state.profile?.pushEnabled;
+    const sndEl = $("#settings-sounds");
+    if (sndEl) sndEl.checked = Sounds.enabled;
     $("#settings-saved").hidden = true;
     // Invite section
     ensureMyInviteCode().then(code => {
@@ -1512,6 +1580,10 @@ function renderSettings() {
 }
 
 function setupSettingsControls() {
+    // Sound toggle saves immediately to localStorage (no server round-trip)
+    const sndEl = $("#settings-sounds");
+    if (sndEl) sndEl.onchange = () => Sounds.set(sndEl.checked);
+
     $("#settings-save-btn").onclick = async () => {
         const newTime = $("#settings-time").value || "19:00";
         const pushOn = $("#settings-push").checked;
@@ -1600,11 +1672,31 @@ function startSocialSubscriptions(uid) {
         (err) => console.warn("requestsOut listener:", err)
     );
 
+    let _chatThreadsInit = false;
+    let _prevUnreadByThread = new Map();
     state.chatThreadsUnsub = onSnapshot(
         collection(db, "users", uid, "chatThreads"),
         (snap) => {
+            // Detect newly arrived messages so we can play a soft chime.
+            // Only after the initial load, and not while the user is already
+            // in that thread (no point chiming for a message they're reading).
+            if (_chatThreadsInit) {
+                snap.docs.forEach(d => {
+                    const data = d.data();
+                    const prev = _prevUnreadByThread.get(d.id) || 0;
+                    const curr = data.unreadCount || 0;
+                    if (curr > prev && data.otherUid !== state.threadOtherUid) {
+                        Sounds.messageIn();
+                    }
+                });
+            }
             state.chatThreads.clear();
-            snap.forEach(d => state.chatThreads.set(d.id, d.data()));
+            _prevUnreadByThread.clear();
+            snap.forEach(d => {
+                state.chatThreads.set(d.id, d.data());
+                _prevUnreadByThread.set(d.id, d.data().unreadCount || 0);
+            });
+            _chatThreadsInit = true;
             updateNavBadges();
             renderChatsList();
         },
@@ -1727,6 +1819,7 @@ async function acceptFriendRequest(otherUid) {
             fromUid: state.user.uid,
             fromUsername: me.username
         });
+        Sounds.friendAccepted();
         showToast(`You and @${incoming.username} are now friends.`, "success");
     } catch (err) {
         console.error(err);
@@ -3010,16 +3103,30 @@ async function openWeeklyRecap() {
     const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     const cutoff = todayKey(sevenDaysAgo);
 
-    const q = query(
-        collection(db, "posts"),
-        where("uid", "==", state.user.uid),
-        where("promptDate", ">=", cutoff)
-    );
-    const snap = await getDocs(q);
-    const posts = snap.docs
-        .map(d => d.data())
-        .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
-        .slice(0, 9);
+    // Single where() — composite (uid + promptDate) requires a Firestore index
+    // we don't ship. Filter and sort client-side, same pattern as renderProfile.
+    let posts = [];
+    try {
+        const q = query(
+            collection(db, "posts"),
+            where("uid", "==", state.user.uid)
+        );
+        const snap = await getDocs(q);
+        posts = snap.docs
+            .map(d => d.data())
+            .filter(p => (p.promptDate || "") >= cutoff)
+            .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+            .slice(0, 9);
+    } catch (err) {
+        console.error("recap query failed:", err);
+        grid.innerHTML = `<div class="recap-empty-msg">
+            Couldn't load your week. Please try again in a moment.
+        </div>`;
+        $("#recap-period").textContent = "—";
+        $("#recap-username").textContent = `@${state.profile?.username || "you"}`;
+        $("#recap-streak").textContent = `🔥 ${state.profile?.currentStreak || 0}`;
+        return;
+    }
 
     // If the user hasn't dropped at all this week, show a friendly empty
     // state instead of an all-blank grid (which made the modal look broken).
