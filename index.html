@@ -254,6 +254,17 @@
                 <textarea id="capture-caption" maxlength="240" rows="2" placeholder="Say something… use #hashtags"></textarea>
                 <p class="hint" id="capture-caption-count">0 / 240</p>
 
+                <label class="mt-md">With friends <span class="muted small">(optional)</span></label>
+                <div id="capture-with-block" class="with-block">
+                    <div id="capture-with-chips" class="with-chips"></div>
+                    <button type="button" id="capture-with-add" class="with-add-btn">+ Tag friends</button>
+                </div>
+                <div id="capture-with-picker" class="with-picker" hidden>
+                    <input id="capture-with-search" class="with-search" type="text" placeholder="Search friends…" />
+                    <div id="capture-with-results" class="with-results"></div>
+                    <button type="button" id="capture-with-done" class="btn btn-secondary btn-block mt-sm">Done</button>
+                </div>
+
                 <button id="capture-post-btn" class="btn btn-primary btn-xl btn-block mt-md">Post</button>
                 <button id="capture-retake-btn" class="btn btn-ghost btn-block mt-sm">Retake</button>
                 <p id="capture-error" class="error-text" hidden></p>

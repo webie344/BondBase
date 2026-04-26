@@ -158,8 +158,12 @@ function spawnFloatingReaction(emoji, anchorEl) {
     let y = window.innerHeight - 120;
     if (anchorEl && anchorEl.getBoundingClientRect) {
         const r = anchorEl.getBoundingClientRect();
-        x = r.left + r.width / 2;
-        y = r.top + r.height / 2;
+        // Ignore zero-rect (hidden / detached) anchors and fall back to the
+        // bottom-center default so the burst is always visible.
+        if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight) {
+            x = r.left + r.width / 2;
+            y = r.top + r.height / 2;
+        }
     }
     // Spawn 5 emojis with slight horizontal jitter
     for (let i = 0; i < 5; i++) {
@@ -1231,9 +1235,12 @@ function renderPostCardHTML(postId, p) {
             </div>`;
 
     const reactionsHtml = renderReactionsRowHTML(p, myReaction, postId, /*compact*/ true);
+    const taggedNames = Array.isArray(p.taggedUsernames) ? p.taggedUsernames.filter(Boolean) : [];
+    const hasTagged = taggedNames.length > 0;
+    const withBadgeHtml = hasTagged ? renderWithBadgeHTML(taggedNames) : "";
 
     return `
-        <article class="post-card" data-post-id="${postId}">
+        <article class="post-card ${hasTagged ? "has-tagged" : ""}" data-post-id="${postId}">
             <header class="post-header">
                 <div class="post-avatar" data-username="${escapeHtml(p.username || "")}">${escapeHtml(initial)}</div>
                 <div class="post-header-text">
@@ -1241,6 +1248,7 @@ function renderPostCardHTML(postId, p) {
                     <span class="post-time">${timeAgo}${timeAgo ? " · " : ""}<span class="post-badge ${onTime ? "badge-ontime" : "badge-late"}">${onTime ? "On time" : "Late"}</span></span>
                 </div>
             </header>
+            ${withBadgeHtml}
             ${imageHtml}
             <div class="post-actions">
                 <button class="post-action like-btn ${userLiked ? "liked" : ""}" data-action="like" aria-label="Like">
@@ -1259,6 +1267,26 @@ function renderPostCardHTML(postId, p) {
             ${p.caption ? `<p class="post-caption"><span class="post-caption-author" data-username="${escapeHtml(p.username || "")}">@${escapeHtml(p.username || "user")}</span> ${linkifyText(p.caption)}</p>` : ""}
             ${comments > 0 ? `<button class="post-view-comments" data-action="open">View all ${comments} comment${comments === 1 ? "" : "s"}</button>` : ""}
         </article>`;
+}
+
+function renderWithBadgeHTML(usernames) {
+    if (!usernames || !usernames.length) return "";
+    const stack = usernames.slice(0, 3).map(u => {
+        const initial = (u || "?").charAt(0).toUpperCase();
+        return `<span class="with-avatar">${escapeHtml(initial)}</span>`;
+    }).join("");
+    let textParts;
+    if (usernames.length === 1) {
+        textParts = `<a data-username="${escapeHtml(usernames[0])}">@${escapeHtml(usernames[0])}</a>`;
+    } else if (usernames.length === 2) {
+        textParts = `<a data-username="${escapeHtml(usernames[0])}">@${escapeHtml(usernames[0])}</a> and <a data-username="${escapeHtml(usernames[1])}">@${escapeHtml(usernames[1])}</a>`;
+    } else {
+        textParts = `<a data-username="${escapeHtml(usernames[0])}">@${escapeHtml(usernames[0])}</a> and ${usernames.length - 1} others`;
+    }
+    return `<div class="post-with-badge">
+        <span class="post-with-stack">${stack}</span>
+        <span class="post-with-text">with ${textParts}</span>
+    </div>`;
 }
 
 function renderReactionsRowHTML(p, myReaction, postId, compact) {
@@ -1312,7 +1340,10 @@ function wirePostCard(card) {
 
             if (reactionKey) {
                 e.stopPropagation();
-                await toggleReaction(postId, reactionKey);
+                // Pass the actual clicked chip so the floating emoji can launch
+                // from its real on-screen position (the row gets re-rendered
+                // after, which would otherwise lose the anchor).
+                await toggleReaction(postId, reactionKey, target);
                 return;
             }
             if (action === "reaction-picker") {
@@ -1380,7 +1411,7 @@ async function toggleLikeOnPost(postId, btn) {
    REACTIONS
    ============================================================= */
 
-async function toggleReaction(postId, reactionKey) {
+async function toggleReaction(postId, reactionKey, anchorEl) {
     const ref = doc(db, "posts", postId);
     const snap = await getDoc(ref);
     if (!snap.exists()) return;
@@ -1411,16 +1442,14 @@ async function toggleReaction(postId, reactionKey) {
         optimisticReactions[reactionKey] = (optimisticReactions[reactionKey] || 0) + 1;
         optimisticUserReaction = reactionKey;
     }
-    patchReactionsInDOM(postId, optimisticReactions, optimisticUserReaction);
-
-    // Liveliness: float the emoji up from the chip the user just tapped
+    // Liveliness: float the emoji up from the visible click target. Capture
+    // the position FIRST, before patchReactionsInDOM swaps the row out.
     if (previous !== reactionKey) {
-        const anchor = document.querySelector(
-            `.post-card[data-post-id="${postId}"] .reaction-chip[data-reaction="${reactionKey}"]`
-        );
-        spawnFloatingReaction(REACTION_EMOJI[reactionKey], anchor);
+        spawnFloatingReaction(REACTION_EMOJI[reactionKey], anchorEl);
         Sounds.likeReceived?.();
     }
+
+    patchReactionsInDOM(postId, optimisticReactions, optimisticUserReaction);
 
     try {
         await updateDoc(ref, updates);
@@ -1454,7 +1483,8 @@ function showReactionPicker(anchorEl, postId) {
         b.textContent = r.emoji;
         b.onclick = (ev) => {
             ev.stopPropagation();
-            toggleReaction(postId, r.key);
+            // Anchor the floating emoji on the picker button the user tapped
+            toggleReaction(postId, r.key, b);
             closeReactionPicker();
         };
         pop.appendChild(b);
@@ -1562,6 +1592,7 @@ function renderCapture() {
     else $("#capture-prompt-text").textContent = state.todayPrompt.text;
 
     captureFiles = [];
+    captureTagged = new Map(); // uid -> { username, displayName }
     $("#capture-picker").hidden = false;
     $("#capture-preview-block").hidden = true;
     $("#capture-uploading").hidden = true;
@@ -1569,6 +1600,60 @@ function renderCapture() {
     $("#capture-caption-count").textContent = "0 / 240";
     $("#capture-error").hidden = true;
     $("#capture-previews").innerHTML = "";
+    renderCaptureWithChips();
+    const picker = $("#capture-with-picker");
+    if (picker) picker.hidden = true;
+}
+
+// "With friends" tagging state + UI
+let captureTagged = new Map();
+function renderCaptureWithChips() {
+    const wrap = $("#capture-with-chips");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    captureTagged.forEach((info, uid) => {
+        const chip = document.createElement("span");
+        chip.className = "with-chip";
+        chip.innerHTML = `@${escapeHtml(info.username || "user")}<button type="button" aria-label="Remove">×</button>`;
+        chip.querySelector("button").onclick = () => {
+            captureTagged.delete(uid);
+            renderCaptureWithChips();
+        };
+        wrap.appendChild(chip);
+    });
+}
+function renderCaptureWithResults(filter = "") {
+    const list = $("#capture-with-results");
+    if (!list) return;
+    const friends = [...state.friends.entries()].map(([uid, info]) => ({ uid, ...info }));
+    const f = filter.trim().toLowerCase();
+    const filtered = f
+        ? friends.filter(x =>
+            (x.username || "").toLowerCase().includes(f) ||
+            (x.displayName || "").toLowerCase().includes(f))
+        : friends;
+    if (filtered.length === 0) {
+        list.innerHTML = `<div class="with-empty">${friends.length === 0 ? "No friends yet — add some first." : "No matches."}</div>`;
+        return;
+    }
+    list.innerHTML = filtered.map(x => {
+        const initial = (x.username || "?").charAt(0).toUpperCase();
+        const sel = captureTagged.has(x.uid) ? "selected" : "";
+        return `<div class="with-result-row ${sel}" data-uid="${x.uid}" data-username="${escapeHtml(x.username || "")}" data-display="${escapeHtml(x.displayName || "")}">
+            <div class="with-result-avatar">${escapeHtml(initial)}</div>
+            <div class="with-result-name">@${escapeHtml(x.username || "user")}</div>
+            <div class="with-result-check"></div>
+        </div>`;
+    }).join("");
+    list.querySelectorAll(".with-result-row").forEach(row => {
+        row.onclick = () => {
+            const uid = row.dataset.uid;
+            if (captureTagged.has(uid)) captureTagged.delete(uid);
+            else captureTagged.set(uid, { username: row.dataset.username, displayName: row.dataset.display });
+            row.classList.toggle("selected");
+            renderCaptureWithChips();
+        };
+    });
 }
 
 function setupCaptureControls() {
@@ -1579,6 +1664,21 @@ function setupCaptureControls() {
     $("#capture-caption").oninput = (e) => {
         $("#capture-caption-count").textContent = `${e.target.value.length} / 240`;
     };
+    // "With friends" picker
+    const addBtn = $("#capture-with-add");
+    const picker = $("#capture-with-picker");
+    const search = $("#capture-with-search");
+    const done = $("#capture-with-done");
+    if (addBtn && picker) {
+        addBtn.onclick = () => {
+            picker.hidden = false;
+            search.value = "";
+            renderCaptureWithResults("");
+            search.focus();
+        };
+    }
+    if (search) search.oninput = (e) => renderCaptureWithResults(e.target.value);
+    if (done && picker) done.onclick = () => { picker.hidden = true; };
 }
 
 function onCaptureFiles(files) {
@@ -1682,8 +1782,12 @@ async function handlePost() {
             } catch {}
         }
 
+        // "With friends" tags
+        const taggedUids = [...captureTagged.keys()];
+        const taggedUsernames = [...captureTagged.values()].map(v => v.username || "");
+
         // Create post (keeps `imageUrl` for backwards compat = first image)
-        await addDoc(collection(db, "posts"), {
+        const postRef = await addDoc(collection(db, "posts"), {
             uid: state.user.uid,
             username: state.profile.username,
             displayName: state.profile.displayName || state.profile.username,
@@ -1695,6 +1799,8 @@ async function handlePost() {
             hashtags,
             isOnTime: onTime,
             circleId: pendingCircleId,
+            taggedUids,
+            taggedUsernames,
             likes: 0,
             likedBy: [],
             commentsCount: 0,
@@ -1703,6 +1809,20 @@ async function handlePost() {
             userReactions: {},
             createdAt: serverTimestamp()
         });
+
+        // Notify each tagged friend
+        for (const uid of taggedUids) {
+            try {
+                await addDoc(collection(db, "users", uid, "notifications"), {
+                    type: "tagged_in_drop",
+                    fromUid: state.user.uid,
+                    fromUsername: state.profile.username,
+                    postId: postRef.id,
+                    read: false,
+                    createdAt: serverTimestamp()
+                });
+            } catch (e) { console.warn("tag notif failed:", e); }
+        }
 
         // Streaks count public daily drops only.
         if (!pendingCircleId) await updateUserStreak();
@@ -3037,6 +3157,7 @@ function renderNotifications() {
             case "friend_accept":  actionText = `<strong>@${escapeHtml(n.fromUsername)}</strong> accepted your friend request.`; break;
             case "message":  actionText = `<strong>@${escapeHtml(n.fromUsername)}</strong>: ${escapeHtml((n.text || "").slice(0, 60))}`; break;
             case "circle_join": actionText = `<strong>@${escapeHtml(n.fromUsername)}</strong> added you to <strong>${escapeHtml(n.circleName || "a circle")}</strong>.`; break;
+            case "tagged_in_drop": actionText = `<strong>@${escapeHtml(n.fromUsername)}</strong> tagged you in their drop.`; break;
             default:         actionText = `<strong>@${escapeHtml(n.fromUsername || "Someone")}</strong> did something.`;
         }
         const thumb = n.postThumb ? `<img class="notif-thumb" src="${escapeHtml(n.postThumb)}" alt="" />` : "";
@@ -3060,7 +3181,7 @@ function renderNotifications() {
             const fromUsername = el.dataset.fromUsername;
             // Mark read
             try { await updateDoc(doc(db, "users", state.user.uid, "notifications", id), { read: true }); } catch {}
-            if (postId && (type === "like" || type === "view" || type === "comment" || type === "reply" || type === "reaction")) {
+            if (postId && (type === "like" || type === "view" || type === "comment" || type === "reply" || type === "reaction" || type === "tagged_in_drop")) {
                 location.hash = `#/post/${postId}`;
             } else if (type === "message") {
                 // need otherUid → store fromUid

@@ -2904,3 +2904,167 @@ body.in-thread #bottom-nav { display: none !important; }
     text-overflow: ellipsis;
 }
 .friend-toast .ft-text strong { font-weight: 700; }
+
+/* --- 11. "With friends" tagging on capture screen --- */
+.with-block {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    min-height: 44px;
+}
+.with-chips { display: contents; }
+.with-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px 4px 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    font-weight: 600;
+}
+.with-chip button {
+    width: 18px; height: 18px;
+    border: none;
+    background: rgba(0,0,0,0.08);
+    color: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.with-add-btn {
+    background: transparent;
+    border: 1px dashed var(--border-strong);
+    color: var(--ink-soft);
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    cursor: pointer;
+}
+.with-add-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.with-picker {
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+}
+.with-search {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+.with-results {
+    max-height: 220px;
+    overflow-y: auto;
+    margin-top: 8px;
+}
+.with-result-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 6px;
+    cursor: pointer;
+    border-radius: 8px;
+}
+.with-result-row:hover { background: var(--surface-2); }
+.with-result-row.selected { background: var(--accent-soft); }
+.with-result-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+.with-result-name { flex: 1; font-size: 14px; font-weight: 500; }
+.with-result-check {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    flex-shrink: 0;
+}
+.with-result-row.selected .with-result-check {
+    background: var(--accent);
+    border-color: var(--accent);
+    position: relative;
+}
+.with-result-row.selected .with-result-check::after {
+    content: "✓";
+    color: white;
+    font-size: 12px;
+    font-weight: 800;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.with-empty {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 13px;
+    padding: 12px;
+}
+
+/* --- 12. "With" badge on post cards --- */
+.post-card.has-tagged {
+    border: 1px solid var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.post-with-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 14px 0;
+    padding: 4px 10px 4px 4px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+}
+.post-with-stack {
+    display: inline-flex;
+}
+.post-with-stack .with-avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    border: 2px solid var(--surface);
+    margin-left: -8px;
+}
+.post-with-stack .with-avatar:first-child { margin-left: 0; }
+.post-with-text { padding-right: 4px; }
+.post-with-text a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 700;
+}
+.post-with-text a:hover { text-decoration: underline; }
