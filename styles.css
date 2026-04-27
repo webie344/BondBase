@@ -4904,3 +4904,257 @@ html[data-theme="dark"] .nav-badge {
     box-shadow: 0 0 0 2px var(--bg);
 }
 /* End professional polish pass */
+
+/* =============================================================
+   APPENDIX 3 — Modal spacing + scroll-aware song polish
+   Targets the three external dialogs (#song-picker-dialog,
+   #chat-custom-dialog, #monthly-recap-dialog) plus the new
+   .post-song-meta line under each post caption.
+   Theme-respecting: uses --surface, --ink, --muted, --border,
+   --accent, --radius-*, --shadow-*. Dark mode parity included.
+   ============================================================= */
+
+/* ---------- Generic dialog rhythm ----------
+   Drop's dialogs use <div class="dialog" hidden> with an inner
+   .dialog-content. The existing CSS sets a max-width / radius
+   but doesn't enforce a clear header / body / footer rhythm,
+   so the song picker, chat-custom, and recap dialogs all feel
+   cramped. These rules fix the internal rhythm without
+   overriding the existing surface / shadow.
+*/
+#song-picker-dialog .dialog-content,
+#chat-custom-dialog .dialog-content,
+#monthly-recap-dialog .dialog-content {
+    padding: 0 !important;          /* we re-pad sections individually */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: min(86vh, 760px);
+}
+
+/* Header band — title + close button. Most Drop dialogs put the
+   title in an .dialog-header or an h3 just inside .dialog-content. */
+#song-picker-dialog .dialog-content > .dialog-header,
+#song-picker-dialog .dialog-content > header,
+#song-picker-dialog .dialog-content > h2,
+#song-picker-dialog .dialog-content > h3,
+#chat-custom-dialog .dialog-content > .dialog-header,
+#chat-custom-dialog .dialog-content > header,
+#chat-custom-dialog .dialog-content > h2,
+#chat-custom-dialog .dialog-content > h3,
+#monthly-recap-dialog .dialog-content > .dialog-header,
+#monthly-recap-dialog .dialog-content > header,
+#monthly-recap-dialog .dialog-content > h2,
+#monthly-recap-dialog .dialog-content > h3 {
+    padding: 18px 20px 12px;
+    margin: 0;
+    border-bottom: 1px solid var(--border, #e5e7eb);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink, #111);
+    background: var(--surface, #fff);
+    flex: 0 0 auto;
+}
+
+/* Footer band — primary / secondary actions. */
+#song-picker-dialog .dialog-content > .dialog-footer,
+#song-picker-dialog .dialog-content > footer,
+#chat-custom-dialog .dialog-content > .dialog-footer,
+#chat-custom-dialog .dialog-content > footer,
+#monthly-recap-dialog .dialog-content > .dialog-footer,
+#monthly-recap-dialog .dialog-content > footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border, #e5e7eb);
+    background: var(--surface, #fff);
+    flex: 0 0 auto;
+}
+
+/* The space between header and footer scrolls. */
+#song-picker-dialog .dialog-content > .dialog-body,
+#song-picker-dialog .dialog-content > .song-picker,
+#chat-custom-dialog .dialog-content > .dialog-body,
+#chat-custom-dialog .dialog-content > .chat-custom,
+#monthly-recap-dialog .dialog-content > .dialog-body,
+#monthly-recap-dialog .dialog-content > .recap-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 20px 20px;
+}
+
+/* ---------- Song picker fine-tuning ---------- */
+.song-picker .song-picker-search { padding: 4px 0 12px; }
+.song-picker-tabs               { padding: 0 0 12px; gap: 8px; }
+.song-picker-list               { padding: 4px 0 4px; max-height: none; }
+.song-picker-list .song-row     { padding: 12px; gap: 14px; }
+.song-row .song-art             { width: 48px; height: 48px; border-radius: 10px; font-size: 22px; }
+.song-row .song-play {
+    width: 40px;
+    height: 40px;
+    box-shadow: 0 4px 10px rgba(255, 69, 0, 0.25);
+    transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.song-row .song-play:hover  { transform: scale(1.05); }
+.song-row .song-play:active { transform: scale(0.96); }
+.song-row.playing .song-play {
+    background: var(--ink, #111);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+.song-row .song-play svg { display: block; }
+.song-picker-empty {
+    list-style: none;
+    text-align: center;
+    color: var(--muted, #6b7280);
+    padding: 36px 16px;
+    font-size: 14px;
+}
+
+/* ---------- Chat custom dialog fine-tuning ---------- */
+#chat-custom-dialog .cc-section {
+    margin-top: 18px;
+}
+#chat-custom-dialog .cc-section:first-child { margin-top: 0; }
+#chat-custom-dialog .cc-section-label,
+#chat-custom-dialog .cc-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted, #6b7280);
+    margin-bottom: 10px;
+}
+#chat-custom-dialog #cc-color-grid,
+#chat-custom-dialog #cc-wallpaper-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    gap: 10px;
+}
+
+/* ---------- Monthly recap dialog fine-tuning ---------- */
+#monthly-recap-dialog .recap-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 14px;
+}
+#monthly-recap-dialog #recap-stage {
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#monthly-recap-dialog .recap-empty {
+    color: var(--muted, #6b7280);
+    font-size: 14px;
+    padding: 32px 16px;
+    text-align: center;
+}
+
+/* ---------- Floating song badge — play / pause toggle ---------- */
+.post-song-badge {
+    padding-right: 12px;            /* extra room for the toggle button */
+}
+.post-song-badge .psb-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-left: 4px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    flex-shrink: 0;
+    transition: background 120ms ease, transform 120ms ease;
+}
+.post-song-badge:hover .psb-toggle  { background: rgba(255,255,255,0.28); }
+.post-song-badge:active .psb-toggle { transform: scale(0.92); }
+.post-song-badge.playing .psb-toggle {
+    background: rgba(0,0,0,0.18);
+}
+.post-song-badge .psb-toggle svg { display: block; }
+
+/* ---------- Small song line under the post caption ---------- */
+.post-song-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 12px 10px;
+    padding: 5px 10px;
+    background: var(--surface-2, #f3f4f6);
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 100px;
+    color: var(--muted, #6b7280);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    max-width: calc(100% - 24px);
+    overflow: hidden;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.post-song-meta:hover {
+    background: var(--accent-soft, #fff1ea);
+    border-color: var(--accent, #ff4500);
+    color: var(--accent, #ff4500);
+}
+.post-song-meta.playing {
+    background: var(--accent, #ff4500);
+    border-color: var(--accent, #ff4500);
+    color: #fff;
+}
+.post-song-meta .psm-text {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.post-song-meta strong {
+    color: inherit;
+    font-weight: 700;
+    margin-right: 2px;
+}
+.post-song-meta svg { flex: 0 0 12px; }
+
+/* ---------- Dark theme parity ---------- */
+html[data-theme="dark"] #song-picker-dialog .dialog-content > .dialog-header,
+html[data-theme="dark"] #song-picker-dialog .dialog-content > header,
+html[data-theme="dark"] #song-picker-dialog .dialog-content > h2,
+html[data-theme="dark"] #song-picker-dialog .dialog-content > h3,
+html[data-theme="dark"] #chat-custom-dialog .dialog-content > .dialog-header,
+html[data-theme="dark"] #chat-custom-dialog .dialog-content > header,
+html[data-theme="dark"] #chat-custom-dialog .dialog-content > h2,
+html[data-theme="dark"] #chat-custom-dialog .dialog-content > h3,
+html[data-theme="dark"] #monthly-recap-dialog .dialog-content > .dialog-header,
+html[data-theme="dark"] #monthly-recap-dialog .dialog-content > header,
+html[data-theme="dark"] #monthly-recap-dialog .dialog-content > h2,
+html[data-theme="dark"] #monthly-recap-dialog .dialog-content > h3,
+html[data-theme="dark"] #song-picker-dialog .dialog-content > .dialog-footer,
+html[data-theme="dark"] #song-picker-dialog .dialog-content > footer,
+html[data-theme="dark"] #chat-custom-dialog .dialog-content > .dialog-footer,
+html[data-theme="dark"] #chat-custom-dialog .dialog-content > footer,
+html[data-theme="dark"] #monthly-recap-dialog .dialog-content > .dialog-footer,
+html[data-theme="dark"] #monthly-recap-dialog .dialog-content > footer {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--ink);
+}
+html[data-theme="dark"] .post-song-meta {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--muted);
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+    .post-song-badge.playing .psb-disc { animation: none; }
+    .song-row .song-play,
+    .post-song-badge .psb-toggle,
+    .post-song-meta { transition: none; }
+}
+/* End appendix 3 */

@@ -312,11 +312,26 @@ const SONG_LIBRARY = [
     { id: "sh12", title: "Last Light",       artist: "Drop FM", mood: "moody",  art: ["#9d4edd", "#3c096c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3" }
 ];
 
+// SVG icons used for play/pause toggling — kept here so every spot
+// (song-picker rows + post badges) renders the exact same shape.
+const SVG_PLAY  = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>`;
+const SVG_PAUSE = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
+const SVG_NOTE  = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+
+// Soft auto-play volume — loud enough to hear, never blasting.
+const SONG_AUTO_VOL = 0.4;
+const SONG_TAP_VOL  = 0.7;
+
 const Songs = {
     pendingSong: null,
     activeAudio: null,
     activeBadge: null,
     activeRow: null,
+    activeCard: null,
+    activeRowBtn: null,
+    activeBadgeBtn: null,
+    userPaused: new Set(),   // post IDs the user explicitly paused — don't auto-restart
+    observer: null,
     pendingKey: "drop:pending-song",
 
     loadPending() {
@@ -386,7 +401,7 @@ const Songs = {
         if (!list) return;
         const songs = this.filteredSongs();
         if (!songs.length) {
-            list.innerHTML = `<li class="recap-empty">No songs match. Try another mood.</li>`;
+            list.innerHTML = `<li class="song-picker-empty">No songs match. Try another mood.</li>`;
             return;
         }
         const selectedId = this.pendingSong?.id;
@@ -399,9 +414,7 @@ const Songs = {
                     <div class="song-title">${escapeHtml(s.title)}</div>
                     <div class="song-artist">${escapeHtml(s.artist)} · ${escapeHtml(s.mood)}</div>
                 </div>
-                <button type="button" class="song-play" data-action="play" aria-label="Preview">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-                </button>
+                <button type="button" class="song-play" data-action="play" aria-label="Play preview">${SVG_PLAY}</button>
             </li>`;
         }).join("");
 
@@ -426,7 +439,17 @@ const Songs = {
         this.refreshAddPill();
     },
 
+    // Swap the icon inside a play/pause button. Falls back gracefully if
+    // the element no longer exists (e.g. the picker was re-rendered).
+    setIcon(btn, isPlaying) {
+        if (!btn) return;
+        btn.innerHTML = isPlaying ? SVG_PAUSE : SVG_PLAY;
+        btn.setAttribute("aria-label", isPlaying ? "Pause preview" : "Play preview");
+    },
+
     previewSong(song, row) {
+        const btn = row.querySelector(".song-play");
+        // Tap the same row again => stop.
         if (this.activeAudio && this.activeRow === row) {
             this.stopActive();
             return;
@@ -434,15 +457,17 @@ const Songs = {
         this.stopActive();
         const audio = new Audio(song.url);
         // NOTE: do NOT set `audio.crossOrigin = "anonymous"`. SoundHelix
-        // (and most demo MP3 hosts) don't return CORS headers, so opting
-        // into CORS mode causes the browser to refuse the load with
-        // "error loading preview". We don't need the raw audio data —
-        // we just need to play it — so default no-CORS mode is fine.
+        // (and most demo MP3 hosts) don't return CORS headers; opting
+        // into CORS mode makes the browser refuse the load with
+        // "error loading preview". Default no-CORS playback is fine.
         audio.preload = "metadata";
+        audio.volume = SONG_TAP_VOL;
         audio.play().then(() => {
             row.classList.add("playing");
             this.activeAudio = audio;
             this.activeRow = row;
+            this.activeRowBtn = btn;
+            this.setIcon(btn, true);
         }).catch(() => showToast("Couldn't play preview.", "error"));
         audio.onended = () => this.stopActive();
     },
@@ -452,8 +477,27 @@ const Songs = {
             try { this.activeAudio.pause(); } catch {}
             this.activeAudio = null;
         }
-        if (this.activeRow) { this.activeRow.classList.remove("playing"); this.activeRow = null; }
-        if (this.activeBadge) { this.activeBadge.classList.remove("playing"); this.activeBadge = null; }
+        if (this.activeRow) {
+            this.activeRow.classList.remove("playing");
+            this.activeRow = null;
+        }
+        if (this.activeRowBtn) {
+            this.setIcon(this.activeRowBtn, false);
+            this.activeRowBtn = null;
+        }
+        if (this.activeBadge) {
+            this.activeBadge.classList.remove("playing");
+            this.activeBadge = null;
+        }
+        if (this.activeBadgeBtn) {
+            this.activeBadgeBtn.innerHTML = SVG_PLAY;
+            this.activeBadgeBtn = null;
+        }
+        if (this.activeCard) {
+            const meta = this.activeCard.querySelector(".post-song-meta");
+            if (meta) meta.classList.remove("playing");
+            this.activeCard = null;
+        }
     },
 
     // ----- Song badge on a rendered post -----
@@ -475,18 +519,78 @@ const Songs = {
             const wrap = card.querySelector(".post-image-wrap");
             if (!wrap) return;
             if (!wrap.style.position) wrap.style.position = "relative";
+
+            // Floating badge over the photo — now with explicit play/pause
+            // toggle button so the icon swap is visible and obvious.
             const badge = document.createElement("button");
             badge.type = "button";
             badge.className = "post-song-badge";
+            badge.dataset.postId = postId;
             badge.innerHTML = `
                 <span class="psb-disc"></span>
-                <span class="psb-text"><strong>${escapeHtml(song.title)}</strong>${escapeHtml(song.artist)}</span>`;
+                <span class="psb-text"><strong>${escapeHtml(song.title)}</strong>${escapeHtml(song.artist)}</span>
+                <span class="psb-toggle" aria-hidden="true">${SVG_PLAY}</span>`;
             badge.addEventListener("click", (e) => {
                 e.stopPropagation();
-                this.toggleBadgePlayback(badge, song);
+                this.toggleBadgePlayback(badge, song, /*manual*/ true);
             });
             wrap.appendChild(badge);
+
+            // Small song line in the post details (under caption / actions).
+            // Idempotent — only inject if not present.
+            if (!card.querySelector(".post-song-meta")) {
+                const meta = document.createElement("div");
+                meta.className = "post-song-meta";
+                meta.innerHTML = `${SVG_NOTE}<span class="psm-text"><strong>${escapeHtml(song.title)}</strong> · ${escapeHtml(song.artist)}</span>`;
+                meta.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    this.toggleBadgePlayback(badge, song, true);
+                });
+                // Place after .post-caption if it exists, otherwise after
+                // .post-actions, otherwise at the end of the card.
+                const cap = card.querySelector(".post-caption");
+                const actions = card.querySelector(".post-actions");
+                if (cap && cap.parentNode) cap.parentNode.insertBefore(meta, cap.nextSibling);
+                else if (actions && actions.parentNode) actions.parentNode.insertBefore(meta, actions.nextSibling);
+                else card.appendChild(meta);
+            }
+
+            // Scroll-into-view auto-play. One song at a time, soft volume.
+            this.observeCard(card);
         }).catch(() => {});
+    },
+
+    // Single shared IntersectionObserver. Auto-plays the song attached to
+    // a post when it scrolls 60% into view, pauses when it leaves.
+    ensureObserver() {
+        if (this.observer) return;
+        if (typeof IntersectionObserver === "undefined") return;
+        this.observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                const card = entry.target;
+                const postId = card.dataset.postId;
+                if (!postId) continue;
+                if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+                    if (this.userPaused.has(postId)) continue;
+                    if (this.activeCard === card) continue;
+                    const badge = card.querySelector(".post-song-badge");
+                    if (!badge) continue;
+                    const song = this.songCache.get(postId);
+                    if (!song) continue;
+                    this.startBadgePlayback(badge, song, SONG_AUTO_VOL, card);
+                } else if (entry.intersectionRatio < 0.3) {
+                    if (this.activeCard === card) this.stopActive();
+                }
+            }
+        }, { threshold: [0, 0.3, 0.6, 0.9] });
+    },
+
+    observeCard(card) {
+        this.ensureObserver();
+        if (!this.observer) return;
+        if (card.dataset.songObserved) return;
+        card.dataset.songObserved = "1";
+        this.observer.observe(card);
     },
 
     songCache: new Map(),
@@ -515,19 +619,51 @@ const Songs = {
         try { return await p; } finally { this.inflight.delete(postId); }
     },
 
-    toggleBadgePlayback(badge, song) {
+    // Tap on the badge / meta line. `manual=true` means we should mark
+    // the post in `userPaused` when stopping so scroll won't restart it.
+    toggleBadgePlayback(badge, song, manual) {
+        const postId = badge.dataset.postId;
         if (this.activeAudio && this.activeBadge === badge) {
+            if (manual && postId) this.userPaused.add(postId);
             this.stopActive();
             return;
         }
+        if (manual && postId) this.userPaused.delete(postId);
+        const card = badge.closest(".post-card");
+        this.startBadgePlayback(badge, song, SONG_TAP_VOL, card);
+    },
+
+    // Shared play routine used by both manual taps and the scroll-into-view
+    // observer. Stops any other active audio first, swaps the play icon
+    // to the pause icon, and updates the playing class on the badge / meta.
+    startBadgePlayback(badge, song, volume, card) {
+        if (this.activeAudio && this.activeBadge === badge) return;
         this.stopActive();
+        if (!song?.url) return;
         const audio = new Audio(song.url);
-        // No crossOrigin — see note in previewSong above.
+        audio.preload = "metadata";
+        audio.volume = (typeof volume === "number") ? volume : SONG_AUTO_VOL;
         audio.play().then(() => {
-            badge.classList.add("playing");
             this.activeAudio = audio;
             this.activeBadge = badge;
-        }).catch(() => showToast("Couldn't play song.", "error"));
+            this.activeCard = card || badge.closest(".post-card");
+            badge.classList.add("playing");
+            const toggle = badge.querySelector(".psb-toggle");
+            if (toggle) {
+                toggle.innerHTML = SVG_PAUSE;
+                this.activeBadgeBtn = toggle;
+            }
+            // Light up the small meta line too, if it exists.
+            if (this.activeCard) {
+                const meta = this.activeCard.querySelector(".post-song-meta");
+                if (meta) meta.classList.add("playing");
+            }
+        }).catch(() => {
+            // Auto-play blocked by the browser — silently ignore so we
+            // don't spam the user with toasts every time they scroll.
+            // Manual taps do show an error via the previous toast path
+            // but for badge taps we treat blocking the same as auto.
+        });
         audio.onended = () => this.stopActive();
     },
 
