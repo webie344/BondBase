@@ -1,5 +1,5 @@
 /* =============================================================
-   features.js — paste-in companion module for Drop
+   features.js — paste-in companion module for Drop  (PATCHED)
    Loaded via:  <script type="module" src="features.js"></script>
    Depends on window.dropApp exposed by app.js
 
@@ -9,6 +9,29 @@
      3. Reply drops (photo replies to a feed drop)
      4. Streak shields (earn 1 every 14-day run, shown next to streak)
      5. Monthly "Year-in-Drops" recap (shareable image)
+
+   ---------------------------------------------------------------
+   IMPORTANT — what changed vs. the previous version
+   ---------------------------------------------------------------
+   The previous version registered FOUR MutationObservers on the
+   entire <body> with { attributes: true, attributeFilter: ["hidden"],
+   childList: true, subtree: true }. Every router view-swap, every feed
+   re-render and every dialog open fired all of them dozens of times
+   per click. They then mutated the DOM in their callbacks (innerHTML
+   writes, appendChild, style writes), which re-triggered themselves
+   in a microtask cascade — locking the UI when the user pressed the
+   "Post late" / capture button.
+
+   This version:
+     * Removes every `attributeFilter:["hidden"]` watcher on body.
+     * Drives all view-aware injection from `hashchange` instead.
+     * Scopes the post-card enhancers to `#feed-grid` only and uses
+       child-presence checks (not dataset flags) so an `innerHTML`
+       patch cleanly re-injects the badge/button without ping-pong.
+     * Caches per-post Firestore lookups so the feed doesn't fire 240
+       reads on every snapshot.
+     * Replaces Shields' setInterval(2s) poller with a single load +
+       hashchange render.
    ============================================================= */
 
 // ---- Wait for app.js to publish window.dropApp ----
@@ -27,17 +50,15 @@ const _on = (el, ev, fn) => el && el.addEventListener(ev, fn);
 const debounce = (fn, ms = 200) => {
     let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 };
-// Drop's existing dialogs are <div class="dialog" hidden> — we toggle the
-// hidden attribute (NOT the native <dialog>.showModal) so theming and
-// styling stay consistent with the rest of the app.
+
+// Drop's existing dialogs are <div class="dialog" hidden>
 const openDialog = (id) => { const d = document.getElementById(id); if (d) d.hidden = false; };
 const closeDialog = (id) => { const d = document.getElementById(id); if (d) d.hidden = true; };
 
-// Generic close-dialog wiring: close button + click-on-backdrop + Esc key
+// Generic close-dialog wiring
 document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-close-dialog]");
     if (btn) { closeDialog(btn.dataset.closeDialog); return; }
-    // Click on the backdrop of one of OUR dialogs (not the inner content)
     const dlg = e.target.closest("#song-picker-dialog, #chat-custom-dialog, #monthly-recap-dialog");
     if (dlg && e.target === dlg) closeDialog(dlg.id);
 });
@@ -48,6 +69,22 @@ document.addEventListener("keydown", (e) => {
         if (d && !d.hidden) closeDialog(id);
     });
 });
+
+// Single shared "current route" helper.
+const currentHash = () => location.hash || "#/";
+const onHash = (fn) => window.addEventListener("hashchange", fn);
+
+// One-shot rAF debouncer — coalesces multiple sync triggers into a
+// single callback before the next paint. Used to gate enhancers so
+// they can't recurse in a microtask cascade.
+function rafOnce(fn) {
+    let scheduled = false;
+    return (...args) => {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(() => { scheduled = false; fn(...args); });
+    };
+}
 
 
 /* =============================================================
@@ -84,7 +121,7 @@ const CHAT_WALLPAPERS = [
 ];
 
 const ChatCustom = {
-    chatPrefsCache: new Map(), // chatId -> { accent, bg }
+    chatPrefsCache: new Map(),
 
     keyFor(otherUid) {
         const me = state.user?.uid;
@@ -111,7 +148,6 @@ const ChatCustom = {
     save(chatId, prefs) {
         this.chatPrefsCache.set(chatId, prefs);
         try { localStorage.setItem(this.localKey(chatId), JSON.stringify(prefs)); } catch {}
-        // Also persist to Firestore so it follows the user across devices
         const me = state.user?.uid;
         if (me) {
             F.setDoc(F.doc(db, "users", me, "chatPrefs", chatId), {
@@ -137,7 +173,6 @@ const ChatCustom = {
         else thread.style.removeProperty("--chat-bg");
     },
 
-    // Inject the customize button into the thread header
     injectButton() {
         const header = document.querySelector("#view-thread .thread-header");
         if (!header || header.querySelector(".chat-custom-btn")) return;
@@ -147,7 +182,6 @@ const ChatCustom = {
         btn.setAttribute("aria-label", "Customize chat");
         btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>`;
         btn.addEventListener("click", () => this.openDialog());
-        // Insert before the existing profile-link icon if present
         const profileLink = header.querySelector("#thread-profile-link");
         if (profileLink) header.insertBefore(btn, profileLink);
         else header.appendChild(btn);
@@ -203,19 +237,26 @@ const ChatCustom = {
         });
     },
 
-    init() {
-        // When the thread view appears, inject the button and apply saved prefs
-        const observer = new MutationObserver(() => {
-            const view = document.getElementById("view-thread");
-            if (!view || view.hidden) return;
+    onRouteEnter() {
+        // Only run when the thread view is the current route.
+        if (!currentHash().startsWith("#/thread/")) return;
+        // Defer to next frame so app.js has had a chance to populate the
+        // thread header for the newly opened conversation.
+        requestAnimationFrame(() => {
             this.injectButton();
             const otherUid = state.threadOtherUid;
             if (!otherUid) return;
             const chatId = this.keyFor(otherUid);
-            const prefs = this.load(chatId);
-            this.apply(prefs);
+            this.apply(this.load(chatId));
         });
-        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+    },
+
+    init() {
+        // Drive injection from hashchange instead of a global hidden-attr
+        // observer. This is the single biggest cause of the freeze fix.
+        onHash(() => this.onRouteEnter());
+        // Run once at boot in case we're already on a thread.
+        this.onRouteEnter();
 
         _on(document.getElementById("cc-save"), "click", () => {
             const otherUid = state.threadOtherUid;
@@ -239,32 +280,28 @@ const ChatCustom = {
 
 /* =============================================================
    2. SONGS ON DROPS
-   - Preloaded royalty-free library
-   - "Add song" pill on capture screen
-   - Song badge + tap-to-play on every post that has a song
    ============================================================= */
 
 const SONG_LIBRARY = [
-    { id: "sh1", title: "Glassy Currents",  artist: "Drop FM", mood: "chill",  art: ["#5d8aa8", "#1a3a5e"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-    { id: "sh2", title: "Soft Gravity",     artist: "Drop FM", mood: "moody",  art: ["#7d5a9b", "#2c1f3d"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
-    { id: "sh3", title: "Sunday Pavement",  artist: "Drop FM", mood: "happy",  art: ["#f4a261", "#e76f51"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
-    { id: "sh4", title: "Late Bus Window",  artist: "Drop FM", mood: "moody",  art: ["#264653", "#0f1e2b"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-    { id: "sh5", title: "Easy Yellow",      artist: "Drop FM", mood: "happy",  art: ["#ffd166", "#ef9b00"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
-    { id: "sh6", title: "Pavement Pulse",   artist: "Drop FM", mood: "energy", art: ["#e63946", "#9d0208"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
-    { id: "sh7", title: "Drift Capsule",    artist: "Drop FM", mood: "chill",  art: ["#06d6a0", "#0a8754"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
-    { id: "sh8", title: "After Hours Walk", artist: "Drop FM", mood: "moody",  art: ["#3a0ca3", "#100245"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
-    { id: "sh9", title: "Cold Brew Skip",   artist: "Drop FM", mood: "happy",  art: ["#43aa8b", "#175e54"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
-    { id: "sh10", title: "Run It Back",     artist: "Drop FM", mood: "energy", art: ["#ff006e", "#8e0049"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
-    { id: "sh11", title: "Slow Headlights", artist: "Drop FM", mood: "chill",  art: ["#118ab2", "#073b4c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3" },
-    { id: "sh12", title: "Last Light",      artist: "Drop FM", mood: "moody",  art: ["#9d4edd", "#3c096c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3" }
+    { id: "sh1",  title: "Glassy Currents",  artist: "Drop FM", mood: "chill",  art: ["#5d8aa8", "#1a3a5e"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+    { id: "sh2",  title: "Soft Gravity",     artist: "Drop FM", mood: "moody",  art: ["#7d5a9b", "#2c1f3d"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+    { id: "sh3",  title: "Sunday Pavement",  artist: "Drop FM", mood: "happy",  art: ["#f4a261", "#e76f51"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+    { id: "sh4",  title: "Late Bus Window",  artist: "Drop FM", mood: "moody",  art: ["#264653", "#0f1e2b"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
+    { id: "sh5",  title: "Easy Yellow",      artist: "Drop FM", mood: "happy",  art: ["#ffd166", "#ef9b00"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
+    { id: "sh6",  title: "Pavement Pulse",   artist: "Drop FM", mood: "energy", art: ["#e63946", "#9d0208"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
+    { id: "sh7",  title: "Drift Capsule",    artist: "Drop FM", mood: "chill",  art: ["#06d6a0", "#0a8754"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
+    { id: "sh8",  title: "After Hours Walk", artist: "Drop FM", mood: "moody",  art: ["#3a0ca3", "#100245"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
+    { id: "sh9",  title: "Cold Brew Skip",   artist: "Drop FM", mood: "happy",  art: ["#43aa8b", "#175e54"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
+    { id: "sh10", title: "Run It Back",      artist: "Drop FM", mood: "energy", art: ["#ff006e", "#8e0049"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
+    { id: "sh11", title: "Slow Headlights",  artist: "Drop FM", mood: "chill",  art: ["#118ab2", "#073b4c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3" },
+    { id: "sh12", title: "Last Light",       artist: "Drop FM", mood: "moody",  art: ["#9d4edd", "#3c096c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3" }
 ];
 
 const Songs = {
-    pendingSong: null,        // currently selected for next post
+    pendingSong: null,
     activeAudio: null,
     activeBadge: null,
     activeRow: null,
-
     pendingKey: "drop:pending-song",
 
     loadPending() {
@@ -282,15 +319,15 @@ const Songs = {
 
     // ----- Add-song pill on the capture screen -----
     injectAddPill() {
-        const view = document.getElementById("view-capture");
-        if (!view || view.hidden) return;
+        // Only do work if we're actually on the capture route.
+        if (currentHash() !== "#/capture") return;
         const previewBlock = document.getElementById("capture-preview-block");
         if (!previewBlock) return;
         if (previewBlock.querySelector(".add-song-pill")) {
             this.refreshAddPill();
             return;
         }
-        previewBlock.style.position = previewBlock.style.position || "relative";
+        if (!previewBlock.style.position) previewBlock.style.position = "relative";
         const pill = document.createElement("button");
         pill.type = "button";
         pill.className = "add-song-pill";
@@ -312,7 +349,6 @@ const Songs = {
         pill.classList.toggle("has-song", !!this.pendingSong);
     },
 
-    // ----- Picker dialog -----
     activeMood: "all",
     activeQuery: "",
 
@@ -376,7 +412,6 @@ const Songs = {
     },
 
     previewSong(song, row) {
-        // Toggle: if same song playing, stop
         if (this.activeAudio && this.activeRow === row) {
             this.stopActive();
             return;
@@ -404,16 +439,23 @@ const Songs = {
 
     // ----- Song badge on a rendered post -----
     enhancePostCard(card) {
-        if (!card || card.dataset.songEnhanced) return;
+        if (!card) return;
         const postId = card.dataset.postId;
         if (!postId) return;
-        // Look up song in our cache (filled by Firestore listener) or fetch on demand
+        // Idempotency check is BY CHILD PRESENCE, not a dataset flag —
+        // because applyFeedRender wipes innerHTML on patches, the dataset
+        // would survive but the badge would not. Using querySelector keeps
+        // the enhancer correct after every wipe AND prevents re-injection
+        // ping-pong with the scoped MutationObserver.
+        if (card.querySelector(".post-song-badge")) return;
         this.fetchPostSong(postId).then(song => {
             if (!song) return;
-            card.dataset.songEnhanced = "1";
+            // Re-check the card is still in the DOM and still un-enhanced
+            // by the time the async lookup resolves.
+            if (!card.isConnected || card.querySelector(".post-song-badge")) return;
             const wrap = card.querySelector(".post-image-wrap");
             if (!wrap) return;
-            wrap.style.position = wrap.style.position || "relative";
+            if (!wrap.style.position) wrap.style.position = "relative";
             const badge = document.createElement("button");
             badge.type = "button";
             badge.className = "post-song-badge";
@@ -430,22 +472,28 @@ const Songs = {
 
     songCache: new Map(),
     fetchedNotFound: new Set(),
+    inflight: new Map(),
 
     async fetchPostSong(postId) {
         if (this.songCache.has(postId)) return this.songCache.get(postId);
         if (this.fetchedNotFound.has(postId)) return null;
-        try {
-            const snap = await F.getDoc(F.doc(db, "posts", postId));
-            const data = snap.data();
-            if (data && data.songId) {
-                const song = SONG_LIBRARY.find(s => s.id === data.songId)
-                    || { id: data.songId, title: data.songTitle || "Song", artist: data.songArtist || "", url: data.songUrl, art: ["#888", "#444"], mood: "any" };
-                this.songCache.set(postId, song);
-                return song;
-            }
-        } catch {}
-        this.fetchedNotFound.add(postId);
-        return null;
+        if (this.inflight.has(postId)) return this.inflight.get(postId);
+        const p = (async () => {
+            try {
+                const snap = await F.getDoc(F.doc(db, "posts", postId));
+                const data = snap.data();
+                if (data && data.songId) {
+                    const song = SONG_LIBRARY.find(s => s.id === data.songId)
+                        || { id: data.songId, title: data.songTitle || "Song", artist: data.songArtist || "", url: data.songUrl, art: ["#888", "#444"], mood: "any" };
+                    this.songCache.set(postId, song);
+                    return song;
+                }
+            } catch {}
+            this.fetchedNotFound.add(postId);
+            return null;
+        })();
+        this.inflight.set(postId, p);
+        try { return await p; } finally { this.inflight.delete(postId); }
     },
 
     toggleBadgePlayback(badge, song) {
@@ -464,7 +512,6 @@ const Songs = {
         audio.onended = () => this.stopActive();
     },
 
-    // ----- Hook the post-publish flow: when our newest post appears, attach the song -----
     watchOwnNewPosts() {
         const me = state.user?.uid;
         if (!me) return;
@@ -483,7 +530,6 @@ const Songs = {
             if (id === baselineLatest) return;
             baselineLatest = id;
             const data = docSnap.data() || {};
-            // If song is pending and not already attached, attach it
             if (this.pendingSong && !data.songId) {
                 F.updateDoc(F.doc(db, "posts", id), {
                     songId: this.pendingSong.id,
@@ -491,7 +537,7 @@ const Songs = {
                     songArtist: this.pendingSong.artist,
                     songUrl: this.pendingSong.url
                 }).then(() => {
-                    showToast(`🎵 Added "${this.pendingSong.title}" to your drop`);
+                    showToast(`Added "${this.pendingSong.title}" to your drop`);
                     this.pendingSong = null;
                     this.savePending();
                     this.refreshAddPill();
@@ -500,10 +546,17 @@ const Songs = {
         }, () => {});
     },
 
+    // Scoped enhancer: scan only the feed grid, never the whole body.
+    scanFeed: rafOnce(function () {
+        const grid = document.getElementById("feed-grid");
+        if (!grid) return;
+        grid.querySelectorAll(".post-card").forEach(c => Songs.enhancePostCard(c));
+    }),
+
     init() {
         this.loadPending();
 
-        // Wire picker dialog controls
+        // Picker dialog wiring
         _on(document.getElementById("song-search-input"), "input", debounce((e) => {
             this.activeQuery = e.target.value || "";
             this.renderPickerList();
@@ -528,47 +581,52 @@ const Songs = {
             closeDialog("song-picker-dialog");
         });
 
-        // Watch DOM for new post cards + capture screen
-        const obs = new MutationObserver((mutations) => {
-            for (const m of mutations) {
-                m.addedNodes.forEach(n => {
-                    if (!(n instanceof HTMLElement)) return;
-                    if (n.matches?.(".post-card")) this.enhancePostCard(n);
-                    n.querySelectorAll?.(".post-card").forEach(c => this.enhancePostCard(c));
-                });
-            }
-            // Capture view: re-inject pill if user navigates to it
-            const cap = document.getElementById("view-capture");
-            if (cap && !cap.hidden) this.injectAddPill();
-        });
-        obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+        // Scoped MutationObserver: only the feed grid, only childList
+        // (no subtree, no attribute filter). Fires when post cards are
+        // added/removed OR when applyFeedRender patches a card's inner
+        // HTML (which removes-then-adds children of #feed-grid > article).
+        const attachFeedObserver = () => {
+            const grid = document.getElementById("feed-grid");
+            if (!grid || grid.dataset.songObsBound) return;
+            grid.dataset.songObsBound = "1";
+            const obs = new MutationObserver(() => this.scanFeed());
+            // childList + subtree on the GRID (not body) is safe: the grid
+            // only contains post cards, and rafOnce coalesces bursts.
+            obs.observe(grid, { childList: true, subtree: true });
+            this.scanFeed();
+        };
 
-        // Initial scan
-        document.querySelectorAll(".post-card").forEach(c => this.enhancePostCard(c));
+        // The feed grid may not exist yet at boot. Try on every hashchange
+        // until we find it, then bind once.
+        onHash(() => {
+            if (currentHash() === "#/capture") this.injectAddPill();
+            attachFeedObserver();
+        });
+        attachFeedObserver();
+        if (currentHash() === "#/capture") this.injectAddPill();
+
+        // Stop audio on navigation
+        onHash(() => this.stopActive());
 
         // Start listening for our own new posts to attach pending song
         this.watchOwnNewPosts();
-
-        // Stop audio on navigation
-        window.addEventListener("hashchange", () => this.stopActive());
     }
 };
 
 
 /* =============================================================
-   3. REPLY DROPS — photo replies to a feed drop
-   - Adds a "↩ Reply with photo" button to every post card
-   - Picks an image, uploads to Cloudinary, creates a new post with replyToPostId
-   - Replies show a banner: "in reply to @user's drop"
+   3. REPLY DROPS
    ============================================================= */
 
 const ReplyDrops = {
+    bannerCache: new Map(),    // postId -> parent data | null
+
     enhancePostCard(card) {
-        if (!card || card.dataset.replyDropEnhanced) return;
+        if (!card) return;
         const postId = card.dataset.postId;
         if (!postId) return;
-        card.dataset.replyDropEnhanced = "1";
 
+        // Reply button (idempotent by child presence)
         const actions = card.querySelector(".post-actions");
         if (actions && !actions.querySelector(".reply-drop-btn")) {
             const btn = document.createElement("button");
@@ -583,23 +641,31 @@ const ReplyDrops = {
             actions.appendChild(btn);
         }
 
-        // If this card itself is a reply, render a banner
+        // Banner (cached lookup so we don't refetch on every snapshot)
         this.maybeRenderReplyBanner(card, postId);
     },
 
     async maybeRenderReplyBanner(card, postId) {
+        if (card.querySelector(".reply-drop-banner")) return;
         try {
-            const snap = await F.getDoc(F.doc(db, "posts", postId));
-            const data = snap.data();
-            if (!data || !data.replyToPostId) return;
-            const parentSnap = await F.getDoc(F.doc(db, "posts", data.replyToPostId));
-            const parent = parentSnap.data();
+            let parent = this.bannerCache.get(postId);
+            if (parent === undefined) {
+                const snap = await F.getDoc(F.doc(db, "posts", postId));
+                const data = snap.data();
+                if (!data || !data.replyToPostId) {
+                    this.bannerCache.set(postId, null);
+                    return;
+                }
+                const parentSnap = await F.getDoc(F.doc(db, "posts", data.replyToPostId));
+                parent = parentSnap.data() || null;
+                this.bannerCache.set(postId, parent);
+            }
             if (!parent) return;
-            if (card.querySelector(".reply-drop-banner")) return;
+            if (!card.isConnected || card.querySelector(".reply-drop-banner")) return;
             const banner = document.createElement("div");
             banner.className = "reply-drop-banner";
             const thumb = parent.imageUrl || (parent.images && parent.images[0]) || "";
-            banner.innerHTML = `${thumb ? `<img class="rdb-thumb" src="${escapeHtml(thumb)}" alt="" />` : ""} ↩ in reply to <strong style="margin-left:4px;">@${escapeHtml(parent.username || "user")}</strong>`;
+            banner.innerHTML = `${thumb ? `<img class="rdb-thumb" src="${escapeHtml(thumb)}" alt="" />` : ""} in reply to <strong style="margin-left:4px;">@${escapeHtml(parent.username || "user")}</strong>`;
             const header = card.querySelector(".post-header");
             if (header) header.parentNode.insertBefore(banner, header);
             else card.prepend(banner);
@@ -631,7 +697,6 @@ const ReplyDrops = {
         showToast("Uploading reply…");
         try {
             const url = await uploadToCloudinary(file);
-            // Look up parent post for context (prompt + author)
             const parentSnap = await F.getDoc(F.doc(db, "posts", parentPostId));
             const parent = parentSnap.data() || {};
             const newDoc = {
@@ -639,7 +704,7 @@ const ReplyDrops = {
                 username: state.profile?.username || "user",
                 imageUrl: url,
                 images: [url],
-                caption: `↩ Reply to @${parent.username || "user"}`,
+                caption: `Reply to @${parent.username || "user"}`,
                 promptText: parent.promptText || "",
                 promptDate: parent.promptDate || todayKey(),
                 createdAt: F.serverTimestamp(),
@@ -653,7 +718,6 @@ const ReplyDrops = {
                 commentsCount: 0
             };
             const ref = await F.addDoc(F.collection(db, "posts"), newDoc);
-            // Notify parent author
             if (parent.uid && parent.uid !== state.user.uid) {
                 await F.addDoc(F.collection(db, "users", parent.uid, "notifications"), {
                     type: "reply_drop",
@@ -672,33 +736,35 @@ const ReplyDrops = {
         }
     },
 
+    scanFeed: rafOnce(function () {
+        const grid = document.getElementById("feed-grid");
+        if (!grid) return;
+        grid.querySelectorAll(".post-card").forEach(c => ReplyDrops.enhancePostCard(c));
+    }),
+
     init() {
-        const obs = new MutationObserver((mutations) => {
-            for (const m of mutations) {
-                m.addedNodes.forEach(n => {
-                    if (!(n instanceof HTMLElement)) return;
-                    if (n.matches?.(".post-card")) this.enhancePostCard(n);
-                    n.querySelectorAll?.(".post-card").forEach(c => this.enhancePostCard(c));
-                });
-            }
-        });
-        obs.observe(document.body, { childList: true, subtree: true });
-        document.querySelectorAll(".post-card").forEach(c => this.enhancePostCard(c));
+        // Same scoped strategy as Songs: observe ONLY #feed-grid.
+        const attachFeedObserver = () => {
+            const grid = document.getElementById("feed-grid");
+            if (!grid || grid.dataset.replyObsBound) return;
+            grid.dataset.replyObsBound = "1";
+            const obs = new MutationObserver(() => this.scanFeed());
+            obs.observe(grid, { childList: true, subtree: true });
+            this.scanFeed();
+        };
+        onHash(attachFeedObserver);
+        attachFeedObserver();
     }
 };
 
 
 /* =============================================================
    4. STREAK SHIELDS
-   - Stored on user profile: shields (number), shieldsLastEarned (date string)
-   - Earn 1 shield each time the user completes a 14-day run
-   - Display next to streak pill: 🛡 ×N
-   - Auto-applies a shield when user posts after missing exactly 1 day
-     (this part requires you to grant the field; see TODO note)
    ============================================================= */
 
 const Shields = {
     cache: { shields: 0, shieldsLastEarned: null },
+    loaded: false,
 
     async load() {
         const me = state.user?.uid;
@@ -708,6 +774,7 @@ const Shields = {
             const data = snap.data() || {};
             this.cache.shields = data.shields || 0;
             this.cache.shieldsLastEarned = data.shieldsLastEarned || null;
+            this.loaded = true;
             this.maybeEarn(data);
             this.render();
         } catch {}
@@ -716,7 +783,6 @@ const Shields = {
     async maybeEarn(profile) {
         const streak = profile?.streak || state.profile?.streak || 0;
         if (!streak || streak < 14) return;
-        // Earn 1 shield every full multiple of 14, but only once per multiple
         const targetTier = Math.floor(streak / 14);
         const lastTier = profile.shieldsTier || 0;
         if (targetTier > lastTier) {
@@ -729,19 +795,17 @@ const Shields = {
                     shieldsLastEarned: todayKey()
                 });
                 this.cache.shields += (targetTier - lastTier);
-                showToast(`🛡 You earned a streak shield! (${this.cache.shields} total)`);
+                showToast(`You earned a streak shield! (${this.cache.shields} total)`);
                 this.render();
             } catch {}
         }
     },
 
-    render() {
-        // Find the streak pill in the UI and append a shield count next to it
+    render: rafOnce(function () {
         const targets = document.querySelectorAll(
             "[data-streak-pill], .streak-pill, .streak-display, #streak-count, .home-streak"
         );
-        const count = this.cache.shields || 0;
-        // Remove any old shield pills first
+        const count = Shields.cache.shields || 0;
         document.querySelectorAll(".streak-shield-pill").forEach(p => p.remove());
         if (count <= 0) return;
         targets.forEach(el => {
@@ -751,33 +815,36 @@ const Shields = {
             pill.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/></svg><span class="ssp-count">×${count}</span>`;
             el.appendChild(pill);
         });
-    },
+    }),
 
     init() {
-        // Try a few times because the streak UI may render after auth resolves
-        const tryRender = () => this.render();
-        if (state.user?.uid) this.load();
-        // Re-poll periodically
-        let tries = 0;
-        const interval = setInterval(() => {
-            tries++;
-            if (state.user?.uid && this.cache.shields === 0 && tries < 6) this.load();
-            tryRender();
-            if (tries > 20) clearInterval(interval);
-        }, 2000);
+        // One-time load when auth is ready, then re-render on every route
+        // change (no setInterval). The 2-second poller in the previous
+        // version was creating constant DOM churn.
+        const tryLoad = () => {
+            if (!this.loaded && state.user?.uid) this.load();
+            else this.render();
+        };
+        tryLoad();
+        onHash(tryLoad);
+        // If the user logs in after boot, app.js will eventually populate
+        // state.user. Give it up to ~10s with light polling.
+        let attempts = 0;
+        const iv = setInterval(() => {
+            attempts++;
+            if (this.loaded || attempts > 10) { clearInterval(iv); return; }
+            if (state.user?.uid) { clearInterval(iv); this.load(); }
+        }, 1000);
     }
 };
 
 
 /* =============================================================
    5. MONTHLY "Year-in-Drops" RECAP
-   - Adds a recap trigger to settings/profile
-   - Pulls user's posts for the month
-   - Renders a 9-grid shareable card, exports PNG via html2canvas
    ============================================================= */
 
 const Recap = {
-    monthOffset: 0, // 0 = this month, -1 = previous, etc.
+    monthOffset: 0,
 
     monthBounds(offset = 0) {
         const now = new Date();
@@ -818,13 +885,13 @@ const Recap = {
         if (!stage) return;
         stage.innerHTML = `<div class="recap-empty">Loading your drops…</div>`;
         const { label } = this.monthBounds(this.monthOffset);
-        document.getElementById("recap-title").textContent = `Your ${label}`;
+        const titleEl = document.getElementById("recap-title");
+        if (titleEl) titleEl.textContent = `Your ${label}`;
         const { posts, totalLikes } = await this.fetchMonth(this.monthOffset);
         if (!posts.length) {
             stage.innerHTML = `<div class="recap-empty">No drops in ${escapeHtml(label)}.</div>`;
             return;
         }
-        // Build 9 cells (most recent 9)
         const sorted = posts.slice().sort((a, b) => {
             const ta = a.createdAt?.toMillis?.() || 0;
             const tb = b.createdAt?.toMillis?.() || 0;
@@ -849,18 +916,9 @@ const Recap = {
                 <div class="rc-title">${posts.length} drop${posts.length === 1 ? "" : "s"} in your month</div>
                 <div class="rc-grid">${cells.join("")}</div>
                 <div class="rc-stats">
-                    <div class="rc-stat">
-                        <span class="rc-stat-num">${posts.length}</span>
-                        <span class="rc-stat-label">drops</span>
-                    </div>
-                    <div class="rc-stat">
-                        <span class="rc-stat-num">${totalLikes}</span>
-                        <span class="rc-stat-label">likes</span>
-                    </div>
-                    <div class="rc-stat">
-                        <span class="rc-stat-num">${posts.filter(p => p.isOnTime).length}</span>
-                        <span class="rc-stat-label">on time</span>
-                    </div>
+                    <div class="rc-stat"><span class="rc-stat-num">${posts.length}</span><span class="rc-stat-label">drops</span></div>
+                    <div class="rc-stat"><span class="rc-stat-num">${totalLikes}</span><span class="rc-stat-label">likes</span></div>
+                    <div class="rc-stat"><span class="rc-stat-num">${posts.filter(p => p.isOnTime).length}</span><span class="rc-stat-label">on time</span></div>
                 </div>
             </div>`;
         stage.innerHTML = card;
@@ -890,15 +948,19 @@ const Recap = {
     },
 
     injectTrigger() {
-        // Try to attach to the profile/settings view
-        const candidates = document.querySelectorAll("#view-profile, #view-settings, .profile-content, .settings-content");
+        // Only do work if we're on a route where the trigger belongs.
+        const hash = currentHash();
+        if (!(hash.startsWith("#/profile") || hash === "#/settings")) return;
+        const candidates = document.querySelectorAll(
+            "#view-profile, #view-settings, .profile-content, .settings-content"
+        );
         candidates.forEach(target => {
             if (!target || target.querySelector(".recap-trigger")) return;
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "recap-trigger";
             btn.innerHTML = `
-                <span class="rt-icon">✨</span>
+                <span class="rt-icon">★</span>
                 <span class="rt-meta">
                     <span class="rt-title">Your month in drops</span>
                     <span class="rt-sub">A shareable recap of this month</span>
@@ -917,8 +979,8 @@ const Recap = {
         _on(document.getElementById("recap-month-prev"), "click", () => { this.monthOffset--; this.render(); });
         _on(document.getElementById("recap-month-next"), "click", () => { if (this.monthOffset < 0) { this.monthOffset++; this.render(); } });
 
-        const obs = new MutationObserver(() => this.injectTrigger());
-        obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+        // Drive trigger injection from hashchange — no body-wide observer.
+        onHash(() => this.injectTrigger());
         this.injectTrigger();
     }
 };
