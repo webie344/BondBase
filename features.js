@@ -238,17 +238,32 @@ const ChatCustom = {
     },
 
     onRouteEnter() {
-        // Only run when the thread view is the current route.
-        if (!currentHash().startsWith("#/thread/")) return;
-        // Defer to next frame so app.js has had a chance to populate the
-        // thread header for the newly opened conversation.
-        requestAnimationFrame(() => {
-            this.injectButton();
-            const otherUid = state.threadOtherUid;
-            if (!otherUid) return;
-            const chatId = this.keyFor(otherUid);
+        const m = currentHash().match(/^#\/thread\/(.+)$/);
+        // If we just LEFT a thread, strip the custom class+vars immediately
+        // so the next chat we open doesn't briefly show the previous one's
+        // color or wallpaper.
+        if (!m) {
+            const thread = document.getElementById("view-thread");
+            if (thread) {
+                thread.classList.remove("has-custom");
+                thread.style.removeProperty("--chat-accent");
+                thread.style.removeProperty("--chat-bg");
+            }
+            return;
+        }
+        const otherUid = decodeURIComponent(m[1]);
+        const me = state.user?.uid;
+        if (me) {
+            // Apply SYNCHRONOUSLY on hashchange (parse uid from hash —
+            // do NOT wait for rAF or state.threadOtherUid). This is what
+            // eliminates the "half background color before it changes
+            // fully" flicker when opening a customized chat.
+            const chatId = [me, otherUid].sort().join("_");
             this.apply(this.load(chatId));
-        });
+        }
+        // Header DOM may need a frame to settle — only the button
+        // injection is deferred.
+        requestAnimationFrame(() => this.injectButton());
     },
 
     init() {
@@ -418,7 +433,11 @@ const Songs = {
         }
         this.stopActive();
         const audio = new Audio(song.url);
-        audio.crossOrigin = "anonymous";
+        // NOTE: do NOT set `audio.crossOrigin = "anonymous"`. SoundHelix
+        // (and most demo MP3 hosts) don't return CORS headers, so opting
+        // into CORS mode causes the browser to refuse the load with
+        // "error loading preview". We don't need the raw audio data —
+        // we just need to play it — so default no-CORS mode is fine.
         audio.preload = "metadata";
         audio.play().then(() => {
             row.classList.add("playing");
@@ -503,7 +522,7 @@ const Songs = {
         }
         this.stopActive();
         const audio = new Audio(song.url);
-        audio.crossOrigin = "anonymous";
+        // No crossOrigin — see note in previewSong above.
         audio.play().then(() => {
             badge.classList.add("playing");
             this.activeAudio = audio;
@@ -512,37 +531,55 @@ const Songs = {
         audio.onended = () => this.stopActive();
     },
 
+    _ownPostsBound: false,
     watchOwnNewPosts() {
+        if (this._ownPostsBound) return;
         const me = state.user?.uid;
         if (!me) return;
-        let baselineLatest = null;
+        this._ownPostsBound = true;
+
+        const seen = new Set();
+        let primed = false;
         const q = F.query(
             F.collection(db, "posts"),
             F.where("uid", "==", me),
             F.orderBy("createdAt", "desc"),
-            F.limit(1)
+            F.limit(5)
         );
         F.onSnapshot(q, (snap) => {
-            if (snap.empty) return;
-            const docSnap = snap.docs[0];
-            const id = docSnap.id;
-            if (baselineLatest === null) { baselineLatest = id; return; }
-            if (id === baselineLatest) return;
-            baselineLatest = id;
-            const data = docSnap.data() || {};
-            if (this.pendingSong && !data.songId) {
-                F.updateDoc(F.doc(db, "posts", id), {
-                    songId: this.pendingSong.id,
-                    songTitle: this.pendingSong.title,
-                    songArtist: this.pendingSong.artist,
-                    songUrl: this.pendingSong.url
-                }).then(() => {
-                    showToast(`Added "${this.pendingSong.title}" to your drop`);
-                    this.pendingSong = null;
-                    this.savePending();
-                    this.refreshAddPill();
-                }).catch(() => {});
+            // PRIMING: on the very first delivery, mark whatever already
+            // exists as "seen" without trying to attach a song. This is the
+            // ONLY thing the previous version got wrong — it returned early
+            // even when the user had zero posts, so the very first drop the
+            // user ever made never received its pending song.
+            if (!primed) {
+                snap.forEach(d => seen.add(d.id));
+                primed = true;
+                return;
             }
+            // Use docChanges so we react to genuine additions only —
+            // not re-deliveries of cached docs.
+            snap.docChanges().forEach(change => {
+                if (change.type !== "added") return;
+                const d = change.doc;
+                if (seen.has(d.id)) return;
+                seen.add(d.id);
+                const data = d.data() || {};
+                if (this.pendingSong && !data.songId) {
+                    const song = this.pendingSong;
+                    F.updateDoc(F.doc(db, "posts", d.id), {
+                        songId: song.id,
+                        songTitle: song.title,
+                        songArtist: song.artist,
+                        songUrl: song.url
+                    }).then(() => {
+                        showToast(`Added "${song.title}" to your drop`);
+                        this.pendingSong = null;
+                        this.savePending();
+                        this.refreshAddPill();
+                    }).catch(() => {});
+                }
+            });
         }, () => {});
     },
 
@@ -608,8 +645,18 @@ const Songs = {
         // Stop audio on navigation
         onHash(() => this.stopActive());
 
-        // Start listening for our own new posts to attach pending song
-        this.watchOwnNewPosts();
+        // Start listening for our own new posts to attach pending song.
+        // Auth may not be ready at module-init time — poll briefly until it is.
+        const tryBind = () => this.watchOwnNewPosts();
+        tryBind();
+        if (!this._ownPostsBound) {
+            let attempts = 0;
+            const iv = setInterval(() => {
+                attempts++;
+                tryBind();
+                if (this._ownPostsBound || attempts > 30) clearInterval(iv);
+            }, 1000);
+        }
     }
 };
 
