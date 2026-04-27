@@ -3297,3 +3297,526 @@ body.in-thread #bottom-nav { display: none !important; }
     border-radius: 10px;
     font-weight: 600;
 }
+
+/* =============================================================
+   ADDED FEATURES — paste-in section
+   - Reply media + voice note bubble fixes
+   - Chat customization (per-chat theme + wallpaper)
+   - Songs on drops (badge + mini-player + picker)
+   - Reply drops (photo replies on feed)
+   - Streak shields (shield count badge)
+   - Monthly "Year-in-Drops" recap
+   ============================================================= */
+
+/* ---------- FIX: reply-to-image and reply-to-voice bubbles ----------
+   Previously the reply quote was rendered in its own tiny bubble and the
+   media floated below it, looking disconnected. We now render the quote
+   *inside* the same bubble as the media (.has-reply) and the bubble
+   absorbs the image / audio with proper rounded corners and spacing. */
+
+.msg-bubble.msg-media-bubble {
+    padding: 4px;
+    background: var(--surface-2, #f0f0f0);
+    overflow: hidden;
+    max-width: 280px;
+}
+.msg-row.from-me .msg-bubble.msg-media-bubble {
+    background: var(--accent);
+}
+.msg-bubble.msg-media-bubble .msg-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 360px;
+    object-fit: cover;
+    border-radius: 14px;
+    margin: 0;
+}
+.msg-bubble.msg-media-bubble.has-reply .msg-image {
+    border-radius: 6px 6px 14px 14px;
+    margin-top: 4px;
+}
+
+/* The reply quote inside a media or audio bubble — sits flush on top */
+.msg-bubble.has-reply .msg-reply-quote {
+    margin: 0 0 4px 0;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.06);
+    padding: 6px 10px;
+}
+.msg-row.from-me .msg-bubble.has-reply .msg-reply-quote {
+    background: rgba(255,255,255,0.18);
+    border-left-color: rgba(255,255,255,0.7);
+    color: rgba(255,255,255,0.95);
+}
+
+/* Voice notes — give them a real bubble shell that matches the rest of the
+   chat instead of the bare native <audio> player floating in space. */
+.msg-bubble.msg-audio {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 8px;
+    background: var(--surface-2, #f0f0f0);
+    border-radius: 22px;
+    min-width: 220px;
+    max-width: 320px;
+    height: auto;
+}
+.msg-row.from-me .msg-bubble.msg-audio {
+    background: var(--accent);
+}
+.msg-bubble.msg-audio audio {
+    flex: 1;
+    height: 36px;
+    width: 100%;
+    border-radius: 18px;
+    background: transparent;
+    color-scheme: light;
+}
+.msg-row.from-me .msg-bubble.msg-audio audio {
+    color-scheme: dark;
+}
+.msg-bubble.msg-audio .msg-audio-dur {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    padding-right: 4px;
+}
+.msg-row.from-me .msg-bubble.msg-audio .msg-audio-dur {
+    color: rgba(255,255,255,0.85);
+}
+/* Audio bubble with a reply on top: switch to column layout */
+.msg-bubble.msg-audio.has-reply {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    border-radius: 18px;
+    padding: 6px;
+}
+.msg-bubble.msg-audio.has-reply audio {
+    width: 100%;
+}
+.msg-bubble.msg-audio.has-reply .msg-audio-dur {
+    align-self: flex-end;
+    padding: 0 6px 2px;
+}
+
+/* ---------- CHAT CUSTOMIZATION — applied per-thread via CSS vars ---------- */
+/* features.js sets these on the active thread root: --chat-accent, --chat-bg */
+.thread.has-custom {
+    background: var(--chat-bg, var(--bg));
+    background-size: cover;
+    background-position: center;
+    background-attachment: local;
+}
+.thread.has-custom .msg-row.from-me .msg-bubble {
+    background: var(--chat-accent, var(--accent));
+}
+.thread.has-custom .msg-row.from-me .msg-bubble .msg-reply-quote {
+    background: rgba(255,255,255,0.18);
+    border-left-color: rgba(255,255,255,0.75);
+}
+.thread.has-custom .msg-row.from-me .msg-time-mine {
+    color: rgba(255,255,255,0.75);
+}
+
+/* Customize button injected into the thread header */
+.chat-custom-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    color: var(--muted);
+    transition: background 120ms, color 120ms;
+}
+.chat-custom-btn:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+}
+.chat-custom-btn svg { display: block; }
+
+/* Chat-custom dialog */
+.chat-custom .cc-section { padding: 12px 16px; }
+.chat-custom .cc-section h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    font-weight: 700;
+}
+.cc-color-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+}
+.cc-swatch {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    background: var(--swatch);
+    transition: transform 120ms, border-color 120ms;
+}
+.cc-swatch.selected {
+    border-color: var(--ink);
+    transform: scale(1.08);
+}
+.cc-wallpaper-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+.cc-wallpaper {
+    aspect-ratio: 4 / 5;
+    border-radius: 12px;
+    border: 3px solid transparent;
+    cursor: pointer;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--surface-2);
+    position: relative;
+    overflow: hidden;
+}
+.cc-wallpaper.selected {
+    border-color: var(--accent);
+}
+.cc-wallpaper-label {
+    position: absolute;
+    bottom: 6px; left: 6px; right: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    text-align: center;
+}
+
+/* ---------- SONGS ON DROPS ---------- */
+/* Song badge shown in the corner of a drop */
+.post-song-badge {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 6px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 100px;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    max-width: calc(100% - 24px);
+    z-index: 4;
+    transition: transform 120ms;
+}
+.post-song-badge:hover { transform: translateY(-1px); }
+.post-song-badge.playing { background: var(--accent); color: white; }
+.post-song-badge .psb-disc {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #fff 0%, #ddd 50%, #888 100%);
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+}
+.post-song-badge .psb-disc::after {
+    content: "";
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(0,0,0,0.65);
+}
+.post-song-badge.playing .psb-disc {
+    animation: psb-spin 3s linear infinite;
+}
+@keyframes psb-spin { to { transform: rotate(360deg); } }
+.post-song-badge .psb-text {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.post-song-badge .psb-text strong {
+    font-weight: 700;
+    margin-right: 5px;
+}
+
+/* Floating "Add song" pill in the capture/post composer */
+.add-song-pill {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 6;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px 8px 10px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: none;
+    color: white;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.add-song-pill.has-song { background: var(--accent); }
+.add-song-pill svg { display: block; }
+
+/* Song picker dialog */
+.song-picker .song-picker-search {
+    padding: 12px 16px 0;
+}
+.song-picker .song-picker-search input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: 14px;
+    outline: none;
+}
+.song-picker-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.song-picker-tabs::-webkit-scrollbar { display: none; }
+.song-tab {
+    padding: 6px 12px;
+    border-radius: 100px;
+    background: var(--surface-2);
+    border: none;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.song-tab.active {
+    background: var(--accent);
+    color: white;
+}
+.song-picker-list {
+    list-style: none;
+    margin: 0;
+    padding: 8px 8px 16px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.song-picker-list .song-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 120ms;
+}
+.song-picker-list .song-row:hover,
+.song-picker-list .song-row.selected {
+    background: var(--surface-2);
+}
+.song-picker-list .song-row.playing {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.song-row .song-art {
+    width: 44px; height: 44px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--art-a, #888), var(--art-b, #444));
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 20px;
+    font-weight: 800;
+}
+.song-row .song-meta { flex: 1; min-width: 0; }
+.song-row .song-title {
+    font-size: 14px; font-weight: 700;
+    color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.song-row .song-artist {
+    font-size: 12px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.song-row .song-play {
+    background: var(--accent);
+    color: white;
+    border: none;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+
+/* ---------- REPLY DROPS (photo replies to a feed drop) ---------- */
+.post-actions .reply-drop-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 10px;
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 100px;
+    transition: background 120ms, color 120ms;
+}
+.post-actions .reply-drop-btn:hover {
+    background: var(--surface-2);
+    color: var(--accent);
+}
+.post-card.reply-drop {
+    position: relative;
+}
+.post-card .reply-drop-banner {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+}
+.post-card .reply-drop-banner .rdb-thumb {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+/* ---------- STREAK SHIELDS ---------- */
+.streak-shield-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 100px;
+    background: linear-gradient(135deg, #6ea8ff 0%, #4577e5 100%);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    margin-left: 6px;
+    cursor: help;
+}
+.streak-shield-pill svg { display: block; }
+.streak-shield-pill .ssp-count {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- MONTHLY RECAP ---------- */
+.recap-trigger {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 6%, transparent));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: 14px;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    color: var(--ink);
+    font-family: inherit;
+    margin: 12px 0;
+}
+.recap-trigger .rt-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+.recap-trigger .rt-meta { flex: 1; min-width: 0; }
+.recap-trigger .rt-title { font-size: 14px; font-weight: 700; }
+.recap-trigger .rt-sub { font-size: 12px; color: var(--muted); }
+
+.recap-dialog .recap-stage {
+    padding: 16px;
+    background: var(--surface-2);
+}
+.recap-card {
+    background: linear-gradient(160deg, #1a1a2e 0%, #0f0f1e 100%);
+    color: white;
+    border-radius: 18px;
+    padding: 24px;
+    aspect-ratio: 4 / 5;
+    max-width: 360px;
+    margin: 0 auto;
+    display: flex; flex-direction: column;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.35);
+    overflow: hidden;
+}
+.recap-card .rc-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 12px;
+}
+.recap-card .rc-month {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    opacity: 0.7;
+}
+.recap-card .rc-brand {
+    font-size: 14px; font-weight: 800;
+    background: linear-gradient(90deg, #ff7a59, #ffb347);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.recap-card .rc-title {
+    font-size: 22px; font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 16px;
+}
+.recap-card .rc-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    flex: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+.recap-card .rc-grid .rc-cell {
+    aspect-ratio: 1;
+    background: rgba(255,255,255,0.06);
+    background-size: cover;
+    background-position: center;
+}
+.recap-card .rc-stats {
+    display: flex;
+    justify-content: space-around;
+    font-size: 12px;
+}
+.recap-card .rc-stats .rc-stat {
+    text-align: center;
+}
+.recap-card .rc-stats .rc-stat-num {
+    font-size: 20px; font-weight: 800;
+    display: block;
+}
+.recap-card .rc-stats .rc-stat-label {
+    opacity: 0.7;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 10px;
+    margin-top: 2px;
+}
+.recap-empty {
+    padding: 40px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+}

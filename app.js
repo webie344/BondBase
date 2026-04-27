@@ -3031,39 +3031,43 @@ async function openThread(otherUid) {
 /* ----- Message bubble rendering (shared between snapshot + initial) ----- */
 
 function buildMessageRowHTML(id, m, mine, consecutive) {
-    let inner = "";
-    // Quoted reply preview at the top of the bubble
+    // Build the reply quote once — it sits *inside* the bubble (not as its own
+    // disconnected mini-bubble) so reply-to-image and reply-to-voice messages
+    // look like one cohesive unit instead of two stacked ones.
+    let replyQuote = "";
     if (m.replyTo) {
         const r = m.replyTo;
         const author = r.senderUid === state.user.uid ? "You" : `@${r.senderUsername || "user"}`;
         let snippet = r.snippet || "";
         if (r.isImage) snippet = "📷 Photo";
         else if (r.isAudio) snippet = "🎤 Voice note";
-        inner += `<div class="msg-bubble"><div class="msg-reply-quote" data-reply-to-id="${escapeHtml(r.messageId || "")}">
+        replyQuote = `<div class="msg-reply-quote" data-reply-to-id="${escapeHtml(r.messageId || "")}">
             <span class="rq-name">${escapeHtml(author)}</span>
             <span class="rq-text">${escapeHtml(snippet || "Message")}</span>
           </div>`;
-        // body inside same bubble for text; for media we close and emit standalone
-        if (m.imageUrl) {
-            inner += `</div><img class="msg-image" src="${escapeHtml(m.imageUrl)}" alt="" />`;
-        } else if (m.audioUrl) {
-            inner += `</div><div class="msg-bubble msg-audio"><audio controls preload="metadata" src="${escapeHtml(m.audioUrl)}"></audio></div>`;
-        } else {
-            inner += linkifyText(m.text || "") + `</div>`;
-        }
+    }
+
+    const hasReplyClass = replyQuote ? " has-reply" : "";
+    let inner;
+    if (m.imageUrl) {
+        inner = `<div class="msg-bubble msg-media-bubble${hasReplyClass}">${replyQuote}<img class="msg-image" src="${escapeHtml(m.imageUrl)}" alt="" /></div>`;
+    } else if (m.audioUrl) {
+        const dur = m.audioDuration ? formatVoiceDuration(m.audioDuration) : "";
+        inner = `<div class="msg-bubble msg-audio${hasReplyClass}">${replyQuote}<audio controls preload="metadata" src="${escapeHtml(m.audioUrl)}"></audio>${dur ? `<span class="msg-audio-dur">${dur}</span>` : ""}</div>`;
     } else {
-        if (m.imageUrl) {
-            inner = `<img class="msg-image" src="${escapeHtml(m.imageUrl)}" alt="" />`;
-        } else if (m.audioUrl) {
-            inner = `<div class="msg-bubble msg-audio"><audio controls preload="metadata" src="${escapeHtml(m.audioUrl)}"></audio></div>`;
-        } else {
-            inner = `<div class="msg-bubble">${linkifyText(m.text || "")}</div>`;
-        }
+        inner = `<div class="msg-bubble${hasReplyClass}">${replyQuote}${linkifyText(m.text || "")}</div>`;
     }
     const replyBtn = `<button type="button" class="msg-reply-btn" data-action="reply-to" aria-label="Reply">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
       </button>`;
     return `<div class="msg-row ${mine ? "from-me" : "from-them"} ${consecutive ? "consecutive" : ""}" data-msg-id="${id}">${inner}${replyBtn}</div>`;
+}
+
+function formatVoiceDuration(sec) {
+    sec = Math.max(0, Math.round(Number(sec) || 0));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function wireMessageRow(rowEl, m) {
@@ -4587,3 +4591,20 @@ function initThemeControls() {
 }
 
 
+
+/* =============================================================
+   PUBLIC API — exposed for features.js
+   (chat customization, songs on drops, reply drops, streak shields, recap)
+   ============================================================= */
+window.dropApp = {
+    state, db, auth, CONFIG,
+    $, $$, escapeHtml, linkifyText, todayKey,
+    showToast, sendMessage, uploadToCloudinary, chatIdFor,
+    firestore: {
+        collection, doc, setDoc, getDoc, updateDoc, deleteDoc,
+        query, where, getDocs, addDoc, serverTimestamp, onSnapshot,
+        orderBy, limit, arrayUnion, arrayRemove, increment,
+        deleteField, writeBatch
+    }
+};
+window.dispatchEvent(new CustomEvent("dropapp:ready"));

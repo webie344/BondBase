@@ -763,7 +763,78 @@
     </div>
 </div>
 
+<!-- ============================================================
+     FEATURES (added) — chat customization, songs on drops,
+     reply drops, streak shields, monthly recap
+     ============================================================ -->
+
+<!-- Song picker dialog: opened from the capture flow when adding a song to a drop -->
+<dialog id="song-picker-dialog" class="dialog">
+    <div class="dialog-content song-picker">
+        <header class="dialog-header">
+            <h3>Add a song</h3>
+            <button class="dialog-close" data-close-dialog="song-picker-dialog" aria-label="Close">&times;</button>
+        </header>
+        <div class="song-picker-search">
+            <input id="song-search-input" type="search" placeholder="Search songs or moods…" autocomplete="off" />
+        </div>
+        <div class="song-picker-tabs">
+            <button class="song-tab active" data-mood="all">All</button>
+            <button class="song-tab" data-mood="chill">Chill</button>
+            <button class="song-tab" data-mood="happy">Happy</button>
+            <button class="song-tab" data-mood="moody">Moody</button>
+            <button class="song-tab" data-mood="energy">Energy</button>
+        </div>
+        <ul id="song-picker-list" class="song-picker-list"></ul>
+        <footer class="dialog-footer">
+            <button class="btn btn-ghost" id="song-picker-clear">Remove song</button>
+            <button class="btn btn-primary" id="song-picker-done">Done</button>
+        </footer>
+    </div>
+</dialog>
+
+<!-- Per-chat customization (theme color + wallpaper) -->
+<dialog id="chat-custom-dialog" class="dialog">
+    <div class="dialog-content chat-custom">
+        <header class="dialog-header">
+            <h3>Customize this chat</h3>
+            <button class="dialog-close" data-close-dialog="chat-custom-dialog" aria-label="Close">&times;</button>
+        </header>
+        <section class="cc-section">
+            <h4>Bubble color</h4>
+            <div id="cc-color-grid" class="cc-color-grid"></div>
+        </section>
+        <section class="cc-section">
+            <h4>Wallpaper</h4>
+            <div id="cc-wallpaper-grid" class="cc-wallpaper-grid"></div>
+        </section>
+        <footer class="dialog-footer">
+            <button class="btn btn-ghost" id="cc-reset">Reset to default</button>
+            <button class="btn btn-primary" id="cc-save">Save</button>
+        </footer>
+    </div>
+</dialog>
+
+<!-- Monthly "Year-in-Drops" recap -->
+<dialog id="monthly-recap-dialog" class="dialog">
+    <div class="dialog-content recap-dialog">
+        <header class="dialog-header">
+            <h3 id="recap-title">Your month in drops</h3>
+            <button class="dialog-close" data-close-dialog="monthly-recap-dialog" aria-label="Close">&times;</button>
+        </header>
+        <div id="recap-stage" class="recap-stage">
+            <div class="recap-empty">Loading your drops…</div>
+        </div>
+        <footer class="dialog-footer">
+            <button class="btn btn-ghost" id="recap-month-prev">&larr; Prev month</button>
+            <button class="btn btn-primary" id="recap-save">Save image</button>
+            <button class="btn btn-ghost" id="recap-month-next">Next month &rarr;</button>
+        </footer>
+    </div>
+</dialog>
+
 <!-- ===== APP SCRIPT ===== -->
 <script type="module" src="app.js"></script>
+<script type="module" src="features.js"></script>
 </body>
 </html>
