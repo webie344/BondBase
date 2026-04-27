@@ -27,13 +27,26 @@ const _on = (el, ev, fn) => el && el.addEventListener(ev, fn);
 const debounce = (fn, ms = 200) => {
     let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 };
-const openDialog = (id) => { const d = document.getElementById(id); if (d && !d.open) d.showModal?.(); };
-const closeDialog = (id) => { const d = document.getElementById(id); if (d && d.open) d.close?.(); };
+// Drop's existing dialogs are <div class="dialog" hidden> — we toggle the
+// hidden attribute (NOT the native <dialog>.showModal) so theming and
+// styling stay consistent with the rest of the app.
+const openDialog = (id) => { const d = document.getElementById(id); if (d) d.hidden = false; };
+const closeDialog = (id) => { const d = document.getElementById(id); if (d) d.hidden = true; };
 
-// Generic close-dialog wiring (works for any [data-close-dialog])
+// Generic close-dialog wiring: close button + click-on-backdrop + Esc key
 document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-close-dialog]");
-    if (btn) closeDialog(btn.dataset.closeDialog);
+    if (btn) { closeDialog(btn.dataset.closeDialog); return; }
+    // Click on the backdrop of one of OUR dialogs (not the inner content)
+    const dlg = e.target.closest("#song-picker-dialog, #chat-custom-dialog, #monthly-recap-dialog");
+    if (dlg && e.target === dlg) closeDialog(dlg.id);
+});
+document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    ["song-picker-dialog", "chat-custom-dialog", "monthly-recap-dialog"].forEach(id => {
+        const d = document.getElementById(id);
+        if (d && !d.hidden) closeDialog(id);
+    });
 });
 
 
@@ -922,5 +935,3 @@ Shields.init();
 Recap.init();
 
 console.log("[features] loaded — chat themes, songs, reply drops, shields, recap");
-
-

@@ -769,11 +769,11 @@
      ============================================================ -->
 
 <!-- Song picker dialog: opened from the capture flow when adding a song to a drop -->
-<dialog id="song-picker-dialog" class="dialog">
+<div id="song-picker-dialog" class="dialog" hidden>
+    <button class="dialog-close" data-close-dialog="song-picker-dialog" aria-label="Close">&times;</button>
     <div class="dialog-content song-picker">
         <header class="dialog-header">
             <h3>Add a song</h3>
-            <button class="dialog-close" data-close-dialog="song-picker-dialog" aria-label="Close">&times;</button>
         </header>
         <div class="song-picker-search">
             <input id="song-search-input" type="search" placeholder="Search songs or moods…" autocomplete="off" />
@@ -791,14 +791,14 @@
             <button class="btn btn-primary" id="song-picker-done">Done</button>
         </footer>
     </div>
-</dialog>
+</div>
 
 <!-- Per-chat customization (theme color + wallpaper) -->
-<dialog id="chat-custom-dialog" class="dialog" hidden>
+<div id="chat-custom-dialog" class="dialog" hidden>
+    <button class="dialog-close" data-close-dialog="chat-custom-dialog" aria-label="Close">&times;</button>
     <div class="dialog-content chat-custom">
         <header class="dialog-header">
             <h3>Customize this chat</h3>
-            <button class="dialog-close" data-close-dialog="chat-custom-dialog" aria-label="Close">&times;</button>
         </header>
         <section class="cc-section">
             <h4>Bubble color</h4>
@@ -813,14 +813,14 @@
             <button class="btn btn-primary" id="cc-save">Save</button>
         </footer>
     </div>
-</dialog>
+</div>
 
 <!-- Monthly "Year-in-Drops" recap -->
-<dialog id="monthly-recap-dialog" class="dialog" hidden>
+<div id="monthly-recap-dialog" class="dialog" hidden>
+    <button class="dialog-close" data-close-dialog="monthly-recap-dialog" aria-label="Close">&times;</button>
     <div class="dialog-content recap-dialog">
         <header class="dialog-header">
             <h3 id="recap-title">Your month in drops</h3>
-            <button class="dialog-close" data-close-dialog="monthly-recap-dialog" aria-label="Close">&times;</button>
         </header>
         <div id="recap-stage" class="recap-stage">
             <div class="recap-empty">Loading your drops…</div>
@@ -831,7 +831,7 @@
             <button class="btn btn-ghost" id="recap-month-next">Next month &rarr;</button>
         </footer>
     </div>
-</dialog>
+</div>
 
 <!-- ===== APP SCRIPT ===== -->
 <script type="module" src="app.js"></script>
