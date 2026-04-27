@@ -3405,20 +3405,20 @@ body.in-thread #bottom-nav { display: none !important; }
 
 /* ---------- CHAT CUSTOMIZATION — applied per-thread via CSS vars ---------- */
 /* features.js sets these on the active thread root: --chat-accent, --chat-bg */
-.thread.has-custom {
+#view-thread.has-custom {
     background: var(--chat-bg, var(--bg));
     background-size: cover;
     background-position: center;
     background-attachment: local;
 }
-.thread.has-custom .msg-row.from-me .msg-bubble {
+#view-thread.has-custom .msg-row.from-me .msg-bubble {
     background: var(--chat-accent, var(--accent));
 }
-.thread.has-custom .msg-row.from-me .msg-bubble .msg-reply-quote {
+#view-thread.has-custom .msg-row.from-me .msg-bubble .msg-reply-quote {
     background: rgba(255,255,255,0.18);
     border-left-color: rgba(255,255,255,0.75);
 }
-.thread.has-custom .msg-row.from-me .msg-time-mine {
+#view-thread.has-custom .msg-row.from-me .msg-time-mine {
     color: rgba(255,255,255,0.75);
 }
 
@@ -3547,28 +3547,49 @@ body.in-thread #bottom-nav { display: none !important; }
     margin-right: 5px;
 }
 
-/* Floating "Add song" pill in the capture/post composer */
+/* Inline "Add song" button — sits in the composer, matches with-add-btn */
+.add-song-wrap {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
 .add-song-pill {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 6;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 12px 8px 10px;
-    background: rgba(0,0,0,0.55);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: none;
-    color: white;
-    border-radius: 100px;
-    font-size: 13px;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface-2, #f3f4f6);
+    border: 1px solid var(--border, #e5e7eb);
+    color: var(--ink, #111);
+    border-radius: var(--radius-full, 999px);
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
+    transition: background 120ms, border-color 120ms, color 120ms;
 }
-.add-song-pill.has-song { background: var(--accent); }
-.add-song-pill svg { display: block; }
+.add-song-pill:hover {
+    background: var(--accent-soft, #fff1ea);
+    border-color: var(--accent, #ff5a3d);
+    color: var(--accent, #ff5a3d);
+}
+.add-song-pill.has-song {
+    background: var(--accent, #ff5a3d);
+    border-color: var(--accent, #ff5a3d);
+    color: #fff;
+}
+.add-song-pill svg { display: block; flex: 0 0 16px; }
+.add-song-clear {
+    background: transparent;
+    border: none;
+    color: var(--muted, #6b7280);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 8px;
+}
+.add-song-clear:hover { color: var(--danger, #e11d48); background: var(--surface-2, #f3f4f6); }
 
 /* Song picker dialog */
 .song-picker .song-picker-search {
@@ -3819,4 +3840,133 @@ body.in-thread #bottom-nav { display: none !important; }
     text-align: center;
     color: var(--muted);
     font-size: 14px;
+}
+
+/* ==========================================================
+   REPLY DROPS — full composer dialog
+   ========================================================== */
+.reply-composer { padding: 0; }
+.reply-composer .dialog-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border, #e5e7eb);
+}
+.reply-composer .dialog-header h3 { font-size: 17px; font-weight: 700; }
+.reply-composer .reply-composer-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+.reply-composer .dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px 16px;
+    border-top: 1px solid var(--border, #e5e7eb);
+    background: var(--surface, #fff);
+}
+
+.reply-parent-preview {
+    display: flex;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--surface-2, #f3f4f6);
+    border-radius: var(--radius, 12px);
+    margin-bottom: 16px;
+    align-items: center;
+}
+.reply-parent-preview .rp-thumb {
+    width: 56px; height: 56px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: var(--ink, #111);
+    flex: 0 0 56px;
+}
+.reply-parent-preview .rp-meta { min-width: 0; flex: 1; }
+.reply-parent-preview .rp-meta .overline {
+    font-size: 11px;
+    color: var(--muted, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 2px;
+}
+.reply-parent-preview .rp-meta .rp-handle {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink, #111);
+    margin-bottom: 2px;
+}
+.reply-parent-preview .rp-meta .rp-caption {
+    color: var(--muted, #6b7280);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.reply-composer .capture-picker {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.reply-composer .capture-tile {
+    aspect-ratio: 4 / 3;
+    border-radius: var(--radius, 12px);
+    border: 1.5px dashed var(--border-strong, #d1d5db);
+    background: var(--surface-2, #f3f4f6);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: var(--muted, #6b7280);
+    cursor: pointer;
+    transition: border-color 120ms, color 120ms, background 120ms;
+}
+.reply-composer .capture-tile:hover {
+    border-color: var(--accent, #ff5a3d);
+    color: var(--accent, #ff5a3d);
+    background: var(--accent-soft, #fff1ea);
+}
+.reply-composer .capture-label { font-size: 13px; font-weight: 600; }
+
+#reply-preview-block { display: flex; flex-direction: column; gap: 8px; }
+#reply-preview-block label { font-size: 13px; font-weight: 600; color: var(--ink, #111); }
+#reply-preview-block textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: var(--radius, 12px);
+    font: inherit;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 60px;
+    background: var(--surface, #fff);
+    color: var(--ink, #111);
+}
+#reply-preview-block textarea:focus {
+    outline: none;
+    border-color: var(--accent, #ff5a3d);
+    box-shadow: 0 0 0 3px var(--accent-soft, #fff1ea);
+}
+#reply-preview-block .hint {
+    text-align: right;
+    font-size: 12px;
+    color: var(--muted, #6b7280);
+    margin: 0;
+}
+#reply-previews {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+#reply-previews img {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    border-radius: var(--radius, 12px);
+    background: var(--ink, #111);
 }

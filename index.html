@@ -834,6 +834,53 @@
 </div>
 
 <!-- ===== APP SCRIPT ===== -->
+<!-- ===== REPLY DROP COMPOSER ===== -->
+<div id="reply-drop-dialog" class="dialog" hidden>
+    <button class="dialog-close" data-close-dialog="reply-drop-dialog" aria-label="Close">&times;</button>
+    <div class="dialog-content reply-composer">
+        <header class="dialog-header">
+            <h3>Reply to <span id="reply-to-handle">@user</span></h3>
+        </header>
+        <div class="reply-composer-body">
+            <div class="reply-parent-preview">
+                <img id="rp-thumb" class="rp-thumb" alt="" />
+                <div class="rp-meta">
+                    <p class="overline">In reply to</p>
+                    <p class="rp-handle" id="rp-handle">@user</p>
+                    <p class="rp-caption" id="rp-caption"></p>
+                    <p class="rp-caption" id="rp-prompt" style="font-style:italic;margin-top:2px;"></p>
+                </div>
+            </div>
+
+            <div id="reply-picker" class="capture-picker">
+                <label for="reply-camera" class="capture-tile">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <span class="capture-label">Take photo</span>
+                </label>
+                <input id="reply-camera" type="file" accept="image/*" capture="environment" hidden />
+
+                <label for="reply-library" class="capture-tile">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span class="capture-label">From library</span>
+                </label>
+                <input id="reply-library" type="file" accept="image/*" hidden />
+            </div>
+
+            <div id="reply-preview-block" hidden>
+                <div id="reply-previews"></div>
+                <label for="reply-caption">Caption</label>
+                <textarea id="reply-caption" maxlength="240" rows="2" placeholder="Say something… use #hashtags"></textarea>
+                <p class="hint" id="reply-caption-count">0 / 240</p>
+                <button type="button" id="reply-retake-btn" class="btn btn-ghost btn-block">Choose another photo</button>
+            </div>
+        </div>
+        <footer class="dialog-footer">
+            <button class="btn btn-ghost" data-close-dialog="reply-drop-dialog">Cancel</button>
+            <button class="btn btn-primary" id="reply-post-btn" disabled>Post reply</button>
+        </footer>
+    </div>
+</div>
+
 <script type="module" src="app.js"></script>
 <script type="module" src="features.js"></script>
 </body>
