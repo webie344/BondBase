@@ -9,9 +9,11 @@
    3. Create a Cloudinary account (free tier is fine):
       - Settings > Upload > add an unsigned upload preset
       - Paste your cloud name + preset name below (CONFIG.cloudinary).
-   4. (Optional) For push notifications:
-      - Create a OneSignal account, paste app id below.
-      - Make sure push-notifications.js sits next to this file.
+   4. Telegram notifications:
+      - Put the bot's username (without @) below in CONFIG.telegram.botUsername.
+      - Make sure telegram.js sits next to this file.
+      - The bot script (bot/telegram-bot.js) runs separately and forwards
+        Firestore notifications to Telegram automatically.
    5. Open index.html in a browser. Sign up. Then in the browser
       console run:  window.seedPrompts()
       to populate 30 days of prompts.
@@ -30,16 +32,9 @@ const CONFIG = {
         cloudName: "ddtdqrh1b",
         uploadPreset: "profile-pictures"
     },
-    onesignal: {
-        appId: ""    // legacy, no longer used — kept so old refs don't break
-    },
-    // Firebase Cloud Messaging (free web push). To turn on:
-    //   1. Firebase Console > Project Settings > Cloud Messaging
-    //   2. Under "Web Push certificates", click Generate Key Pair
-    //   3. Paste the key here, then redeploy.
-    // Until this is set, the push toggle in Settings will quietly do nothing.
-    fcm: {
-        vapidKey: "BLQsknL2NRqCD5ZT5LwOSIloH9hnuAXk-0_I3N-AU3CV37CO871Uo508Own-XFzmrt-kQICZZ9mERyCP3C5nKTQ"
+    telegram: {
+        // Your bot's username from @BotFather (without the @).
+        botUsername: "Drop121_bot"
     }
 };
 
@@ -605,7 +600,7 @@ const state = {
     todayPrompt: null,    // { date, text }
     countdownInterval: null,
     feedUnsub: null,
-    pushReady: false,
+    telegramReady: false,
 
     // ----- social state -----
     feedTab: "friends",                // "friends" | "all"
@@ -709,9 +704,9 @@ onAuthStateChanged(auth, async (user) => {
         const profileSnap = await getDoc(doc(db, "users", user.uid));
         if (profileSnap.exists()) {
             state.profile = { uid: user.uid, ...profileSnap.data() };
-            // Init push if available + enabled
-            if (CONFIG.fcm.vapidKey && state.profile.pushEnabled !== false) {
-                initPushFor(user.uid).catch(() => {});
+            // Init Telegram link helper (no-op if bot username isn't set yet)
+            if (CONFIG.telegram.botUsername) {
+                initTelegramFor(user.uid).catch(() => {});
             }
             // Start social subscriptions (friends, requests, chat threads)
             startSocialSubscriptions(user.uid);
@@ -738,7 +733,8 @@ onAuthStateChanged(auth, async (user) => {
                 longestStreak: 0,
                 totalDrops: 0,
                 promptTimeLocal: "19:00",
-                pushEnabled: false
+                telegramChatId: null,
+                telegramNotifyEnabled: false
             });
             location.hash = "#/onboarding";
         }
@@ -790,7 +786,8 @@ async function handleSignup(e) {
             longestStreak: inviter ? 1 : 0,
             totalDrops: 0,
             promptTimeLocal: "19:00",
-            pushEnabled: false,
+            telegramChatId: null,
+            telegramNotifyEnabled: false,
             inviteCode: myInviteCode,
             invitedBy: inviter ? inviter.uid : null,
             invitedCount: 0
@@ -859,7 +856,6 @@ async function handleForgot() {
 
 async function handleSignout() {
     try {
-        if (window.PushNotifications?.logoutUser) await window.PushNotifications.logoutUser();
         await signOut(auth);
     } catch (err) {
         showToast("Sign out failed.", "error");
@@ -1856,7 +1852,8 @@ async function handlePost() {
             createdAt: serverTimestamp()
         });
 
-        // Notify each tagged friend
+        // Notify each tagged friend (Telegram delivery is automatic
+        // — the bot listens to this collection)
         for (const uid of taggedUids) {
             try {
                 await addDoc(collection(db, "users", uid, "notifications"), {
@@ -2112,7 +2109,11 @@ async function renderShare(postId) {
 
 function renderSettings() {
     $("#settings-time").value = state.profile?.promptTimeLocal || "19:00";
-    $("#settings-push").checked = !!state.profile?.pushEnabled;
+    // The "notifications" toggle now controls Telegram alerts.
+    const pushEl = $("#settings-push");
+    if (pushEl) pushEl.checked = !!state.profile?.telegramNotifyEnabled;
+    ensureTelegramSettingsUI();
+    renderTelegramStatus();
     const sndEl = $("#settings-sounds");
     if (sndEl) sndEl.checked = Sounds.enabled;
     $("#settings-saved").hidden = true;
@@ -2133,37 +2134,46 @@ function setupSettingsControls() {
     const sndEl = $("#settings-sounds");
     if (sndEl) sndEl.onchange = () => Sounds.set(sndEl.checked);
 
+    // Optional "Connect Telegram" button. If your HTML doesn't have one yet,
+    // this is a no-op — users can still toggle the notifications switch
+    // and we'll prompt them to connect on the spot.
+    const tgBtn = $("#settings-telegram-btn");
+    if (tgBtn) {
+        tgBtn.onclick = async () => {
+            if (state.profile?.telegramChatId) {
+                const ok = await confirmDialog(
+                    "Disconnect Telegram?",
+                    "We'll stop sending you Telegram alerts. You can reconnect any time.",
+                    "Disconnect"
+                );
+                if (!ok) return;
+                await disconnectTelegram();
+            } else {
+                await connectTelegram();
+            }
+        };
+    }
+
     $("#settings-save-btn").onclick = async () => {
         const newTime = $("#settings-time").value || "19:00";
-        const pushOn = $("#settings-push").checked;
+        const wantOn = $("#settings-push").checked;
         try {
             await updateDoc(doc(db, "users", state.user.uid), {
                 promptTimeLocal: newTime,
-                pushEnabled: pushOn
+                telegramNotifyEnabled: wantOn
             });
             state.profile.promptTimeLocal = newTime;
-            state.profile.pushEnabled = pushOn;
+            state.profile.telegramNotifyEnabled = wantOn;
 
-            if (CONFIG.fcm.vapidKey) {
-                if (pushOn) {
-                    // Lazily load the module if it wasn't already
-                    if (!window.Notifications) await initPushFor(state.user.uid);
-                    const token = await window.Notifications?.enable(state.user.uid);
-                    if (!token) {
-                        if (Notification.permission === "denied") {
-                            showToast("Notifications blocked. Enable them in your browser site settings.", "error");
-                        } else {
-                            showToast("Couldn't turn on notifications on this device.", "error");
-                        }
-                        $("#settings-push").checked = false;
-                        await updateDoc(doc(db, "users", state.user.uid), { pushEnabled: false });
-                        state.profile.pushEnabled = false;
-                    }
-                } else if (window.Notifications) {
-                    await window.Notifications.disable(state.user.uid);
+            // If they turned the switch on but never linked Telegram, walk
+            // them through it now.
+            if (wantOn && !state.profile.telegramChatId) {
+                if (!CONFIG.telegram.botUsername) {
+                    showToast("Telegram isn't configured yet.", "default");
+                } else {
+                    showToast("Open Telegram to finish connecting.", "default");
+                    await connectTelegram();
                 }
-            } else if (pushOn) {
-                showToast("Push isn't configured yet.", "default");
             }
 
             $("#settings-saved").hidden = false;
@@ -2176,29 +2186,136 @@ function setupSettingsControls() {
     $("#settings-delete-btn").onclick = handleDeleteAccount;
 }
 
+// Inject a "Connect Telegram" button + status line into the Settings
+// view if the HTML doesn't already include them. This way the user
+// doesn't have to edit index.html to get the new UI.
+function ensureTelegramSettingsUI() {
+    if ($("#settings-telegram-btn")) return; // already present
+    const pushEl = $("#settings-push");
+    if (!pushEl) return;
+    // Walk up to a sensible insertion row (the label row containing the toggle).
+    const anchor = pushEl.closest("label, .row, .form-row, .setting-row, li") || pushEl.parentElement;
+    if (!anchor) return;
+
+    const wrap = document.createElement("div");
+    wrap.id = "settings-telegram-row";
+    wrap.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-top:12px;";
+    wrap.innerHTML = `
+        <button type="button" id="settings-telegram-btn"
+            style="align-self:flex-start;padding:10px 18px;border-radius:999px;
+                   border:1.5px solid var(--border-strong, #d6d3d1);
+                   background:transparent;color:var(--ink, #0a0a0a);
+                   font-weight:600;font-size:14px;cursor:pointer;">
+            Connect Telegram
+        </button>
+        <div id="settings-telegram-status"
+            style="font-size:13px;color:var(--muted, #737373);"></div>
+    `;
+    anchor.parentElement.insertBefore(wrap, anchor.nextSibling);
+
+    // Wire the click handler now (setupSettingsControls runs once at boot
+    // and may have already missed this element).
+    const tgBtn = $("#settings-telegram-btn");
+    if (tgBtn && !tgBtn.dataset.bound) {
+        tgBtn.dataset.bound = "1";
+        tgBtn.onclick = async () => {
+            if (state.profile?.telegramChatId) {
+                const ok = await confirmDialog(
+                    "Disconnect Telegram?",
+                    "We'll stop sending you Telegram alerts. You can reconnect any time.",
+                    "Disconnect"
+                );
+                if (!ok) return;
+                await disconnectTelegram();
+            } else {
+                await connectTelegram();
+            }
+        };
+    }
+}
+
+function renderTelegramStatus() {
+    const el = $("#settings-telegram-status");
+    const btn = $("#settings-telegram-btn");
+    const linked = !!state.profile?.telegramChatId;
+    if (el) {
+        el.textContent = linked
+            ? "Telegram connected."
+            : (CONFIG.telegram.botUsername
+                ? "Not connected — tap to link your Telegram."
+                : "Telegram isn't configured yet.");
+        el.classList.toggle("is-connected", linked);
+    }
+    if (btn) {
+        btn.textContent = linked ? "Disconnect Telegram" : "Connect Telegram";
+        btn.disabled = !CONFIG.telegram.botUsername;
+    }
+}
+
 /* =============================================================
-   PUSH NOTIFICATIONS (optional)
+   TELEGRAM NOTIFICATIONS
+   -------------------------------------------------------------
+   The web app no longer asks the browser for push permission.
+   Instead, every notification we write to Firestore is picked
+   up by a small bot script (see /bot/telegram-bot.js) which
+   forwards it to the recipient's Telegram chat automatically.
+
+   The web app's only job here is the LINK FLOW: when a user
+   taps "Connect Telegram" we generate a one-time code, write
+   it to Firestore, and open t.me/<bot>?start=<code>. The bot
+   handles the rest.
    ============================================================= */
 
-async function initPushFor(uid) {
-    if (state.pushReady || !CONFIG.fcm.vapidKey) return;
+async function initTelegramFor(uid) {
+    if (state.telegramReady) return;
+    if (!CONFIG.telegram.botUsername) return;
     try {
-        const mod = await import("./notification.js");
-        window.Notifications = mod.Notifications;
-        mod.Notifications.configure({
-            firebaseConfig: CONFIG.firebase,
-            vapidKey: CONFIG.fcm.vapidKey
+        const mod = await import("./telegram.js");
+        window.Telegram = mod.Telegram;
+        mod.Telegram.configure({
+            botUsername: CONFIG.telegram.botUsername,
+            db,
+            uid
         });
-        // When a push arrives while the tab is open, show our in-app toast
-        mod.Notifications.onForeground((payload) => {
-            const n = payload?.notification || {};
-            if (n.title || n.body) showToast(n.body || n.title, "default");
-        });
-        // If the user already opted in, silently refresh their token
-        await mod.Notifications.initIfEnabled(uid);
-        state.pushReady = true;
+        state.telegramReady = true;
     } catch (err) {
-        console.warn("Push init failed:", err);
+        console.warn("Telegram init failed:", err);
+    }
+}
+
+async function connectTelegram() {
+    if (!state.user) return;
+    if (!CONFIG.telegram.botUsername) {
+        showToast("Telegram isn't configured yet.", "default");
+        return;
+    }
+    if (!window.Telegram) await initTelegramFor(state.user.uid);
+    try {
+        const url = await window.Telegram?.connect(state.user.uid);
+        if (!url) { showToast("Couldn't start Telegram link.", "error"); return; }
+        // Open Telegram. On phones this will deep-link into the app.
+        window.open(url, "_blank", "noopener");
+        renderTelegramStatus();
+    } catch (err) {
+        console.warn("connectTelegram:", err);
+        showToast("Couldn't open Telegram.", "error");
+    }
+}
+
+async function disconnectTelegram() {
+    if (!state.user) return;
+    try {
+        if (!window.Telegram) await initTelegramFor(state.user.uid);
+        await window.Telegram?.disconnect(state.user.uid);
+        state.profile.telegramChatId = null;
+        state.profile.telegramNotifyEnabled = false;
+        const pushEl = $("#settings-push");
+        if (pushEl) pushEl.checked = false;
+        renderTelegramStatus();
+        showToast("Telegram disconnected.", "success");
+    } catch (err) {
+        console.warn("disconnectTelegram:", err);
+        showToast("Couldn't disconnect Telegram.", "error");
     }
 }
 
@@ -3169,6 +3286,8 @@ async function writeNotification(toUid, payload) {
             read: false,
             createdAt: serverTimestamp()
         });
+        // The Telegram bot listens to this collection and forwards
+        // every new notification to the recipient automatically.
     } catch (err) {
         console.warn("notification:", err);
     }

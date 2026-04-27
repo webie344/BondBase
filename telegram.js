@@ -1,61 +1,138 @@
-/* =============================================================================
-   drop/telegram.js  —  Optional Telegram bot connector
-   -----------------------------------------------------------------------------
-   Talks to your Cloudflare Worker (so the bot token never lives in the
-   browser). Lets the user link their Telegram account by sending a short
-   code to the bot, then the worker fans out notifications to that chat.
-   ============================================================================= */
+/* =============================================================
+   Drop — telegram.js
+   -------------------------------------------------------------
+   Tiny client-side helper for the Telegram link flow.
+   Sits next to app.js. Loaded lazily by app.js when the user
+   has Telegram enabled in CONFIG.
 
-let _config = { workerUrl: "", botUsername: "" };
+   It does TWO things:
+
+     1.  connect(uid)
+         Generates a one-time link code, stores it in Firestore
+         under  telegramLinks/{code}  with the user's uid, and
+         returns a URL of the form:
+             https://t.me/<botUsername>?start=<code>
+         The user opens that URL, taps "Start" in Telegram, and
+         the bot picks up the /start <code> message, looks up
+         the code, and writes the user's chat_id back into
+         users/{uid}.telegramChatId .
+
+     2.  disconnect(uid)
+         Clears  telegramChatId  on the user doc. Notifications
+         stop arriving on Telegram.
+
+   Why is there no send() here?
+   ----------------------------
+   Notification delivery is fully automatic. Whenever the web
+   app writes to  users/{uid}/notifications/{id}  (which it
+   already does for the in-app bell icon), the bot picks the
+   change up over Firestore in real time and sends a Telegram
+   message to the right person. The browser never has to know.
+   ============================================================= */
+
+import {
+    doc,
+    setDoc,
+    updateDoc,
+    deleteField,
+    serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const config = {
+    botUsername: "",
+    db: null,
+    uid: null
+};
+
+// ---------- helpers ----------
+
+function makeCode() {
+    // 12 chars, URL-safe, easy to read. Telegram /start payloads
+    // allow up to 64 alphanumeric characters, so we have lots of
+    // headroom.
+    const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for (let i = 0; i < 12; i++) s += A[Math.floor(Math.random() * A.length)];
+    return s;
+}
+
+// ---------- public API ----------
 
 export const Telegram = {
-    configure({ workerUrl, botUsername }) {
-        _config.workerUrl   = (workerUrl || "").replace(/\/+$/, "");
-        _config.botUsername = botUsername || "";
-    },
-    isConfigured() {
-        return !!(_config.workerUrl && _config.botUsername);
-    },
+
     /**
-     * Begin the link flow.
-     * Returns { code, botLink } — show the link to the user and start polling.
+     * Configure once at startup.
+     *   botUsername  — your bot's username, no @ (e.g. "DropAppBot")
+     *   db           — the Firestore instance from app.js
+     *   uid          — the current user's uid (used as a default)
      */
-    async startLink(uid) {
-        if (!this.isConfigured()) throw new Error("Telegram is not configured.");
-        const r = await fetch(_config.workerUrl + "/telegram/start", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ uid })
-        });
-        const data = await r.json();
-        if (!r.ok || data.error) throw new Error(data.error || "Could not start Telegram link.");
-        return data; // { code, botLink }
+    configure(opts) {
+        Object.assign(config, opts || {});
     },
-    /** Poll the worker every 3s for up to 5 minutes. Resolves true on success. */
-    async waitForLink(uid, code, { timeoutMs = 5 * 60 * 1000 } = {}) {
-        const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            try {
-                const r = await fetch(_config.workerUrl + "/telegram/check", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ uid, code })
-                });
-                const data = await r.json();
-                if (data.ok) return true;
-            } catch { /* keep polling */ }
-            await new Promise(res => setTimeout(res, 3000));
+
+    /**
+     * Returns true if the given profile has a linked Telegram chat.
+     */
+    isLinked(profile) {
+        return !!profile?.telegramChatId;
+    },
+
+    /**
+     * Start the link flow. Writes a single-use code into
+     *   telegramLinks/{code} = { uid, createdAt }
+     * and returns the t.me URL the user should open.
+     *
+     * The bot, when it receives  /start <code>  from a Telegram
+     * user, will:
+     *   1. read telegramLinks/{code}
+     *   2. update users/{uid} with { telegramChatId, telegramUsername }
+     *   3. delete telegramLinks/{code}
+     */
+    async connect(uid) {
+        if (!config.botUsername) {
+            throw new Error("Telegram bot username not configured");
         }
-        return false;
+        if (!config.db) throw new Error("Telegram db not configured");
+        const useUid = uid || config.uid;
+        if (!useUid) throw new Error("Telegram connect requires a uid");
+
+        const code = makeCode();
+        try {
+            await setDoc(doc(config.db, "telegramLinks", code), {
+                uid: useUid,
+                createdAt: serverTimestamp()
+            });
+        } catch (err) {
+            console.warn("telegram link write failed:", err);
+            throw err;
+        }
+
+        return `https://t.me/${config.botUsername}?start=${encodeURIComponent(code)}`;
     },
+
+    /**
+     * Stop sending Telegram notifications to this user. Clears
+     * the stored chat id so the bot has nothing to deliver to.
+     */
     async disconnect(uid) {
-        if (!_config.workerUrl) return;
-        await fetch(_config.workerUrl + "/telegram/disconnect", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ uid })
-        }).catch(() => {});
+        if (!config.db) throw new Error("Telegram db not configured");
+        const useUid = uid || config.uid;
+        if (!useUid) throw new Error("Telegram disconnect requires a uid");
+
+        try {
+            await updateDoc(doc(config.db, "users", useUid), {
+                telegramChatId: deleteField(),
+                telegramUsername: deleteField(),
+                telegramNotifyEnabled: false
+            });
+        } catch (err) {
+            console.warn("telegram disconnect (firestore):", err);
+            throw err;
+        }
     }
 };
 
-
+// Expose for quick console debugging.
+if (typeof window !== "undefined") {
+    window.Telegram = Telegram;
+}
