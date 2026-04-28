@@ -127,36 +127,6 @@ const PROMPTS = [
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
-// Safe DOM helpers — log a clear warning instead of throwing when an
-// element is missing from the HTML. This prevents a single missing node
-// from killing renderCapture / setupCaptureControls and leaving the user
-// stuck on a frozen screen.
-function $safe(sel, where = "") {
-    const el = document.querySelector(sel);
-    if (!el) console.warn(`[drop] missing element ${sel}${where ? " in " + where : ""}`);
-    return el;
-}
-function setHidden(sel, hidden, where = "") {
-    const el = $safe(sel, where);
-    if (el) el.hidden = hidden;
-    return el;
-}
-function setText(sel, text, where = "") {
-    const el = $safe(sel, where);
-    if (el) el.textContent = text;
-    return el;
-}
-function setVal(sel, val, where = "") {
-    const el = $safe(sel, where);
-    if (el) el.value = val;
-    return el;
-}
-function setHTML(sel, html, where = "") {
-    const el = $safe(sel, where);
-    if (el) el.innerHTML = html;
-    return el;
-}
-
 function todayKey(d = new Date()) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -1659,36 +1629,22 @@ function closePhotoDialog() {
 let captureFiles = [];                  // array of File objects (max 5)
 const MAX_CAPTURE_FILES = 5;
 
-async function renderCapture() {
-    try {
-        // Make sure today's prompt is loaded BEFORE we try to render the
-        // capture screen. Doing this asynchronously without awaiting (the
-        // old behavior) caused the capture text to show up blank and
-        // could throw later inside handlePost.
-        if (!state.todayPrompt) {
-            try { await loadTodayPrompt(); } catch (e) { console.warn("loadTodayPrompt failed:", e); }
-        }
-        setText("#capture-prompt-text", state.todayPrompt?.text || "Today", "renderCapture");
+function renderCapture() {
+    if (!state.todayPrompt) loadTodayPrompt().then(() => $("#capture-prompt-text").textContent = state.todayPrompt.text);
+    else $("#capture-prompt-text").textContent = state.todayPrompt.text;
 
-        captureFiles = [];
-        captureTagged = new Map(); // uid -> { username, displayName }
-
-        setHidden("#capture-picker",        false, "renderCapture");
-        setHidden("#capture-preview-block", true,  "renderCapture");
-        setHidden("#capture-uploading",     true,  "renderCapture");
-        setVal   ("#capture-caption",       "",    "renderCapture");
-        setText  ("#capture-caption-count", "0 / 240", "renderCapture");
-        setHidden("#capture-error",         true,  "renderCapture");
-        setHTML  ("#capture-previews",      "",    "renderCapture");
-
-        renderCaptureWithChips();
-        setHidden("#capture-with-picker", true, "renderCapture");
-    } catch (err) {
-        // Last-resort guard: never let a render exception leave the user
-        // staring at a frozen screen.
-        console.error("renderCapture crashed:", err);
-        showToast?.("Couldn't open the capture screen. Check console.", "error");
-    }
+    captureFiles = [];
+    captureTagged = new Map(); // uid -> { username, displayName }
+    $("#capture-picker").hidden = false;
+    $("#capture-preview-block").hidden = true;
+    $("#capture-uploading").hidden = true;
+    $("#capture-caption").value = "";
+    $("#capture-caption-count").textContent = "0 / 240";
+    $("#capture-error").hidden = true;
+    $("#capture-previews").innerHTML = "";
+    renderCaptureWithChips();
+    const picker = $("#capture-with-picker");
+    if (picker) picker.hidden = true;
 }
 
 // "With friends" tagging state + UI
@@ -1743,31 +1699,24 @@ function renderCaptureWithResults(filter = "") {
 }
 
 function setupCaptureControls() {
-    // Each binding is null-guarded so a missing element in the HTML
-    // can no longer abort the entire DOMContentLoaded boot sequence.
-    const cam = $safe("#capture-camera",     "setupCaptureControls");
-    const lib = $safe("#capture-library",    "setupCaptureControls");
-    const ret = $safe("#capture-retake-btn", "setupCaptureControls");
-    const post = $safe("#capture-post-btn",  "setupCaptureControls");
-    const cap = $safe("#capture-caption",    "setupCaptureControls");
-    const cnt = $safe("#capture-caption-count", "setupCaptureControls");
-
-    if (cam)  cam.onchange  = (e) => onCaptureFiles(Array.from(e.target.files || []));
-    if (lib)  lib.onchange  = (e) => onCaptureFiles(Array.from(e.target.files || []));
-    if (ret)  ret.onclick   = () => renderCapture();
-    if (post) post.onclick  = handlePost;
-    if (cap)  cap.oninput   = (e) => { if (cnt) cnt.textContent = `${e.target.value.length} / 240`; };
-
+    $("#capture-camera").onchange = (e) => onCaptureFiles(Array.from(e.target.files || []));
+    $("#capture-library").onchange = (e) => onCaptureFiles(Array.from(e.target.files || []));
+    $("#capture-retake-btn").onclick = () => renderCapture();
+    $("#capture-post-btn").onclick = handlePost;
+    $("#capture-caption").oninput = (e) => {
+        $("#capture-caption-count").textContent = `${e.target.value.length} / 240`;
+    };
     // "With friends" picker
-    const addBtn = $safe("#capture-with-add",    "setupCaptureControls");
-    const picker = $safe("#capture-with-picker", "setupCaptureControls");
-    const search = $safe("#capture-with-search", "setupCaptureControls");
-    const done   = $safe("#capture-with-done",   "setupCaptureControls");
+    const addBtn = $("#capture-with-add");
+    const picker = $("#capture-with-picker");
+    const search = $("#capture-with-search");
+    const done = $("#capture-with-done");
     if (addBtn && picker) {
         addBtn.onclick = () => {
             picker.hidden = false;
-            if (search) { search.value = ""; search.focus(); }
+            search.value = "";
             renderCaptureWithResults("");
+            search.focus();
         };
     }
     if (search) search.oninput = (e) => renderCaptureWithResults(e.target.value);
@@ -4401,7 +4350,7 @@ async function router() {
         if (!state.todayPrompt) await loadTodayPrompt();
         renderFeed();
     }
-    else if (route.view === "view-capture") await renderCapture();
+    else if (route.view === "view-capture") renderCapture();
     else if (route.view === "view-profile") {
         const m = hash.match(/^#\/profile\/(.+)$/);
         await renderProfile(m ? decodeURIComponent(m[1]) : null);
@@ -4651,6 +4600,7 @@ window.dropApp = {
     state, db, auth, CONFIG,
     $, $$, escapeHtml, linkifyText, todayKey,
     showToast, sendMessage, uploadToCloudinary, chatIdFor,
+    extractHashtags: (typeof extractHashtags === "function") ? extractHashtags : (s) => (String(s || "").match(/#([\p{L}\p{N}_]+)/gu) || []).map(t => t.slice(1).toLowerCase()),
     firestore: {
         collection, doc, setDoc, getDoc, updateDoc, deleteDoc,
         query, where, getDocs, addDoc, serverTimestamp, onSnapshot,
@@ -4659,3 +4609,10 @@ window.dropApp = {
     }
 };
 window.dispatchEvent(new CustomEvent("dropapp:ready"));
+
+// Re-emit a "user-ready" event each time auth state resolves (sign-in / sign-out)
+// so features.js can defer user-dependent setup (song attachment, shields, etc.)
+// until state.user is populated.
+onAuthStateChanged(auth, (u) => {
+    window.dispatchEvent(new CustomEvent("dropapp:user-ready", { detail: { uid: u?.uid || null } }));
+});

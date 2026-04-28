@@ -800,14 +800,16 @@
         <header class="dialog-header">
             <h3>Customize this chat</h3>
         </header>
-        <section class="cc-section">
-            <h4>Bubble color</h4>
-            <div id="cc-color-grid" class="cc-color-grid"></div>
-        </section>
-        <section class="cc-section">
-            <h4>Wallpaper</h4>
-            <div id="cc-wallpaper-grid" class="cc-wallpaper-grid"></div>
-        </section>
+        <div class="dialog-body">
+            <section class="cc-section">
+                <h4>Bubble color</h4>
+                <div id="cc-color-grid" class="cc-color-grid"></div>
+            </section>
+            <section class="cc-section">
+                <h4>Wallpaper</h4>
+                <div id="cc-wallpaper-grid" class="cc-wallpaper-grid"></div>
+            </section>
+        </div>
         <footer class="dialog-footer">
             <button class="btn btn-ghost" id="cc-reset">Reset to default</button>
             <button class="btn btn-primary" id="cc-save">Save</button>
@@ -841,7 +843,7 @@
         <header class="dialog-header">
             <h3>Reply to <span id="reply-to-handle">@user</span></h3>
         </header>
-        <div class="reply-composer-body">
+        <div class="reply-composer-body dialog-body">
             <div class="reply-parent-preview">
                 <img id="rp-thumb" class="rp-thumb" alt="" />
                 <div class="rp-meta">
