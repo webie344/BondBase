@@ -1,5 +1,5 @@
 /* =============================================================
-   features.js — paste-in companion module for Drop
+   features.js — paste-in companion module for Drop  (PATCHED)
    Loaded via:  <script type="module" src="features.js"></script>
    Depends on window.dropApp exposed by app.js
 
@@ -9,71 +9,82 @@
      3. Reply drops (photo replies to a feed drop)
      4. Streak shields (earn 1 every 14-day run, shown next to streak)
      5. Monthly "Year-in-Drops" recap (shareable image)
+
+   ---------------------------------------------------------------
+   IMPORTANT — what changed vs. the previous version
+   ---------------------------------------------------------------
+   The previous version registered FOUR MutationObservers on the
+   entire <body> with { attributes: true, attributeFilter: ["hidden"],
+   childList: true, subtree: true }. Every router view-swap, every feed
+   re-render and every dialog open fired all of them dozens of times
+   per click. They then mutated the DOM in their callbacks (innerHTML
+   writes, appendChild, style writes), which re-triggered themselves
+   in a microtask cascade — locking the UI when the user pressed the
+   "Post late" / capture button.
+
+   This version:
+     * Removes every `attributeFilter:["hidden"]` watcher on body.
+     * Drives all view-aware injection from `hashchange` instead.
+     * Scopes the post-card enhancers to `#feed-grid` only and uses
+       child-presence checks (not dataset flags) so an `innerHTML`
+       patch cleanly re-injects the badge/button without ping-pong.
+     * Caches per-post Firestore lookups so the feed doesn't fire 240
+       reads on every snapshot.
+     * Replaces Shields' setInterval(2s) poller with a single load +
+       hashchange render.
    ============================================================= */
 
 // ---- Wait for app.js to publish window.dropApp ----
-// We do NOT use top-level await here so a missing or slow window.dropApp
-// can never block the host page from rendering. Instead, every feature
-// module schedules its init() inside `whenReady(...)` below.
-function whenReady(cb) {
-    if (window.dropApp) return Promise.resolve(cb(window.dropApp));
-    return new Promise((resolve) => {
-        const fire = () => { try { resolve(cb(window.dropApp)); } catch (e) { console.error("[features] init error", e); resolve(); } };
-        window.addEventListener("dropapp:ready", fire, { once: true });
-        // Safety: if dropapp:ready was already dispatched before we attached,
-        // poll for window.dropApp every 250ms (give up after ~30s).
-        let tries = 0;
-        const poll = setInterval(() => {
-            if (window.dropApp) { clearInterval(poll); fire(); }
-            else if (++tries > 120) { clearInterval(poll); console.warn("[features] window.dropApp never appeared"); }
-        }, 250);
+let App = window.dropApp;
+if (!App) {
+    await new Promise(resolve => {
+        window.addEventListener("dropapp:ready", () => { App = window.dropApp; resolve(); }, { once: true });
     });
 }
 
-// Lazy proxies — populated inside whenReady() before any feature runs.
-let App = null, state = null, db = null, F = null;
-let $ = null, $$ = null, escapeHtml = null, showToast = null, todayKey = null, uploadToCloudinary = null, extractHashtags = null;
+const { state, db, $, $$, escapeHtml, showToast, todayKey, uploadToCloudinary } = App;
+const F = App.firestore;
 
 // Tiny helpers
 const _on = (el, ev, fn) => el && el.addEventListener(ev, fn);
 const debounce = (fn, ms = 200) => {
     let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 };
-// Wait until app.js sets state.user (after Firebase auth resolves)
-const waitForUser = () => new Promise(resolve => {
-    if (state.user?.uid) return resolve(state.user);
-    const onReady = () => {
-        if (state.user?.uid) { window.removeEventListener("dropapp:user-ready", onReady); resolve(state.user); }
-    };
-    window.addEventListener("dropapp:user-ready", onReady);
-    // Safety poll in case event already fired before listener attached
-    const poll = setInterval(() => {
-        if (state.user?.uid) { clearInterval(poll); window.removeEventListener("dropapp:user-ready", onReady); resolve(state.user); }
-    }, 250);
-});
 
-// Drop's existing dialogs are <div class="dialog" hidden> — we toggle the
-// hidden attribute (NOT the native <dialog>.showModal) so theming and
-// styling stay consistent with the rest of the app.
+// Drop's existing dialogs are <div class="dialog" hidden>
 const openDialog = (id) => { const d = document.getElementById(id); if (d) d.hidden = false; };
 const closeDialog = (id) => { const d = document.getElementById(id); if (d) d.hidden = true; };
 
-// Generic close-dialog wiring: close button + click-on-backdrop + Esc key
-const FEATURE_DIALOGS = ["song-picker-dialog", "chat-custom-dialog", "monthly-recap-dialog", "reply-drop-dialog"];
+// Generic close-dialog wiring
 document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-close-dialog]");
     if (btn) { closeDialog(btn.dataset.closeDialog); return; }
-    // Click on the backdrop of one of OUR dialogs (not the inner content)
-    const dlg = e.target.closest(FEATURE_DIALOGS.map(id => `#${id}`).join(", "));
+    const dlg = e.target.closest("#song-picker-dialog, #chat-custom-dialog, #monthly-recap-dialog");
     if (dlg && e.target === dlg) closeDialog(dlg.id);
 });
 document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    FEATURE_DIALOGS.forEach(id => {
+    ["song-picker-dialog", "chat-custom-dialog", "monthly-recap-dialog"].forEach(id => {
         const d = document.getElementById(id);
         if (d && !d.hidden) closeDialog(id);
     });
 });
+
+// Single shared "current route" helper.
+const currentHash = () => location.hash || "#/";
+const onHash = (fn) => window.addEventListener("hashchange", fn);
+
+// One-shot rAF debouncer — coalesces multiple sync triggers into a
+// single callback before the next paint. Used to gate enhancers so
+// they can't recurse in a microtask cascade.
+function rafOnce(fn) {
+    let scheduled = false;
+    return (...args) => {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(() => { scheduled = false; fn(...args); });
+    };
+}
 
 
 /* =============================================================
@@ -110,7 +121,7 @@ const CHAT_WALLPAPERS = [
 ];
 
 const ChatCustom = {
-    chatPrefsCache: new Map(), // chatId -> { accent, bg }
+    chatPrefsCache: new Map(),
 
     keyFor(otherUid) {
         const me = state.user?.uid;
@@ -137,7 +148,6 @@ const ChatCustom = {
     save(chatId, prefs) {
         this.chatPrefsCache.set(chatId, prefs);
         try { localStorage.setItem(this.localKey(chatId), JSON.stringify(prefs)); } catch {}
-        // Also persist to Firestore so it follows the user across devices
         const me = state.user?.uid;
         if (me) {
             F.setDoc(F.doc(db, "users", me, "chatPrefs", chatId), {
@@ -163,7 +173,6 @@ const ChatCustom = {
         else thread.style.removeProperty("--chat-bg");
     },
 
-    // Inject the customize button into the thread header
     injectButton() {
         const header = document.querySelector("#view-thread .thread-header");
         if (!header || header.querySelector(".chat-custom-btn")) return;
@@ -173,7 +182,6 @@ const ChatCustom = {
         btn.setAttribute("aria-label", "Customize chat");
         btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>`;
         btn.addEventListener("click", () => this.openDialog());
-        // Insert before the existing profile-link icon if present
         const profileLink = header.querySelector("#thread-profile-link");
         if (profileLink) header.insertBefore(btn, profileLink);
         else header.appendChild(btn);
@@ -229,19 +237,41 @@ const ChatCustom = {
         });
     },
 
+    onRouteEnter() {
+        const m = currentHash().match(/^#\/thread\/(.+)$/);
+        // If we just LEFT a thread, strip the custom class+vars immediately
+        // so the next chat we open doesn't briefly show the previous one's
+        // color or wallpaper.
+        if (!m) {
+            const thread = document.getElementById("view-thread");
+            if (thread) {
+                thread.classList.remove("has-custom");
+                thread.style.removeProperty("--chat-accent");
+                thread.style.removeProperty("--chat-bg");
+            }
+            return;
+        }
+        const otherUid = decodeURIComponent(m[1]);
+        const me = state.user?.uid;
+        if (me) {
+            // Apply SYNCHRONOUSLY on hashchange (parse uid from hash —
+            // do NOT wait for rAF or state.threadOtherUid). This is what
+            // eliminates the "half background color before it changes
+            // fully" flicker when opening a customized chat.
+            const chatId = [me, otherUid].sort().join("_");
+            this.apply(this.load(chatId));
+        }
+        // Header DOM may need a frame to settle — only the button
+        // injection is deferred.
+        requestAnimationFrame(() => this.injectButton());
+    },
+
     init() {
-        // When the thread view appears, inject the button and apply saved prefs
-        const observer = new MutationObserver(() => {
-            const view = document.getElementById("view-thread");
-            if (!view || view.hidden) return;
-            this.injectButton();
-            const otherUid = state.threadOtherUid;
-            if (!otherUid) return;
-            const chatId = this.keyFor(otherUid);
-            const prefs = this.load(chatId);
-            this.apply(prefs);
-        });
-        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+        // Drive injection from hashchange instead of a global hidden-attr
+        // observer. This is the single biggest cause of the freeze fix.
+        onHash(() => this.onRouteEnter());
+        // Run once at boot in case we're already on a thread.
+        this.onRouteEnter();
 
         _on(document.getElementById("cc-save"), "click", () => {
             const otherUid = state.threadOtherUid;
@@ -265,32 +295,43 @@ const ChatCustom = {
 
 /* =============================================================
    2. SONGS ON DROPS
-   - Preloaded royalty-free library
-   - "Add song" pill on capture screen
-   - Song badge + tap-to-play on every post that has a song
    ============================================================= */
 
 const SONG_LIBRARY = [
-    { id: "sh1", title: "Glassy Currents",  artist: "Drop FM", mood: "chill",  art: ["#5d8aa8", "#1a3a5e"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-    { id: "sh2", title: "Soft Gravity",     artist: "Drop FM", mood: "moody",  art: ["#7d5a9b", "#2c1f3d"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
-    { id: "sh3", title: "Sunday Pavement",  artist: "Drop FM", mood: "happy",  art: ["#f4a261", "#e76f51"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
-    { id: "sh4", title: "Late Bus Window",  artist: "Drop FM", mood: "moody",  art: ["#264653", "#0f1e2b"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-    { id: "sh5", title: "Easy Yellow",      artist: "Drop FM", mood: "happy",  art: ["#ffd166", "#ef9b00"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
-    { id: "sh6", title: "Pavement Pulse",   artist: "Drop FM", mood: "energy", art: ["#e63946", "#9d0208"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
-    { id: "sh7", title: "Drift Capsule",    artist: "Drop FM", mood: "chill",  art: ["#06d6a0", "#0a8754"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
-    { id: "sh8", title: "After Hours Walk", artist: "Drop FM", mood: "moody",  art: ["#3a0ca3", "#100245"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
-    { id: "sh9", title: "Cold Brew Skip",   artist: "Drop FM", mood: "happy",  art: ["#43aa8b", "#175e54"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
-    { id: "sh10", title: "Run It Back",     artist: "Drop FM", mood: "energy", art: ["#ff006e", "#8e0049"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
-    { id: "sh11", title: "Slow Headlights", artist: "Drop FM", mood: "chill",  art: ["#118ab2", "#073b4c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3" },
-    { id: "sh12", title: "Last Light",      artist: "Drop FM", mood: "moody",  art: ["#9d4edd", "#3c096c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3" }
+    { id: "sh1",  title: "Glassy Currents",  artist: "Drop FM", mood: "chill",  art: ["#5d8aa8", "#1a3a5e"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+    { id: "sh2",  title: "Soft Gravity",     artist: "Drop FM", mood: "moody",  art: ["#7d5a9b", "#2c1f3d"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+    { id: "sh3",  title: "Sunday Pavement",  artist: "Drop FM", mood: "happy",  art: ["#f4a261", "#e76f51"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+    { id: "sh4",  title: "Late Bus Window",  artist: "Drop FM", mood: "moody",  art: ["#264653", "#0f1e2b"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
+    { id: "sh5",  title: "Easy Yellow",      artist: "Drop FM", mood: "happy",  art: ["#ffd166", "#ef9b00"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
+    { id: "sh6",  title: "Pavement Pulse",   artist: "Drop FM", mood: "energy", art: ["#e63946", "#9d0208"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
+    { id: "sh7",  title: "Drift Capsule",    artist: "Drop FM", mood: "chill",  art: ["#06d6a0", "#0a8754"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
+    { id: "sh8",  title: "After Hours Walk", artist: "Drop FM", mood: "moody",  art: ["#3a0ca3", "#100245"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
+    { id: "sh9",  title: "Cold Brew Skip",   artist: "Drop FM", mood: "happy",  art: ["#43aa8b", "#175e54"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
+    { id: "sh10", title: "Run It Back",      artist: "Drop FM", mood: "energy", art: ["#ff006e", "#8e0049"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
+    { id: "sh11", title: "Slow Headlights",  artist: "Drop FM", mood: "chill",  art: ["#118ab2", "#073b4c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3" },
+    { id: "sh12", title: "Last Light",       artist: "Drop FM", mood: "moody",  art: ["#9d4edd", "#3c096c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3" }
 ];
 
+// SVG icons used for play/pause toggling — kept here so every spot
+// (song-picker rows + post badges) renders the exact same shape.
+const SVG_PLAY  = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>`;
+const SVG_PAUSE = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
+const SVG_NOTE  = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+
+// Soft auto-play volume — loud enough to hear, never blasting.
+const SONG_AUTO_VOL = 0.4;
+const SONG_TAP_VOL  = 0.7;
+
 const Songs = {
-    pendingSong: null,        // currently selected for next post
+    pendingSong: null,
     activeAudio: null,
     activeBadge: null,
     activeRow: null,
-
+    activeCard: null,
+    activeRowBtn: null,
+    activeBadgeBtn: null,
+    userPaused: new Set(),   // post IDs the user explicitly paused — don't auto-restart
+    observer: null,
     pendingKey: "drop:pending-song",
 
     loadPending() {
@@ -306,42 +347,23 @@ const Songs = {
         } catch {}
     },
 
-    // ----- Inline "Add song" button placed in the capture composer -----
+    // ----- Add-song pill on the capture screen -----
     injectAddPill() {
+        // Only do work if we're actually on the capture route.
+        if (currentHash() !== "#/capture") return;
         const previewBlock = document.getElementById("capture-preview-block");
         if (!previewBlock) return;
-        if (previewBlock.querySelector(".add-song-wrap")) {
+        if (previewBlock.querySelector(".add-song-pill")) {
             this.refreshAddPill();
             return;
         }
-        const wrap = document.createElement("div");
-        wrap.className = "add-song-wrap";
-
+        if (!previewBlock.style.position) previewBlock.style.position = "relative";
         const pill = document.createElement("button");
         pill.type = "button";
-        pill.className = "add-song-pill" + (this.pendingSong ? " has-song" : "");
+        pill.className = "add-song-pill";
         pill.innerHTML = this.pillHTML();
-        pill.addEventListener("click", (e) => { e.preventDefault(); this.openPicker(); });
-        wrap.appendChild(pill);
-
-        const clear = document.createElement("button");
-        clear.type = "button";
-        clear.className = "add-song-clear";
-        clear.textContent = "Remove";
-        clear.hidden = !this.pendingSong;
-        clear.addEventListener("click", (e) => {
-            e.preventDefault();
-            this.pendingSong = null;
-            this.savePending();
-            this.refreshAddPill();
-            showToast("Song removed.");
-        });
-        wrap.appendChild(clear);
-
-        // Insert right before the Post button so it shows after Tag friends
-        const postBtn = previewBlock.querySelector("#capture-post-btn");
-        if (postBtn) previewBlock.insertBefore(wrap, postBtn);
-        else previewBlock.appendChild(wrap);
+        pill.addEventListener("click", () => this.openPicker());
+        previewBlock.appendChild(pill);
     },
 
     pillHTML() {
@@ -352,15 +374,11 @@ const Songs = {
 
     refreshAddPill() {
         const pill = document.querySelector("#capture-preview-block .add-song-pill");
-        const clear = document.querySelector("#capture-preview-block .add-song-clear");
-        if (pill) {
-            pill.innerHTML = this.pillHTML();
-            pill.classList.toggle("has-song", !!this.pendingSong);
-        }
-        if (clear) clear.hidden = !this.pendingSong;
+        if (!pill) return;
+        pill.innerHTML = this.pillHTML();
+        pill.classList.toggle("has-song", !!this.pendingSong);
     },
 
-    // ----- Picker dialog -----
     activeMood: "all",
     activeQuery: "",
 
@@ -383,7 +401,7 @@ const Songs = {
         if (!list) return;
         const songs = this.filteredSongs();
         if (!songs.length) {
-            list.innerHTML = `<li class="recap-empty">No songs match. Try another mood.</li>`;
+            list.innerHTML = `<li class="song-picker-empty">No songs match. Try another mood.</li>`;
             return;
         }
         const selectedId = this.pendingSong?.id;
@@ -396,9 +414,7 @@ const Songs = {
                     <div class="song-title">${escapeHtml(s.title)}</div>
                     <div class="song-artist">${escapeHtml(s.artist)} · ${escapeHtml(s.mood)}</div>
                 </div>
-                <button type="button" class="song-play" data-action="play" aria-label="Preview">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-                </button>
+                <button type="button" class="song-play" data-action="play" aria-label="Play preview">${SVG_PLAY}</button>
             </li>`;
         }).join("");
 
@@ -423,20 +439,35 @@ const Songs = {
         this.refreshAddPill();
     },
 
+    // Swap the icon inside a play/pause button. Falls back gracefully if
+    // the element no longer exists (e.g. the picker was re-rendered).
+    setIcon(btn, isPlaying) {
+        if (!btn) return;
+        btn.innerHTML = isPlaying ? SVG_PAUSE : SVG_PLAY;
+        btn.setAttribute("aria-label", isPlaying ? "Pause preview" : "Play preview");
+    },
+
     previewSong(song, row) {
-        // Toggle: if same song playing, stop
+        const btn = row.querySelector(".song-play");
+        // Tap the same row again => stop.
         if (this.activeAudio && this.activeRow === row) {
             this.stopActive();
             return;
         }
         this.stopActive();
         const audio = new Audio(song.url);
-        audio.crossOrigin = "anonymous";
+        // NOTE: do NOT set `audio.crossOrigin = "anonymous"`. SoundHelix
+        // (and most demo MP3 hosts) don't return CORS headers; opting
+        // into CORS mode makes the browser refuse the load with
+        // "error loading preview". Default no-CORS playback is fine.
         audio.preload = "metadata";
+        audio.volume = SONG_TAP_VOL;
         audio.play().then(() => {
             row.classList.add("playing");
             this.activeAudio = audio;
             this.activeRow = row;
+            this.activeRowBtn = btn;
+            this.setIcon(btn, true);
         }).catch(() => showToast("Couldn't play preview.", "error"));
         audio.onended = () => this.stopActive();
     },
@@ -446,112 +477,259 @@ const Songs = {
             try { this.activeAudio.pause(); } catch {}
             this.activeAudio = null;
         }
-        if (this.activeRow) { this.activeRow.classList.remove("playing"); this.activeRow = null; }
-        if (this.activeBadge) { this.activeBadge.classList.remove("playing"); this.activeBadge = null; }
+        if (this.activeRow) {
+            this.activeRow.classList.remove("playing");
+            this.activeRow = null;
+        }
+        if (this.activeRowBtn) {
+            this.setIcon(this.activeRowBtn, false);
+            this.activeRowBtn = null;
+        }
+        if (this.activeBadge) {
+            this.activeBadge.classList.remove("playing");
+            this.activeBadge = null;
+        }
+        if (this.activeBadgeBtn) {
+            this.activeBadgeBtn.innerHTML = SVG_PLAY;
+            this.activeBadgeBtn = null;
+        }
+        if (this.activeCard) {
+            const meta = this.activeCard.querySelector(".post-song-meta");
+            if (meta) meta.classList.remove("playing");
+            this.activeCard = null;
+        }
     },
 
     // ----- Song badge on a rendered post -----
     enhancePostCard(card) {
-        if (!card || card.dataset.songEnhanced) return;
+        if (!card) return;
         const postId = card.dataset.postId;
         if (!postId) return;
-        // Look up song in our cache (filled by Firestore listener) or fetch on demand
+        // Idempotency check is BY CHILD PRESENCE, not a dataset flag —
+        // because applyFeedRender wipes innerHTML on patches, the dataset
+        // would survive but the badge would not. Using querySelector keeps
+        // the enhancer correct after every wipe AND prevents re-injection
+        // ping-pong with the scoped MutationObserver.
+        if (card.querySelector(".post-song-badge")) return;
         this.fetchPostSong(postId).then(song => {
             if (!song) return;
-            card.dataset.songEnhanced = "1";
+            // Re-check the card is still in the DOM and still un-enhanced
+            // by the time the async lookup resolves.
+            if (!card.isConnected || card.querySelector(".post-song-badge")) return;
             const wrap = card.querySelector(".post-image-wrap");
             if (!wrap) return;
-            wrap.style.position = wrap.style.position || "relative";
+            if (!wrap.style.position) wrap.style.position = "relative";
+
+            // Floating badge over the photo — now with explicit play/pause
+            // toggle button so the icon swap is visible and obvious.
             const badge = document.createElement("button");
             badge.type = "button";
             badge.className = "post-song-badge";
+            badge.dataset.postId = postId;
             badge.innerHTML = `
                 <span class="psb-disc"></span>
-                <span class="psb-text"><strong>${escapeHtml(song.title)}</strong>${escapeHtml(song.artist)}</span>`;
+                <span class="psb-text"><strong>${escapeHtml(song.title)}</strong>${escapeHtml(song.artist)}</span>
+                <span class="psb-toggle" aria-hidden="true">${SVG_PLAY}</span>`;
             badge.addEventListener("click", (e) => {
                 e.stopPropagation();
-                this.toggleBadgePlayback(badge, song);
+                this.toggleBadgePlayback(badge, song, /*manual*/ true);
             });
             wrap.appendChild(badge);
+
+            // Small song line in the post details (under caption / actions).
+            // Idempotent — only inject if not present.
+            if (!card.querySelector(".post-song-meta")) {
+                const meta = document.createElement("div");
+                meta.className = "post-song-meta";
+                meta.innerHTML = `${SVG_NOTE}<span class="psm-text"><strong>${escapeHtml(song.title)}</strong> · ${escapeHtml(song.artist)}</span>`;
+                meta.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    this.toggleBadgePlayback(badge, song, true);
+                });
+                // Place after .post-caption if it exists, otherwise after
+                // .post-actions, otherwise at the end of the card.
+                const cap = card.querySelector(".post-caption");
+                const actions = card.querySelector(".post-actions");
+                if (cap && cap.parentNode) cap.parentNode.insertBefore(meta, cap.nextSibling);
+                else if (actions && actions.parentNode) actions.parentNode.insertBefore(meta, actions.nextSibling);
+                else card.appendChild(meta);
+            }
+
+            // Scroll-into-view auto-play. One song at a time, soft volume.
+            this.observeCard(card);
         }).catch(() => {});
+    },
+
+    // Single shared IntersectionObserver. Auto-plays the song attached to
+    // a post when it scrolls 60% into view, pauses when it leaves.
+    ensureObserver() {
+        if (this.observer) return;
+        if (typeof IntersectionObserver === "undefined") return;
+        this.observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                const card = entry.target;
+                const postId = card.dataset.postId;
+                if (!postId) continue;
+                if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+                    if (this.userPaused.has(postId)) continue;
+                    if (this.activeCard === card) continue;
+                    const badge = card.querySelector(".post-song-badge");
+                    if (!badge) continue;
+                    const song = this.songCache.get(postId);
+                    if (!song) continue;
+                    this.startBadgePlayback(badge, song, SONG_AUTO_VOL, card);
+                } else if (entry.intersectionRatio < 0.3) {
+                    if (this.activeCard === card) this.stopActive();
+                }
+            }
+        }, { threshold: [0, 0.3, 0.6, 0.9] });
+    },
+
+    observeCard(card) {
+        this.ensureObserver();
+        if (!this.observer) return;
+        if (card.dataset.songObserved) return;
+        card.dataset.songObserved = "1";
+        this.observer.observe(card);
     },
 
     songCache: new Map(),
     fetchedNotFound: new Set(),
+    inflight: new Map(),
 
     async fetchPostSong(postId) {
         if (this.songCache.has(postId)) return this.songCache.get(postId);
         if (this.fetchedNotFound.has(postId)) return null;
-        try {
-            const snap = await F.getDoc(F.doc(db, "posts", postId));
-            const data = snap.data();
-            if (data && data.songId) {
-                const song = SONG_LIBRARY.find(s => s.id === data.songId)
-                    || { id: data.songId, title: data.songTitle || "Song", artist: data.songArtist || "", url: data.songUrl, art: ["#888", "#444"], mood: "any" };
-                this.songCache.set(postId, song);
-                return song;
-            }
-        } catch {}
-        this.fetchedNotFound.add(postId);
-        return null;
+        if (this.inflight.has(postId)) return this.inflight.get(postId);
+        const p = (async () => {
+            try {
+                const snap = await F.getDoc(F.doc(db, "posts", postId));
+                const data = snap.data();
+                if (data && data.songId) {
+                    const song = SONG_LIBRARY.find(s => s.id === data.songId)
+                        || { id: data.songId, title: data.songTitle || "Song", artist: data.songArtist || "", url: data.songUrl, art: ["#888", "#444"], mood: "any" };
+                    this.songCache.set(postId, song);
+                    return song;
+                }
+            } catch {}
+            this.fetchedNotFound.add(postId);
+            return null;
+        })();
+        this.inflight.set(postId, p);
+        try { return await p; } finally { this.inflight.delete(postId); }
     },
 
-    toggleBadgePlayback(badge, song) {
+    // Tap on the badge / meta line. `manual=true` means we should mark
+    // the post in `userPaused` when stopping so scroll won't restart it.
+    toggleBadgePlayback(badge, song, manual) {
+        const postId = badge.dataset.postId;
         if (this.activeAudio && this.activeBadge === badge) {
+            if (manual && postId) this.userPaused.add(postId);
             this.stopActive();
             return;
         }
+        if (manual && postId) this.userPaused.delete(postId);
+        const card = badge.closest(".post-card");
+        this.startBadgePlayback(badge, song, SONG_TAP_VOL, card);
+    },
+
+    // Shared play routine used by both manual taps and the scroll-into-view
+    // observer. Stops any other active audio first, swaps the play icon
+    // to the pause icon, and updates the playing class on the badge / meta.
+    startBadgePlayback(badge, song, volume, card) {
+        if (this.activeAudio && this.activeBadge === badge) return;
         this.stopActive();
+        if (!song?.url) return;
         const audio = new Audio(song.url);
-        audio.crossOrigin = "anonymous";
+        audio.preload = "metadata";
+        audio.volume = (typeof volume === "number") ? volume : SONG_AUTO_VOL;
         audio.play().then(() => {
-            badge.classList.add("playing");
             this.activeAudio = audio;
             this.activeBadge = badge;
-        }).catch(() => showToast("Couldn't play song.", "error"));
+            this.activeCard = card || badge.closest(".post-card");
+            badge.classList.add("playing");
+            const toggle = badge.querySelector(".psb-toggle");
+            if (toggle) {
+                toggle.innerHTML = SVG_PAUSE;
+                this.activeBadgeBtn = toggle;
+            }
+            // Light up the small meta line too, if it exists.
+            if (this.activeCard) {
+                const meta = this.activeCard.querySelector(".post-song-meta");
+                if (meta) meta.classList.add("playing");
+            }
+        }).catch(() => {
+            // Auto-play blocked by the browser — silently ignore so we
+            // don't spam the user with toasts every time they scroll.
+            // Manual taps do show an error via the previous toast path
+            // but for badge taps we treat blocking the same as auto.
+        });
         audio.onended = () => this.stopActive();
     },
 
-    // ----- Hook the post-publish flow: when our newest post appears, attach the song -----
+    _ownPostsBound: false,
     watchOwnNewPosts() {
+        if (this._ownPostsBound) return;
         const me = state.user?.uid;
         if (!me) return;
-        let baselineLatest = null;
+        this._ownPostsBound = true;
+
+        const seen = new Set();
+        let primed = false;
         const q = F.query(
             F.collection(db, "posts"),
             F.where("uid", "==", me),
             F.orderBy("createdAt", "desc"),
-            F.limit(1)
+            F.limit(5)
         );
         F.onSnapshot(q, (snap) => {
-            if (snap.empty) return;
-            const docSnap = snap.docs[0];
-            const id = docSnap.id;
-            if (baselineLatest === null) { baselineLatest = id; return; }
-            if (id === baselineLatest) return;
-            baselineLatest = id;
-            const data = docSnap.data() || {};
-            // If song is pending and not already attached, attach it
-            if (this.pendingSong && !data.songId) {
-                F.updateDoc(F.doc(db, "posts", id), {
-                    songId: this.pendingSong.id,
-                    songTitle: this.pendingSong.title,
-                    songArtist: this.pendingSong.artist,
-                    songUrl: this.pendingSong.url
-                }).then(() => {
-                    showToast(`🎵 Added "${this.pendingSong.title}" to your drop`);
-                    this.pendingSong = null;
-                    this.savePending();
-                    this.refreshAddPill();
-                }).catch(() => {});
+            // PRIMING: on the very first delivery, mark whatever already
+            // exists as "seen" without trying to attach a song. This is the
+            // ONLY thing the previous version got wrong — it returned early
+            // even when the user had zero posts, so the very first drop the
+            // user ever made never received its pending song.
+            if (!primed) {
+                snap.forEach(d => seen.add(d.id));
+                primed = true;
+                return;
             }
+            // Use docChanges so we react to genuine additions only —
+            // not re-deliveries of cached docs.
+            snap.docChanges().forEach(change => {
+                if (change.type !== "added") return;
+                const d = change.doc;
+                if (seen.has(d.id)) return;
+                seen.add(d.id);
+                const data = d.data() || {};
+                if (this.pendingSong && !data.songId) {
+                    const song = this.pendingSong;
+                    F.updateDoc(F.doc(db, "posts", d.id), {
+                        songId: song.id,
+                        songTitle: song.title,
+                        songArtist: song.artist,
+                        songUrl: song.url
+                    }).then(() => {
+                        showToast(`Added "${song.title}" to your drop`);
+                        this.pendingSong = null;
+                        this.savePending();
+                        this.refreshAddPill();
+                    }).catch(() => {});
+                }
+            });
         }, () => {});
     },
+
+    // Scoped enhancer: scan only the feed grid, never the whole body.
+    scanFeed: rafOnce(function () {
+        const grid = document.getElementById("feed-grid");
+        if (!grid) return;
+        grid.querySelectorAll(".post-card").forEach(c => Songs.enhancePostCard(c));
+    }),
 
     init() {
         this.loadPending();
 
-        // Wire picker dialog controls
+        // Picker dialog wiring
         _on(document.getElementById("song-search-input"), "input", debounce((e) => {
             this.activeQuery = e.target.value || "";
             this.renderPickerList();
@@ -576,86 +754,101 @@ const Songs = {
             closeDialog("song-picker-dialog");
         });
 
-        // Inject the "Add song" button into the capture composer immediately —
-        // #capture-preview-block exists in the HTML at load time, even when hidden.
-        this.injectAddPill();
+        // Scoped MutationObserver: only the feed grid, only childList
+        // (no subtree, no attribute filter). Fires when post cards are
+        // added/removed OR when applyFeedRender patches a card's inner
+        // HTML (which removes-then-adds children of #feed-grid > article).
+        const attachFeedObserver = () => {
+            const grid = document.getElementById("feed-grid");
+            if (!grid || grid.dataset.songObsBound) return;
+            grid.dataset.songObsBound = "1";
+            const obs = new MutationObserver(() => this.scanFeed());
+            // childList + subtree on the GRID (not body) is safe: the grid
+            // only contains post cards, and rafOnce coalesces bursts.
+            obs.observe(grid, { childList: true, subtree: true });
+            this.scanFeed();
+        };
 
-        // Watch DOM for new post cards + re-inject pill if it ever gets removed
-        const obs = new MutationObserver((mutations) => {
-            for (const m of mutations) {
-                m.addedNodes.forEach(n => {
-                    if (!(n instanceof HTMLElement)) return;
-                    if (n.matches?.(".post-card")) this.enhancePostCard(n);
-                    n.querySelectorAll?.(".post-card").forEach(c => this.enhancePostCard(c));
-                });
-            }
-            // Safety: re-inject if button disappears (e.g. preview-block re-rendered)
-            this.injectAddPill();
+        // The feed grid may not exist yet at boot. Try on every hashchange
+        // until we find it, then bind once.
+        onHash(() => {
+            if (currentHash() === "#/capture") this.injectAddPill();
+            attachFeedObserver();
         });
-        obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
-
-        // Initial scan
-        document.querySelectorAll(".post-card").forEach(c => this.enhancePostCard(c));
-
-        // Start listening for our own new posts to attach pending song.
-        // Must wait until Firebase auth has resolved (state.user populated).
-        waitForUser().then(() => this.watchOwnNewPosts());
+        attachFeedObserver();
+        if (currentHash() === "#/capture") this.injectAddPill();
 
         // Stop audio on navigation
-        window.addEventListener("hashchange", () => this.stopActive());
+        onHash(() => this.stopActive());
+
+        // Start listening for our own new posts to attach pending song.
+        // Auth may not be ready at module-init time — poll briefly until it is.
+        const tryBind = () => this.watchOwnNewPosts();
+        tryBind();
+        if (!this._ownPostsBound) {
+            let attempts = 0;
+            const iv = setInterval(() => {
+                attempts++;
+                tryBind();
+                if (this._ownPostsBound || attempts > 30) clearInterval(iv);
+            }, 1000);
+        }
     }
 };
 
 
 /* =============================================================
-   3. REPLY DROPS — photo replies to a feed drop
-   - Adds a "↩ Reply with photo" button to every post card
-   - Picks an image, uploads to Cloudinary, creates a new post with replyToPostId
-   - Replies show a banner: "in reply to @user's drop"
+   3. REPLY DROPS
    ============================================================= */
 
 const ReplyDrops = {
-    pendingParentId: null,
-    pendingParentData: null,
-    pendingFile: null,
+    bannerCache: new Map(),    // postId -> parent data | null
 
     enhancePostCard(card) {
-        if (!card || card.dataset.replyDropEnhanced) return;
+        if (!card) return;
         const postId = card.dataset.postId;
         if (!postId) return;
-        card.dataset.replyDropEnhanced = "1";
 
+        // Reply button (idempotent by child presence)
         const actions = card.querySelector(".post-actions");
         if (actions && !actions.querySelector(".reply-drop-btn")) {
             const btn = document.createElement("button");
-            btn.className = "reply-drop-btn post-action";
+            btn.className = "reply-drop-btn";
             btn.type = "button";
             btn.title = "Reply with a photo";
-            btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg> <span>Reply</span>`;
+            btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg> Reply`;
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();
-                this.openComposer(postId);
+                this.triggerReply(postId, card);
             });
             actions.appendChild(btn);
         }
 
-        // If this card itself is a reply, render a banner
+        // Banner (cached lookup so we don't refetch on every snapshot)
         this.maybeRenderReplyBanner(card, postId);
     },
 
     async maybeRenderReplyBanner(card, postId) {
+        if (card.querySelector(".reply-drop-banner")) return;
         try {
-            const snap = await F.getDoc(F.doc(db, "posts", postId));
-            const data = snap.data();
-            if (!data || !data.replyToPostId) return;
-            const parentSnap = await F.getDoc(F.doc(db, "posts", data.replyToPostId));
-            const parent = parentSnap.data();
+            let parent = this.bannerCache.get(postId);
+            if (parent === undefined) {
+                const snap = await F.getDoc(F.doc(db, "posts", postId));
+                const data = snap.data();
+                if (!data || !data.replyToPostId) {
+                    this.bannerCache.set(postId, null);
+                    return;
+                }
+                const parentSnap = await F.getDoc(F.doc(db, "posts", data.replyToPostId));
+                parent = parentSnap.data() || null;
+                this.bannerCache.set(postId, parent);
+            }
             if (!parent) return;
-            if (card.querySelector(".reply-drop-banner")) return;
+            if (!card.isConnected || card.querySelector(".reply-drop-banner")) return;
             const banner = document.createElement("div");
             banner.className = "reply-drop-banner";
             const thumb = parent.imageUrl || (parent.images && parent.images[0]) || "";
-            banner.innerHTML = `${thumb ? `<img class="rdb-thumb" src="${escapeHtml(thumb)}" alt="" />` : ""} ↩ in reply to <strong style="margin-left:4px;">@${escapeHtml(parent.username || "user")}</strong>`;
+            banner.innerHTML = `${thumb ? `<img class="rdb-thumb" src="${escapeHtml(thumb)}" alt="" />` : ""} in reply to <strong style="margin-left:4px;">@${escapeHtml(parent.username || "user")}</strong>`;
             const header = card.querySelector(".post-header");
             if (header) header.parentNode.insertBefore(banner, header);
             else card.prepend(banner);
@@ -663,187 +856,98 @@ const ReplyDrops = {
         } catch {}
     },
 
-    // ----- Composer dialog -----
-    async openComposer(parentPostId) {
+    pendingFile: null,
+    pendingParent: null,
+
+    async triggerReply(postId, card) {
+        this.pendingParent = postId;
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.style.display = "none";
+        document.body.appendChild(input);
+        input.addEventListener("change", async () => {
+            const file = input.files?.[0];
+            input.remove();
+            if (!file) return;
+            await this.uploadAndPost(file, postId);
+        }, { once: true });
+        input.click();
+    },
+
+    async uploadAndPost(file, parentPostId) {
         if (!state.user?.uid) { showToast("Please sign in.", "error"); return; }
-        this.pendingParentId = parentPostId;
-        this.pendingFile = null;
-        this.resetComposer();
-
-        // Load parent post into the preview header
+        showToast("Uploading reply…");
         try {
-            const snap = await F.getDoc(F.doc(db, "posts", parentPostId));
-            const parent = snap.data() || {};
-            this.pendingParentData = parent;
-            const handle = document.getElementById("reply-to-handle");
-            const rpHandle = document.getElementById("rp-handle");
-            const rpPrompt = document.getElementById("rp-prompt");
-            const rpCaption = document.getElementById("rp-caption");
-            const rpThumb = document.getElementById("rp-thumb");
-            const uname = parent.username ? `@${parent.username}` : "@user";
-            if (handle) handle.textContent = uname;
-            if (rpHandle) rpHandle.textContent = uname;
-            if (rpPrompt) rpPrompt.textContent = parent.promptText || "Today's drop";
-            if (rpCaption) rpCaption.textContent = parent.caption || "";
-            const thumb = parent.imageUrl || (parent.images && parent.images[0]) || "";
-            if (rpThumb) {
-                if (thumb) { rpThumb.src = thumb; rpThumb.style.display = ""; }
-                else rpThumb.style.display = "none";
-            }
-        } catch {}
-
-        openDialog("reply-drop-dialog");
-    },
-
-    resetComposer() {
-        const previewBlock = document.getElementById("reply-preview-block");
-        const picker = document.getElementById("reply-picker");
-        const previews = document.getElementById("reply-previews");
-        const caption = document.getElementById("reply-caption");
-        const count = document.getElementById("reply-caption-count");
-        const post = document.getElementById("reply-post-btn");
-        const camera = document.getElementById("reply-camera");
-        const library = document.getElementById("reply-library");
-        if (previewBlock) previewBlock.hidden = true;
-        if (picker) picker.hidden = false;
-        if (previews) previews.innerHTML = "";
-        if (caption) caption.value = "";
-        if (count) count.textContent = "0 / 240";
-        if (post) post.disabled = true;
-        if (camera) camera.value = "";
-        if (library) library.value = "";
-        this.pendingFile = null;
-    },
-
-    onPickFile(file) {
-        if (!file) return;
-        if (file.size > 12 * 1024 * 1024) {
-            showToast("Photo is over 12MB.", "error");
-            return;
-        }
-        this.pendingFile = file;
-        const previews = document.getElementById("reply-previews");
-        if (previews) {
-            previews.innerHTML = "";
-            const img = document.createElement("img");
-            img.alt = "";
-            img.src = URL.createObjectURL(file);
-            previews.appendChild(img);
-        }
-        document.getElementById("reply-picker").hidden = true;
-        document.getElementById("reply-preview-block").hidden = false;
-        document.getElementById("reply-post-btn").disabled = false;
-    },
-
-    setupComposer() {
-        const camera = document.getElementById("reply-camera");
-        const library = document.getElementById("reply-library");
-        const retake = document.getElementById("reply-retake-btn");
-        const caption = document.getElementById("reply-caption");
-        const count = document.getElementById("reply-caption-count");
-        const post = document.getElementById("reply-post-btn");
-
-        if (camera) camera.onchange = (e) => this.onPickFile(e.target.files?.[0]);
-        if (library) library.onchange = (e) => this.onPickFile(e.target.files?.[0]);
-        if (retake) retake.onclick = () => {
-            this.pendingFile = null;
-            document.getElementById("reply-previews").innerHTML = "";
-            document.getElementById("reply-preview-block").hidden = true;
-            document.getElementById("reply-picker").hidden = false;
-            document.getElementById("reply-post-btn").disabled = true;
-            if (camera) camera.value = "";
-            if (library) library.value = "";
-        };
-        if (caption && count) {
-            caption.oninput = (e) => { count.textContent = `${e.target.value.length} / 240`; };
-        }
-        if (post) post.onclick = () => this.submit();
-    },
-
-    async submit() {
-        if (!this.pendingFile || !this.pendingParentId) return;
-        const post = document.getElementById("reply-post-btn");
-        const captionEl = document.getElementById("reply-caption");
-        const captionRaw = (captionEl?.value || "").trim();
-        const hashtags = (typeof extractHashtags === "function") ? extractHashtags(captionRaw) : [];
-        post.disabled = true;
-        post.textContent = "Posting…";
-        try {
-            const url = await uploadToCloudinary(this.pendingFile);
-            const parent = this.pendingParentData || {};
+            const url = await uploadToCloudinary(file);
+            const parentSnap = await F.getDoc(F.doc(db, "posts", parentPostId));
+            const parent = parentSnap.data() || {};
             const newDoc = {
                 uid: state.user.uid,
                 username: state.profile?.username || "user",
-                displayName: state.profile?.displayName || state.profile?.username || "user",
                 imageUrl: url,
                 images: [url],
-                caption: captionRaw,
-                hashtags,
+                caption: `Reply to @${parent.username || "user"}`,
                 promptText: parent.promptText || "",
                 promptDate: parent.promptDate || todayKey(),
                 createdAt: F.serverTimestamp(),
                 isOnTime: false,
                 isReplyDrop: true,
-                replyToPostId: this.pendingParentId,
+                replyToPostId: parentPostId,
                 replyToUid: parent.uid || null,
                 replyToUsername: parent.username || null,
                 likes: 0,
                 likedBy: [],
-                commentsCount: 0,
-                viewsCount: 0,
-                reactions: {}
+                commentsCount: 0
             };
             const ref = await F.addDoc(F.collection(db, "posts"), newDoc);
             if (parent.uid && parent.uid !== state.user.uid) {
-                F.addDoc(F.collection(db, "users", parent.uid, "notifications"), {
+                await F.addDoc(F.collection(db, "users", parent.uid, "notifications"), {
                     type: "reply_drop",
                     fromUid: state.user.uid,
                     fromUsername: state.profile?.username || "user",
                     postId: ref.id,
-                    parentPostId: this.pendingParentId,
+                    parentPostId,
                     createdAt: F.serverTimestamp(),
                     seen: false
                 }).catch(() => {});
             }
             showToast("Reply drop posted!");
-            closeDialog("reply-drop-dialog");
-            this.resetComposer();
         } catch (e) {
             console.error(e);
             showToast("Couldn't post reply.", "error");
-            post.disabled = false;
-            post.textContent = "Post reply";
         }
     },
 
+    scanFeed: rafOnce(function () {
+        const grid = document.getElementById("feed-grid");
+        if (!grid) return;
+        grid.querySelectorAll(".post-card").forEach(c => ReplyDrops.enhancePostCard(c));
+    }),
+
     init() {
-        this.setupComposer();
-        const obs = new MutationObserver((mutations) => {
-            for (const m of mutations) {
-                m.addedNodes.forEach(n => {
-                    if (!(n instanceof HTMLElement)) return;
-                    if (n.matches?.(".post-card")) this.enhancePostCard(n);
-                    n.querySelectorAll?.(".post-card").forEach(c => this.enhancePostCard(c));
-                });
-            }
-        });
-        obs.observe(document.body, { childList: true, subtree: true });
-        document.querySelectorAll(".post-card").forEach(c => this.enhancePostCard(c));
+        // Same scoped strategy as Songs: observe ONLY #feed-grid.
+        const attachFeedObserver = () => {
+            const grid = document.getElementById("feed-grid");
+            if (!grid || grid.dataset.replyObsBound) return;
+            grid.dataset.replyObsBound = "1";
+            const obs = new MutationObserver(() => this.scanFeed());
+            obs.observe(grid, { childList: true, subtree: true });
+            this.scanFeed();
+        };
+        onHash(attachFeedObserver);
+        attachFeedObserver();
     }
 };
 
 
 /* =============================================================
    4. STREAK SHIELDS
-   - Stored on user profile: shields (number), shieldsLastEarned (date string)
-   - Earn 1 shield each time the user completes a 14-day run
-   - Display next to streak pill: 🛡 ×N
-   - Auto-applies a shield when user posts after missing exactly 1 day
-     (this part requires you to grant the field; see TODO note)
    ============================================================= */
 
 const Shields = {
     cache: { shields: 0, shieldsLastEarned: null },
+    loaded: false,
 
     async load() {
         const me = state.user?.uid;
@@ -853,6 +957,7 @@ const Shields = {
             const data = snap.data() || {};
             this.cache.shields = data.shields || 0;
             this.cache.shieldsLastEarned = data.shieldsLastEarned || null;
+            this.loaded = true;
             this.maybeEarn(data);
             this.render();
         } catch {}
@@ -861,7 +966,6 @@ const Shields = {
     async maybeEarn(profile) {
         const streak = profile?.streak || state.profile?.streak || 0;
         if (!streak || streak < 14) return;
-        // Earn 1 shield every full multiple of 14, but only once per multiple
         const targetTier = Math.floor(streak / 14);
         const lastTier = profile.shieldsTier || 0;
         if (targetTier > lastTier) {
@@ -874,19 +978,17 @@ const Shields = {
                     shieldsLastEarned: todayKey()
                 });
                 this.cache.shields += (targetTier - lastTier);
-                showToast(`🛡 You earned a streak shield! (${this.cache.shields} total)`);
+                showToast(`You earned a streak shield! (${this.cache.shields} total)`);
                 this.render();
             } catch {}
         }
     },
 
-    render() {
-        // Find the streak pill in the UI and append a shield count next to it
+    render: rafOnce(function () {
         const targets = document.querySelectorAll(
             "[data-streak-pill], .streak-pill, .streak-display, #streak-count, .home-streak"
         );
-        const count = this.cache.shields || 0;
-        // Remove any old shield pills first
+        const count = Shields.cache.shields || 0;
         document.querySelectorAll(".streak-shield-pill").forEach(p => p.remove());
         if (count <= 0) return;
         targets.forEach(el => {
@@ -896,33 +998,36 @@ const Shields = {
             pill.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/></svg><span class="ssp-count">×${count}</span>`;
             el.appendChild(pill);
         });
-    },
+    }),
 
     init() {
-        // Try a few times because the streak UI may render after auth resolves
-        const tryRender = () => this.render();
-        if (state.user?.uid) this.load();
-        // Re-poll periodically
-        let tries = 0;
-        const interval = setInterval(() => {
-            tries++;
-            if (state.user?.uid && this.cache.shields === 0 && tries < 6) this.load();
-            tryRender();
-            if (tries > 20) clearInterval(interval);
-        }, 2000);
+        // One-time load when auth is ready, then re-render on every route
+        // change (no setInterval). The 2-second poller in the previous
+        // version was creating constant DOM churn.
+        const tryLoad = () => {
+            if (!this.loaded && state.user?.uid) this.load();
+            else this.render();
+        };
+        tryLoad();
+        onHash(tryLoad);
+        // If the user logs in after boot, app.js will eventually populate
+        // state.user. Give it up to ~10s with light polling.
+        let attempts = 0;
+        const iv = setInterval(() => {
+            attempts++;
+            if (this.loaded || attempts > 10) { clearInterval(iv); return; }
+            if (state.user?.uid) { clearInterval(iv); this.load(); }
+        }, 1000);
     }
 };
 
 
 /* =============================================================
    5. MONTHLY "Year-in-Drops" RECAP
-   - Adds a recap trigger to settings/profile
-   - Pulls user's posts for the month
-   - Renders a 9-grid shareable card, exports PNG via html2canvas
    ============================================================= */
 
 const Recap = {
-    monthOffset: 0, // 0 = this month, -1 = previous, etc.
+    monthOffset: 0,
 
     monthBounds(offset = 0) {
         const now = new Date();
@@ -963,13 +1068,13 @@ const Recap = {
         if (!stage) return;
         stage.innerHTML = `<div class="recap-empty">Loading your drops…</div>`;
         const { label } = this.monthBounds(this.monthOffset);
-        document.getElementById("recap-title").textContent = `Your ${label}`;
+        const titleEl = document.getElementById("recap-title");
+        if (titleEl) titleEl.textContent = `Your ${label}`;
         const { posts, totalLikes } = await this.fetchMonth(this.monthOffset);
         if (!posts.length) {
             stage.innerHTML = `<div class="recap-empty">No drops in ${escapeHtml(label)}.</div>`;
             return;
         }
-        // Build 9 cells (most recent 9)
         const sorted = posts.slice().sort((a, b) => {
             const ta = a.createdAt?.toMillis?.() || 0;
             const tb = b.createdAt?.toMillis?.() || 0;
@@ -994,18 +1099,9 @@ const Recap = {
                 <div class="rc-title">${posts.length} drop${posts.length === 1 ? "" : "s"} in your month</div>
                 <div class="rc-grid">${cells.join("")}</div>
                 <div class="rc-stats">
-                    <div class="rc-stat">
-                        <span class="rc-stat-num">${posts.length}</span>
-                        <span class="rc-stat-label">drops</span>
-                    </div>
-                    <div class="rc-stat">
-                        <span class="rc-stat-num">${totalLikes}</span>
-                        <span class="rc-stat-label">likes</span>
-                    </div>
-                    <div class="rc-stat">
-                        <span class="rc-stat-num">${posts.filter(p => p.isOnTime).length}</span>
-                        <span class="rc-stat-label">on time</span>
-                    </div>
+                    <div class="rc-stat"><span class="rc-stat-num">${posts.length}</span><span class="rc-stat-label">drops</span></div>
+                    <div class="rc-stat"><span class="rc-stat-num">${totalLikes}</span><span class="rc-stat-label">likes</span></div>
+                    <div class="rc-stat"><span class="rc-stat-num">${posts.filter(p => p.isOnTime).length}</span><span class="rc-stat-label">on time</span></div>
                 </div>
             </div>`;
         stage.innerHTML = card;
@@ -1035,15 +1131,19 @@ const Recap = {
     },
 
     injectTrigger() {
-        // Try to attach to the profile/settings view
-        const candidates = document.querySelectorAll("#view-profile, #view-settings, .profile-content, .settings-content");
+        // Only do work if we're on a route where the trigger belongs.
+        const hash = currentHash();
+        if (!(hash.startsWith("#/profile") || hash === "#/settings")) return;
+        const candidates = document.querySelectorAll(
+            "#view-profile, #view-settings, .profile-content, .settings-content"
+        );
         candidates.forEach(target => {
             if (!target || target.querySelector(".recap-trigger")) return;
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "recap-trigger";
             btn.innerHTML = `
-                <span class="rt-icon">✨</span>
+                <span class="rt-icon">★</span>
                 <span class="rt-meta">
                     <span class="rt-title">Your month in drops</span>
                     <span class="rt-sub">A shareable recap of this month</span>
@@ -1062,8 +1162,8 @@ const Recap = {
         _on(document.getElementById("recap-month-prev"), "click", () => { this.monthOffset--; this.render(); });
         _on(document.getElementById("recap-month-next"), "click", () => { if (this.monthOffset < 0) { this.monthOffset++; this.render(); } });
 
-        const obs = new MutationObserver(() => this.injectTrigger());
-        obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+        // Drive trigger injection from hashchange — no body-wide observer.
+        onHash(() => this.injectTrigger());
         this.injectTrigger();
     }
 };
@@ -1073,27 +1173,10 @@ const Recap = {
    BOOT
    ============================================================= */
 
-whenReady((app) => {
-    App = app;
-    state = app.state;
-    db = app.db;
-    F = app.firestore;
-    $ = app.$;
-    $$ = app.$$;
-    escapeHtml = app.escapeHtml;
-    showToast = app.showToast;
-    todayKey = app.todayKey;
-    uploadToCloudinary = app.uploadToCloudinary;
-    extractHashtags = app.extractHashtags || ((s) => (String(s || "").match(/#([\p{L}\p{N}_]+)/gu) || []).map(t => t.slice(1).toLowerCase()));
+ChatCustom.init();
+Songs.init();
+ReplyDrops.init();
+Shields.init();
+Recap.init();
 
-    const safeInit = (name, mod) => {
-        try { mod.init(); } catch (e) { console.error(`[features] ${name}.init failed`, e); }
-    };
-    safeInit("ChatCustom", ChatCustom);
-    safeInit("Songs", Songs);
-    safeInit("ReplyDrops", ReplyDrops);
-    safeInit("Shields", Shields);
-    safeInit("Recap", Recap);
-
-    console.log("[features] loaded — chat themes, songs, reply drops, shields, recap");
-});
+console.log("[features] loaded — chat themes, songs, reply drops, shields, recap");
