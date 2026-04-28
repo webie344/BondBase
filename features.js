@@ -12,15 +12,27 @@
    ============================================================= */
 
 // ---- Wait for app.js to publish window.dropApp ----
-let App = window.dropApp;
-if (!App) {
-    await new Promise(resolve => {
-        window.addEventListener("dropapp:ready", () => { App = window.dropApp; resolve(); }, { once: true });
+// We do NOT use top-level await here so a missing or slow window.dropApp
+// can never block the host page from rendering. Instead, every feature
+// module schedules its init() inside `whenReady(...)` below.
+function whenReady(cb) {
+    if (window.dropApp) return Promise.resolve(cb(window.dropApp));
+    return new Promise((resolve) => {
+        const fire = () => { try { resolve(cb(window.dropApp)); } catch (e) { console.error("[features] init error", e); resolve(); } };
+        window.addEventListener("dropapp:ready", fire, { once: true });
+        // Safety: if dropapp:ready was already dispatched before we attached,
+        // poll for window.dropApp every 250ms (give up after ~30s).
+        let tries = 0;
+        const poll = setInterval(() => {
+            if (window.dropApp) { clearInterval(poll); fire(); }
+            else if (++tries > 120) { clearInterval(poll); console.warn("[features] window.dropApp never appeared"); }
+        }, 250);
     });
 }
 
-const { state, db, $, $$, escapeHtml, showToast, todayKey, uploadToCloudinary, extractHashtags } = App;
-const F = App.firestore;
+// Lazy proxies — populated inside whenReady() before any feature runs.
+let App = null, state = null, db = null, F = null;
+let $ = null, $$ = null, escapeHtml = null, showToast = null, todayKey = null, uploadToCloudinary = null, extractHashtags = null;
 
 // Tiny helpers
 const _on = (el, ev, fn) => el && el.addEventListener(ev, fn);
@@ -1061,10 +1073,27 @@ const Recap = {
    BOOT
    ============================================================= */
 
-ChatCustom.init();
-Songs.init();
-ReplyDrops.init();
-Shields.init();
-Recap.init();
+whenReady((app) => {
+    App = app;
+    state = app.state;
+    db = app.db;
+    F = app.firestore;
+    $ = app.$;
+    $$ = app.$$;
+    escapeHtml = app.escapeHtml;
+    showToast = app.showToast;
+    todayKey = app.todayKey;
+    uploadToCloudinary = app.uploadToCloudinary;
+    extractHashtags = app.extractHashtags || ((s) => (String(s || "").match(/#([\p{L}\p{N}_]+)/gu) || []).map(t => t.slice(1).toLowerCase()));
 
-console.log("[features] loaded — chat themes, songs, reply drops, shields, recap");
+    const safeInit = (name, mod) => {
+        try { mod.init(); } catch (e) { console.error(`[features] ${name}.init failed`, e); }
+    };
+    safeInit("ChatCustom", ChatCustom);
+    safeInit("Songs", Songs);
+    safeInit("ReplyDrops", ReplyDrops);
+    safeInit("Shields", Shields);
+    safeInit("Recap", Recap);
+
+    console.log("[features] loaded — chat themes, songs, reply drops, shields, recap");
+});
