@@ -2394,7 +2394,10 @@ body.in-thread #bottom-nav { display: none !important; }
 }
 .story-progress .seg.done .fill { width: 100%; }
 .story-progress .seg.active .fill {
-    animation: storyProgress var(--story-dur, 3s) linear forwards;
+    animation-name: storyProgress;
+    animation-duration: 3s;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
 }
 @keyframes storyProgress { from { width: 0%; } to { width: 100%; } }
 .story-close {
@@ -3404,6 +3407,13 @@ body.in-thread #bottom-nav { display: none !important; }
 }
 
 /* ---------- CHAT CUSTOMIZATION — applied per-thread via CSS vars ---------- */
+/* Suppress background-color transition on the thread view so there is no
+   white flash between navigating in and the custom theme being applied.
+   The capture-phase hashchange in features.js ensures has-custom is set
+   before the view becomes visible, but transition: none is a safety net. */
+#view-thread {
+    transition: none;
+}
 /* features.js sets these on the active thread root: --chat-accent, --chat-bg */
 #view-thread.has-custom {
     background: var(--chat-bg, var(--bg));

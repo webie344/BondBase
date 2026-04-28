@@ -1,5 +1,5 @@
 /* =============================================================
-   Drop — One prompt. One photo. Once a day.
+   Drop —One prompt. One photo. Once a day.
    -------------------------------------------------------------
    SETUP
    1. Create a Firebase project at console.firebase.google.com
@@ -1879,6 +1879,11 @@ async function handlePost() {
         const taggedUids = [...captureTagged.keys()];
         const taggedUsernames = [...captureTagged.values()].map(v => v.username || "");
 
+        // Pending song — read directly from the Songs module so the song is
+        // written into the post document at creation time (avoids the async
+        // post-write patch that could race or fail on missing Firestore index).
+        const _pendingSong = window.Songs?.pendingSong || null;
+
         // Create post (keeps `imageUrl` for backwards compat = first image)
         const postRef = await addDoc(collection(db, "posts"), {
             uid: state.user.uid,
@@ -1894,6 +1899,12 @@ async function handlePost() {
             circleId: pendingCircleId,
             taggedUids,
             taggedUsernames,
+            ...(_pendingSong ? {
+                songId: _pendingSong.id,
+                songTitle: _pendingSong.title,
+                songArtist: _pendingSong.artist,
+                songUrl: _pendingSong.url || ""
+            } : {}),
             likes: 0,
             likedBy: [],
             commentsCount: 0,
@@ -1920,6 +1931,13 @@ async function handlePost() {
 
         // Streaks count public daily drops only.
         if (!pendingCircleId) await updateUserStreak();
+
+        // Clear the pending song now that it's baked into the post.
+        if (_pendingSong && window.Songs) {
+            window.Songs.pendingSong = null;
+            if (typeof window.Songs.savePending === "function") window.Songs.savePending();
+            if (typeof window.Songs.refreshAddPill === "function") window.Songs.refreshAddPill();
+        }
 
         Sounds.postSent();
         showToast("Posted!", "success");
@@ -2053,10 +2071,12 @@ async function renderProfile(usernameOrUid) {
     const grid = $("#profile-grid");
     // Liveliness: shimmer placeholders while the query resolves
     grid.innerHTML = skeletonFeedHTML(3);
-    // Single where() — no composite index needed. Sort client-side below.
+    // limit(30) here avoids downloading every post for busy users.
+    // Sort client-side to show the newest 30 without needing a composite index.
     const q = query(
         collection(db, "posts"),
-        where("uid", "==", targetUid)
+        where("uid", "==", targetUid),
+        limit(30)
     );
     const postSnap = await getDocs(q);
     if (postSnap.empty) {
@@ -3823,10 +3843,12 @@ function showStoryFrame() {
     $("#story-caption").textContent = p.caption || "";
     // Build progress segments
     const prog = $("#story-progress");
-    prog.style.setProperty("--story-dur", `${story.durationMs}ms`);
+    // Inline animation-duration on each active fill so Safari/WebKit correctly
+    // picks up the duration (CSS var in animation shorthand is unreliable there).
     prog.innerHTML = story.posts.map((_, i) => {
         const cls = i < story.idx ? "done" : i === story.idx ? "active" : "";
-        return `<div class="seg ${cls}"><span class="fill"></span></div>`;
+        const durStyle = (cls === "active") ? ` style="animation-duration:${story.durationMs}ms"` : "";
+        return `<div class="seg ${cls}"><span class="fill"${durStyle}></span></div>`;
     }).join("");
     if (story.timer) clearTimeout(story.timer);
     story.timer = setTimeout(nextStoryFrame, story.durationMs);

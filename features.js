@@ -267,9 +267,11 @@ const ChatCustom = {
     },
 
     init() {
-        // Drive injection from hashchange instead of a global hidden-attr
-        // observer. This is the single biggest cause of the freeze fix.
-        onHash(() => this.onRouteEnter());
+        // Use capture phase (3rd arg = true) so this handler fires BEFORE
+        // the router's bubble-phase hashchange listener. That guarantees
+        // has-custom + CSS vars are applied to #view-thread while it is
+        // still hidden, so no white flash is visible when it becomes shown.
+        window.addEventListener("hashchange", () => this.onRouteEnter(), true);
         // Run once at boot in case we're already on a thread.
         this.onRouteEnter();
 
@@ -771,7 +773,7 @@ const Songs = {
 
         // The feed grid may not exist yet at boot. Try on every hashchange
         // until we find it, then bind once.
-        onHash(() => {
+        window.addEventListener("hashchange", () => {
             if (currentHash() === "#/capture") this.injectAddPill();
             attachFeedObserver();
         });
@@ -1175,6 +1177,8 @@ const Recap = {
 
 ChatCustom.init();
 Songs.init();
+// Expose Songs on window so app.js handlePost can read pendingSong at post time.
+window.Songs = Songs;
 ReplyDrops.init();
 Shields.init();
 Recap.init();
