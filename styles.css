@@ -82,6 +82,8 @@ html, body {
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
     overscroll-behavior-y: none;
+    /* Momentum scrolling on iOS for the whole page */
+    -webkit-overflow-scrolling: touch;
 }
 
 /* Kill default focus/tap blue ring on tappable surfaces */
@@ -199,12 +201,19 @@ a { color: inherit; text-decoration: none; }
    ============================================= */
 
 .view {
-    animation: fade-in 200ms ease-out;
+    animation: fade-in 180ms ease-out;
+    /* Promote each view to its own GPU layer so the browser can
+       composite the fade without triggering layout passes. */
+    will-change: opacity;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 @keyframes fade-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
+    /* Opacity-only — no translateY. translateY forces a layout reflow
+       on every frame which is the main cause of janky page switches. */
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 .container {
@@ -524,6 +533,7 @@ textarea {
     max-width: 100%;
     margin: 0;
     border-top: 1px solid var(--border);
+    touch-action: pan-y;
 }
 
 .post-card {
@@ -537,6 +547,8 @@ textarea {
     display: flex;
     flex-direction: column;
     user-select: none;
+    /* Isolate each card's paint so scrolling doesn't repaint the whole list */
+    contain: content;
 }
 .post-card:hover { background: var(--surface); }
 
@@ -771,6 +783,7 @@ textarea {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
+    touch-action: pan-y;
 }
 .profile-thumb {
     position: relative;
@@ -779,11 +792,15 @@ textarea {
     border-radius: var(--radius-md);
     overflow: hidden;
     cursor: pointer;
-    transition: transform 120ms ease, box-shadow 120ms ease;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    /* Only transition transform — box-shadow transitions are expensive
+       because they repaint on every scroll frame when hover state changes.
+       contain:content isolates layout/paint to this tile alone. */
+    transition: transform 120ms ease;
     border: 1px solid var(--border);
+    will-change: transform;
+    contain: layout style paint;
 }
-.profile-thumb:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.profile-thumb:hover { transform: translateY(-2px); }
 .profile-thumb:active { transform: scale(0.97); }
 .profile-thumb img {
     width: 100%;
@@ -3430,6 +3447,37 @@ body.in-thread #bottom-nav { display: none !important; }
 }
 #view-thread.has-custom .msg-row.from-me .msg-time-mine {
     color: rgba(255,255,255,0.75);
+}
+/* Make the composer + reply preview blend with the wallpaper */
+#view-thread.has-custom .thread-composer {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top-color: rgba(255,255,255,0.12);
+}
+#view-thread.has-custom .thread-composer input[type="text"] {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.2);
+    color: #fff;
+}
+#view-thread.has-custom .thread-composer input[type="text"]::placeholder {
+    color: rgba(255,255,255,0.55);
+}
+#view-thread.has-custom .composer-icon-btn {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.2);
+    color: #fff;
+}
+#view-thread.has-custom .thread-reply-preview {
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top-color: rgba(255,255,255,0.12);
+}
+#view-thread.has-custom .recording-bar {
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
 }
 
 /* Customize button injected into the thread header */

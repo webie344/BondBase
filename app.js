@@ -3843,12 +3843,14 @@ function showStoryFrame() {
     $("#story-caption").textContent = p.caption || "";
     // Build progress segments
     const prog = $("#story-progress");
-    // Inline animation-duration on each active fill so Safari/WebKit correctly
-    // picks up the duration (CSS var in animation shorthand is unreliable there).
+    // Inline ALL animation properties on the active fill so every browser
+    // (especially iOS Safari) reliably shows the moving white progress line.
     prog.innerHTML = story.posts.map((_, i) => {
         const cls = i < story.idx ? "done" : i === story.idx ? "active" : "";
-        const durStyle = (cls === "active") ? ` style="animation-duration:${story.durationMs}ms"` : "";
-        return `<div class="seg ${cls}"><span class="fill"${durStyle}></span></div>`;
+        const fillStyle = (cls === "active")
+            ? ` style="animation-name:storyProgress;animation-duration:${story.durationMs}ms;animation-timing-function:linear;animation-fill-mode:forwards;"`
+            : (cls === "done") ? ` style="width:100%"` : "";
+        return `<div class="seg ${cls}"><span class="fill"${fillStyle}></span></div>`;
     }).join("");
     if (story.timer) clearTimeout(story.timer);
     story.timer = setTimeout(nextStoryFrame, story.durationMs);

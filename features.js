@@ -300,18 +300,18 @@ const ChatCustom = {
    ============================================================= */
 
 const SONG_LIBRARY = [
-    { id: "sh1",  title: "Glassy Currents",  artist: "Drop FM", mood: "chill",  art: ["#5d8aa8", "#1a3a5e"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-    { id: "sh2",  title: "Soft Gravity",     artist: "Drop FM", mood: "moody",  art: ["#7d5a9b", "#2c1f3d"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
-    { id: "sh3",  title: "Sunday Pavement",  artist: "Drop FM", mood: "happy",  art: ["#f4a261", "#e76f51"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
-    { id: "sh4",  title: "Late Bus Window",  artist: "Drop FM", mood: "moody",  art: ["#264653", "#0f1e2b"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-    { id: "sh5",  title: "Easy Yellow",      artist: "Drop FM", mood: "happy",  art: ["#ffd166", "#ef9b00"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
-    { id: "sh6",  title: "Pavement Pulse",   artist: "Drop FM", mood: "energy", art: ["#e63946", "#9d0208"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
-    { id: "sh7",  title: "Drift Capsule",    artist: "Drop FM", mood: "chill",  art: ["#06d6a0", "#0a8754"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
-    { id: "sh8",  title: "After Hours Walk", artist: "Drop FM", mood: "moody",  art: ["#3a0ca3", "#100245"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
-    { id: "sh9",  title: "Cold Brew Skip",   artist: "Drop FM", mood: "happy",  art: ["#43aa8b", "#175e54"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
-    { id: "sh10", title: "Run It Back",      artist: "Drop FM", mood: "energy", art: ["#ff006e", "#8e0049"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
-    { id: "sh11", title: "Slow Headlights",  artist: "Drop FM", mood: "chill",  art: ["#118ab2", "#073b4c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3" },
-    { id: "sh12", title: "Last Light",       artist: "Drop FM", mood: "moody",  art: ["#9d4edd", "#3c096c"], url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3" }
+    { id: "cc1",  title: "Wave",                          artist: "Central Cee",       mood: "energy", art: ["#1a1a2e", "#16213e"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/db/e3/6a/dbe36a34-40e9-41b0-49bc-9e531ab74850/mzaf_17877855992015873512.plus.aac.p.m4a" },
+    { id: "as1",  title: "Rush",                          artist: "Ayra Starr",         mood: "happy",  art: ["#ff6b6b", "#c0392b"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/a0/0c/07/a00c0745-9162-1e7f-af70-b92f891a728e/mzaf_12267370392753596352.plus.aac.p.m4a" },
+    { id: "bb1",  title: "Last Last",                     artist: "Burna Boy",          mood: "chill",  art: ["#f39c12", "#d35400"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/98/27/c3/9827c314-7ee0-7f70-2528-b904f3914188/mzaf_3677227575880735836.plus.aac.p.m4a" },
+    { id: "rm1",  title: "Baby (Is It A Crime)",          artist: "Rema",               mood: "happy",  art: ["#27ae60", "#1e8449"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/ab/59/66/ab59667e-c7fb-4abe-4975-c578360826c7/mzaf_5756032370307881213.plus.aac.p.m4a" },
+    { id: "wk1",  title: "Essence (feat. Tems)",          artist: "Wizkid",             mood: "chill",  art: ["#8e6b3e", "#5d4e37"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/b3/dc/ba/b3dcba73-7f33-9abe-089c-73557a6dcb54/mzaf_16412591162283722395.plus.aac.p.m4a" },
+    { id: "dr1",  title: "Hold On, We're Going Home",     artist: "Drake",              mood: "moody",  art: ["#2c2c54", "#1a1a3e"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/e1/9b/b6/e19bb624-9cd8-021b-f771-e51629057774/mzaf_13878644440815306616.plus.aac.p.m4a" },
+    { id: "jc1",  title: "All I Want Is You",             artist: "J. Cole",            mood: "moody",  art: ["#6d4c41", "#4e342e"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/5c/76/4f/5c764f13-36da-d47b-1fe1-d895f0d42636/mzaf_14479033350538581906.plus.aac.p.m4a" },
+    { id: "sz1",  title: "Saturn",                        artist: "SZA",                mood: "chill",  art: ["#7b2d8b", "#4a0072"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/7c/28/b3/7c28b3ed-9aa9-6454-92c6-e46d20849bed/mzaf_518591709818271733.plus.aac.p.m4a" },
+    { id: "tm1",  title: "What You Need",                 artist: "Tems",               mood: "happy",  art: ["#00897b", "#00574b"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/7e/3c/25/7e3c2565-b83d-e690-49c1-92298bd2a244/mzaf_2428036131779969369.plus.aac.p.m4a" },
+    { id: "ak1",  title: "Jogodo",                        artist: "Asake",              mood: "energy", art: ["#e67e22", "#d35400"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/82/42/7a/82427aaa-0012-28f2-a1d7-f4dc58b7aa16/mzaf_8312211163811258783.plus.aac.p.m4a" },
+    { id: "dv1",  title: "Raindance",                     artist: "Dave",               mood: "moody",  art: ["#1565c0", "#0d47a1"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/d6/f4/71/d6f47137-43b6-8dce-4b2c-0827045c68ae/mzaf_15227156188895023873.plus.aac.p.m4a" },
+    { id: "sm1",  title: "Own It (feat. Ed Sheeran & Burna Boy)", artist: "Stormzy",   mood: "energy", art: ["#b71c1c", "#7f0000"], url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/08/75/df/0875df9b-1ed2-ea92-8c57-02571d42f89a/mzaf_17076102039735527644.plus.aac.p.m4a" }
 ];
 
 // SVG icons used for play/pause toggling — kept here so every spot
@@ -320,9 +320,9 @@ const SVG_PLAY  = `<svg viewBox="0 0 24 24" width="14" height="14" fill="current
 const SVG_PAUSE = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
 const SVG_NOTE  = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
 
-// Soft auto-play volume — loud enough to hear, never blasting.
-const SONG_AUTO_VOL = 0.4;
-const SONG_TAP_VOL  = 0.7;
+// Soft background volume — quiet enough to feel ambient, not intrusive.
+const SONG_AUTO_VOL = 0.15;
+const SONG_TAP_VOL  = 0.3;
 
 const Songs = {
     pendingSong: null,
@@ -645,10 +645,13 @@ const Songs = {
         const audio = new Audio(song.url);
         audio.preload = "metadata";
         audio.volume = (typeof volume === "number") ? volume : SONG_AUTO_VOL;
+        // Set active state BEFORE play() so the IntersectionObserver can
+        // stop the audio immediately if the card scrolls out while the
+        // browser is still buffering (play() is async on mobile).
+        this.activeAudio = audio;
+        this.activeBadge = badge;
+        this.activeCard = card || badge.closest(".post-card");
         audio.play().then(() => {
-            this.activeAudio = audio;
-            this.activeBadge = badge;
-            this.activeCard = card || badge.closest(".post-card");
             badge.classList.add("playing");
             const toggle = badge.querySelector(".psb-toggle");
             if (toggle) {
@@ -661,10 +664,11 @@ const Songs = {
                 if (meta) meta.classList.add("playing");
             }
         }).catch(() => {
-            // Auto-play blocked by the browser — silently ignore so we
-            // don't spam the user with toasts every time they scroll.
-            // Manual taps do show an error via the previous toast path
-            // but for badge taps we treat blocking the same as auto.
+            // Auto-play blocked — clear state so we don't hold a reference
+            // to a never-playing audio object.
+            this.activeAudio = null;
+            this.activeBadge = null;
+            this.activeCard = null;
         });
         audio.onended = () => this.stopActive();
     },
