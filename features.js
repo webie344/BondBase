@@ -439,6 +439,15 @@ const Songs = {
         this.refreshAddPill();
     },
 
+    // Called from app.js handlePost() after a successful post — resets
+    // the pending pick so the next drop starts fresh and the capture
+    // pill goes back to the "Add song" state.
+    clearPending() {
+        this.pendingSong = null;
+        try { localStorage.removeItem(this.pendingKey); } catch {}
+        this.refreshAddPill();
+    },
+
     // Swap the icon inside a play/pause button. Falls back gracefully if
     // the element no longer exists (e.g. the picker was re-rendered).
     setIcon(btn, isPlaying) {
@@ -728,6 +737,13 @@ const Songs = {
 
     init() {
         this.loadPending();
+
+        // Expose this module on window.dropApp so app.js can read the
+        // current pending song inside handlePost() and call clearPending()
+        // after a successful post. Without this, the song is never written
+        // onto the post document and the badge / scroll-into-view audio
+        // never appears on the feed card.
+        try { App.Songs = this; } catch {}
 
         // Picker dialog wiring
         _on(document.getElementById("song-search-input"), "input", debounce((e) => {
